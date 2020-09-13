@@ -3,10 +3,27 @@
 
 #![warn(clippy::all)]
 
-use logos::{Logos, Lexer};
+use logos::{Logos};
+
+pub type Span = std::ops::Range<usize>;
+
+trait TokenInfo<'source> {
+    fn span(&self) -> Span;
+    fn slice(&self) -> &'source str;
+}
+
+struct Identifier<'source> {
+    loc : Span,
+    s : &'source str,
+}
+
+impl<'source> TokenInfo<'source> for Identifier<'source> {
+    fn span(&self) -> Span { self.loc.clone() }
+    fn slice(&self) -> &'source str { self.s }
+}
+
 
 #[derive(Logos, Debug, PartialEq)]
-#[logos(extras = usize)]
 enum Token {
     #[token("section")]
     Section,
@@ -23,13 +40,13 @@ enum Token {
     #[regex("[_a-zA-Z][0-9a-zA-Z_]*")]
     Identifier,
 
-    #[regex("[0-9]+")]
+    #[regex("[1-9][0-9]*|0")]
     DecimalInt,
 
     #[regex("0x[0-9a-fA-F]+")]
     HexInt,
 
-    #[regex(r#""([^\\"]|\\.)*""#)]
+    #[regex(r#""([^\\"]|\\.)*""#)] // " fix syntax highlighting
     QuotedString,
 
     #[regex(r#"/\*([^*]|\*[^/])+\*/"#, logos::skip)] // block comments
