@@ -3,18 +3,24 @@
 
 #![warn(clippy::all)]
 
-use logos::{Logos};
+use logos::{Logos,Lexer};
 
 pub type Span = std::ops::Range<usize>;
 
-struct TokenInfo<'source> {
+#[derive(Debug, Clone, PartialEq)]
+struct TokenInfo {
     loc : Span,
-    s : &'source str,
+    s : String,
 }
 
-impl<'source> TokenInfo<'source> {
-    pub fn span(&self) -> Span { self.loc.clone() }
-    pub fn slice(&self) -> &'source str { self.s }
+impl TokenInfo {
+    pub fn span(&self) -> &Span { &self.loc }
+    pub fn slice(&self) -> &str { &self.s }
+}
+
+fn attach_token_info(lex: &mut logos::Lexer<LexToken>)
+        -> TokenInfo {
+    TokenInfo{ loc: lex.span(), s: lex.slice().to_string()}
 }
 
 #[derive(Logos, Debug, Clone, PartialEq)]
@@ -31,8 +37,8 @@ enum LexToken {
     #[token(";")]
     Semicolon,
 
-    #[regex("[_a-zA-Z][0-9a-zA-Z_]*")]
-    Identifier,
+    #[regex("[_a-zA-Z][0-9a-zA-Z_]*", attach_token_info)]
+    Identifier(TokenInfo),
 
     #[regex("[1-9][0-9]*|0")]
     DecimalInt,
@@ -40,8 +46,12 @@ enum LexToken {
     #[regex("0x[0-9a-fA-F]+")]
     HexInt,
 
-    #[regex(r#""([^\\"]|\\.)*""#)] // " fix syntax highlighting
-    QuotedString,
+    // Not only is \ special in strings and must be escaped, but also special in
+    // regex.  We use raw string here to avoid having the escape the \ for the
+    // string itself. The \\ in this raw string are escape \ for the regex
+    // engine underneath.
+    #[regex(r#""(\\"|\\.|[^"])*""#, attach_token_info)]
+    QuotedString(TokenInfo),
 
     #[regex(r#"/\*([^*]|\*[^/])+\*/"#, logos::skip)] // block comments
     #[regex(r#"//[^\r\n]*(\r\n|\n)?"#, logos::skip)] // line comments
