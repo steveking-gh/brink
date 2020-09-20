@@ -25,26 +25,26 @@ fn attach_token_info(lex: &mut logos::Lexer<LexToken>)
 
 #[derive(Logos, Debug, Clone, PartialEq)]
 enum LexToken {
-    #[token("section")]
-    Section,
+    #[token("section", attach_token_info)]
+    Section(TokenInfo),
 
-    #[token("{")]
-    OpenBrace,
+    #[token("{", attach_token_info)]
+    OpenBrace(TokenInfo),
 
-    #[token("}")]
-    CloseBrace,
+    #[token("}", attach_token_info)]
+    CloseBrace(TokenInfo),
 
-    #[token(";")]
-    Semicolon,
+    #[token(";", attach_token_info)]
+    Semicolon(TokenInfo),
 
     #[regex("[_a-zA-Z][0-9a-zA-Z_]*", attach_token_info)]
     Identifier(TokenInfo),
 
-    #[regex("[1-9][0-9]*|0")]
-    DecimalInt,
+    #[regex("[1-9][0-9]*|0", attach_token_info)]
+    DecimalInt(TokenInfo),
 
-    #[regex("0x[0-9a-fA-F]+")]
-    HexInt,
+    #[regex("0x[0-9a-fA-F]+", attach_token_info)]
+    HexInt(TokenInfo),
 
     // Not only is \ special in strings and must be escaped, but also special in
     // regex.  We use raw string here to avoid having the escape the \ for the
