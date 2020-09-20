@@ -3,7 +3,8 @@
 
 #![warn(clippy::all)]
 
-use logos::{Logos,Lexer};
+use std::vec::Vec;
+use logos::{Logos};
 
 pub type Span = std::ops::Range<usize>;
 
@@ -62,11 +63,16 @@ enum LexToken {
 
 
 fn main() {
+    let mut tv = Vec::new();
+
     let temp = "section foo{/*stu\nff*/92};// line \"quote\" comment\n section bar {0x56};\nsection foo {\"w\\\"o\nw\"}";
     print!("Lexing:\n\n{}\n\n", temp);
     let lex = LexToken::lexer(temp);
     for t in lex {
-        println!("LexToken = {:?}", t );
+        tv.push(t);
     }
 
+    for t in tv {
+        println!("LexToken = {:?}", t );
+    }
 }
