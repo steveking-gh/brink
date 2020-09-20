@@ -7,24 +7,18 @@ use logos::{Logos};
 
 pub type Span = std::ops::Range<usize>;
 
-trait TokenInfo<'source> {
-    fn span(&self) -> Span;
-    fn slice(&self) -> &'source str;
-}
-
-struct Identifier<'source> {
+struct TokenInfo<'source> {
     loc : Span,
     s : &'source str,
 }
 
-impl<'source> TokenInfo<'source> for Identifier<'source> {
-    fn span(&self) -> Span { self.loc.clone() }
-    fn slice(&self) -> &'source str { self.s }
+impl<'source> TokenInfo<'source> {
+    pub fn span(&self) -> Span { self.loc.clone() }
+    pub fn slice(&self) -> &'source str { self.s }
 }
 
-
-#[derive(Logos, Debug, PartialEq)]
-enum Token {
+#[derive(Logos, Debug, Clone, PartialEq)]
+enum LexToken {
     #[token("section")]
     Section,
 
@@ -56,11 +50,13 @@ enum Token {
     Unknown,
 }
 
+
 fn main() {
     let temp = "section foo{/*stu\nff*/92};// line \"quote\" comment\n section bar {0x56};\nsection foo {\"w\\\"o\nw\"}";
-    let lex = Token::lexer(temp);
+    print!("Lexing:\n\n{}\n\n", temp);
+    let lex = LexToken::lexer(temp);
     for t in lex {
-        println!("Token = {:?}", t);
+        println!("LexToken = {:?}", t );
     }
 
 }
