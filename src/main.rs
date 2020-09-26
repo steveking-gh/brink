@@ -41,11 +41,8 @@ enum LexToken {
     #[regex("[_a-zA-Z][0-9a-zA-Z_]*", attach_token_info)]
     Identifier(TokenInfo),
 
-    #[regex("[1-9][0-9]*|0", attach_token_info)]
-    DecimalInt(TokenInfo),
-
-    #[regex("0x[0-9a-fA-F]+", attach_token_info)]
-    HexInt(TokenInfo),
+    #[regex("0x[0-9a-fA-F]+|[1-9][0-9]*|0", attach_token_info)]
+    Int(TokenInfo),
 
     // Not only is \ special in strings and must be escaped, but also special in
     // regex.  We use raw string here to avoid having the escape the \ for the
@@ -65,7 +62,7 @@ enum LexToken {
 fn main() {
     let mut tv = Vec::new();
 
-    let temp = "section foo{/*stu\nff*/92};// line \"quote\" comment\n section bar {0x56};\nsection foo {\"w\\\"o\nw\"}";
+    let temp = "section foo{/*stu\nff*/92};// line \"quote\" comment\n section bar {0x56};\nsection foo {\"w\\\"o\nw\"}\n\nsection baz {0}";
     print!("Lexing:\n\n{}\n\n", temp);
     let lex = LexToken::lexer(temp);
     for t in lex {
