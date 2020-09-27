@@ -9,7 +9,7 @@ use logos::{Logos};
 pub type Span = std::ops::Range<usize>;
 
 #[derive(Debug, Clone, PartialEq)]
-struct TokenInfo {
+pub struct TokenInfo {
     loc : Span,
     s : String,
 }
@@ -25,7 +25,7 @@ fn attach_token_info(lex: &mut logos::Lexer<LexToken>)
 }
 
 #[derive(Logos, Debug, Clone, PartialEq)]
-enum LexToken {
+pub enum LexToken {
     #[token("section", attach_token_info)]
     Section(TokenInfo),
 
@@ -58,6 +58,62 @@ enum LexToken {
     Unknown,
 }
 
+
+pub struct ASTNode<'toks> {
+    tok : &'toks LexToken,
+    childvec : Vec<ASTNode<'toks>>,
+}
+
+impl<'toks> ASTNode<'toks> {
+    pub fn new(t :&'toks LexToken) -> ASTNode {
+        ASTNode { childvec: vec![], tok : t }
+    }
+
+    pub fn add_child(&mut self, child: ASTNode<'toks>) {
+        self.childvec.push(child)
+    }
+}
+
+pub fn parse<'toks>(ltv : &'toks[LexToken], tn : &mut usize, parent : &'toks mut ASTNode<'toks>) {
+    let t = &ltv[*tn];
+    println!("Parsing token {}: {:?}", *tn, t);
+    match t {
+        LexToken::Section(_) => parse_section(ltv, tn, parent),
+        _ => println!("Something else"),
+    }
+}
+
+pub fn parse_section<'toks>(ltv : &'toks[LexToken], tn : &mut usize,
+        parent : &'toks mut ASTNode<'toks>) {
+
+    // get the section keyword
+    let mut node = ASTNode::new(&ltv[*tn]);
+    parent.add_child(node);
+    *tn += 1;
+
+    // After a section, an identifier is expected
+    let t = &ltv[*tn];
+    match t {
+        LexToken::Identifier(_) => parse_identifier(ltv, tn, &mut node),
+        _ => println!("Something else"),
+    }
+}
+
+pub fn parse_identifier<'toks>(ltv : &'toks[LexToken], tn : &mut usize,
+        parent : &'toks mut ASTNode<'toks>) {
+
+    // get the section keyword
+    let mut node = ASTNode::new(&ltv[*tn]);
+    parent.add_child(node);
+    *tn += 1;
+
+    // After a section, an identifier is expected
+    let t = &ltv[*tn];
+    match t {
+        LexToken::Identifier(_) => parse_identifier(ltv, tn, &mut node),
+        _ => println!("Something else"),
+    }
+}
 
 fn main() {
     let mut tv = Vec::new();
