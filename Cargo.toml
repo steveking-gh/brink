@@ -8,3 +8,4 @@ edition = "2018"
 
 [dependencies]
 logos = "0.11.4"
+indextree = "4.3.1"

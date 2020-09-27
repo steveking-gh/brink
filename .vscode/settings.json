@@ -3,6 +3,7 @@
         "Pretoken",
         "Pretokenizer",
         "childvec",
+        "indextree",
         "pretok",
         "tinfo",
         "toks"

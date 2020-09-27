@@ -5,6 +5,7 @@
 
 use std::vec::Vec;
 use logos::{Logos};
+use indextree::{Arena,NodeId};
 
 pub type Span = std::ops::Range<usize>;
 
@@ -26,6 +27,8 @@ fn attach_token_info(lex: &mut logos::Lexer<LexToken>)
 
 #[derive(Logos, Debug, Clone, PartialEq)]
 pub enum LexToken {
+    _Root_,
+
     #[token("section", attach_token_info)]
     Section(TokenInfo),
 
@@ -59,60 +62,52 @@ pub enum LexToken {
 }
 
 
-pub struct ASTNode<'toks> {
-    tok : &'toks LexToken,
-    childvec : Vec<ASTNode<'toks>>,
-}
+pub fn parse<'toks>(ltv: &'toks[LexToken], tn: &mut usize) -> Arena<usize> {
+    let mut arena = Arena::new();
 
-impl<'toks> ASTNode<'toks> {
-    pub fn new(t :&'toks LexToken) -> ASTNode {
-        ASTNode { childvec: vec![], tok : t }
-    }
-
-    pub fn add_child(&mut self, child: ASTNode<'toks>) {
-        self.childvec.push(child)
-    }
-}
-
-pub fn parse<'toks>(ltv : &'toks[LexToken], tn : &mut usize, parent : &'toks mut ASTNode<'toks>) {
+    // For uniformity, we want a root node as a parent for recursion
+    // The LexToken index of the root should not get confused with an
+    // actual index into ltv, so use MAX.
+    let mut root = arena.new_node(usize::MAX);
     let t = &ltv[*tn];
     println!("Parsing token {}: {:?}", *tn, t);
     match t {
-        LexToken::Section(_) => parse_section(ltv, tn, parent),
-        _ => println!("Something else"),
+        LexToken::Section(_) => parse_section(&mut arena, ltv, tn, &mut root),
+        _ => println!("Error"),
     }
+
+    arena
 }
 
-pub fn parse_section<'toks>(ltv : &'toks[LexToken], tn : &mut usize,
-        parent : &'toks mut ASTNode<'toks>) {
+pub fn parse_section<'toks>(arena : &mut Arena<usize>, ltv : &'toks[LexToken],
+                            tn : &mut usize, parent : &mut NodeId) {
 
-    // get the section keyword
-    let mut node = ASTNode::new(&ltv[*tn]);
-    parent.add_child(node);
+    // Add the section keyword as a child of the parent
+    // All content in the section are children of the section node
+    let mut node = arena.new_node(*tn);
+    parent.append(node, arena);
+
+    // Advance the token number past 'section'
     *tn += 1;
 
-    // After a section, an identifier is expected
+    // After a section declaration, an identifier is expected
     let t = &ltv[*tn];
     match t {
-        LexToken::Identifier(_) => parse_identifier(ltv, tn, &mut node),
-        _ => println!("Something else"),
+        LexToken::Identifier(_) => parse_identifier(arena, tn, &mut node),
+        _ => println!("Error in section declaration"),
     }
+
 }
 
-pub fn parse_identifier<'toks>(ltv : &'toks[LexToken], tn : &mut usize,
-        parent : &'toks mut ASTNode<'toks>) {
+pub fn parse_identifier(arena : &mut Arena<usize>,
+                        tn : &mut usize, parent : &mut NodeId) {
 
-    // get the section keyword
-    let mut node = ASTNode::new(&ltv[*tn]);
-    parent.add_child(node);
+    // add the identifier as a child of the parent
+    let node = arena.new_node(*tn);
+    parent.append(node, arena);
+
+    // Identifiers are leaf nodes.  Just advance the token index and return.
     *tn += 1;
-
-    // After a section, an identifier is expected
-    let t = &ltv[*tn];
-    match t {
-        LexToken::Identifier(_) => parse_identifier(ltv, tn, &mut node),
-        _ => println!("Something else"),
-    }
 }
 
 fn main() {
@@ -125,7 +120,12 @@ fn main() {
         tv.push(t);
     }
 
-    for t in tv {
-        println!("LexToken = {:?}", t );
+    let mut tok_index = 0;
+    let arena = parse(&tv, &mut tok_index);
+    for node in arena.iter() {
+        if *node.get() == usize::MAX {
+            continue; // skip the fake root node
+        }
+        println!("Node = {} for token {:?}", *node.get(), tv[*node.get()] );
     }
 }
