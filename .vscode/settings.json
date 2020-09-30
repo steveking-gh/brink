@@ -3,8 +3,13 @@
         "Pretoken",
         "Pretokenizer",
         "childvec",
+        "codespan",
+        "ctxt",
+        "fstr",
         "indextree",
         "pretok",
+        "structs",
+        "termcolor",
         "tinfo",
         "toks"
     ]

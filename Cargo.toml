@@ -1,5 +1,5 @@
 [package]
-name = "lexer_test"
+name = "roust"
 version = "0.1.0"
 authors = ["Steve King <sk@metrokings.com>"]
 edition = "2018"
@@ -9,3 +9,7 @@ edition = "2018"
 [dependencies]
 logos = "0.11.4"
 indextree = "4.3.1"
+codespan-reporting = "0.9.5"
+clap = { version = "2.33.0", features = ["wrap_help"] }
+fern = "0.6.0"
+log = "0.4.11"
