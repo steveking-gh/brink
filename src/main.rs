@@ -47,13 +47,13 @@ pub enum LexToken {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct TokenInfo {
+pub struct TokenInfo<'toks> {
     tok : LexToken,
     loc : Span,
-    s : String,
+    s : &'toks str,
 }
 
-impl TokenInfo {
+impl<'toks> TokenInfo<'toks> {
     pub fn span(&self) -> Span { self.loc.clone() }
     pub fn slice(&self) -> &str { &self.s }
 }
@@ -81,7 +81,7 @@ impl<'a> Diags<'a> {
                            &self.source_map, diag);
     }
 
-    fn line_number(&self, byte_index: usize) -> usize {
+    fn _line_number(&self, byte_index: usize) -> usize {
         self.source_map.line_index((),byte_index).unwrap() + 1
     }
 }
@@ -161,7 +161,7 @@ pub fn process(name: &str, fstr: &str) {
     let mut tv = Vec::new();
     let mut lex = LexToken::lexer(fstr);
     while let Some(t) = lex.next() {
-        tv.push(TokenInfo{tok: t, s:lex.slice().to_string(), loc: lex.span()});
+        tv.push(TokenInfo{tok: t, s:lex.slice(), loc: lex.span()});
     }
 
 
