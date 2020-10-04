@@ -1,0 +1,7 @@
+/*
+ Too many foo sections
+ */
+section foo {}
+section bar {}
+section baz {}
+section foo {}

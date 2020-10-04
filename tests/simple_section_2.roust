@@ -1,0 +1,5 @@
+section foo {
+    wr "Wow!";
+}
+
+output "neat.bin" foo;

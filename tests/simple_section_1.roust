@@ -1,0 +1,5 @@
+section foo {}
+/*
+ test
+ */
+output "empty.bin" foo;
