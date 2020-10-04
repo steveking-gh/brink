@@ -94,13 +94,9 @@ pub struct Context<'a> {
 
 pub fn parse<'toks>(arena : &mut Arena<usize>, ltv: &'toks[TokenInfo],
                     ctxt: &mut Context) -> bool {
-    let total_toks = ltv.len();
-    if total_toks == 0 {
-        return true;
-    }
-
+    let toks_end = ltv.len();
     let mut tok_num = 0;
-    while tok_num < total_toks {
+    while tok_num < toks_end {
         let tinfo = &ltv[tok_num];
         debug!("Parsing token {}: {:?}", &mut tok_num, tinfo);
         match tinfo.tok {
@@ -166,19 +162,17 @@ pub fn parse_section<'toks>(arena : &mut Arena<usize>, ltv : &'toks[TokenInfo],
 
 pub fn parse_section_contents<'toks>(arena : &mut Arena<usize>, ltv : &'toks[TokenInfo],
                               tok_num : &mut usize, parent : NodeId, ctxt: &mut Context) -> bool {
-
-
-    let total_toks = ltv.len();
-    if total_toks == 0 {
-        return true;
-    }
-
-    while *tok_num < total_toks {
+    let toks_end = ltv.len();
+    while *tok_num < toks_end {
         let tinfo = &ltv[*tok_num];
         debug!("Parsing token {}: {:?}", *tok_num, tinfo);
         match tinfo.tok {
             // For now, we only support writing strings in a section.
-            LexToken::Wr => parse_leaf(arena, tok_num, parent),
+            LexToken::Wr => {
+                if !parse_wr(arena, ltv, tok_num, parent, ctxt) {
+                    return false;
+                }
+            }
             LexToken::CloseBrace => {
                 // When we find a close brace, we're done with section content
                 parse_leaf(arena, tok_num, parent);
@@ -194,6 +188,51 @@ pub fn parse_section_contents<'toks>(arena : &mut Arena<usize>, ltv : &'toks[Tok
             }
         }
     }
+    true
+}
+
+pub fn parse_wr<'toks>(arena : &mut Arena<usize>, ltv : &'toks[TokenInfo],
+                       tok_num : &mut usize, parent : NodeId,
+                       ctxt: &mut Context) -> bool {
+
+    // Add the sr keyword as a child of the parent
+    // Parameters of the wr are children of the wr node
+    let node = arena.new_node(*tok_num);
+
+    // wr must have a parent
+    parent.append(node, arena);
+
+    // Advance the token number past 'wr'
+    *tok_num += 1;
+
+    // Next, a quoted string is expected
+    let tinfo = &ltv[*tok_num];
+    if let LexToken::QuotedString = tinfo.tok {
+        parse_leaf(arena, tok_num, node);
+    } else {
+        let diag = Diagnostic::error()
+            .with_code("E004")
+            .with_message(format!("Expected a quoted string after 'wr', instead found '{}'", tinfo.slice()))
+            .with_labels(vec![Label::primary((), tinfo.span()),
+                              Label::secondary((), ltv[*tok_num-1].span())]);
+        ctxt.diags.emit(&diag);
+        return false;
+    }
+
+    // Finally a semicolon
+    let tinfo = &ltv[*tok_num];
+    if let LexToken::Semicolon = tinfo.tok {
+        parse_leaf(arena, tok_num, node);
+    } else {
+        let diag = Diagnostic::error()
+            .with_code("E005")
+            .with_message(format!("Expected ';' after string, instead found '{}'", tinfo.slice()))
+            .with_labels(vec![Label::primary((), tinfo.span()),
+                              Label::secondary((), ltv[*tok_num-1].span())]);
+        ctxt.diags.emit(&diag);
+        return false;
+    }
+    debug!("parse_wr success");
     true
 }
 
