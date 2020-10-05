@@ -130,12 +130,20 @@ impl<'toks> Ast<'toks> {
     true
     }
 
-    fn err_expected_after(&self, ctxt: &mut Context, code: &str, msg: &str, tok_num: &usize) {
+    fn err_expected_after(&self, ctxt: &mut Context, code: u32, msg: &str, tok_num: &usize) {
         let diag = Diagnostic::error()
-                .with_code(code)
+                .with_code(format!("ERR_{}", code))
                 .with_message(format!("{}, but found '{}'", msg, self.ltv[*tok_num].slice()))
                 .with_labels(vec![Label::primary((), self.ltv[*tok_num].span()),
                                 Label::secondary((), self.ltv[*tok_num-1].span())]);
+        ctxt.diags.emit(&diag);
+    }
+
+    fn err_invalid_expression(&self, ctxt: &mut Context, code: u32, tok_num: &usize) {
+        let diag = Diagnostic::error()
+                .with_code(format!("ERR_{}", code))
+                .with_message(format!("Invalid expression '{}'", self.ltv[*tok_num].slice()))
+                .with_labels(vec![Label::primary((), self.ltv[*tok_num].span())]);
         ctxt.diags.emit(&diag);
     }
 
@@ -152,7 +160,7 @@ impl<'toks> Ast<'toks> {
         if let LexToken::Identifier = tinfo.tok {
             self.parse_leaf(tok_num, node);
         } else {
-            self.err_expected_after(ctxt, "E001", "Expected an identifier after 'section'", tok_num);
+            self.err_expected_after(ctxt, 1, "Expected an identifier after 'section'", tok_num);
             return false;
         }
 
@@ -161,12 +169,7 @@ impl<'toks> Ast<'toks> {
         if let LexToken::OpenBrace = tinfo.tok {
             self.parse_leaf(tok_num, node);
         } else {
-            let diag = Diagnostic::error()
-                .with_code("E002")
-                .with_message(format!("Expected '{{' after identifier, instead found '{}'", tinfo.slice()))
-                .with_labels(vec![Label::primary((), tinfo.span()),
-                                Label::secondary((), self.ltv[*tok_num-1].span())]);
-            ctxt.diags.emit(&diag);
+            self.err_expected_after(ctxt, 2, "Expected {{ after identifier", tok_num);
             return false;
         }
 
@@ -194,11 +197,7 @@ impl<'toks> Ast<'toks> {
                     return true;
                 }
                 _ => {
-                    let diag = Diagnostic::error()
-                        .with_code("E003")
-                        .with_message(format!("Invalid expression in section '{}'", tinfo.slice()))
-                        .with_labels(vec![Label::primary((), tinfo.span())]);
-                    ctxt.diags.emit(&diag);
+                    self.err_invalid_expression(ctxt, 3, tok_num);
                     return false;
                 }
             }
@@ -224,12 +223,7 @@ impl<'toks> Ast<'toks> {
         if let LexToken::QuotedString = tinfo.tok {
             self.parse_leaf(tok_num, node);
         } else {
-            let diag = Diagnostic::error()
-                .with_code("E004")
-                .with_message(format!("Expected a quoted string after 'wr', instead found '{}'", tinfo.slice()))
-                .with_labels(vec![Label::primary((), tinfo.span()),
-                                Label::secondary((), self.ltv[*tok_num-1].span())]);
-            ctxt.diags.emit(&diag);
+            self.err_expected_after(ctxt, 4, "Expected a quoted string after 'wr'", tok_num);
             return false;
         }
 
@@ -238,12 +232,7 @@ impl<'toks> Ast<'toks> {
         if let LexToken::Semicolon = tinfo.tok {
             self.parse_leaf(tok_num, node);
         } else {
-            let diag = Diagnostic::error()
-                .with_code("E005")
-                .with_message(format!("Expected ';' after string, instead found '{}'", tinfo.slice()))
-                .with_labels(vec![Label::primary((), tinfo.span()),
-                                Label::secondary((), self.ltv[*tok_num-1].span())]);
-            ctxt.diags.emit(&diag);
+            self.err_expected_after(ctxt, 5, "Expected ';' after string", tok_num);
             return false;
         }
         debug!("parse_wr success");
@@ -263,12 +252,7 @@ impl<'toks> Ast<'toks> {
         if let LexToken::QuotedString = tinfo.tok {
             self.parse_leaf(tok_num, node);
         } else {
-            let diag = Diagnostic::error()
-                .with_code("E006")
-                .with_message(format!("Expected the file path as a quoted string after 'output', instead found '{}'", tinfo.slice()))
-                .with_labels(vec![Label::primary((), tinfo.span()),
-                                Label::secondary((), self.ltv[*tok_num-1].span())]);
-            ctxt.diags.emit(&diag);
+            self.err_expected_after(ctxt, 6, "Expected the file path as a quoted string after 'output'", tok_num);
             return false;
         }
 
@@ -277,12 +261,7 @@ impl<'toks> Ast<'toks> {
         if let LexToken::Identifier = tinfo.tok {
             self.parse_leaf(tok_num, node);
         } else {
-            let diag = Diagnostic::error()
-                .with_code("E007")
-                .with_message(format!("Expected section name after path string, instead found '{}'", tinfo.slice()))
-                .with_labels(vec![Label::primary((), tinfo.span()),
-                                Label::secondary((), self.ltv[*tok_num-1].span())]);
-            ctxt.diags.emit(&diag);
+            self.err_expected_after(ctxt, 7, "Expected a section name after the path string", tok_num);
             return false;
         }
 
@@ -291,12 +270,7 @@ impl<'toks> Ast<'toks> {
         if let LexToken::Semicolon = tinfo.tok {
             self.parse_leaf(tok_num, node);
         } else {
-            let diag = Diagnostic::error()
-                .with_code("E008")
-                .with_message(format!("Expected ';' after identifier, instead found '{}'", tinfo.slice()))
-                .with_labels(vec![Label::primary((), tinfo.span()),
-                                Label::secondary((), self.ltv[*tok_num-1].span())]);
-            ctxt.diags.emit(&diag);
+            self.err_expected_after(ctxt, 8, "Expected ';' after identifier", tok_num);
             return false;
         }
         debug!("parse_output success");
