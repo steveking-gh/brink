@@ -130,6 +130,15 @@ impl<'toks> Ast<'toks> {
     true
     }
 
+    fn err_expected_after(&self, ctxt: &mut Context, code: &str, msg: &str, tok_num: &usize) {
+        let diag = Diagnostic::error()
+                .with_code(code)
+                .with_message(format!("{}, but found '{}'", msg, self.ltv[*tok_num].slice()))
+                .with_labels(vec![Label::primary((), self.ltv[*tok_num].span()),
+                                Label::secondary((), self.ltv[*tok_num-1].span())]);
+        ctxt.diags.emit(&diag);
+    }
+
     pub fn parse_section(&mut self, tok_num : &mut usize, parent : NodeId,
                          ctxt: &mut Context) -> bool {
 
@@ -143,12 +152,7 @@ impl<'toks> Ast<'toks> {
         if let LexToken::Identifier = tinfo.tok {
             self.parse_leaf(tok_num, node);
         } else {
-            let diag = Diagnostic::error()
-                .with_code("E001")
-                .with_message(format!("Expected an identifier after 'section', instead found '{}'", tinfo.slice()))
-                .with_labels(vec![Label::primary((), tinfo.span()),
-                                Label::secondary((), self.ltv[*tok_num-1].span())]);
-            ctxt.diags.emit(&diag);
+            self.err_expected_after(ctxt, "E001", "Expected an identifier after 'section'", tok_num);
             return false;
         }
 
