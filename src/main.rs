@@ -23,6 +23,7 @@ pub type Span = std::ops::Range<usize>;
 pub enum LexToken {
     #[token("section")] Section,
     #[token("wr")] Wr,
+    #[token("output")] Output,
     #[token("{")] OpenBrace,
     #[token("}")] CloseBrace,
     #[token(";")] Semicolon,
@@ -88,6 +89,11 @@ pub struct Context<'a> {
     diags: Diags<'a>,
 }
 
+/**
+ * Abstract Syntax Tree
+ * This structure contains the AST created from the raw lexical
+ * tokens.  The lifetime of this struct is the same as the tokens.
+ */
 pub struct Ast<'toks> {
     arena: Arena<usize>,
     ltv: &'toks[TokenInfo<'toks>],
@@ -109,10 +115,15 @@ impl<'toks> Ast<'toks> {
             debug!("Parsing token {}: {:?}", &mut tok_num, tinfo);
             match tinfo.tok {
                 LexToken::Section => {
-                if !self.parse_section(&mut tok_num, self.root, ctxt) {
-                    return false;
+                    if !self.parse_section(&mut tok_num, self.root, ctxt) {
+                        return false;
                     }
-                }
+                },
+                LexToken::Output => {
+                    if !self.parse_output(&mut tok_num, self.root, ctxt) {
+                        return false;
+                    }
+                },
                 _ => { return false; },
             }
         }
@@ -122,13 +133,9 @@ impl<'toks> Ast<'toks> {
     pub fn parse_section(&mut self, tok_num : &mut usize, parent : NodeId,
                          ctxt: &mut Context) -> bool {
 
-        // Add the section keyword as a child of the parent
-        // All content in the section are children of the section node
+        // Add the section keyword as a child of the parent and advance
         let node = self.arena.new_node(*tok_num);
-
         parent.append(node, &mut self.arena);
-
-        // Advance the token number past 'section'
         *tok_num += 1;
 
         // After a section declaration, an identifier is expected
@@ -236,6 +243,59 @@ impl<'toks> Ast<'toks> {
             return false;
         }
         debug!("parse_wr success");
+        true
+    }
+
+    pub fn parse_output(&mut self, tok_num : &mut usize, parent : NodeId,
+                         ctxt: &mut Context) -> bool {
+
+        // Add the output keyword as a child of the parent and advance
+        let node = self.arena.new_node(*tok_num);
+        parent.append(node, &mut self.arena);
+        *tok_num += 1;
+
+        // After a output declaration we expect a quoted string.
+        let tinfo = &self.ltv[*tok_num];
+        if let LexToken::QuotedString = tinfo.tok {
+            self.parse_leaf(tok_num, node);
+        } else {
+            let diag = Diagnostic::error()
+                .with_code("E006")
+                .with_message(format!("Expected the file path as a quoted string after 'output', instead found '{}'", tinfo.slice()))
+                .with_labels(vec![Label::primary((), tinfo.span()),
+                                Label::secondary((), self.ltv[*tok_num-1].span())]);
+            ctxt.diags.emit(&diag);
+            return false;
+        }
+
+        // After the string, an identifier
+        let tinfo = &self.ltv[*tok_num];
+        if let LexToken::Identifier = tinfo.tok {
+            self.parse_leaf(tok_num, node);
+        } else {
+            let diag = Diagnostic::error()
+                .with_code("E007")
+                .with_message(format!("Expected section name after path string, instead found '{}'", tinfo.slice()))
+                .with_labels(vec![Label::primary((), tinfo.span()),
+                                Label::secondary((), self.ltv[*tok_num-1].span())]);
+            ctxt.diags.emit(&diag);
+            return false;
+        }
+
+        // After the identifier, a semicolon
+        let tinfo = &self.ltv[*tok_num];
+        if let LexToken::Semicolon = tinfo.tok {
+            self.parse_leaf(tok_num, node);
+        } else {
+            let diag = Diagnostic::error()
+                .with_code("E008")
+                .with_message(format!("Expected ';' after identifier, instead found '{}'", tinfo.slice()))
+                .with_labels(vec![Label::primary((), tinfo.span()),
+                                Label::secondary((), self.ltv[*tok_num-1].span())]);
+            ctxt.diags.emit(&diag);
+            return false;
+        }
+        debug!("parse_output success");
         true
     }
 
