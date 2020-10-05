@@ -77,10 +77,6 @@ impl<'a> Diags<'a> {
         let _ = term::emit(&mut self.writer.lock(), &self.config,
                            &self.source_map, diag);
     }
-
-    fn _line_number(&self, byte_index: usize) -> usize {
-        self.source_map.line_index((),byte_index).unwrap() + 1
-    }
 }
 
 
@@ -92,159 +88,190 @@ pub struct Context<'a> {
     diags: Diags<'a>,
 }
 
-pub fn parse<'toks>(arena : &mut Arena<usize>, ltv: &'toks[TokenInfo],
-                    ctxt: &mut Context) -> bool {
-    let toks_end = ltv.len();
-    let mut tok_num = 0;
-    while tok_num < toks_end {
-        let tinfo = &ltv[tok_num];
-        debug!("Parsing token {}: {:?}", &mut tok_num, tinfo);
-        match tinfo.tok {
-            LexToken::Section => {
-                if !parse_section(arena, ltv, &mut tok_num, None, ctxt) {
+pub struct Ast<'toks> {
+    arena: Arena<usize>,
+    ltv: &'toks[TokenInfo<'toks>],
+    root: NodeId,
+}
+
+impl<'toks> Ast<'toks> {
+    pub fn new(ltv: &'toks[TokenInfo<'toks>]) -> Self {
+        let mut a = Arena::new();
+        let root = a.new_node(usize::MAX);
+        Self { arena: a, ltv, root }
+    }
+
+    pub fn parse(&mut self, ctxt: &mut Context) -> bool {
+        let toks_end = self.ltv.len();
+        let mut tok_num = 0;
+        while tok_num < toks_end {
+            let tinfo = &self.ltv[tok_num];
+            debug!("Parsing token {}: {:?}", &mut tok_num, tinfo);
+            match tinfo.tok {
+                LexToken::Section => {
+                if !self.parse_section(&mut tok_num, self.root, ctxt) {
+                    return false;
+                    }
+                }
+                _ => { return false; },
+            }
+        }
+    true
+    }
+
+    pub fn parse_section(&mut self, tok_num : &mut usize, parent : NodeId,
+                         ctxt: &mut Context) -> bool {
+
+        // Add the section keyword as a child of the parent
+        // All content in the section are children of the section node
+        let node = self.arena.new_node(*tok_num);
+
+        parent.append(node, &mut self.arena);
+
+        // Advance the token number past 'section'
+        *tok_num += 1;
+
+        // After a section declaration, an identifier is expected
+        let tinfo = &self.ltv[*tok_num];
+        if let LexToken::Identifier = tinfo.tok {
+            self.parse_leaf(tok_num, node);
+        } else {
+            let diag = Diagnostic::error()
+                .with_code("E001")
+                .with_message(format!("Expected an identifier after 'section', instead found '{}'", tinfo.slice()))
+                .with_labels(vec![Label::primary((), tinfo.span()),
+                                Label::secondary((), self.ltv[*tok_num-1].span())]);
+            ctxt.diags.emit(&diag);
+            return false;
+        }
+
+        // After a section identifier, open brace
+        let tinfo = &self.ltv[*tok_num];
+        if let LexToken::OpenBrace = tinfo.tok {
+            self.parse_leaf(tok_num, node);
+        } else {
+            let diag = Diagnostic::error()
+                .with_code("E002")
+                .with_message(format!("Expected '{{' after identifier, instead found '{}'", tinfo.slice()))
+                .with_labels(vec![Label::primary((), tinfo.span()),
+                                Label::secondary((), self.ltv[*tok_num-1].span())]);
+            ctxt.diags.emit(&diag);
+            return false;
+        }
+
+        self.parse_section_contents(tok_num, node, ctxt);
+
+        true
+    }
+
+    pub fn parse_section_contents(&mut self, tok_num : &mut usize, parent : NodeId,
+                                         ctxt: &mut Context) -> bool {
+        let toks_end = self.ltv.len();
+        while *tok_num < toks_end {
+            let tinfo = &self.ltv[*tok_num];
+            debug!("Parsing token {}: {:?}", *tok_num, tinfo);
+            match tinfo.tok {
+                // For now, we only support writing strings in a section.
+                LexToken::Wr => {
+                    if !self.parse_wr(tok_num, parent, ctxt) {
+                        return false;
+                    }
+                }
+                LexToken::CloseBrace => {
+                    // When we find a close brace, we're done with section content
+                    self.parse_leaf(tok_num, parent);
+                    return true;
+                }
+                _ => {
+                    let diag = Diagnostic::error()
+                        .with_code("E003")
+                        .with_message(format!("Invalid expression in section '{}'", tinfo.slice()))
+                        .with_labels(vec![Label::primary((), tinfo.span())]);
+                    ctxt.diags.emit(&diag);
                     return false;
                 }
             }
-            _ => { return false; },
+        }
+        true
+    }
+
+    pub fn parse_wr(&mut self, tok_num : &mut usize, parent : NodeId,
+                     ctxt: &mut Context) -> bool {
+
+        // Add the sr keyword as a child of the parent
+        // Parameters of the wr are children of the wr node
+        let node = self.arena.new_node(*tok_num);
+
+        // wr must have a parent
+        parent.append(node, &mut self.arena);
+
+        // Advance the token number past 'wr'
+        *tok_num += 1;
+
+        // Next, a quoted string is expected
+        let tinfo = &self.ltv[*tok_num];
+        if let LexToken::QuotedString = tinfo.tok {
+            self.parse_leaf(tok_num, node);
+        } else {
+            let diag = Diagnostic::error()
+                .with_code("E004")
+                .with_message(format!("Expected a quoted string after 'wr', instead found '{}'", tinfo.slice()))
+                .with_labels(vec![Label::primary((), tinfo.span()),
+                                Label::secondary((), self.ltv[*tok_num-1].span())]);
+            ctxt.diags.emit(&diag);
+            return false;
+        }
+
+        // Finally a semicolon
+        let tinfo = &self.ltv[*tok_num];
+        if let LexToken::Semicolon = tinfo.tok {
+            self.parse_leaf(tok_num, node);
+        } else {
+            let diag = Diagnostic::error()
+                .with_code("E005")
+                .with_message(format!("Expected ';' after string, instead found '{}'", tinfo.slice()))
+                .with_labels(vec![Label::primary((), tinfo.span()),
+                                Label::secondary((), self.ltv[*tok_num-1].span())]);
+            ctxt.diags.emit(&diag);
+            return false;
+        }
+        debug!("parse_wr success");
+        true
+    }
+
+    /**
+     * Adds the token as a child of teh parent and advances
+     * the token index.
+     */
+    pub fn parse_leaf(&mut self, tok_num : &mut usize, parent : NodeId) {
+        let node = self.arena.new_node(*tok_num);
+        parent.append(node, &mut self.arena);
+        *tok_num += 1;
+    }
+
+    fn get_tok(&self, nid: &'toks NodeId) -> &'toks TokenInfo {
+        let tok_num = *self.arena[*nid].get();
+        &self.ltv[tok_num]
+    }
+
+    // recursive entry for the display algorithm
+    fn display_ast_r(&self, nid: &'toks NodeId, depth: usize) {
+        // print this node, then recurse through all the children
+        print!("{:<1$}", " ", depth * 4 );
+        let tok = self.get_tok(nid);
+        println!("{}", tok.slice());
+
+        let children = nid.children(&self.arena);
+        for child_nid in children {
+            self.display_ast_r(&child_nid, depth+1);
         }
     }
-    true
-}
-
-pub fn parse_section<'toks>(arena : &mut Arena<usize>, ltv : &'toks[TokenInfo],
-                            tok_num : &mut usize, parent : Option<NodeId>,
-                            ctxt: &mut Context) -> bool {
-
-    // Add the section keyword as a child of the parent
-    // All content in the section are children of the section node
-    let node = arena.new_node(*tok_num);
-
-    // If the parent exists, attach the child node
-    if let Some(p) = parent {
-        p.append(node, arena);
-    }
-
-    // Advance the token number past 'section'
-    *tok_num += 1;
-
-    // After a section declaration, an identifier is expected
-    let tinfo = &ltv[*tok_num];
-    if let LexToken::Identifier = tinfo.tok {
-        parse_leaf(arena, tok_num, node);
-    } else {
-        let diag = Diagnostic::error()
-            .with_code("E001")
-            .with_message(format!("Expected an identifier after 'section', instead found '{}'", tinfo.slice()))
-            .with_labels(vec![Label::primary((), tinfo.span()),
-                              Label::secondary((), ltv[*tok_num-1].span())]);
-        ctxt.diags.emit(&diag);
-        return false;
-    }
-
-    // After a section identifier, open brace
-    let tinfo = &ltv[*tok_num];
-    if let LexToken::OpenBrace = tinfo.tok {
-        parse_leaf(arena, tok_num, node);
-    } else {
-        let diag = Diagnostic::error()
-            .with_code("E002")
-            .with_message(format!("Expected '{{' after identifier, instead found '{}'", tinfo.slice()))
-            .with_labels(vec![Label::primary((), tinfo.span()),
-                              Label::secondary((), ltv[*tok_num-1].span())]);
-        ctxt.diags.emit(&diag);
-        return false;
-    }
-
-    parse_section_contents(arena, ltv, tok_num, node, ctxt);
-
-    true
-}
-
-pub fn parse_section_contents<'toks>(arena : &mut Arena<usize>, ltv : &'toks[TokenInfo],
-                              tok_num : &mut usize, parent : NodeId, ctxt: &mut Context) -> bool {
-    let toks_end = ltv.len();
-    while *tok_num < toks_end {
-        let tinfo = &ltv[*tok_num];
-        debug!("Parsing token {}: {:?}", *tok_num, tinfo);
-        match tinfo.tok {
-            // For now, we only support writing strings in a section.
-            LexToken::Wr => {
-                if !parse_wr(arena, ltv, tok_num, parent, ctxt) {
-                    return false;
-                }
-            }
-            LexToken::CloseBrace => {
-                // When we find a close brace, we're done with section content
-                parse_leaf(arena, tok_num, parent);
-                return true;
-            }
-            _ => {
-                let diag = Diagnostic::error()
-                    .with_code("E003")
-                    .with_message(format!("Invalid expression in section '{}'", tinfo.slice()))
-                    .with_labels(vec![Label::primary((), tinfo.span())]);
-                ctxt.diags.emit(&diag);
-                return false;
-            }
+    pub fn dump(&self) {
+        let children = self.root.children(&self.arena);
+        for child_nid in children {
+            self.display_ast_r(&child_nid, 0);
         }
     }
-    true
-}
-
-pub fn parse_wr<'toks>(arena : &mut Arena<usize>, ltv : &'toks[TokenInfo],
-                       tok_num : &mut usize, parent : NodeId,
-                       ctxt: &mut Context) -> bool {
-
-    // Add the sr keyword as a child of the parent
-    // Parameters of the wr are children of the wr node
-    let node = arena.new_node(*tok_num);
-
-    // wr must have a parent
-    parent.append(node, arena);
-
-    // Advance the token number past 'wr'
-    *tok_num += 1;
-
-    // Next, a quoted string is expected
-    let tinfo = &ltv[*tok_num];
-    if let LexToken::QuotedString = tinfo.tok {
-        parse_leaf(arena, tok_num, node);
-    } else {
-        let diag = Diagnostic::error()
-            .with_code("E004")
-            .with_message(format!("Expected a quoted string after 'wr', instead found '{}'", tinfo.slice()))
-            .with_labels(vec![Label::primary((), tinfo.span()),
-                              Label::secondary((), ltv[*tok_num-1].span())]);
-        ctxt.diags.emit(&diag);
-        return false;
-    }
-
-    // Finally a semicolon
-    let tinfo = &ltv[*tok_num];
-    if let LexToken::Semicolon = tinfo.tok {
-        parse_leaf(arena, tok_num, node);
-    } else {
-        let diag = Diagnostic::error()
-            .with_code("E005")
-            .with_message(format!("Expected ';' after string, instead found '{}'", tinfo.slice()))
-            .with_labels(vec![Label::primary((), tinfo.span()),
-                              Label::secondary((), ltv[*tok_num-1].span())]);
-        ctxt.diags.emit(&diag);
-        return false;
-    }
-    debug!("parse_wr success");
-    true
-}
-
-/**
- * Adds the token as a child of teh parent and advances
- * the token index.
- */
-pub fn parse_leaf(arena : &mut Arena<usize>,
-        tok_num : &mut usize, parent : NodeId) {
-    let node = arena.new_node(*tok_num);
-    parent.append(node, arena);
-    *tok_num += 1;
 }
 
 /// Entry point for all processing on the input source file
@@ -264,12 +291,10 @@ pub fn process(name: &str, fstr: &str) {
         tv.push(TokenInfo{tok: t, s:lex.slice(), loc: lex.span()});
     }
 
-    let mut arena = Arena::new();
-    let success = parse(&mut arena, &tv, &mut ctxt);
+    let mut ast = Ast::new(tv.as_slice());
+    let success = ast.parse(&mut ctxt);
     println!("Parsing {}", if success {"succeeded"} else {"failed"});
-    for (node_num, tok_num) in arena.iter().enumerate() {
-        println!("Node {} is token #{} = {}", node_num, *tok_num.get(), tv[*tok_num.get()].s);
-    }
+    ast.dump();
 
 }
 
