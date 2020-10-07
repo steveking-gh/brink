@@ -13,7 +13,6 @@ use clap::{Arg, App};
 // codespan crate provide error reporting help
 use codespan_reporting::diagnostic::{Diagnostic, Label};
 use codespan_reporting::files::SimpleFile;
-use codespan_reporting::files::Files;
 use codespan_reporting::term;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 
@@ -174,7 +173,6 @@ impl<'toks> Ast<'toks> {
         }
 
         self.parse_section_contents(tok_num, node, ctxt);
-
         true
     }
 
@@ -208,7 +206,7 @@ impl<'toks> Ast<'toks> {
     pub fn parse_wr(&mut self, tok_num : &mut usize, parent : NodeId,
                      ctxt: &mut Context) -> bool {
 
-        // Add the sr keyword as a child of the parent
+        // Add the wr keyword as a child of the parent
         // Parameters of the wr are children of the wr node
         let node = self.arena.new_node(*tok_num);
 
@@ -292,22 +290,23 @@ impl<'toks> Ast<'toks> {
         &self.ltv[tok_num]
     }
 
-    // recursive entry for the display algorithm
-    fn display_ast_r(&self, nid: &'toks NodeId, depth: usize) {
-        // print this node, then recurse through all the children
-        print!("{:<1$}", " ", depth * 4 );
-        let tok = self.get_tok(nid);
-        println!("{}", tok.slice());
-
+    fn dump_r(&self, nid: &'toks NodeId, depth: usize) {
+        print!("AST: ");
+        println!("{}{}", " ".repeat(depth * 4), self.get_tok(nid).slice());
         let children = nid.children(&self.arena);
         for child_nid in children {
-            self.display_ast_r(&child_nid, depth+1);
+            self.dump_r(&child_nid, depth+1);
         }
     }
+
+    /**
+     * Recursively dumps the AST to the console.
+     */
     pub fn dump(&self) {
+        debug!("Dumping AST\n");
         let children = self.root.children(&self.arena);
         for child_nid in children {
-            self.display_ast_r(&child_nid, 0);
+            self.dump_r(&child_nid, 0);
         }
     }
 }
@@ -331,9 +330,11 @@ pub fn process(name: &str, fstr: &str) {
 
     let mut ast = Ast::new(tv.as_slice());
     let success = ast.parse(&mut ctxt);
-    println!("Parsing {}", if success {"succeeded"} else {"failed"});
     ast.dump();
-
+    if !success {
+        println!("AST construction failed");
+        return;
+    }
 }
 
 // Logging
