@@ -3,6 +3,7 @@
 
 #![warn(clippy::all)]
 
+use std::collections::HashMap;
 use std::vec::Vec;
 use std::{io,fs};
 use logos::{Logos};
@@ -146,7 +147,7 @@ impl<'toks> Ast<'toks> {
         ctxt.diags.emit(&diag);
     }
 
-    pub fn parse_section(&mut self, tok_num : &mut usize, parent : NodeId,
+    fn parse_section(&mut self, tok_num : &mut usize, parent : NodeId,
                          ctxt: &mut Context) -> bool {
 
         // Add the section keyword as a child of the parent and advance
@@ -176,7 +177,7 @@ impl<'toks> Ast<'toks> {
         true
     }
 
-    pub fn parse_section_contents(&mut self, tok_num : &mut usize, parent : NodeId,
+    fn parse_section_contents(&mut self, tok_num : &mut usize, parent : NodeId,
                                          ctxt: &mut Context) -> bool {
         let toks_end = self.ltv.len();
         while *tok_num < toks_end {
@@ -203,7 +204,7 @@ impl<'toks> Ast<'toks> {
         true
     }
 
-    pub fn parse_wr(&mut self, tok_num : &mut usize, parent : NodeId,
+    fn parse_wr(&mut self, tok_num : &mut usize, parent : NodeId,
                      ctxt: &mut Context) -> bool {
 
         // Add the wr keyword as a child of the parent
@@ -237,7 +238,7 @@ impl<'toks> Ast<'toks> {
         true
     }
 
-    pub fn parse_output(&mut self, tok_num : &mut usize, parent : NodeId,
+    fn parse_output(&mut self, tok_num : &mut usize, parent : NodeId,
                          ctxt: &mut Context) -> bool {
 
         // Add the output keyword as a child of the parent and advance
@@ -279,23 +280,23 @@ impl<'toks> Ast<'toks> {
      * Adds the token as a child of teh parent and advances
      * the token index.
      */
-    pub fn parse_leaf(&mut self, tok_num : &mut usize, parent : NodeId) {
+    fn parse_leaf(&mut self, tok_num : &mut usize, parent : NodeId) {
         let node = self.arena.new_node(*tok_num);
         parent.append(node, &mut self.arena);
         *tok_num += 1;
     }
 
-    fn get_tok(&self, nid: &'toks NodeId) -> &'toks TokenInfo {
-        let tok_num = *self.arena[*nid].get();
+    fn get_tok(&self, nid: NodeId) -> &'toks TokenInfo {
+        let tok_num = *self.arena[nid].get();
         &self.ltv[tok_num]
     }
 
-    fn dump_r(&self, nid: &'toks NodeId, depth: usize) {
+    fn dump_r(&self, nid: NodeId, depth: usize) {
         print!("AST: ");
         println!("{}{}", " ".repeat(depth * 4), self.get_tok(nid).slice());
         let children = nid.children(&self.arena);
         for child_nid in children {
-            self.dump_r(&child_nid, depth+1);
+            self.dump_r(child_nid, depth+1);
         }
     }
 
@@ -306,15 +307,95 @@ impl<'toks> Ast<'toks> {
         debug!("Dumping AST\n");
         let children = self.root.children(&self.arena);
         for child_nid in children {
-            self.dump_r(&child_nid, 0);
+            self.dump_r(child_nid, 0);
         }
     }
+}
+
+struct Section<'toks> {
+    tinfo: &'toks TokenInfo<'toks>,
+    nid: NodeId,
+    size: usize,
+}
+
+impl<'toks> Section<'toks> {
+    pub fn new(ast: &'toks Ast, nid: NodeId) -> Section<'toks> {
+        Section { tinfo: ast.get_tok(nid), nid, size: 0}
+    }
+}
+
+struct Output<'toks> {
+    tinfo: &'toks TokenInfo<'toks>,
+    nid: NodeId,
+    size: usize,
+}
+
+impl<'toks> Output<'toks> {
+    /// Create an new output object
+    pub fn new(ast: &'toks Ast, nid: NodeId) -> Output<'toks> {
+        Output { tinfo: ast.get_tok(nid), nid, size: 0}
+    }
+}
+
+struct AllDB<'toks> {
+    output_db: Vec<Output<'toks>>,
+    section_db: HashMap<&'toks str, Section<'toks>>,
+}
+
+impl<'toks> AllDB<'toks> {
+    pub fn new() -> AllDB<'toks> {
+        AllDB { output_db: Vec::new(), section_db: HashMap::new() }
+    }
+}
+
+trait ActionItem {
+    fn size(&self) -> usize;
+    fn get_tinfo(&self) -> &TokenInfo;
+    fn iterate(&self, ast: &Ast, all_db: &mut AllDB) -> bool;
+}
+
+impl<'toks> ActionItem for Section<'toks> {
+    fn size(&self) -> usize { self.size }
+    fn get_tinfo(&self) -> &TokenInfo { &self.tinfo }
+    fn iterate(&self, ast: &Ast, all_db: &mut AllDB) -> bool { true }
+}
+
+impl<'toks> ActionItem for Output<'toks> {
+    fn size(&self) -> usize { self.size }
+    fn get_tinfo(&self) -> &TokenInfo { &self.tinfo }
+    fn iterate(&self, ast: &Ast, all_db: &mut AllDB) -> bool { true }
+}
+
+fn process_section<'toks>(ctxt: &mut Context, sec_nid: NodeId,
+                          ast: &'toks Ast, all_db: &mut AllDB<'toks>) -> bool {
+    // nid points to 'section'
+    // the first child of section is the section identifier
+    let mut children = sec_nid.children(&ast.arena);
+    if let Some(sec_id_nid) = children.next() {
+        let sec_id_tinfo = ast.get_tok(sec_id_nid);
+        let sec_id_str = sec_id_tinfo.slice();
+        if all_db.section_db.contains_key(sec_id_str) {
+            // error, duplicate section names
+            // We know the section exists, so unwrap is fine.
+            let orig_section = all_db.section_db.get(sec_id_str).unwrap();
+            let orig_tinfo = orig_section.tinfo;
+            let diag = Diagnostic::error()
+                    .with_code("ERR_9")
+                    .with_message(format!("Duplicate section name '{}'", sec_id_str))
+                    .with_labels(vec![Label::primary((), sec_id_tinfo.span()),
+                                    Label::secondary((), orig_tinfo.span())]);
+            ctxt.diags.emit(&diag);
+            return false;
+        }
+        all_db.section_db.insert(sec_id_str, Section::new(&ast,sec_nid));
+    }
+    true
 }
 
 /// Entry point for all processing on the input source file
 /// name: The name of the file
 /// fstr: A string containing the file
-pub fn process(name: &str, fstr: &str) {
+pub fn process(name: &str, fstr: &str) -> bool {
     info!("Processing {}", name);
     debug!("File contains: {}", fstr);
 
@@ -333,8 +414,25 @@ pub fn process(name: &str, fstr: &str) {
     ast.dump();
     if !success {
         println!("AST construction failed");
-        return;
+        return false;
     }
+
+    let mut all_db = AllDB::new();
+
+    let mut success = true;
+
+    // Populate the database of critical structures.
+    for nid in ast.root.children(&ast.arena) {
+        let tinfo = ast.get_tok(nid);
+        success = match tinfo.tok {
+            LexToken::Section => process_section(&mut ctxt, nid, &ast, &mut all_db),
+            _ => { true }
+        };
+
+        if !success { break;}
+    }
+
+    success
 }
 
 // Logging
@@ -413,5 +511,7 @@ fn main() {
     }
     let in_file = result.unwrap();
 
-    process(&in_file_name, &in_file);
+    if !process(&in_file_name, &in_file) {
+        std::process::exit(-1);
+    }
 }
