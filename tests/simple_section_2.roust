@@ -2,4 +2,4 @@ section foo {
     wr "Wow!";
 }
 
-output "neat.bin" foo;
+output foo "neat.bin";

@@ -205,7 +205,7 @@ impl<'toks> Ast<'toks> {
     }
 
     fn parse_wr(&mut self, tok_num : &mut usize, parent : NodeId,
-                     ctxt: &mut Context) -> bool {
+                ctxt: &mut Context) -> bool {
 
         // Add the wr keyword as a child of the parent
         // Parameters of the wr are children of the wr node
@@ -246,21 +246,21 @@ impl<'toks> Ast<'toks> {
         parent.append(node, &mut self.arena);
         *tok_num += 1;
 
-        // After a output declaration we expect a quoted string.
-        let tinfo = &self.ltv[*tok_num];
-        if let LexToken::QuotedString = tinfo.tok {
-            self.parse_leaf(tok_num, node);
-        } else {
-            self.err_expected_after(ctxt, 6, "Expected the file path as a quoted string after 'output'", tok_num);
-            return false;
-        }
-
-        // After the string, an identifier
+        // After a output declaration we expect a section identifier
         let tinfo = &self.ltv[*tok_num];
         if let LexToken::Identifier = tinfo.tok {
             self.parse_leaf(tok_num, node);
         } else {
-            self.err_expected_after(ctxt, 7, "Expected a section name after the path string", tok_num);
+            self.err_expected_after(ctxt, 7, "Expected a section name after output", tok_num);
+            return false;
+        }
+
+        // After the identifier, the file name as a quoted string
+        let tinfo = &self.ltv[*tok_num];
+        if let LexToken::QuotedString = tinfo.tok {
+            self.parse_leaf(tok_num, node);
+        } else {
+            self.err_expected_after(ctxt, 6, "Expected the file path as a quoted string after the section name", tok_num);
             return false;
         }
 
@@ -312,19 +312,40 @@ impl<'toks> Ast<'toks> {
     }
 }
 
+trait ActionItem {
+    fn size(&self) -> usize;
+    fn get_tinfo(&self) -> &TokenInfo;
+    fn iterate(&self, ast: &Ast, all_db: &mut AllDB) -> bool;
+    fn get_ast_nid(&self) -> NodeId;
+}
+
+/*******************************
+ * Section
+ ******************************/
 struct Section<'toks> {
     tinfo: &'toks TokenInfo<'toks>,
     nid: NodeId,
     size: usize,
+    actions: Vec<Box<dyn ActionItem>>,
 }
 
 impl<'toks> Section<'toks> {
     pub fn new(ast: &'toks Ast, nid: NodeId) -> Section<'toks> {
-        Section { tinfo: ast.get_tok(nid), nid, size: 0}
+        Section { tinfo: ast.get_tok(nid), nid, size: 0, actions: Vec::new() }
     }
 }
 
-struct Output<'toks> {
+impl<'toks> ActionItem for Section<'toks> {
+    fn size(&self) -> usize { self.size }
+    fn get_tinfo(&self) -> &TokenInfo { &self.tinfo }
+    fn iterate(&self, ast: &Ast, all_db: &mut AllDB) -> bool { true }
+    fn get_ast_nid(&self) -> NodeId { self.nid }
+}
+
+/*******************************
+ * Output
+ ******************************/
+ struct Output<'toks> {
     tinfo: &'toks TokenInfo<'toks>,
     nid: NodeId,
     size: usize,
@@ -337,7 +358,17 @@ impl<'toks> Output<'toks> {
     }
 }
 
-struct AllDB<'toks> {
+impl<'toks> ActionItem for Output<'toks> {
+    fn size(&self) -> usize { self.size }
+    fn get_tinfo(&self) -> &TokenInfo { &self.tinfo }
+    fn iterate(&self, ast: &Ast, all_db: &mut AllDB) -> bool { true }
+    fn get_ast_nid(&self) -> NodeId { self.nid }
+}
+
+/*******************************
+ * AllDB
+ ******************************/
+ struct AllDB<'toks> {
     output_db: Vec<Output<'toks>>,
     section_db: HashMap<&'toks str, Section<'toks>>,
 }
@@ -348,24 +379,9 @@ impl<'toks> AllDB<'toks> {
     }
 }
 
-trait ActionItem {
-    fn size(&self) -> usize;
-    fn get_tinfo(&self) -> &TokenInfo;
-    fn iterate(&self, ast: &Ast, all_db: &mut AllDB) -> bool;
-}
-
-impl<'toks> ActionItem for Section<'toks> {
-    fn size(&self) -> usize { self.size }
-    fn get_tinfo(&self) -> &TokenInfo { &self.tinfo }
-    fn iterate(&self, ast: &Ast, all_db: &mut AllDB) -> bool { true }
-}
-
-impl<'toks> ActionItem for Output<'toks> {
-    fn size(&self) -> usize { self.size }
-    fn get_tinfo(&self) -> &TokenInfo { &self.tinfo }
-    fn iterate(&self, ast: &Ast, all_db: &mut AllDB) -> bool { true }
-}
-
+/// Processes a section in the AST
+/// ctxt: the system context
+/// sec_nid: section node ID in the AST
 fn process_section<'toks>(ctxt: &mut Context, sec_nid: NodeId,
                           ast: &'toks Ast, all_db: &mut AllDB<'toks>) -> bool {
     // nid points to 'section'
@@ -389,6 +405,15 @@ fn process_section<'toks>(ctxt: &mut Context, sec_nid: NodeId,
         }
         all_db.section_db.insert(sec_id_str, Section::new(&ast,sec_nid));
     }
+    true
+}
+
+fn process_output<'toks>(ctxt: &mut Context, output_nid: NodeId,
+                         ast: &'toks Ast, all_db: &mut AllDB<'toks>) -> bool {
+    // nid points to 'output'
+    // don't bother with semantic error checking yet.
+    // The lexer already did basic checking
+    all_db.output_db.push(Output::new(&ast, output_nid));
     true
 }
 
@@ -419,20 +444,21 @@ pub fn process(name: &str, fstr: &str) -> bool {
 
     let mut all_db = AllDB::new();
 
-    let mut success = true;
+    let mut result = true;
 
     // Populate the database of critical structures.
     for nid in ast.root.children(&ast.arena) {
         let tinfo = ast.get_tok(nid);
-        success = match tinfo.tok {
+        result = match tinfo.tok {
             LexToken::Section => process_section(&mut ctxt, nid, &ast, &mut all_db),
+            LexToken::Output => process_output(&mut ctxt, nid, &ast, &mut all_db),
             _ => { true }
         };
 
-        if !success { break;}
+        if !result { break;}
     }
 
-    success
+    result
 }
 
 // Logging
