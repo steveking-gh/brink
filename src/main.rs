@@ -304,11 +304,12 @@ impl<'toks> Ast<'toks> {
      * Recursively dumps the AST to the console.
      */
     pub fn dump(&self) {
-        debug!("Dumping AST\n");
+        println!();
         let children = self.root.children(&self.arena);
         for child_nid in children {
             self.dump_r(child_nid, 0);
         }
+        println!();
     }
 }
 
@@ -369,20 +370,20 @@ impl<'toks> ActionItem for Output<'toks> {
  * AllDB
  ******************************/
  struct AllDB<'toks> {
-    output_db: Vec<Output<'toks>>,
+    output_vec: Vec<Output<'toks>>,
     section_db: HashMap<&'toks str, Section<'toks>>,
 }
 
 impl<'toks> AllDB<'toks> {
     pub fn new() -> AllDB<'toks> {
-        AllDB { output_db: Vec::new(), section_db: HashMap::new() }
+        AllDB { output_vec: Vec::new(), section_db: HashMap::new() }
     }
 }
 
 /// Processes a section in the AST
 /// ctxt: the system context
 /// sec_nid: section node ID in the AST
-fn process_section<'toks>(ctxt: &mut Context, sec_nid: NodeId,
+fn inventory_sections<'toks>(ctxt: &mut Context, sec_nid: NodeId,
                           ast: &'toks Ast, all_db: &mut AllDB<'toks>) -> bool {
     // nid points to 'section'
     // the first child of section is the section identifier
@@ -408,12 +409,12 @@ fn process_section<'toks>(ctxt: &mut Context, sec_nid: NodeId,
     true
 }
 
-fn process_output<'toks>(ctxt: &mut Context, output_nid: NodeId,
+fn inventory_outputs<'toks>(_ctxt: &mut Context, output_nid: NodeId,
                          ast: &'toks Ast, all_db: &mut AllDB<'toks>) -> bool {
     // nid points to 'output'
     // don't bother with semantic error checking yet.
     // The lexer already did basic checking
-    all_db.output_db.push(Output::new(&ast, output_nid));
+    all_db.output_vec.push(Output::new(&ast, output_nid));
     true
 }
 
@@ -450,12 +451,19 @@ pub fn process(name: &str, fstr: &str) -> bool {
     for nid in ast.root.children(&ast.arena) {
         let tinfo = ast.get_tok(nid);
         result = match tinfo.tok {
-            LexToken::Section => process_section(&mut ctxt, nid, &ast, &mut all_db),
-            LexToken::Output => process_output(&mut ctxt, nid, &ast, &mut all_db),
+            LexToken::Section => inventory_sections(&mut ctxt, nid, &ast, &mut all_db),
+            LexToken::Output => inventory_outputs(&mut ctxt, nid, &ast, &mut all_db),
             _ => { true }
         };
 
         if !result { break;}
+    }
+
+    if all_db.output_vec.is_empty() {
+        let diag = Diagnostic::warning()
+                .with_code("WARN_10")
+                .with_message("No output statement, nothing to do.");
+        ctxt.diags.emit(&diag);
     }
 
     result

@@ -1,3 +1,5 @@
+use predicates::str::contains;
+
 
 #[cfg(test)]
 mod tests {
@@ -109,6 +111,15 @@ fn section_rename_err_1() {
     .failure();
 }
 
+#[test]
+fn no_output_warn_1() {
+    let _cmd = Command::cargo_bin("roust")
+    .unwrap()
+    .arg("tests/no_output_warn_1.roust")
+    .assert()
+    .success()
+    .stderr(predicates::str::contains("WARN_10"));
+}
 
 } // mod tests
 
