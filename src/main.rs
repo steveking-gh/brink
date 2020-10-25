@@ -370,13 +370,12 @@ impl<'toks> ActionItem for Output<'toks> {
  * AllDB
  ******************************/
  struct AllDB<'toks> {
-    output_vec: Vec<Output<'toks>>,
     section_db: HashMap<&'toks str, Section<'toks>>,
 }
 
 impl<'toks> AllDB<'toks> {
     pub fn new() -> AllDB<'toks> {
-        AllDB { output_vec: Vec::new(), section_db: HashMap::new() }
+        AllDB { section_db: HashMap::new() }
     }
 }
 
@@ -410,13 +409,21 @@ fn inventory_sections<'toks>(ctxt: &mut Context, sec_nid: NodeId,
 }
 
 fn inventory_outputs<'toks>(_ctxt: &mut Context, output_nid: NodeId,
-                         ast: &'toks Ast, all_db: &mut AllDB<'toks>) -> bool {
+                         ast: &'toks Ast, output_vec: &mut Vec<Output<'toks>>) -> bool {
     // nid points to 'output'
     // don't bother with semantic error checking yet.
     // The lexer already did basic checking
-    all_db.output_vec.push(Output::new(&ast, output_nid));
+    output_vec.push(Output::new(&ast, output_nid));
     true
 }
+
+fn process_output<'toks>(_ctxt: &mut Context, output_nid: NodeId,
+    ast: &'toks Ast, all_db: &mut AllDB<'toks>) -> bool {
+    let output_tinfo = ast.get_tok(output_nid);
+    info!("Processing output {}", output_tinfo.slice());
+    true
+}
+
 
 /// Entry point for all processing on the input source file
 /// name: The name of the file
@@ -447,23 +454,29 @@ pub fn process(name: &str, fstr: &str) -> bool {
 
     let mut result = true;
 
+    let mut output_vec = Vec::new();
+
     // Populate the database of critical structures.
     for nid in ast.root.children(&ast.arena) {
         let tinfo = ast.get_tok(nid);
         result = match tinfo.tok {
             LexToken::Section => inventory_sections(&mut ctxt, nid, &ast, &mut all_db),
-            LexToken::Output => inventory_outputs(&mut ctxt, nid, &ast, &mut all_db),
+            LexToken::Output => inventory_outputs(&mut ctxt, nid, &ast, &mut output_vec),
             _ => { true }
         };
 
         if !result { break;}
     }
 
-    if all_db.output_vec.is_empty() {
+    if output_vec.is_empty() {
         let diag = Diagnostic::warning()
                 .with_code("WARN_10")
                 .with_message("No output statement, nothing to do.");
         ctxt.diags.emit(&diag);
+    }
+
+    for op in output_vec {
+        process_output(&mut ctxt, op.nid, &ast, &mut all_db);
     }
 
     result
