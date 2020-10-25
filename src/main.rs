@@ -315,7 +315,7 @@ impl<'toks> Ast<'toks> {
 
 trait ActionItem {
     fn size(&self) -> usize;
-    fn get_tinfo(&self) -> &TokenInfo;
+    fn tinfo(&self) -> &TokenInfo;
     fn iterate(&self, ast: &Ast, all_db: &mut StaticDB) -> bool;
     fn get_ast_nid(&self) -> NodeId;
 }
@@ -338,7 +338,7 @@ impl<'toks> Section<'toks> {
 
 impl<'toks> ActionItem for Section<'toks> {
     fn size(&self) -> usize { self.size }
-    fn get_tinfo(&self) -> &TokenInfo { &self.tinfo }
+    fn tinfo(&self) -> &TokenInfo { &self.tinfo }
     fn iterate(&self, ast: &Ast, all_db: &mut StaticDB) -> bool { true }
     fn get_ast_nid(&self) -> NodeId { self.nid }
 }
@@ -372,7 +372,7 @@ impl<'toks> Output<'toks> {
 
 impl<'toks> ActionItem for Output<'toks> {
     fn size(&self) -> usize { self.size }
-    fn get_tinfo(&self) -> &TokenInfo { &self.tinfo }
+    fn tinfo(&self) -> &TokenInfo { &self.tinfo }
     fn iterate(&self, ast: &Ast, all_db: &mut StaticDB) -> bool { true }
     fn get_ast_nid(&self) -> NodeId { self.nid }
 }
