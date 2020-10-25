@@ -350,13 +350,24 @@ impl<'toks> ActionItem for Section<'toks> {
     tinfo: &'toks TokenInfo<'toks>,
     nid: NodeId,
     size: usize,
+    sec_nid: NodeId,
+    sec_str: &'toks str,
 }
 
 impl<'toks> Output<'toks> {
     /// Create an new output object
     pub fn new(ast: &'toks Ast, nid: NodeId) -> Output<'toks> {
-        Output { tinfo: ast.get_tok(nid), nid, size: 0}
+        let mut children = nid.children(&ast.arena);
+        // the section name is the first child of the output
+        // AST processing guarantees this exists.
+        let sec_nid = children.next().unwrap();
+        let sec_tinfo = ast.get_tok(sec_nid);
+        let sec_str = sec_tinfo.slice();
+        Output { tinfo: ast.get_tok(nid), nid, size: 0,
+                sec_nid, sec_str}
     }
+
+    pub fn get_sec_name(&self) -> &'toks str { self.sec_str }
 }
 
 impl<'toks> ActionItem for Output<'toks> {
@@ -386,25 +397,25 @@ fn inventory_sections<'toks>(ctxt: &mut Context, sec_nid: NodeId,
                           ast: &'toks Ast, all_db: &mut AllDB<'toks>) -> bool {
     // nid points to 'section'
     // the first child of section is the section identifier
+    // AST processing guarantees this exists, so unwrap
     let mut children = sec_nid.children(&ast.arena);
-    if let Some(sec_id_nid) = children.next() {
-        let sec_id_tinfo = ast.get_tok(sec_id_nid);
-        let sec_id_str = sec_id_tinfo.slice();
-        if all_db.section_db.contains_key(sec_id_str) {
-            // error, duplicate section names
-            // We know the section exists, so unwrap is fine.
-            let orig_section = all_db.section_db.get(sec_id_str).unwrap();
-            let orig_tinfo = orig_section.tinfo;
-            let diag = Diagnostic::error()
-                    .with_code("ERR_9")
-                    .with_message(format!("Duplicate section name '{}'", sec_id_str))
-                    .with_labels(vec![Label::primary((), sec_id_tinfo.span()),
-                                    Label::secondary((), orig_tinfo.span())]);
-            ctxt.diags.emit(&diag);
-            return false;
-        }
-        all_db.section_db.insert(sec_id_str, Section::new(&ast,sec_nid));
+    let sec_id_nid = children.next().unwrap();
+    let sec_id_tinfo = ast.get_tok(sec_id_nid);
+    let sec_id_str = sec_id_tinfo.slice();
+    if all_db.section_db.contains_key(sec_id_str) {
+        // error, duplicate section names
+        // We know the section exists, so unwrap is fine.
+        let orig_section = all_db.section_db.get(sec_id_str).unwrap();
+        let orig_tinfo = orig_section.tinfo;
+        let diag = Diagnostic::error()
+                .with_code("ERR_9")
+                .with_message(format!("Duplicate section name '{}'", sec_id_str))
+                .with_labels(vec![Label::primary((), sec_id_tinfo.span()),
+                                Label::secondary((), orig_tinfo.span())]);
+        ctxt.diags.emit(&diag);
+        return false;
     }
+    all_db.section_db.insert(sec_id_str, Section::new(&ast,sec_nid));
     true
 }
 
@@ -417,10 +428,10 @@ fn inventory_outputs<'toks>(_ctxt: &mut Context, output_nid: NodeId,
     true
 }
 
-fn process_output<'toks>(_ctxt: &mut Context, output_nid: NodeId,
+fn process_output<'toks>(_ctxt: &mut Context, output: &mut Output,
     ast: &'toks Ast, all_db: &mut AllDB<'toks>) -> bool {
-    let output_tinfo = ast.get_tok(output_nid);
-    info!("Processing output {}", output_tinfo.slice());
+    info!("Processing output {}", output.get_sec_name());
+
     true
 }
 
@@ -475,8 +486,8 @@ pub fn process(name: &str, fstr: &str) -> bool {
         ctxt.diags.emit(&diag);
     }
 
-    for op in output_vec {
-        process_output(&mut ctxt, op.nid, &ast, &mut all_db);
+    for mut op in output_vec {
+        process_output(&mut ctxt, &mut op, &ast, &mut all_db);
     }
 
     result
