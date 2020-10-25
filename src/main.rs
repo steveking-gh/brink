@@ -316,7 +316,7 @@ impl<'toks> Ast<'toks> {
 trait ActionItem {
     fn size(&self) -> usize;
     fn get_tinfo(&self) -> &TokenInfo;
-    fn iterate(&self, ast: &Ast, all_db: &mut AllDB) -> bool;
+    fn iterate(&self, ast: &Ast, all_db: &mut StaticDB) -> bool;
     fn get_ast_nid(&self) -> NodeId;
 }
 
@@ -339,7 +339,7 @@ impl<'toks> Section<'toks> {
 impl<'toks> ActionItem for Section<'toks> {
     fn size(&self) -> usize { self.size }
     fn get_tinfo(&self) -> &TokenInfo { &self.tinfo }
-    fn iterate(&self, ast: &Ast, all_db: &mut AllDB) -> bool { true }
+    fn iterate(&self, ast: &Ast, all_db: &mut StaticDB) -> bool { true }
     fn get_ast_nid(&self) -> NodeId { self.nid }
 }
 
@@ -373,20 +373,20 @@ impl<'toks> Output<'toks> {
 impl<'toks> ActionItem for Output<'toks> {
     fn size(&self) -> usize { self.size }
     fn get_tinfo(&self) -> &TokenInfo { &self.tinfo }
-    fn iterate(&self, ast: &Ast, all_db: &mut AllDB) -> bool { true }
+    fn iterate(&self, ast: &Ast, all_db: &mut StaticDB) -> bool { true }
     fn get_ast_nid(&self) -> NodeId { self.nid }
 }
 
 /*******************************
- * AllDB
+ * StaticDB
  ******************************/
- struct AllDB<'toks> {
+ struct StaticDB<'toks> {
     section_db: HashMap<&'toks str, Section<'toks>>,
 }
 
-impl<'toks> AllDB<'toks> {
-    pub fn new() -> AllDB<'toks> {
-        AllDB { section_db: HashMap::new() }
+impl<'toks> StaticDB<'toks> {
+    pub fn new() -> StaticDB<'toks> {
+        StaticDB { section_db: HashMap::new() }
     }
 }
 
@@ -394,7 +394,7 @@ impl<'toks> AllDB<'toks> {
 /// ctxt: the system context
 /// sec_nid: section node ID in the AST
 fn inventory_sections<'toks>(ctxt: &mut Context, sec_nid: NodeId,
-                          ast: &'toks Ast, all_db: &mut AllDB<'toks>) -> bool {
+                          ast: &'toks Ast, all_db: &mut StaticDB<'toks>) -> bool {
     // nid points to 'section'
     // the first child of section is the section identifier
     // AST processing guarantees this exists, so unwrap
@@ -429,7 +429,7 @@ fn inventory_outputs<'toks>(_ctxt: &mut Context, output_nid: NodeId,
 }
 
 fn process_output<'toks>(_ctxt: &mut Context, output: &mut Output,
-    ast: &'toks Ast, all_db: &mut AllDB<'toks>) -> bool {
+    ast: &'toks Ast, all_db: &mut StaticDB<'toks>) -> bool {
     info!("Processing output {}", output.get_sec_name());
 
     true
@@ -461,7 +461,7 @@ pub fn process(name: &str, fstr: &str) -> bool {
         return false;
     }
 
-    let mut all_db = AllDB::new();
+    let mut all_db = StaticDB::new();
 
     let mut result = true;
 
