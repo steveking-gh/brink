@@ -368,7 +368,7 @@ impl<'toks> Output<'toks> {
 impl<'toks> SizeItem<'toks> for Output<'toks> {
     fn calc_size(&self, ast_db: &ASTDB) {
         // The size of an output is the size of its section
-        let sitem = ast_db.section_db.get(self.sec_str).unwrap();
+        let sitem = ast_db.sections.get(self.sec_str).unwrap();
         sitem.calc_size(ast_db);
     }
 }
@@ -381,12 +381,76 @@ impl<'toks> SizeItem<'toks> for Output<'toks> {
  * The key is the AST NodeID, the value is the TokenInfo object.
  *****************************************************************************/
 struct ASTDB<'toks> {
-    section_db: HashMap<&'toks str, Section<'toks>>,
+    sections: HashMap<&'toks str, Section<'toks>>,
+    outputs: Vec<Output<'toks>>,
+
 }
 
 impl<'toks> ASTDB<'toks> {
-    pub fn new() -> ASTDB<'toks> {
-        ASTDB { section_db: HashMap::new() }
+
+    /// Processes a section in the AST
+    /// ctxt: the system context
+    /// sec_nid: section node ID in the AST
+    fn record_section(ctxt: &mut Context, sec_nid: NodeId, ast: &'toks Ast,
+                      sections: &mut HashMap<&'toks str, Section<'toks>> ) -> bool {
+        // sec_nid points to 'section'
+        // the first child of section is the section identifier
+        // AST processing guarantees this exists, so unwrap
+        let mut children = sec_nid.children(&ast.arena);
+        let sec_nid = children.next().unwrap();
+        let sec_tinfo = ast.get_tok(sec_nid);
+        let sec_str = sec_tinfo.slice();
+        if sections.contains_key(sec_str) {
+            // error, duplicate section names
+            // We know the section exists, so unwrap is fine.
+            let orig_section = sections.get(sec_str).unwrap();
+            let orig_tinfo = orig_section.tinfo;
+            let diag = Diagnostic::error()
+                    .with_code("ERR_9")
+                    .with_message(format!("Duplicate section name '{}'", sec_str))
+                    .with_labels(vec![Label::primary((), sec_tinfo.span()),
+                                      Label::secondary((), orig_tinfo.span())]);
+            ctxt.diags.emit(&diag);
+            return false;
+        }
+        sections.insert(sec_str, Section::new(&ast,sec_nid));
+        true
+    }
+
+    /**
+     * Adds a new output to the vector of output structs.
+     */
+    fn record_output(_ctxt: &mut Context, nid: NodeId, ast: &'toks Ast,
+                     outputs: &mut Vec<Output<'toks>>) -> bool {
+        // nid points to 'output'
+        // don't bother with semantic error checking yet.
+        // The lexer already did basic checking
+        debug!("Inventory output at NodeId {}", nid);
+        outputs.push(Output::new(&ast, nid));
+        true
+    }
+
+    pub fn new(ctxt: &mut Context, ast: &'toks Ast) -> Option<ASTDB<'toks>> {
+        // Populate the AST database of critical structures.
+        let mut result = true;
+
+        let mut sections: HashMap<&'toks str, Section<'toks>> = HashMap::new();
+        let mut outputs: Vec<Output<'toks>> = Vec::new();
+
+        for nid in ast.root.children(&ast.arena) {
+            let tinfo = ast.get_tok(nid);
+            result = result && match tinfo.tok {
+                LexToken::Section => Self::record_section(ctxt, nid, &ast, &mut sections),
+                LexToken::Output => Self::record_output(ctxt, nid, &ast, &mut outputs),
+                _ => { true }
+            };
+        }
+
+        if !result {
+            return None;
+        }
+
+        Some(ASTDB { sections: HashMap::new(), outputs: Vec::new() })
     }
 }
 
@@ -397,54 +461,6 @@ impl<'toks> ASTDB<'toks> {
  * The key is the AST NodeID, the value is the size.
  *****************************************************************************/
 type SizeDB = HashMap<NodeId, usize>;
-
-/// Processes a section in the AST
-/// ctxt: the system context
-/// sec_nid: section node ID in the AST
-fn inventory_sections<'toks>(ctxt: &mut Context, sec_nid: NodeId,
-                          ast: &'toks Ast, all_db: &mut ASTDB<'toks>) -> bool {
-    // nid points to 'section'
-    // the first child of section is the section identifier
-    // AST processing guarantees this exists, so unwrap
-    let mut children = sec_nid.children(&ast.arena);
-    let sec_nid = children.next().unwrap();
-    let sec_tinfo = ast.get_tok(sec_nid);
-    let sec_str = sec_tinfo.slice();
-    if all_db.section_db.contains_key(sec_str) {
-        // error, duplicate section names
-        // We know the section exists, so unwrap is fine.
-        let orig_section = all_db.section_db.get(sec_str).unwrap();
-        let orig_tinfo = orig_section.tinfo;
-        let diag = Diagnostic::error()
-                .with_code("ERR_9")
-                .with_message(format!("Duplicate section name '{}'", sec_str))
-                .with_labels(vec![Label::primary((), sec_tinfo.span()),
-                                Label::secondary((), orig_tinfo.span())]);
-        ctxt.diags.emit(&diag);
-        return false;
-    }
-    all_db.section_db.insert(sec_str, Section::new(&ast,sec_nid));
-    true
-}
-
-/**
- * Adds a new output to the vector of output structs.
- */
-fn inventory_outputs<'toks>(_ctxt: &mut Context, nid: NodeId,
-                         ast: &'toks Ast, output_vec: &mut Vec<Output<'toks>>) -> bool {
-    // nid points to 'output'
-    // don't bother with semantic error checking yet.
-    // The lexer already did basic checking
-    debug!("Inventory output at NodeId {}", nid);
-    output_vec.push(Output::new(&ast, nid));
-    true
-}
-
-fn process_output<'toks>(_ctxt: &mut Context, output: &mut Output,
-            ast: &'toks Ast, all_db: &mut ASTDB<'toks>) -> bool {
-    info!("Processing output {}", output.get_sec_name());
-    true
-}
 
 
 /// Entry point for all processing on the input source file
@@ -472,36 +488,21 @@ pub fn process(name: &str, fstr: &str) -> bool {
         return false;
     }
 
-    let mut all_db = ASTDB::new();
-
-    let mut result = true;
-
-    let mut output_vec = Vec::new();
-
-    // Populate the database of critical structures.
-    for nid in ast.root.children(&ast.arena) {
-        let tinfo = ast.get_tok(nid);
-        result = match tinfo.tok {
-            LexToken::Section => inventory_sections(&mut ctxt, nid, &ast, &mut all_db),
-            LexToken::Output => inventory_outputs(&mut ctxt, nid, &ast, &mut output_vec),
-            _ => { true }
-        };
-
-        if !result { break;}
+    let ast_db_opt = ASTDB::new(&mut ctxt, &ast);
+    if ast_db_opt.is_none() {
+        return false;
     }
 
-    if output_vec.is_empty() {
+    let ast_db = ast_db_opt.unwrap();
+
+    if ast_db.outputs.is_empty() {
         let diag = Diagnostic::warning()
                 .with_code("WARN_10")
                 .with_message("No output statement, nothing to do.");
         ctxt.diags.emit(&diag);
     }
 
-    for mut op in output_vec {
-        process_output(&mut ctxt, &mut op, &ast, &mut all_db);
-    }
-
-    result
+    true
 }
 
 // Logging
