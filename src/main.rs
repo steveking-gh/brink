@@ -313,11 +313,9 @@ impl<'toks> Ast<'toks> {
     }
 }
 
-trait ActionItem {
-    fn size(&self) -> usize;
-    fn tinfo(&self) -> &TokenInfo;
-    fn iterate(&self, ast: &Ast, all_db: &mut StaticDB) -> bool;
-    fn nid(&self) -> NodeId;
+trait SizeItem<'toks> {
+    /// Calculate the size in bytes of the item
+    fn calc_size(&self, db: &'toks ASTDB);
 }
 
 /*******************************
@@ -327,26 +325,23 @@ struct Section<'toks> {
     tinfo: &'toks TokenInfo<'toks>,
     nid: NodeId,
     size: usize,
-    actions: Vec<Box<dyn ActionItem>>,
 }
 
 impl<'toks> Section<'toks> {
     pub fn new(ast: &'toks Ast, nid: NodeId) -> Section<'toks> {
-        Section { tinfo: ast.get_tok(nid), nid, size: 0, actions: Vec::new() }
+        Section { tinfo: ast.get_tok(nid), nid, size: 0 }
     }
 }
 
-impl<'toks> ActionItem for Section<'toks> {
-    fn size(&self) -> usize { self.size }
-    fn tinfo(&self) -> &TokenInfo { &self.tinfo }
-    fn iterate(&self, ast: &Ast, all_db: &mut StaticDB) -> bool { true }
-    fn nid(&self) -> NodeId { self.nid }
+impl<'toks> SizeItem<'toks> for Section<'toks> {
+    fn calc_size(&self, db: &ASTDB) {
+    }
 }
 
 /*******************************
  * Output
  ******************************/
- struct Output<'toks> {
+struct Output<'toks> {
     tinfo: &'toks TokenInfo<'toks>,
     nid: NodeId,
     size: usize,
@@ -370,68 +365,84 @@ impl<'toks> Output<'toks> {
     pub fn get_sec_name(&self) -> &'toks str { self.sec_str }
 }
 
-impl<'toks> ActionItem for Output<'toks> {
-    fn size(&self) -> usize { self.size }
-    fn tinfo(&self) -> &TokenInfo { &self.tinfo }
-    fn iterate(&self, ast: &Ast, all_db: &mut StaticDB) -> bool { true }
-    fn nid(&self) -> NodeId { self.nid }
+impl<'toks> SizeItem<'toks> for Output<'toks> {
+    fn calc_size(&self, ast_db: &ASTDB) {
+        // The size of an output is the size of its section
+        let sitem = ast_db.section_db.get(self.sec_str).unwrap();
+        sitem.calc_size(ast_db);
+    }
 }
 
-/*******************************
- * StaticDB
- ******************************/
- struct StaticDB<'toks> {
+
+/*****************************************************************************
+ * ASTDB
+ * The ASTDB contains a map of various items in the AST.
+ * After construction, we never mutate this database.
+ * The key is the AST NodeID, the value is the TokenInfo object.
+ *****************************************************************************/
+struct ASTDB<'toks> {
     section_db: HashMap<&'toks str, Section<'toks>>,
 }
 
-impl<'toks> StaticDB<'toks> {
-    pub fn new() -> StaticDB<'toks> {
-        StaticDB { section_db: HashMap::new() }
+impl<'toks> ASTDB<'toks> {
+    pub fn new() -> ASTDB<'toks> {
+        ASTDB { section_db: HashMap::new() }
     }
 }
+
+/*****************************************************************************
+ * SizeDB
+ * The SizeDB contains a map of the logical size in bytes of various items in
+ * the AST, e.g. the byte length of a string.
+ * The key is the AST NodeID, the value is the size.
+ *****************************************************************************/
+type SizeDB = HashMap<NodeId, usize>;
 
 /// Processes a section in the AST
 /// ctxt: the system context
 /// sec_nid: section node ID in the AST
 fn inventory_sections<'toks>(ctxt: &mut Context, sec_nid: NodeId,
-                          ast: &'toks Ast, all_db: &mut StaticDB<'toks>) -> bool {
+                          ast: &'toks Ast, all_db: &mut ASTDB<'toks>) -> bool {
     // nid points to 'section'
     // the first child of section is the section identifier
     // AST processing guarantees this exists, so unwrap
     let mut children = sec_nid.children(&ast.arena);
-    let sec_id_nid = children.next().unwrap();
-    let sec_id_tinfo = ast.get_tok(sec_id_nid);
-    let sec_id_str = sec_id_tinfo.slice();
-    if all_db.section_db.contains_key(sec_id_str) {
+    let sec_nid = children.next().unwrap();
+    let sec_tinfo = ast.get_tok(sec_nid);
+    let sec_str = sec_tinfo.slice();
+    if all_db.section_db.contains_key(sec_str) {
         // error, duplicate section names
         // We know the section exists, so unwrap is fine.
-        let orig_section = all_db.section_db.get(sec_id_str).unwrap();
+        let orig_section = all_db.section_db.get(sec_str).unwrap();
         let orig_tinfo = orig_section.tinfo;
         let diag = Diagnostic::error()
                 .with_code("ERR_9")
-                .with_message(format!("Duplicate section name '{}'", sec_id_str))
-                .with_labels(vec![Label::primary((), sec_id_tinfo.span()),
+                .with_message(format!("Duplicate section name '{}'", sec_str))
+                .with_labels(vec![Label::primary((), sec_tinfo.span()),
                                 Label::secondary((), orig_tinfo.span())]);
         ctxt.diags.emit(&diag);
         return false;
     }
-    all_db.section_db.insert(sec_id_str, Section::new(&ast,sec_nid));
+    all_db.section_db.insert(sec_str, Section::new(&ast,sec_nid));
     true
 }
 
-fn inventory_outputs<'toks>(_ctxt: &mut Context, output_nid: NodeId,
+/**
+ * Adds a new output to the vector of output structs.
+ */
+fn inventory_outputs<'toks>(_ctxt: &mut Context, nid: NodeId,
                          ast: &'toks Ast, output_vec: &mut Vec<Output<'toks>>) -> bool {
     // nid points to 'output'
     // don't bother with semantic error checking yet.
     // The lexer already did basic checking
-    output_vec.push(Output::new(&ast, output_nid));
+    debug!("Inventory output at NodeId {}", nid);
+    output_vec.push(Output::new(&ast, nid));
     true
 }
 
 fn process_output<'toks>(_ctxt: &mut Context, output: &mut Output,
-    ast: &'toks Ast, all_db: &mut StaticDB<'toks>) -> bool {
+            ast: &'toks Ast, all_db: &mut ASTDB<'toks>) -> bool {
     info!("Processing output {}", output.get_sec_name());
-
     true
 }
 
@@ -461,7 +472,7 @@ pub fn process(name: &str, fstr: &str) -> bool {
         return false;
     }
 
-    let mut all_db = StaticDB::new();
+    let mut all_db = ASTDB::new();
 
     let mut result = true;
 
