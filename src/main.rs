@@ -611,11 +611,20 @@ impl<'toks> SizeDB {
 
     /// Recursively calculate sizes on the children of the start_nid.
     /// Returns true if all sizes were known.  False otherwise.
-    fn record_size_r(start_nid: NodeId, ctxt: &mut Context, ast: &'toks Ast,
+    fn record_size_r(nid: NodeId, ctxt: &mut Context, ast: &'toks Ast,
                      ast_db: &ASTDB, sizes: &mut HashMap<NodeId, usize>) -> bool {
 
-        debug!("SizeDB::record_size_r: >>>> ENTER");
-        let mut done = true;
+        debug!("SizeDB::record_size_r: >>>> ENTER for nid {}", nid);
+        let tinfo = ast.get_tok(nid);
+        let done = match tinfo.tok {
+            LexToken::Section => Self::record_section_size(nid, ctxt, ast, ast_db, sizes),
+            LexToken::Output => Self::record_output_size(nid, ctxt, ast, ast_db, sizes),
+            LexToken::Wrs => Self::record_wrs_size(nid, ctxt, ast, ast_db, sizes),
+            LexToken::QuotedString => Self::record_string_size(nid, ctxt, ast, ast_db, sizes),
+            _ => { true }
+        };
+
+/*
         for nid in start_nid.children(&ast.arena) {
             let tinfo = ast.get_tok(nid);
             done = done && match tinfo.tok {
@@ -626,18 +635,26 @@ impl<'toks> SizeDB {
                 _ => { true }
             };
         }
-        debug!("SizeDB::record_size_r: <<<< EXIT");
+*/
+        debug!("SizeDB::record_size_r: <<<< EXIT({}) for nid {}", done, nid);
         done
     }
 
     pub fn new(ctxt: &mut Context, ast: &'toks Ast, ast_db: &'toks ASTDB) -> SizeDB {
 
         let mut sizes = HashMap::new();
+
         // iterate until the size DB is complete
         let mut done = false;
-        let root_nid = ast.root;
+
+        // The root of the AST is in the arena, but has no associated language
+        // token. We can't pass the root directly to the recursive size
+        // function. So, iterate over the children of the root.
         while !done {
-            done = Self::record_size_r(root_nid, ctxt, ast, ast_db, &mut sizes);
+            done = true;
+            for nid in ast.root.children(&ast.arena) {
+                done = done && Self::record_size_r(nid, ctxt, ast, ast_db, &mut sizes);
+            }
         }
 
         SizeDB { sizes }
@@ -686,6 +703,10 @@ pub fn process(name: &str, fstr: &str) -> bool {
     }
 
     let size_db = SizeDB::new(&mut ctxt, &ast, &ast_db);
+
+    for (nid, sz) in size_db.sizes {
+        debug!("SizeDB: nid {} is {} bytes", nid, sz);
+    }
 
     true
 }
