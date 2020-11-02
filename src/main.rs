@@ -22,7 +22,7 @@ pub type Span = std::ops::Range<usize>;
 #[derive(Logos, Debug, Clone, PartialEq)]
 pub enum LexToken {
     #[token("section")] Section,
-    #[token("wr")] Wr,
+    #[token("wrs")] Wrs,
     #[token("output")] Output,
     #[token("{")] OpenBrace,
     #[token("}")] CloseBrace,
@@ -112,7 +112,7 @@ impl<'toks> Ast<'toks> {
         let mut tok_num = 0;
         while tok_num < toks_end {
             let tinfo = &self.ltv[tok_num];
-            debug!("Parsing token {}: {:?}", &mut tok_num, tinfo);
+            debug!("Ast::parse: Parsing token {}: {:?}", &mut tok_num, tinfo);
             match tinfo.tok {
                 LexToken::Section => {
                     if !self.parse_section(&mut tok_num, self.root, ctxt) {
@@ -148,7 +148,7 @@ impl<'toks> Ast<'toks> {
     }
 
     fn parse_section(&mut self, tok_num : &mut usize, parent : NodeId,
-                         ctxt: &mut Context) -> bool {
+                     ctxt: &mut Context) -> bool {
 
         // Add the section keyword as a child of the parent and advance
         let node = self.arena.new_node(*tok_num);
@@ -182,11 +182,10 @@ impl<'toks> Ast<'toks> {
         let toks_end = self.ltv.len();
         while *tok_num < toks_end {
             let tinfo = &self.ltv[*tok_num];
-            debug!("Parsing token {}: {:?}", *tok_num, tinfo);
             match tinfo.tok {
                 // For now, we only support writing strings in a section.
-                LexToken::Wr => {
-                    if !self.parse_wr(tok_num, parent, ctxt) {
+                LexToken::Wrs => {
+                    if !self.parse_wrs(tok_num, parent, ctxt) {
                         return false;
                     }
                 }
@@ -204,7 +203,7 @@ impl<'toks> Ast<'toks> {
         true
     }
 
-    fn parse_wr(&mut self, tok_num : &mut usize, parent : NodeId,
+    fn parse_wrs(&mut self, tok_num : &mut usize, parent : NodeId,
                 ctxt: &mut Context) -> bool {
 
         // Add the wr keyword as a child of the parent
@@ -222,7 +221,7 @@ impl<'toks> Ast<'toks> {
         if let LexToken::QuotedString = tinfo.tok {
             self.parse_leaf(tok_num, node);
         } else {
-            self.err_expected_after(ctxt, 4, "Expected a quoted string after 'wr'", tok_num);
+            self.err_expected_after(ctxt, 4, "Expected a quoted string after 'wrs'", tok_num);
             return false;
         }
 
@@ -234,7 +233,7 @@ impl<'toks> Ast<'toks> {
             self.err_expected_after(ctxt, 5, "Expected ';' after string", tok_num);
             return false;
         }
-        debug!("parse_wr success");
+        debug!("parse_wrs success");
         true
     }
 
@@ -281,6 +280,8 @@ impl<'toks> Ast<'toks> {
      * the token index.
      */
     fn parse_leaf(&mut self, tok_num : &mut usize, parent : NodeId) {
+        let tinfo = &self.ltv[*tok_num]; // debug! only
+        debug!("Ast::parse_leaf: Parsing token {}: {:?}", *tok_num, tinfo);
         let node = self.arena.new_node(*tok_num);
         parent.append(node, &mut self.arena);
         *tok_num += 1;
@@ -292,7 +293,7 @@ impl<'toks> Ast<'toks> {
     }
 
     fn dump_r(&self, nid: NodeId, depth: usize) {
-        print!("AST: ");
+        print!("AST: {}: ", nid);
         println!("{}{}", " ".repeat(depth * 4), self.get_tok(nid).slice());
         let children = nid.children(&self.arena);
         for child_nid in children {
@@ -324,12 +325,11 @@ trait SizeItem<'toks> {
 struct Section<'toks> {
     tinfo: &'toks TokenInfo<'toks>,
     nid: NodeId,
-    size: usize,
 }
 
 impl<'toks> Section<'toks> {
     pub fn new(ast: &'toks Ast, nid: NodeId) -> Section<'toks> {
-        Section { tinfo: ast.get_tok(nid), nid, size: 0 }
+        Section { tinfo: ast.get_tok(nid), nid }
     }
 }
 
@@ -344,7 +344,6 @@ impl<'toks> SizeItem<'toks> for Section<'toks> {
 struct Output<'toks> {
     tinfo: &'toks TokenInfo<'toks>,
     nid: NodeId,
-    size: usize,
     sec_nid: NodeId,
     sec_str: &'toks str,
 }
@@ -358,8 +357,7 @@ impl<'toks> Output<'toks> {
         let sec_nid = children.next().unwrap();
         let sec_tinfo = ast.get_tok(sec_nid);
         let sec_str = sec_tinfo.slice();
-        Output { tinfo: ast.get_tok(nid), nid, size: 0,
-                sec_nid, sec_str}
+        Output { tinfo: ast.get_tok(nid), nid, sec_nid, sec_str}
     }
 
     pub fn get_sec_name(&self) -> &'toks str { self.sec_str }
@@ -383,22 +381,22 @@ impl<'toks> SizeItem<'toks> for Output<'toks> {
 struct ASTDB<'toks> {
     sections: HashMap<&'toks str, Section<'toks>>,
     outputs: Vec<Output<'toks>>,
-
 }
 
 impl<'toks> ASTDB<'toks> {
 
     /// Processes a section in the AST
     /// ctxt: the system context
-    /// sec_nid: section node ID in the AST
     fn record_section(ctxt: &mut Context, sec_nid: NodeId, ast: &'toks Ast,
                       sections: &mut HashMap<&'toks str, Section<'toks>> ) -> bool {
+        debug!("ASTDB::record_section: NodeId {}", sec_nid);
+
         // sec_nid points to 'section'
         // the first child of section is the section identifier
         // AST processing guarantees this exists, so unwrap
         let mut children = sec_nid.children(&ast.arena);
-        let sec_nid = children.next().unwrap();
-        let sec_tinfo = ast.get_tok(sec_nid);
+        let name_nid = children.next().unwrap();
+        let sec_tinfo = ast.get_tok(name_nid);
         let sec_str = sec_tinfo.slice();
         if sections.contains_key(sec_str) {
             // error, duplicate section names
@@ -425,7 +423,7 @@ impl<'toks> ASTDB<'toks> {
         // nid points to 'output'
         // don't bother with semantic error checking yet.
         // The lexer already did basic checking
-        debug!("Inventory output at NodeId {}", nid);
+        debug!("ASTDB::record_output: NodeId {}", nid);
         outputs.push(Output::new(&ast, nid));
         true
     }
@@ -450,17 +448,202 @@ impl<'toks> ASTDB<'toks> {
             return None;
         }
 
-        Some(ASTDB { sections: HashMap::new(), outputs: Vec::new() })
+        Some(ASTDB { sections, outputs })
     }
 }
 
 /*****************************************************************************
  * SizeDB
- * The SizeDB contains a map of the logical size in bytes of various items in
- * the AST, e.g. the byte length of a string.
- * The key is the AST NodeID, the value is the size.
+ * The SizeDB contains a map of the logical size in bytes of all items with a
+ * size in the AST. The key is the AST NodeID, the value is the size.
  *****************************************************************************/
-type SizeDB = HashMap<NodeId, usize>;
+struct SizeDB {
+    sizes : HashMap<NodeId, usize>
+}
+
+impl<'toks> SizeDB {
+
+    /// Try to record the logical byte size of a section in the AST
+    fn record_section_size(sec_nid: NodeId, ctxt: &mut Context, ast: &'toks Ast,
+                           ast_db: &ASTDB, sizes: &mut HashMap<NodeId, usize> ) -> bool {
+
+        // If we already have the size, we can return immediately
+        if sizes.contains_key(&sec_nid) {
+            return true;
+        }
+
+        debug!("SizeDB::record_section_size: >>>> ENTER for nid: {}", sec_nid);
+
+        let children = sec_nid.children(&ast.arena);
+        let mut done = true;
+        for nid in children {
+            done = done && Self::record_size_r(nid, ctxt, ast, ast_db, sizes);
+        }
+
+        if done {
+
+            // All the parts of this section have a known size
+            // Sum them up and add an entry into the size_db.
+            let mut total = 0;
+
+            let children = sec_nid.children(&ast.arena);
+            for nid in children {
+                // Not every nid has a size, e.g. curly braces have no size.
+                if let Some(sz) = sizes.get(&nid) {
+                    total += sz;
+                }
+            }
+
+            debug!("SizeDB::record_section_size: nid {} size is {}", sec_nid, total);
+            sizes.insert(sec_nid, total);
+        }
+
+        /*
+        We only need the string name for debug, but save this code.
+
+        // the first child of section is the section identifier
+        // AST processing guarantees this exists, so unwrap
+        let children = sec_nid.children(&ast.arena);
+        let name_nid = children.next().unwrap();
+        let sec_tinfo = ast.get_tok(name_nid);
+        let sec_str = sec_tinfo.slice();
+        debug!("record_section_size: {}", sec_str);
+        */
+
+        debug!("SizeDB::record_section_size: <<<< EXIT({}) for nid: {}", done, sec_nid);
+        done
+    }
+
+    /// Try to record the logical byte size of an output in the AST The logical
+    /// size of an output is the same as the size of the specified section.
+    fn record_output_size(output_nid: NodeId, ctxt: &mut Context, ast: &'toks Ast,
+                          ast_db: &ASTDB, sizes: &mut HashMap<NodeId, usize> ) -> bool {
+
+        // If we already have the size, we can return immediately
+        if sizes.contains_key(&output_nid) {
+            return true;
+        }
+
+        debug!("SizeDB::record_output_size: >>>> ENTER for nid: {}", output_nid);
+
+        let mut children = output_nid.children(&ast.arena);
+        let sec_name_nid = children.next().unwrap();
+        let sec_tinfo = ast.get_tok(sec_name_nid);
+        let sec_str = sec_tinfo.slice();
+        debug!("record_output_size: output section name is {}", sec_str);
+
+        // Using the name of the section, use the AST database to get a reference
+        // to the section object.  ast_db processing has already guaranteed
+        // that the section name is legitimate, so unwrap().
+        let section = ast_db.sections.get(sec_str).unwrap();
+        let sec_nid = section.nid;
+
+        let mut done = false;
+        if let Some(sec_size) = sizes.get(&sec_nid) {
+            // Insert the size of the section as the size of this output.
+            sizes.insert(output_nid, *sec_size);
+            done = true;
+        }
+
+        debug!("SizeDB::record_output_size: <<<< EXIT({}) for nid: {}", done, output_nid);
+        done
+    }
+
+    /// Try to record the logical byte size of string write in the AST. The logical
+    /// size of a string write is the same as the size of associated string.
+    fn record_wrs_size(wrs_nid: NodeId, ctxt: &mut Context, ast: &'toks Ast,
+                      ast_db: &ASTDB, sizes: &mut HashMap<NodeId, usize> ) -> bool {
+
+        // If we already have the size, we can return immediately
+        if sizes.contains_key(&wrs_nid) {
+            return true;
+        }
+
+        debug!("SizeDB::record_wrs_size: >>>> ENTER for nid: {}", wrs_nid);
+
+        let children = wrs_nid.children(&ast.arena);
+        let mut done = true;
+        for nid in children {
+            done = done && Self::record_size_r(nid, ctxt, ast, ast_db, sizes);
+        }
+
+        if done {
+
+            // All the parts of this wrs have a known size.
+            // Sum them up and add an entry into the size_db.
+            let mut total = 0;
+
+            let children = wrs_nid.children(&ast.arena);
+            for nid in children {
+                // Not every nid has a size, e.g. curly braces have no size.
+                if let Some(sz) = sizes.get(&nid) {
+                    total += sz;
+                }
+            }
+
+            debug!("SizeDB::record_wrs_size: nid {} size is {}", wrs_nid, total);
+            sizes.insert(wrs_nid, total);
+        }
+
+        debug!("SizeDB::record_wrs_size: <<<< EXIT({}) for nid: {}", done, wrs_nid);
+        done
+    }
+
+    /// Record the logical byte size of a quoted string.
+    fn record_string_size(str_nid: NodeId, ctxt: &mut Context, ast: &'toks Ast,
+                      ast_db: &ASTDB, sizes: &mut HashMap<NodeId, usize> ) -> bool {
+
+        // If we already have the size, we can return immediately
+        if sizes.contains_key(&str_nid) {
+            return true;
+        }
+
+        debug!("SizeDB::record_str_size: >>>> ENTER for nid: {}", str_nid);
+
+        let str_tinfo = ast.get_tok(str_nid);
+        let str_str = str_tinfo.slice();
+
+        sizes.insert(str_nid, str_str.len());
+
+        debug!("SizeDB::record_wrs_size: <<<< EXIT({}) for nid: {}", true, str_nid);
+        true
+    }
+
+    /// Recursively calculate sizes on the children of the start_nid.
+    /// Returns true if all sizes were known.  False otherwise.
+    fn record_size_r(start_nid: NodeId, ctxt: &mut Context, ast: &'toks Ast,
+                     ast_db: &ASTDB, sizes: &mut HashMap<NodeId, usize>) -> bool {
+
+        debug!("SizeDB::record_size_r: >>>> ENTER");
+        let mut done = true;
+        for nid in start_nid.children(&ast.arena) {
+            let tinfo = ast.get_tok(nid);
+            done = done && match tinfo.tok {
+                LexToken::Section => Self::record_section_size(nid, ctxt, ast, ast_db, sizes),
+                LexToken::Output => Self::record_output_size(nid, ctxt, ast, ast_db, sizes),
+                LexToken::Wrs => Self::record_wrs_size(nid, ctxt, ast, ast_db, sizes),
+                LexToken::QuotedString => Self::record_string_size(nid, ctxt, ast, ast_db, sizes),
+                _ => { true }
+            };
+        }
+        debug!("SizeDB::record_size_r: <<<< EXIT");
+        done
+    }
+
+    pub fn new(ctxt: &mut Context, ast: &'toks Ast, ast_db: &'toks ASTDB) -> SizeDB {
+
+        let mut sizes = HashMap::new();
+        // iterate until the size DB is complete
+        let mut done = false;
+        let root_nid = ast.root;
+        while !done {
+            done = Self::record_size_r(root_nid, ctxt, ast, ast_db, &mut sizes);
+        }
+
+        SizeDB { sizes }
+    }
+
+}
 
 
 /// Entry point for all processing on the input source file
@@ -501,6 +684,8 @@ pub fn process(name: &str, fstr: &str) -> bool {
                 .with_message("No output statement, nothing to do.");
         ctxt.diags.emit(&diag);
     }
+
+    let size_db = SizeDB::new(&mut ctxt, &ast, &ast_db);
 
     true
 }

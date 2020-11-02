@@ -103,6 +103,15 @@ fn simple_section_1() {
 }
 
 #[test]
+fn simple_section_2() {
+    let _cmd = Command::cargo_bin("roust")
+                .unwrap()
+                .arg("tests/simple_section_2.roust")
+                .assert()
+                .success();
+}
+
+#[test]
 fn section_rename_err_1() {
     let _cmd = Command::cargo_bin("roust")
     .unwrap()

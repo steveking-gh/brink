@@ -1,5 +1,5 @@
 section foo {
-    wr "Wow!";
+    wrs "Wow!";
 }
 
 output foo "neat.bin";
