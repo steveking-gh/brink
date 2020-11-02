@@ -464,17 +464,12 @@ struct SizeDB {
 impl<'toks> SizeDB {
 
     /// Try to record the logical byte size of a section in the AST
-    fn record_section_size(sec_nid: NodeId, ctxt: &mut Context, ast: &'toks Ast,
-                           ast_db: &ASTDB, sizes: &mut HashMap<NodeId, usize> ) -> bool {
+    fn record_children_size(parent_nid: NodeId, ctxt: &mut Context, ast: &'toks Ast,
+                            ast_db: &ASTDB, sizes: &mut HashMap<NodeId, usize> ) -> bool {
 
-        // If we already have the size, we can return immediately
-        if sizes.contains_key(&sec_nid) {
-            return true;
-        }
+        debug!("SizeDB::record_children_size: >>>> ENTER for nid: {}", parent_nid);
 
-        debug!("SizeDB::record_section_size: >>>> ENTER for nid: {}", sec_nid);
-
-        let children = sec_nid.children(&ast.arena);
+        let children = parent_nid.children(&ast.arena);
         let mut done = true;
         for nid in children {
             done = done && Self::record_size_r(nid, ctxt, ast, ast_db, sizes);
@@ -486,7 +481,7 @@ impl<'toks> SizeDB {
             // Sum them up and add an entry into the size_db.
             let mut total = 0;
 
-            let children = sec_nid.children(&ast.arena);
+            let children = parent_nid.children(&ast.arena);
             for nid in children {
                 // Not every nid has a size, e.g. curly braces have no size.
                 if let Some(sz) = sizes.get(&nid) {
@@ -494,23 +489,11 @@ impl<'toks> SizeDB {
                 }
             }
 
-            debug!("SizeDB::record_section_size: nid {} size is {}", sec_nid, total);
-            sizes.insert(sec_nid, total);
+            debug!("SizeDB::record_children_size: nid {} size is {}", parent_nid, total);
+            sizes.insert(parent_nid, total);
         }
 
-        /*
-        We only need the string name for debug, but save this code.
-
-        // the first child of section is the section identifier
-        // AST processing guarantees this exists, so unwrap
-        let children = sec_nid.children(&ast.arena);
-        let name_nid = children.next().unwrap();
-        let sec_tinfo = ast.get_tok(name_nid);
-        let sec_str = sec_tinfo.slice();
-        debug!("record_section_size: {}", sec_str);
-        */
-
-        debug!("SizeDB::record_section_size: <<<< EXIT({}) for nid: {}", done, sec_nid);
+        debug!("SizeDB::record_children_size: <<<< EXIT({}) for nid: {}", done, parent_nid);
         done
     }
 
@@ -549,46 +532,6 @@ impl<'toks> SizeDB {
         done
     }
 
-    /// Try to record the logical byte size of string write in the AST. The logical
-    /// size of a string write is the same as the size of associated string.
-    fn record_wrs_size(wrs_nid: NodeId, ctxt: &mut Context, ast: &'toks Ast,
-                      ast_db: &ASTDB, sizes: &mut HashMap<NodeId, usize> ) -> bool {
-
-        // If we already have the size, we can return immediately
-        if sizes.contains_key(&wrs_nid) {
-            return true;
-        }
-
-        debug!("SizeDB::record_wrs_size: >>>> ENTER for nid: {}", wrs_nid);
-
-        let children = wrs_nid.children(&ast.arena);
-        let mut done = true;
-        for nid in children {
-            done = done && Self::record_size_r(nid, ctxt, ast, ast_db, sizes);
-        }
-
-        if done {
-
-            // All the parts of this wrs have a known size.
-            // Sum them up and add an entry into the size_db.
-            let mut total = 0;
-
-            let children = wrs_nid.children(&ast.arena);
-            for nid in children {
-                // Not every nid has a size, e.g. curly braces have no size.
-                if let Some(sz) = sizes.get(&nid) {
-                    total += sz;
-                }
-            }
-
-            debug!("SizeDB::record_wrs_size: nid {} size is {}", wrs_nid, total);
-            sizes.insert(wrs_nid, total);
-        }
-
-        debug!("SizeDB::record_wrs_size: <<<< EXIT({}) for nid: {}", done, wrs_nid);
-        done
-    }
-
     /// Record the logical byte size of a quoted string.
     fn record_string_size(str_nid: NodeId, ctxt: &mut Context, ast: &'toks Ast,
                       ast_db: &ASTDB, sizes: &mut HashMap<NodeId, usize> ) -> bool {
@@ -609,17 +552,23 @@ impl<'toks> SizeDB {
         true
     }
 
-    /// Recursively calculate sizes on the children of the start_nid.
+    /// Recursively calculate sizes.  The size of a node is either it's intrinsic size
+    /// for a leaf node, or the sum of children sizes for a non-leaf.
     /// Returns true if all sizes were known.  False otherwise.
     fn record_size_r(nid: NodeId, ctxt: &mut Context, ast: &'toks Ast,
                      ast_db: &ASTDB, sizes: &mut HashMap<NodeId, usize>) -> bool {
 
+        // If we already have the size, nothing more to do
+        if sizes.contains_key(&nid) {
+            return true;
+        }
+
         debug!("SizeDB::record_size_r: >>>> ENTER for nid {}", nid);
         let tinfo = ast.get_tok(nid);
         let done = match tinfo.tok {
-            LexToken::Section => Self::record_section_size(nid, ctxt, ast, ast_db, sizes),
+            LexToken::Section
+                | LexToken::Wrs => Self::record_children_size(nid, ctxt, ast, ast_db, sizes),
             LexToken::Output => Self::record_output_size(nid, ctxt, ast, ast_db, sizes),
-            LexToken::Wrs => Self::record_wrs_size(nid, ctxt, ast, ast_db, sizes),
             LexToken::QuotedString => Self::record_string_size(nid, ctxt, ast, ast_db, sizes),
             _ => { true }
         };
