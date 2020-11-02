@@ -313,11 +313,6 @@ impl<'toks> Ast<'toks> {
     }
 }
 
-trait SizeItem<'toks> {
-    /// Calculate the size in bytes of the item
-    fn calc_size(&self, db: &'toks ASTDB);
-}
-
 /*******************************
  * Section
  ******************************/
@@ -329,11 +324,6 @@ struct Section<'toks> {
 impl<'toks> Section<'toks> {
     pub fn new(ast: &'toks Ast, nid: NodeId) -> Section<'toks> {
         Section { tinfo: ast.get_tok(nid), nid }
-    }
-}
-
-impl<'toks> SizeItem<'toks> for Section<'toks> {
-    fn calc_size(&self, db: &ASTDB) {
     }
 }
 
@@ -361,15 +351,6 @@ impl<'toks> Output<'toks> {
 
     pub fn get_sec_name(&self) -> &'toks str { self.sec_str }
 }
-
-impl<'toks> SizeItem<'toks> for Output<'toks> {
-    fn calc_size(&self, ast_db: &ASTDB) {
-        // The size of an output is the size of its section
-        let sitem = ast_db.sections.get(self.sec_str).unwrap();
-        sitem.calc_size(ast_db);
-    }
-}
-
 
 /*****************************************************************************
  * ASTDB
@@ -652,6 +633,7 @@ pub fn process(name: &str, fstr: &str) -> bool {
     let size_db = SizeDB::new(&mut ctxt, &ast, &ast_db);
 
     size_db.dump();
+
 
     true
 }
