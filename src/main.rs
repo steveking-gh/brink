@@ -293,8 +293,7 @@ impl<'toks> Ast<'toks> {
     }
 
     fn dump_r(&self, nid: NodeId, depth: usize) {
-        print!("AST: {}: ", nid);
-        println!("{}{}", " ".repeat(depth * 4), self.get_tok(nid).slice());
+        debug!("AST: {}: {}{}", nid, " ".repeat(depth * 4), self.get_tok(nid).slice());
         let children = nid.children(&self.arena);
         for child_nid in children {
             self.dump_r(child_nid, depth+1);
@@ -305,12 +304,12 @@ impl<'toks> Ast<'toks> {
      * Recursively dumps the AST to the console.
      */
     pub fn dump(&self) {
-        println!();
+        debug!("");
         let children = self.root.children(&self.arena);
         for child_nid in children {
             self.dump_r(child_nid, 0);
         }
-        println!();
+        debug!("");
     }
 }
 
@@ -463,6 +462,13 @@ struct SizeDB {
 
 impl<'toks> SizeDB {
 
+    /// Dump the size DB for debug
+    pub fn dump(&self) {
+        for (nid, sz) in &self.sizes {
+            debug!("SizeDB: nid {} is {} bytes", nid, sz);
+        }
+    }
+
     /// Try to record the logical byte size of a section in the AST
     fn record_children_size(parent_nid: NodeId, ctxt: &mut Context, ast: &'toks Ast,
                             ast_db: &ASTDB, sizes: &mut HashMap<NodeId, usize> ) -> bool {
@@ -553,7 +559,8 @@ impl<'toks> SizeDB {
     }
 
     /// Recursively calculate sizes.  The size of a node is either it's intrinsic size
-    /// for a leaf node, or the sum of children sizes for a non-leaf.
+    /// for a leaf node, or the sum of children sizes for a non-leaf.  Many simple
+    /// tokens like ';' have zero size and we don't bother recording them in the DB.
     /// Returns true if all sizes were known.  False otherwise.
     fn record_size_r(nid: NodeId, ctxt: &mut Context, ast: &'toks Ast,
                      ast_db: &ASTDB, sizes: &mut HashMap<NodeId, usize>) -> bool {
@@ -570,7 +577,7 @@ impl<'toks> SizeDB {
                 | LexToken::Wrs => Self::record_children_size(nid, ctxt, ast, ast_db, sizes),
             LexToken::Output => Self::record_output_size(nid, ctxt, ast, ast_db, sizes),
             LexToken::QuotedString => Self::record_string_size(nid, ctxt, ast, ast_db, sizes),
-            _ => { true }
+            _ => { true } // trivial zero size token like ';'.  Don't record anything.
         };
 
         debug!("SizeDB::record_size_r: <<<< EXIT({}) for nid {}", done, nid);
@@ -644,9 +651,7 @@ pub fn process(name: &str, fstr: &str) -> bool {
 
     let size_db = SizeDB::new(&mut ctxt, &ast, &ast_db);
 
-    for (nid, sz) in size_db.sizes {
-        debug!("SizeDB: nid {} is {} bytes", nid, sz);
-    }
+    size_db.dump();
 
     true
 }
