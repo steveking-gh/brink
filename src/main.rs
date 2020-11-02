@@ -530,7 +530,7 @@ impl<'toks> SizeDB {
         let sec_name_nid = children.next().unwrap();
         let sec_tinfo = ast.get_tok(sec_name_nid);
         let sec_str = sec_tinfo.slice();
-        debug!("record_output_size: output section name is {}", sec_str);
+        debug!("SizeDB::record_output_size: output section name is {}", sec_str);
 
         // Using the name of the section, use the AST database to get a reference
         // to the section object.  ast_db processing has already guaranteed
@@ -647,14 +647,17 @@ impl<'toks> SizeDB {
         // iterate until the size DB is complete
         let mut done = false;
 
+        let mut iteration = 1;
         // The root of the AST is in the arena, but has no associated language
         // token. We can't pass the root directly to the recursive size
         // function. So, iterate over the children of the root.
         while !done {
             done = true;
+            debug!("SizeDB::new: Calculating sizes, iteration {}", iteration);
             for nid in ast.root.children(&ast.arena) {
                 done = done && Self::record_size_r(nid, ctxt, ast, ast_db, &mut sizes);
             }
+            iteration += 1;
         }
 
         SizeDB { sizes }
