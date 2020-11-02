@@ -573,18 +573,6 @@ impl<'toks> SizeDB {
             _ => { true }
         };
 
-/*
-        for nid in start_nid.children(&ast.arena) {
-            let tinfo = ast.get_tok(nid);
-            done = done && match tinfo.tok {
-                LexToken::Section => Self::record_section_size(nid, ctxt, ast, ast_db, sizes),
-                LexToken::Output => Self::record_output_size(nid, ctxt, ast, ast_db, sizes),
-                LexToken::Wrs => Self::record_wrs_size(nid, ctxt, ast, ast_db, sizes),
-                LexToken::QuotedString => Self::record_string_size(nid, ctxt, ast, ast_db, sizes),
-                _ => { true }
-            };
-        }
-*/
         debug!("SizeDB::record_size_r: <<<< EXIT({}) for nid {}", done, nid);
         done
     }
