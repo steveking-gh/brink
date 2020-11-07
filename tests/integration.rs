@@ -1,6 +1,3 @@
-use predicates::str::contains;
-
-
 #[cfg(test)]
 mod tests {
 use assert_cmd::{Command};
