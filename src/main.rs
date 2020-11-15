@@ -447,77 +447,162 @@ mod ast {
     }
 }
 
+/**
+ * Tracks the size and absolute address of avery object associated
+ * with an output.
+ */
+struct ActionInfo {
+    abs_addr: usize,
+    size: usize,
+    done: bool,
+}
+
+impl ActionInfo {
+    pub fn new(abs_addr: usize) -> ActionInfo {
+        ActionInfo { abs_addr, size: 0, done: false}
+    }
+}
+
 /*****************************************************************************
- * SizeDB
- * The SizeDB contains a map of the logical size in bytes of all items with a
+ * InfoDB
+ * The InfoDB contains a map of the logical size in bytes of all items with a
  * size in the AST. The key is the AST NodeID, the value is the size.
  *****************************************************************************/
-struct SizeDB {
-    sizes : HashMap<NodeId, usize>
+struct InfoDB {
+    infos : HashMap<NodeId, ActionInfo>
 }
 
 use ast::{Ast,AstDb};
 
-impl<'toks> SizeDB {
+impl<'toks> InfoDB {
 
-    /// Dump the size DB for debug
+    /// Dump the DB for debug
     pub fn dump(&self) {
-        for (nid, sz) in &self.sizes {
-            debug!("SizeDB: nid {} is {} bytes", nid, sz);
+        for (nid, info) in &self.infos {
+            debug!("InfoDB: nid {} is {} bytes at absolute address {}",
+                    nid, info.size, info.abs_addr);
         }
     }
 
-    /// Try to record the logical byte size of a section in the AST
-    fn record_children_size(parent_nid: NodeId, ctxt: &mut Context, ast: &'toks Ast,
-                            ast_db: &AstDb, sizes: &mut HashMap<NodeId, usize> ) -> bool {
+    /// Recursively record information about the children of an AST object.
+    /// This function assumes the caller already checked if the parent_nid
+    /// has a completed entry in the info_db and this function is only called
+    /// when the parent is not 'done'.
+    fn record_children_info(parent_nid: NodeId, ctxt: &mut Context, ast: &'toks Ast,
+                            ast_db: &AstDb, abs_start: &mut usize,
+                            info_db: &mut HashMap<NodeId, ActionInfo> ) -> bool {
 
-        debug!("SizeDB::record_children_size: >>>> ENTER for nid: {}", parent_nid);
+        debug!("InfoDB::record_children_info: >>>> ENTER for parent nid: {} at {}",
+                parent_nid, *abs_start);
 
         let children = parent_nid.children(&ast.arena);
         let mut done = true;
         for nid in children {
-            done = done && Self::record_size_r(nid, ctxt, ast, ast_db, sizes);
+            done = done && Self::record_info_r(nid, ctxt, ast, ast_db, abs_start, info_db);
         }
 
         if done {
 
-            // All the parts of this section have a known size
-            // Sum them up and add an entry into the size_db.
+            // All the children of this object have a known size
+            // Update the info_db with the sum.
             let mut total = 0;
 
             let children = parent_nid.children(&ast.arena);
             for nid in children {
                 // Not every nid has a size, e.g. curly braces have no size.
-                if let Some(sz) = sizes.get(&nid) {
-                    total += sz;
+                if let Some(info) = info_db.get(&nid) {
+                    // If the function returns done, then all the children should
+                    // record that they're all done too.
+                    assert_eq!(info.done, true);
+                    total += info.size;
                 }
             }
 
-            debug!("SizeDB::record_children_size: nid {} size is {}", parent_nid, total);
-            sizes.insert(parent_nid, total);
+            debug!("InfoDB::record_children_info: nid {} is done with size {}", parent_nid, total);
+
+            // Get the existing info or make a new one.  The caller is required to create
+            // the info_db entry for the parent.
+            let parent_info = info_db.get_mut(&parent_nid).unwrap();
+
+            parent_info.size = total;
+            parent_info.done = true;
         }
 
-        debug!("SizeDB::record_children_size: <<<< EXIT({}) for nid: {}", done, parent_nid);
+        debug!("InfoDB::record_children_info: <<<< EXIT({}) for nid: {}", done, parent_nid);
         done
     }
 
-    /// Try to record the logical byte size of an output in the AST The logical
-    /// size of an output is the same as the size of the specified section.
-    fn record_output_size(output_nid: NodeId, _ctxt: &mut Context, ast: &'toks Ast,
-                          ast_db: &AstDb, sizes: &mut HashMap<NodeId, usize> ) -> bool {
+    /// Update the info database for a string write
+    fn record_string_info(nid: NodeId, _ctxt: &mut Context, ast: &'toks Ast,
+                      _ast_db: &AstDb, abs_start: &mut usize,
+                      info_db: &mut HashMap<NodeId, ActionInfo> ) -> bool {
 
-        // If we already have the size, we can return immediately
-        if sizes.contains_key(&output_nid) {
+        // Get the existing info or make a new one
+        let info = info_db.entry(nid).or_insert_with(|| ActionInfo::new(*abs_start));
+
+        // If this info is done, then it's stabilized.  No need to iterate on it,
+        // just return the final results.
+        if info.done {
+            *abs_start += info.size;
             return true;
         }
 
-        debug!("SizeDB::record_output_size: >>>> ENTER for nid: {}", output_nid);
+        debug!("InfoDB::record_str_size: >>>> ENTER for nid: {} at {}", nid, *abs_start);
+
+        let str_tinfo = ast.get_tok(nid);
+        let str_str = str_tinfo.slice();
+
+        info.done = true;
+        info.size = str_str.len();
+
+        debug!("InfoDB::record_wrs_size: <<<< EXIT({}) for nid: {}", true, nid);
+        true
+    }
+
+    /// Recursively calculate sizes.  The size of a node is either it's
+    /// intrinsic size for a leaf node, or the sum of children sizes for a
+    /// non-leaf.  Many simple tokens like ';' have zero size and we don't
+    /// bother recording them in the DB. Returns true if all sizes were known.
+    /// False otherwise.
+    fn record_info_r(nid: NodeId, ctxt: &mut Context, ast: &'toks Ast,
+                     ast_db: &AstDb, abs_start: &mut usize,
+                     info_db: &mut HashMap<NodeId, ActionInfo>) -> bool {
+
+        // Get the existing info or make a new one
+        let info = info_db.entry(nid).or_insert_with(|| ActionInfo::new(*abs_start));
+
+        // If this info is done, then it's stabilized.  No need to iterate on it,
+        // just return the final results.
+        if info.done {
+            *abs_start += info.size;
+            return true;
+        }
+
+        debug!("InfoDB::record_info_r: >>>> ENTER for nid {} at {}", nid, *abs_start);
+        let tinfo = ast.get_tok(nid);
+        let done = match tinfo.tok {
+            LexToken::Section
+                | LexToken::Wrs => Self::record_children_info(nid, ctxt, ast, ast_db, abs_start, info_db),
+            LexToken::QuotedString => Self::record_string_info(nid, ctxt, ast, ast_db, abs_start, info_db),
+            _ => { info.done = true; true } // trivial zero size token like ';'.
+        };
+
+        debug!("InfoDB::record_info_r: <<<< EXIT({}) for nid {}", done, nid);
+        done
+    }
+
+    /// The InfoDB object must start with an output statement
+    pub fn new(output_nid: NodeId, ctxt: &mut Context, ast: &'toks Ast,
+               ast_db: &'toks AstDb, abs_start: usize) -> InfoDB {
+
+        debug!("InfoDB::new: >>>> ENTER for output nid: {} at {}", output_nid, abs_start);
+        let mut infos = HashMap::new();
 
         let mut children = output_nid.children(&ast.arena);
         let sec_name_nid = children.next().unwrap();
         let sec_tinfo = ast.get_tok(sec_name_nid);
         let sec_str = sec_tinfo.slice();
-        debug!("SizeDB::record_output_size: output section name is {}", sec_str);
+        debug!("InfoDB::new: output section name is {}", sec_str);
 
         // Using the name of the section, use the AST database to get a reference
         // to the section object.  ast_db processing has already guaranteed
@@ -525,88 +610,21 @@ impl<'toks> SizeDB {
         let section = ast_db.sections.get(sec_str).unwrap();
         let sec_nid = section.nid;
 
-        let mut done = false;
-        if let Some(&sec_size) = sizes.get(&sec_nid) {
-            // Insert the size of the section as the size of this output.
-            sizes.insert(output_nid, sec_size);
-            done = true;
-        }
-
-        debug!("SizeDB::record_output_size: <<<< EXIT({}) for nid: {}", done, output_nid);
-        done
-    }
-
-    /// Record the logical byte size of a quoted string.
-    fn record_string_size(str_nid: NodeId, _ctxt: &mut Context, ast: &'toks Ast,
-                      _ast_db: &AstDb, sizes: &mut HashMap<NodeId, usize> ) -> bool {
-
-        // If we already have the size, we can return immediately
-        if sizes.contains_key(&str_nid) {
-            return true;
-        }
-
-        debug!("SizeDB::record_str_size: >>>> ENTER for nid: {}", str_nid);
-
-        let str_tinfo = ast.get_tok(str_nid);
-        let str_str = str_tinfo.slice();
-
-        sizes.insert(str_nid, str_str.len());
-
-        debug!("SizeDB::record_wrs_size: <<<< EXIT({}) for nid: {}", true, str_nid);
-        true
-    }
-
-    /// Recursively calculate sizes.  The size of a node is either it's intrinsic size
-    /// for a leaf node, or the sum of children sizes for a non-leaf.  Many simple
-    /// tokens like ';' have zero size and we don't bother recording them in the DB.
-    /// Returns true if all sizes were known.  False otherwise.
-    fn record_size_r(nid: NodeId, ctxt: &mut Context, ast: &'toks Ast,
-                     ast_db: &AstDb, sizes: &mut HashMap<NodeId, usize>) -> bool {
-
-        // If we already have the size, nothing more to do
-        if sizes.contains_key(&nid) {
-            return true;
-        }
-
-        debug!("SizeDB::record_size_r: >>>> ENTER for nid {}", nid);
-        let tinfo = ast.get_tok(nid);
-        let done = match tinfo.tok {
-            LexToken::Section
-                | LexToken::Wrs => Self::record_children_size(nid, ctxt, ast, ast_db, sizes),
-            LexToken::Output => Self::record_output_size(nid, ctxt, ast, ast_db, sizes),
-            LexToken::QuotedString => Self::record_string_size(nid, ctxt, ast, ast_db, sizes),
-            _ => { true } // trivial zero size token like ';'.  Don't record anything.
-        };
-
-        debug!("SizeDB::record_size_r: <<<< EXIT({}) for nid {}", done, nid);
-        done
-    }
-
-    pub fn new(ctxt: &mut Context, ast: &'toks Ast, ast_db: &'toks AstDb) -> SizeDB {
-
-        let mut sizes = HashMap::new();
-
-        // iterate until the size DB is complete
+        // iterate until the database is complete
         let mut done = false;
 
         let mut iteration = 1;
-        // The root of the AST is in the arena, but has no associated language
-        // token. We can't pass the root directly to the recursive size
-        // function. So, iterate over the children of the root.
         while !done {
-            done = true;
-            debug!("SizeDB::new: Calculating sizes, iteration {}", iteration);
-            for nid in ast.root.children(&ast.arena) {
-                done = done && Self::record_size_r(nid, ctxt, ast, ast_db, &mut sizes);
-            }
+            let mut start = abs_start;
+            debug!("InfoDB::new: Calculating sizes and addresses, iteration {}", iteration);
+            done = Self::record_children_info(sec_nid, ctxt, ast, ast_db, &mut start, &mut infos);
             iteration += 1;
         }
 
-        SizeDB { sizes }
+        debug!("InfoDB::new: <<<< EXIT for nid: {}", output_nid);
+        InfoDB { infos }
     }
-
 }
-
 
 /// Entry point for all processing on the input source file
 /// name: The name of the file
@@ -647,11 +665,14 @@ pub fn process(name: &str, fstr: &str) -> bool {
         ctxt.diags.emit(&diag);
     }
 
-    let size_db = SizeDB::new(&mut ctxt, &ast, &ast_db);
-
-    size_db.dump();
-
-
+    // Take the reference to the ast_db to avoid a move due to the
+    // implicit into_iter().
+    // http://xion.io/post/code/rust-for-loop.html
+    // https://stackoverflow.com/q/43036279/233981
+    for outp in &ast_db.outputs {
+        let info_db = InfoDB::new(outp.nid, &mut ctxt, &ast, &ast_db, 0);
+        info_db.dump();
+    }
     true
 }
 
