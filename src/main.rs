@@ -488,6 +488,7 @@ impl<'toks> InfoDB {
     /// This function assumes the caller already checked if the parent_nid
     /// has a completed entry in the info_db and this function is only called
     /// when the parent is not 'done'.
+    /// On completion, info object for the parent is updated if done.
     fn record_children_info(parent_nid: NodeId, ctxt: &mut Context, ast: &'toks Ast,
                             ast_db: &AstDb, abs_start: &mut usize,
                             info_db: &mut HashMap<NodeId, ActionInfo> ) -> bool {
@@ -519,10 +520,9 @@ impl<'toks> InfoDB {
             }
 
             debug!("InfoDB::record_children_info: nid {} is done with size {}", parent_nid, total);
-
-            // Get the existing info or make a new one.  The caller is required to create
-            // the info_db entry for the parent.
-            let parent_info = info_db.get_mut(&parent_nid).unwrap();
+            // If we don't have an info_db entry for the parent yet, create one.
+            let mut parent_info = info_db.entry(parent_nid).or_insert_with(
+                || ActionInfo::new(*abs_start));
 
             parent_info.size = total;
             parent_info.done = true;
@@ -547,7 +547,7 @@ impl<'toks> InfoDB {
             return true;
         }
 
-        debug!("InfoDB::record_str_size: >>>> ENTER for nid: {} at {}", nid, *abs_start);
+        debug!("InfoDB::record_wrs_size: >>>> ENTER for nid: {} at {}", nid, *abs_start);
 
         let str_tinfo = ast.get_tok(nid);
         let str_str = str_tinfo.slice();
@@ -597,6 +597,9 @@ impl<'toks> InfoDB {
 
         debug!("InfoDB::new: >>>> ENTER for output nid: {} at {}", output_nid, abs_start);
         let mut infos = HashMap::new();
+
+        // make an entry for this output statement.
+        infos.insert(output_nid, ActionInfo::new(abs_start));
 
         let mut children = output_nid.children(&ast.arena);
         let sec_name_nid = children.next().unwrap();
