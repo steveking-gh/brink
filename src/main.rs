@@ -454,12 +454,11 @@ mod ast {
 struct ActionInfo {
     abs_addr: usize,
     size: usize,
-    done: bool,
 }
 
 impl ActionInfo {
     pub fn new(abs_addr: usize) -> ActionInfo {
-        ActionInfo { abs_addr, size: 0, done: false}
+        ActionInfo { abs_addr, size: 0}
     }
 }
 
@@ -491,104 +490,81 @@ impl<'toks> InfoDB {
     /// On completion, info object for the parent is updated if done.
     fn record_children_info(parent_nid: NodeId, ctxt: &mut Context, ast: &'toks Ast,
                             ast_db: &AstDb, abs_start: &mut usize,
-                            info_db: &mut HashMap<NodeId, ActionInfo> ) -> bool {
+                            info_db: &mut HashMap<NodeId, ActionInfo> ) {
 
         debug!("InfoDB::record_children_info: >>>> ENTER for parent nid: {} at {}",
                 parent_nid, *abs_start);
 
         let children = parent_nid.children(&ast.arena);
-        let mut done = true;
         for nid in children {
-            done = done && Self::record_info_r(nid, ctxt, ast, ast_db, abs_start, info_db);
+            Self::record_info_r(nid, ctxt, ast, ast_db, abs_start, info_db);
         }
 
-        if done {
+        let mut total = 0;
 
-            // All the children of this object have a known size
-            // Update the info_db with the sum.
-            let mut total = 0;
-
-            let children = parent_nid.children(&ast.arena);
-            for nid in children {
-                // Not every nid has a size, e.g. curly braces have no size.
-                if let Some(info) = info_db.get(&nid) {
-                    // If the function returns done, then all the children should
-                    // record that they're all done too.
-                    assert_eq!(info.done, true);
-                    total += info.size;
-                }
+        let children = parent_nid.children(&ast.arena);
+        for nid in children {
+            // Not every nid has a size, e.g. curly braces have no size.
+            if let Some(info) = info_db.get(&nid) {
+                // If the function returns done, then all the children should
+                // record that they're all done too.
+                total += info.size;
             }
-
-            debug!("InfoDB::record_children_info: nid {} is done with size {}", parent_nid, total);
-            // If we don't have an info_db entry for the parent yet, create one.
-            let mut parent_info = info_db.entry(parent_nid).or_insert_with(
-                || ActionInfo::new(*abs_start));
-
-            parent_info.size = total;
-            parent_info.done = true;
         }
 
-        debug!("InfoDB::record_children_info: <<<< EXIT({}) for nid: {}", done, parent_nid);
-        done
+        debug!("InfoDB::record_children_info: nid {} has size {}", parent_nid, total);
+        // If we don't have an info_db entry for the parent yet, create one.
+        let mut parent_info = info_db.entry(parent_nid).or_insert_with(
+            || ActionInfo::new(*abs_start));
+
+        parent_info.size = total;
+        parent_info.abs_addr = *abs_start;
+        // Don't update the current address, since the children
+        // already added in their sizes.
+
+        debug!("InfoDB::record_children_info: <<<< EXIT for nid: {}", parent_nid);
     }
 
     /// Update the info database for a string write
     fn record_string_info(nid: NodeId, _ctxt: &mut Context, ast: &'toks Ast,
                       _ast_db: &AstDb, abs_start: &mut usize,
-                      info_db: &mut HashMap<NodeId, ActionInfo> ) -> bool {
+                      info_db: &mut HashMap<NodeId, ActionInfo> ) {
+
+        debug!("InfoDB::record_string_info: >>>> ENTER for nid: {} at {}", nid, *abs_start);
 
         // Get the existing info or make a new one
         let info = info_db.entry(nid).or_insert_with(|| ActionInfo::new(*abs_start));
 
-        // If this info is done, then it's stabilized.  No need to iterate on it,
-        // just return the final results.
-        if info.done {
-            *abs_start += info.size;
-            return true;
-        }
-
-        debug!("InfoDB::record_wrs_size: >>>> ENTER for nid: {} at {}", nid, *abs_start);
 
         let str_tinfo = ast.get_tok(nid);
         let str_str = str_tinfo.slice();
 
-        info.done = true;
         info.size = str_str.len();
+        info.abs_addr = *abs_start;
+        *abs_start += info.size;
 
-        debug!("InfoDB::record_wrs_size: <<<< EXIT({}) for nid: {}", true, nid);
-        true
+        debug!("InfoDB::record_string_info: <<<< EXIT for nid: {}", nid);
     }
 
     /// Recursively calculate sizes.  The size of a node is either it's
     /// intrinsic size for a leaf node, or the sum of children sizes for a
     /// non-leaf.  Many simple tokens like ';' have zero size and we don't
-    /// bother recording them in the DB. Returns true if all sizes were known.
-    /// False otherwise.
+    /// bother recording them in the DB.
     fn record_info_r(nid: NodeId, ctxt: &mut Context, ast: &'toks Ast,
                      ast_db: &AstDb, abs_start: &mut usize,
-                     info_db: &mut HashMap<NodeId, ActionInfo>) -> bool {
-
-        // Get the existing info or make a new one
-        let info = info_db.entry(nid).or_insert_with(|| ActionInfo::new(*abs_start));
-
-        // If this info is done, then it's stabilized.  No need to iterate on it,
-        // just return the final results.
-        if info.done {
-            *abs_start += info.size;
-            return true;
-        }
+                     info_db: &mut HashMap<NodeId, ActionInfo>) {
 
         debug!("InfoDB::record_info_r: >>>> ENTER for nid {} at {}", nid, *abs_start);
+
         let tinfo = ast.get_tok(nid);
-        let done = match tinfo.tok {
+        match tinfo.tok {
             LexToken::Section
                 | LexToken::Wrs => Self::record_children_info(nid, ctxt, ast, ast_db, abs_start, info_db),
             LexToken::QuotedString => Self::record_string_info(nid, ctxt, ast, ast_db, abs_start, info_db),
-            _ => { info.done = true; true } // trivial zero size token like ';'.
+            _ => () // trivial zero size token like ';'.
         };
 
-        debug!("InfoDB::record_info_r: <<<< EXIT({}) for nid {}", done, nid);
-        done
+        debug!("InfoDB::record_info_r: <<<< EXIT() for nid {}", nid);
     }
 
     /// The InfoDB object must start with an output statement
@@ -613,14 +589,21 @@ impl<'toks> InfoDB {
         let section = ast_db.sections.get(sec_str).unwrap();
         let sec_nid = section.nid;
 
-        // iterate until the database is complete
-        let mut done = false;
-
         let mut iteration = 1;
-        while !done {
+
+        // Iterate until the size of the section stops changing.
+        loop {
             let mut start = abs_start;
             debug!("InfoDB::new: Calculating sizes and addresses, iteration {}", iteration);
-            done = Self::record_children_info(sec_nid, ctxt, ast, ast_db, &mut start, &mut infos);
+            Self::record_children_info(sec_nid, ctxt, ast, ast_db, &mut start, &mut infos);
+
+            // get the info for the section for this output
+            let sec_info_size = infos.get(&sec_nid).unwrap().size;
+            let mut output_info = infos.get_mut(&output_nid).unwrap();
+            if output_info.size == sec_info_size {
+                break;
+            }
+            output_info.size = sec_info_size;
             iteration += 1;
         }
 
