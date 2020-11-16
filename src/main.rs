@@ -600,6 +600,8 @@ impl<'toks> InfoDB {
             // get the info for the section for this output
             let sec_info_size = infos.get(&sec_nid).unwrap().size;
             let mut output_info = infos.get_mut(&output_nid).unwrap();
+
+            // When the size stops changing, we're done iterating
             if output_info.size == sec_info_size {
                 break;
             }
