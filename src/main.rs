@@ -3,7 +3,6 @@
 
 #![warn(clippy::all)]
 
-use std::collections::HashMap;
 use std::vec::Vec;
 use std::{io,fs};
 use logos::{Logos};
@@ -375,6 +374,7 @@ mod ast {
     pub struct AstDb<'toks> {
         pub sections: HashMap<&'toks str, Section<'toks>>,
         pub outputs: Vec<Output<'toks>>,
+        //pub properties: HashMap<NodeId, NodeProperty>
     }
 
     impl<'toks> AstDb<'toks> {
@@ -447,141 +447,161 @@ mod ast {
     }
 }
 
-/**
- * Tracks the size and absolute address of avery object associated
- * with an output.
- */
-struct ActionInfo {
-    abs_addr: usize,
-    size: usize,
+trait ActionInfo {
+    fn set_abs_addr(&mut self, abs: usize);
+    fn get_abs_addr(&self) -> usize;
+    fn get_nid(&self) -> NodeId;
+    fn get_size(&self) -> usize;
+    fn write(&self);
+    fn get_type_str(&self) -> &'static str;
 }
 
-impl ActionInfo {
-    pub fn new(abs_addr: usize) -> ActionInfo {
-        ActionInfo { abs_addr, size: 0}
+struct WrsActionInfo<'toks> {
+    abs_addr: usize,
+    nid: NodeId,
+    str_nid: NodeId,
+    str_size: usize,
+    strout: &'toks str,
+}
+
+impl<'toks> WrsActionInfo<'toks> {
+    pub fn new(abs_addr: usize, nid: NodeId, ast: &'toks Ast) -> WrsActionInfo<'toks> {
+        debug!("WrsActionInfo::new: >>>> ENTER for nid {} at {}", nid, abs_addr);
+        let mut children = nid.children(&ast.arena);
+        let str_nid = children.next().unwrap();
+        let str_tinfo = ast.get_tok(str_nid);
+        let strout = str_tinfo.slice();
+        debug!("WrsActionInfo::new: output string at nid {} is {}", str_nid, strout);
+        let str_size = strout.len();
+        debug!("WrsActionInfo::new: <<<< EXIT for nid {}", nid);
+        WrsActionInfo{ abs_addr, nid, str_nid, str_size, strout}
+    }
+}
+
+impl<'toks> ActionInfo for WrsActionInfo<'toks> {
+    fn set_abs_addr(&mut self, abs: usize) { self.abs_addr = abs; }
+    fn get_abs_addr(&self) -> usize { self.abs_addr}
+    fn get_nid(&self) -> NodeId { self.nid}
+    fn get_size(&self) -> usize { self.str_size }
+    fn write(&self) {} // temp for debug
+    fn get_type_str(&self) -> &'static str {
+        "wrs"
     }
 }
 
 /*****************************************************************************
- * InfoDB
- * The InfoDB contains a map of the logical size in bytes of all items with a
+ * ActionDB
+ * The ActionDB contains a map of the logical size in bytes of all items with a
  * size in the AST. The key is the AST NodeID, the value is the size.
  *****************************************************************************/
-struct InfoDB {
-    infos : HashMap<NodeId, ActionInfo>
+struct ActionDB<'toks> {
+    actions : Vec<Box<dyn ActionInfo + 'toks>>,
 }
 
 use ast::{Ast,AstDb};
 
-impl<'toks> InfoDB {
+impl<'toks> ActionDB<'toks> {
 
     /// Dump the DB for debug
     pub fn dump(&self) {
-        for (nid, info) in &self.infos {
-            debug!("InfoDB: nid {} is {} bytes at absolute address {}",
-                    nid, info.size, info.abs_addr);
+        for a in &self.actions {
+            debug!("ActionDB: nid {} is {} bytes at absolute address {}",
+                    a.get_nid(), a.get_size(), a.get_abs_addr());
         }
     }
 
-    /// Recursively record information about the children of an AST object.
-    /// This function assumes the caller already checked if the parent_nid
-    /// has a completed entry in the info_db and this function is only called
-    /// when the parent is not 'done'.
-    /// On completion, info object for the parent is updated if done.
-    fn record_children_info(parent_nid: NodeId, ctxt: &mut Context, ast: &'toks Ast,
-                            ast_db: &AstDb, abs_start: &mut usize,
-                            info_db: &mut HashMap<NodeId, ActionInfo> ) {
+    pub fn new(linear_db: &LinearDB, ctxt: &mut Context, ast: &'toks Ast,
+               ast_db: &'toks AstDb, abs_start: usize) -> ActionDB<'toks> {
 
-        debug!("InfoDB::record_children_info: >>>> ENTER for parent nid: {} at {}",
-                parent_nid, *abs_start);
+        debug!("ActionDB::new: >>>> ENTER for output nid: {} at {}", linear_db.output_nid,
+                abs_start);
+        let mut actions : Vec<Box<dyn ActionInfo + 'toks>> = Vec::new();
+        let output_nid = linear_db.output_nid;
 
-        let children = parent_nid.children(&ast.arena);
-        for nid in children {
-            Self::record_info_r(nid, ctxt, ast, ast_db, abs_start, info_db);
+        // Using the name of the section, use the AST database to get a reference
+        // to the section object.  ast_db processing has already guaranteed
+        // that the section name is legitimate, so unwrap().
+        let mut children = output_nid.children(&ast.arena);
+        let sec_name_nid = children.next().unwrap();
+        let sec_tinfo = ast.get_tok(sec_name_nid);
+        let sec_str = sec_tinfo.slice();
+        debug!("ActionDB::new: output section name is {}", sec_str);
+
+
+        // Iterate until the size of the section stops changing.
+        let mut start = abs_start;
+        let mut new_size = 0;
+        for &nid in &linear_db.nidvec {
+            let tinfo = ast.get_tok(nid);
+            match tinfo.tok {
+                LexToken::Wrs => {
+                    let wrsa = Box::new(WrsActionInfo::new(start, nid, ast));
+                    let sz = wrsa.get_size();
+                    start += sz;
+                    new_size += sz;
+                    actions.push(wrsa);
+                },
+                _ => () // trivial zero size token like ';'.
+            };
         }
 
-        let mut total = 0;
-
-        let children = parent_nid.children(&ast.arena);
-        for nid in children {
-            // Not every nid has a size, e.g. curly braces have no size.
-            if let Some(info) = info_db.get(&nid) {
-                // If the function returns done, then all the children should
-                // record that they're all done too.
-                total += info.size;
+        let mut old_size = new_size;
+        let mut iteration = 1;
+        loop {
+            new_size = 0;
+            for ainfo in &actions {
+                debug!("ActionDB:new: Iterating for {} at nid {}", ainfo.get_type_str(), ainfo.get_nid());
+                let sz = ainfo.get_size();
+                start += sz;
+                new_size += sz;
             }
+
+            if old_size == new_size {
+                break;
+            }
+            debug!("ActionDB:new: Size for iteration {} is {}", iteration, new_size);
+            old_size = new_size;
+            iteration += 1;
         }
 
-        debug!("InfoDB::record_children_info: nid {} has size {}", parent_nid, total);
-        // If we don't have an info_db entry for the parent yet, create one.
-        let mut parent_info = info_db.entry(parent_nid).or_insert_with(
-            || ActionInfo::new(*abs_start));
+        debug!("ActionDB::new: <<<< EXIT with size {}", new_size);
+        ActionDB { actions }
+    }
+}
 
-        parent_info.size = total;
-        parent_info.abs_addr = *abs_start;
-        // Don't update the current address, since the children
-        // already added in their sizes.
+struct LinearDB {
+    output_nid: NodeId,
+    nidvec : Vec<NodeId>,
+}
 
-        debug!("InfoDB::record_children_info: <<<< EXIT for nid: {}", parent_nid);
+impl<'toks> LinearDB {
+    /// Recursively record information about the children of an AST object.
+    fn record_r(&mut self, parent_nid: NodeId, ctxt: &mut Context,
+                            ast: &'toks Ast, ast_db: &AstDb) {
+
+        debug!("LinearDB::record_children_info: >>>> ENTER for parent nid: {}",
+                parent_nid);
+
+        self.nidvec.push(parent_nid);
+        let children = parent_nid.children(&ast.arena);
+        for nid in children {
+            self.record_r(nid, ctxt, ast, ast_db);
+        }
+        debug!("LinearDB::record_r: <<<< EXIT for nid: {}", parent_nid);
     }
 
-    /// Update the info database for a string write
-    fn record_string_info(nid: NodeId, _ctxt: &mut Context, ast: &'toks Ast,
-                      _ast_db: &AstDb, abs_start: &mut usize,
-                      info_db: &mut HashMap<NodeId, ActionInfo> ) {
-
-        debug!("InfoDB::record_string_info: >>>> ENTER for nid: {} at {}", nid, *abs_start);
-
-        // Get the existing info or make a new one
-        let info = info_db.entry(nid).or_insert_with(|| ActionInfo::new(*abs_start));
-
-
-        let str_tinfo = ast.get_tok(nid);
-        let str_str = str_tinfo.slice();
-
-        info.size = str_str.len();
-        info.abs_addr = *abs_start;
-        *abs_start += info.size;
-
-        debug!("InfoDB::record_string_info: <<<< EXIT for nid: {}", nid);
-    }
-
-    /// Recursively calculate sizes.  The size of a node is either it's
-    /// intrinsic size for a leaf node, or the sum of children sizes for a
-    /// non-leaf.  Many simple tokens like ';' have zero size and we don't
-    /// bother recording them in the DB.
-    fn record_info_r(nid: NodeId, ctxt: &mut Context, ast: &'toks Ast,
-                     ast_db: &AstDb, abs_start: &mut usize,
-                     info_db: &mut HashMap<NodeId, ActionInfo>) {
-
-        debug!("InfoDB::record_info_r: >>>> ENTER for nid {} at {}", nid, *abs_start);
-
-        let tinfo = ast.get_tok(nid);
-        match tinfo.tok {
-            LexToken::Section
-                | LexToken::Wrs => Self::record_children_info(nid, ctxt, ast, ast_db, abs_start, info_db),
-            LexToken::QuotedString => Self::record_string_info(nid, ctxt, ast, ast_db, abs_start, info_db),
-            _ => () // trivial zero size token like ';'.
-        };
-
-        debug!("InfoDB::record_info_r: <<<< EXIT() for nid {}", nid);
-    }
-
-    /// The InfoDB object must start with an output statement
+    /// The ActionDB object must start with an output statement
     pub fn new(output_nid: NodeId, ctxt: &mut Context, ast: &'toks Ast,
-               ast_db: &'toks AstDb, abs_start: usize) -> InfoDB {
+               ast_db: &'toks AstDb) -> LinearDB {
 
-        debug!("InfoDB::new: >>>> ENTER for output nid: {} at {}", output_nid, abs_start);
-        let mut infos = HashMap::new();
-
-        // make an entry for this output statement.
-        infos.insert(output_nid, ActionInfo::new(abs_start));
+        debug!("LinearDB::new: >>>> ENTER for output nid: {}", output_nid);
+        let mut linear_db = LinearDB { output_nid, nidvec: Vec::new() };
 
         let mut children = output_nid.children(&ast.arena);
         let sec_name_nid = children.next().unwrap();
         let sec_tinfo = ast.get_tok(sec_name_nid);
         let sec_str = sec_tinfo.slice();
-        debug!("InfoDB::new: output section name is {}", sec_str);
+        debug!("LinearDB::new: output section name is {}", sec_str);
 
         // Using the name of the section, use the AST database to get a reference
         // to the section object.  ast_db processing has already guaranteed
@@ -589,28 +609,17 @@ impl<'toks> InfoDB {
         let section = ast_db.sections.get(sec_str).unwrap();
         let sec_nid = section.nid;
 
-        let mut iteration = 1;
+        linear_db.record_r(sec_nid, ctxt, ast, ast_db);
 
-        // Iterate until the size of the section stops changing.
-        loop {
-            let mut start = abs_start;
-            debug!("InfoDB::new: Calculating sizes and addresses, iteration {}", iteration);
-            Self::record_children_info(sec_nid, ctxt, ast, ast_db, &mut start, &mut infos);
+        debug!("LinearDB::new: <<<< EXIT for nid: {}", output_nid);
+        linear_db
+    }
 
-            // get the info for the section for this output
-            let sec_info_size = infos.get(&sec_nid).unwrap().size;
-            let mut output_info = infos.get_mut(&output_nid).unwrap();
-
-            // When the size stops changing, we're done iterating
-            if output_info.size == sec_info_size {
-                break;
-            }
-            output_info.size = sec_info_size;
-            iteration += 1;
+    fn dump(&self) {
+        debug!("LinearDB: Output NID {}", self.output_nid);
+        for nid in &self.nidvec {
+            debug!("LinearDB: {}", nid);
         }
-
-        debug!("InfoDB::new: <<<< EXIT for nid: {}", output_nid);
-        InfoDB { infos }
     }
 }
 
@@ -658,7 +667,9 @@ pub fn process(name: &str, fstr: &str) -> bool {
     // http://xion.io/post/code/rust-for-loop.html
     // https://stackoverflow.com/q/43036279/233981
     for outp in &ast_db.outputs {
-        let info_db = InfoDB::new(outp.nid, &mut ctxt, &ast, &ast_db, 0);
+        let linear_db = LinearDB::new(outp.nid, &mut ctxt, &ast, &ast_db);
+        linear_db.dump();
+        let info_db = ActionDB::new(&linear_db, &mut ctxt, &ast, &ast_db, 0);
         info_db.dump();
     }
     true
