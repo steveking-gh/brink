@@ -2,11 +2,13 @@
     "cSpell.words": [
         "Pretoken",
         "Pretokenizer",
+        "ainfo",
         "childvec",
         "codespan",
         "ctxt",
         "fstr",
         "indextree",
+        "nidvec",
         "pretok",
         "structs",
         "termcolor",

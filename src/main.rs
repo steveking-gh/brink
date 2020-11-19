@@ -470,7 +470,8 @@ impl<'toks> WrsActionInfo<'toks> {
         let mut children = nid.children(&ast.arena);
         let str_nid = children.next().unwrap();
         let str_tinfo = ast.get_tok(str_nid);
-        let strout = str_tinfo.slice();
+        // trim the leading and trailing quote characters
+        let strout = str_tinfo.slice().trim_matches('\"');
         debug!("WrsActionInfo::new: output string at nid {} is {}", str_nid, strout);
         let str_size = strout.len();
         debug!("WrsActionInfo::new: <<<< EXIT for nid {}", nid);
@@ -496,6 +497,8 @@ impl<'toks> ActionInfo for WrsActionInfo<'toks> {
  *****************************************************************************/
 struct ActionDB<'toks> {
     actions : Vec<Box<dyn ActionInfo + 'toks>>,
+    output_nid: NodeId,
+    file_name_str: &'toks str,
 }
 
 use ast::{Ast,AstDb};
@@ -518,6 +521,7 @@ impl<'toks> ActionDB<'toks> {
         let mut actions : Vec<Box<dyn ActionInfo + 'toks>> = Vec::new();
         let output_nid = linear_db.output_nid;
 
+
         // Using the name of the section, use the AST database to get a reference
         // to the section object.  ast_db processing has already guaranteed
         // that the section name is legitimate, so unwrap().
@@ -527,6 +531,11 @@ impl<'toks> ActionDB<'toks> {
         let sec_str = sec_tinfo.slice();
         debug!("ActionDB::new: output section name is {}", sec_str);
 
+        let file_name_nid = children.next().unwrap();
+        let file_tinfo = ast.get_tok(file_name_nid);
+        // strip the surrounding quote chars from the string
+        let file_name_str = file_tinfo.slice().trim_matches('\"');
+        debug!("ActionDB::new: output file name is {}", file_name_str);
 
         // Iterate until the size of the section stops changing.
         let mut start = abs_start;
@@ -565,7 +574,12 @@ impl<'toks> ActionDB<'toks> {
         }
 
         debug!("ActionDB::new: <<<< EXIT with size {}", new_size);
-        ActionDB { actions }
+        ActionDB { actions, output_nid, file_name_str }
+    }
+
+    pub fn write(&self) {
+        use std::fs::File;
+        use std::io::prelude::*;
     }
 }
 
@@ -669,8 +683,11 @@ pub fn process(name: &str, fstr: &str) -> bool {
     for outp in &ast_db.outputs {
         let linear_db = LinearDB::new(outp.nid, &mut ctxt, &ast, &ast_db);
         linear_db.dump();
-        let info_db = ActionDB::new(&linear_db, &mut ctxt, &ast, &ast_db, 0);
-        info_db.dump();
+        let action_db = ActionDB::new(&linear_db, &mut ctxt, &ast, &ast_db, 0);
+        action_db.dump();
+
+
+
     }
     true
 }
