@@ -7,7 +7,7 @@ use std::vec::Vec;
 use std::{io,fs};
 use std::fs::File;
 use std::io::prelude::*;
-use anyhow::{Context,Result};
+use anyhow::{Context,Result,bail};
 use logos::{Logos};
 use indextree::NodeId;
 extern crate clap;
@@ -103,6 +103,7 @@ mod ast {
     use super::LexToken;
     use codespan_reporting::diagnostic::{Diagnostic, Label};
     use std::collections::HashMap;
+    use anyhow::{bail};
 
     #[allow(unused_imports)]
     use super::{error, warn, info, debug, trace};
@@ -425,7 +426,7 @@ mod ast {
             true
         }
 
-        pub fn new(helpers: &mut Helpers, ast: &'toks Ast) -> Option<AstDb<'toks>> {
+        pub fn new(helpers: &mut Helpers, ast: &'toks Ast) -> anyhow::Result<AstDb<'toks>> {
             // Populate the AST database of critical structures.
             let mut result = true;
 
@@ -442,10 +443,10 @@ mod ast {
             }
 
             if !result {
-                return None;
+                bail!("AST construction failed");
             }
 
-            Some(AstDb { sections, outputs })
+            Ok(AstDb { sections, outputs })
         }
     }
 }
@@ -649,7 +650,7 @@ impl<'toks> LinearDB {
 /// Entry point for all processing on the input source file
 /// name: The name of the file
 /// fstr: A string containing the file
-pub fn process(name: &str, fstr: &str) -> bool {
+pub fn process(name: &str, fstr: &str) -> anyhow::Result<()> {
     info!("Processing {}", name);
     debug!("File contains: {}", fstr);
 
@@ -664,25 +665,19 @@ pub fn process(name: &str, fstr: &str) -> bool {
     }
 
     let mut ast = Ast::new(tv.as_slice());
-    let success = ast.parse(&mut helpers);
+    if !ast.parse(&mut helpers) {
+        bail!("Parsing failed.")
+    }
     ast.dump();
-    if !success {
-        println!("AST construction failed");
-        return false;
-    }
 
-    let ast_db_opt = AstDb::new(&mut helpers, &ast);
-    if ast_db_opt.is_none() {
-        return false;
-    }
-
-    let ast_db = ast_db_opt.unwrap();
+    let ast_db = AstDb::new(&mut helpers, &ast)?;
 
     if ast_db.outputs.is_empty() {
         let diag = Diagnostic::warning()
                 .with_code("WARN_10")
                 .with_message("No output statement, nothing to do.");
         helpers.diags.emit(&diag);
+        // this is not a bail
     }
 
     // Take the reference to the ast_db to avoid a move due to the
@@ -696,7 +691,7 @@ pub fn process(name: &str, fstr: &str) -> bool {
         action_db.dump();
         action_db.write();
     }
-    true
+    Ok(())
 }
 
 fn init_log(verbosity : u64) -> Result<(), fern::InitError>  {
@@ -724,7 +719,7 @@ fn init_log(verbosity : u64) -> Result<(), fern::InitError>  {
     Ok(())
 }
 
-fn main() {
+fn main() -> Result<()> {
     // clap processes args
     let args = App::new("roust")
             // See Cargo.toml for env! CARGO strings.
@@ -761,17 +756,12 @@ fn main() {
     // A bland error message here is fine since clap already
     // provides nice error messages.
     let in_file_name = args.value_of("INPUT")
-            .expect("Strange input file argument error.");
+            .context("Unknown input file argument error.")?;
 
-    let result = fs::read_to_string(in_file_name);
-    if result.is_err() {
-        let e = result.err().unwrap();
-        eprintln!("Unable to read file '{}'\nError: {}", in_file_name, e);
-        std::process::exit(-1);
-    }
-    let in_file = result.unwrap();
+    let in_file = fs::read_to_string(in_file_name)
+        .with_context(|| format!("Failed to read from file {}", in_file_name))?;
 
-    if !process(&in_file_name, &in_file) {
-        std::process::exit(-1);
-    }
+    process(&in_file_name, &in_file)?;
+
+    Ok(())
 }
