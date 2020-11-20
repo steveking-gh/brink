@@ -7,6 +7,7 @@ use std::vec::Vec;
 use std::{io,fs};
 use std::fs::File;
 use std::io::prelude::*;
+use anyhow::{Context,Result};
 use logos::{Logos};
 use indextree::NodeId;
 extern crate clap;
@@ -86,10 +87,10 @@ impl<'a> Diags<'a> {
 }
 
 
-/// Context for most functions.  This struct is just a handy bundle
+/// Helpers for most functions.  This struct is just a handy bundle
 /// of other structs used to keep function parameter lists under
 /// control.
-pub struct Context<'a> {
+pub struct Helpers<'a> {
     /// Diagnostic interface, generally for error messages
     diags: Diags<'a>,
 }
@@ -98,7 +99,7 @@ pub struct Context<'a> {
 mod ast {
     use indextree::{Arena,NodeId};
     use super::TokenInfo;
-    use super::Context;
+    use super::Helpers;
     use super::LexToken;
     use codespan_reporting::diagnostic::{Diagnostic, Label};
     use std::collections::HashMap;
@@ -124,7 +125,7 @@ mod ast {
             Self { arena: a, ltv, root }
         }
 
-        pub fn parse(&mut self, ctxt: &mut Context) -> bool {
+        pub fn parse(&mut self, ctxt: &mut Helpers) -> bool {
             let toks_end = self.ltv.len();
             let mut tok_num = 0;
             while tok_num < toks_end {
@@ -147,7 +148,7 @@ mod ast {
         true
         }
 
-        fn err_expected_after(&self, ctxt: &mut Context, code: u32, msg: &str, tok_num: &usize) {
+        fn err_expected_after(&self, ctxt: &mut Helpers, code: u32, msg: &str, tok_num: &usize) {
             let diag = Diagnostic::error()
                     .with_code(format!("ERR_{}", code))
                     .with_message(format!("{}, but found '{}'", msg, self.ltv[*tok_num].slice()))
@@ -156,7 +157,7 @@ mod ast {
             ctxt.diags.emit(&diag);
         }
 
-        fn err_invalid_expression(&self, ctxt: &mut Context, code: u32, tok_num: &usize) {
+        fn err_invalid_expression(&self, ctxt: &mut Helpers, code: u32, tok_num: &usize) {
             let diag = Diagnostic::error()
                     .with_code(format!("ERR_{}", code))
                     .with_message(format!("Invalid expression '{}'", self.ltv[*tok_num].slice()))
@@ -165,7 +166,7 @@ mod ast {
         }
 
         fn parse_section(&mut self, tok_num : &mut usize, parent : NodeId,
-                        ctxt: &mut Context) -> bool {
+                        ctxt: &mut Helpers) -> bool {
 
             // Add the section keyword as a child of the parent and advance
             let node = self.arena.new_node(*tok_num);
@@ -195,7 +196,7 @@ mod ast {
         }
 
         fn parse_section_contents(&mut self, tok_num : &mut usize, parent : NodeId,
-                                            ctxt: &mut Context) -> bool {
+                                            ctxt: &mut Helpers) -> bool {
             let toks_end = self.ltv.len();
             while *tok_num < toks_end {
                 let tinfo = &self.ltv[*tok_num];
@@ -221,7 +222,7 @@ mod ast {
         }
 
         fn parse_wrs(&mut self, tok_num : &mut usize, parent : NodeId,
-                    ctxt: &mut Context) -> bool {
+                    ctxt: &mut Helpers) -> bool {
 
             // Add the wr keyword as a child of the parent
             // Parameters of the wr are children of the wr node
@@ -255,7 +256,7 @@ mod ast {
         }
 
         fn parse_output(&mut self, tok_num : &mut usize, parent : NodeId,
-                            ctxt: &mut Context) -> bool {
+                            ctxt: &mut Helpers) -> bool {
 
             // Add the output keyword as a child of the parent and advance
             let node = self.arena.new_node(*tok_num);
@@ -383,7 +384,7 @@ mod ast {
 
         /// Processes a section in the AST
         /// ctxt: the system context
-        fn record_section(ctxt: &mut Context, sec_nid: NodeId, ast: &'toks Ast,
+        fn record_section(ctxt: &mut Helpers, sec_nid: NodeId, ast: &'toks Ast,
                         sections: &mut HashMap<&'toks str, Section<'toks>> ) -> bool {
             debug!("AstDb::record_section: NodeId {}", sec_nid);
 
@@ -414,7 +415,7 @@ mod ast {
         /**
          * Adds a new output to the vector of output structs.
          */
-        fn record_output(_ctxt: &mut Context, nid: NodeId, ast: &'toks Ast,
+        fn record_output(_ctxt: &mut Helpers, nid: NodeId, ast: &'toks Ast,
                         outputs: &mut Vec<Output<'toks>>) -> bool {
             // nid points to 'output'
             // don't bother with semantic error checking yet.
@@ -424,7 +425,7 @@ mod ast {
             true
         }
 
-        pub fn new(ctxt: &mut Context, ast: &'toks Ast) -> Option<AstDb<'toks>> {
+        pub fn new(ctxt: &mut Helpers, ast: &'toks Ast) -> Option<AstDb<'toks>> {
             // Populate the AST database of critical structures.
             let mut result = true;
 
@@ -517,7 +518,7 @@ impl<'toks> ActionDB<'toks> {
         }
     }
 
-    pub fn new(linear_db: &LinearDB, ctxt: &mut Context, ast: &'toks Ast,
+    pub fn new(linear_db: &LinearDB, ctxt: &mut Helpers, ast: &'toks Ast,
                ast_db: &'toks AstDb, abs_start: usize) -> ActionDB<'toks> {
 
         debug!("ActionDB::new: >>>> ENTER for output nid: {} at {}", linear_db.output_nid,
@@ -598,7 +599,7 @@ struct LinearDB {
 
 impl<'toks> LinearDB {
     /// Recursively record information about the children of an AST object.
-    fn record_r(&mut self, parent_nid: NodeId, ctxt: &mut Context,
+    fn record_r(&mut self, parent_nid: NodeId, ctxt: &mut Helpers,
                             ast: &'toks Ast, ast_db: &AstDb) {
 
         debug!("LinearDB::record_children_info: >>>> ENTER for parent nid: {}",
@@ -613,7 +614,7 @@ impl<'toks> LinearDB {
     }
 
     /// The ActionDB object must start with an output statement
-    pub fn new(output_nid: NodeId, ctxt: &mut Context, ast: &'toks Ast,
+    pub fn new(output_nid: NodeId, ctxt: &mut Helpers, ast: &'toks Ast,
                ast_db: &'toks AstDb) -> LinearDB {
 
         debug!("LinearDB::new: >>>> ENTER for output nid: {}", output_nid);
@@ -652,7 +653,7 @@ pub fn process(name: &str, fstr: &str) -> bool {
     info!("Processing {}", name);
     debug!("File contains: {}", fstr);
 
-    let mut ctxt = Context {
+    let mut ctxt = Helpers {
         diags: Diags::new(name,fstr),
     };
 
