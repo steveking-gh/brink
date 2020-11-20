@@ -5,6 +5,8 @@
 
 use std::vec::Vec;
 use std::{io,fs};
+use std::fs::File;
+use std::io::prelude::*;
 use logos::{Logos};
 use indextree::NodeId;
 extern crate clap;
@@ -452,7 +454,7 @@ trait ActionInfo {
     fn get_abs_addr(&self) -> usize;
     fn get_nid(&self) -> NodeId;
     fn get_size(&self) -> usize;
-    fn write(&self);
+    fn write(&self, file: &mut fs::File);
     fn get_type_str(&self) -> &'static str;
 }
 
@@ -484,7 +486,9 @@ impl<'toks> ActionInfo for WrsActionInfo<'toks> {
     fn get_abs_addr(&self) -> usize { self.abs_addr}
     fn get_nid(&self) -> NodeId { self.nid}
     fn get_size(&self) -> usize { self.str_size }
-    fn write(&self) {} // temp for debug
+    fn write(&self, file: &mut fs::File) {
+        file.write_all(self.strout.as_bytes()).expect("write failed"); // FIXME
+    }
     fn get_type_str(&self) -> &'static str {
         "wrs"
     }
@@ -559,7 +563,7 @@ impl<'toks> ActionDB<'toks> {
         loop {
             new_size = 0;
             for ainfo in &actions {
-                debug!("ActionDB:new: Iterating for {} at nid {}", ainfo.get_type_str(), ainfo.get_nid());
+                debug!("ActionDB::new: Iterating for {} at nid {}", ainfo.get_type_str(), ainfo.get_nid());
                 let sz = ainfo.get_size();
                 start += sz;
                 new_size += sz;
@@ -568,7 +572,7 @@ impl<'toks> ActionDB<'toks> {
             if old_size == new_size {
                 break;
             }
-            debug!("ActionDB:new: Size for iteration {} is {}", iteration, new_size);
+            debug!("ActionDB::new: Size for iteration {} is {}", iteration, new_size);
             old_size = new_size;
             iteration += 1;
         }
@@ -578,8 +582,12 @@ impl<'toks> ActionDB<'toks> {
     }
 
     pub fn write(&self) {
-        use std::fs::File;
-        use std::io::prelude::*;
+        let mut file = File::create(self.file_name_str).unwrap();  // FIXME with real error
+
+        for ainfo in &self.actions {
+            debug!("ActionDB::write: writing {} at nid {}", ainfo.get_type_str(), ainfo.get_nid());
+            ainfo.write(&mut file);  // FIXME
+        }
     }
 }
 
@@ -685,9 +693,7 @@ pub fn process(name: &str, fstr: &str) -> bool {
         linear_db.dump();
         let action_db = ActionDB::new(&linear_db, &mut ctxt, &ast, &ast_db, 0);
         action_db.dump();
-
-
-
+        action_db.write();
     }
     true
 }
