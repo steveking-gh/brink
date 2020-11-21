@@ -1,6 +1,9 @@
 #[cfg(test)]
 mod tests {
 use assert_cmd::{Command};
+use predicates::prelude::*;
+use std::path::Path;
+use std::fs;
 
 #[test]
 fn help_only() {
@@ -97,6 +100,13 @@ fn simple_section_1() {
                 .arg("tests/simple_section_1.roust")
                 .assert()
                 .success();
+
+    let p_is_empty = predicate::str::is_empty().from_utf8().from_file_path();
+    assert!(p_is_empty.eval(Path::new("empty.bin")));
+
+    // File content good, clean up.
+    fs::remove_file("empty.bin").unwrap();
+
 }
 
 #[test]
@@ -106,6 +116,13 @@ fn simple_section_2() {
                 .arg("tests/simple_section_2.roust")
                 .assert()
                 .success();
+
+    // Verify output file is correct
+    let p_eq = predicates::path::eq_file(Path::new("test.bin")).utf8().unwrap();
+    assert!(p_eq.eval("Wow!"));
+
+    // File content good, clean up.
+    fs::remove_file("test.bin").unwrap();
 }
 
 #[test]
