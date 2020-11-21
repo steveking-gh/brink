@@ -2,4 +2,4 @@ section foo {
     wrs "Wow!";
 }
 
-output foo "test.bin";
+output foo "simple_section_2.bin";

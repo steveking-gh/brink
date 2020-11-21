@@ -1,5 +1,0 @@
-section foo {}
-/*
- test
- */
-output foo "test.bin";

@@ -94,19 +94,19 @@ fn multi_comment_3() {
 }
 
 #[test]
-fn simple_section_1() {
+fn empty_section_1() {
     let _cmd = Command::cargo_bin("roust")
                 .unwrap()
-                .arg("tests/simple_section_1.roust")
+                .arg("tests/empty_section_1.roust")
                 .assert()
                 .success();
 
     let p_is_empty = predicate::str::is_empty().from_utf8().from_file_path();
-    assert!(p_is_empty.eval(Path::new("empty.bin")));
+    assert!(p_is_empty.eval(Path::new("empty_section_1.bin")));
 
     // Verify file is empty.  If so, then clean up.
-    assert!(fs::read_to_string("test.bin").unwrap().len() == 0);
-    fs::remove_file("test.bin").unwrap();
+    assert!(fs::read_to_string("empty_section_1.bin").unwrap().len() == 0);
+    fs::remove_file("empty_section_1.bin").unwrap();
 
 }
 
@@ -119,8 +119,21 @@ fn simple_section_2() {
                 .success();
 
     // Verify output file is correct.  If so, then clean up.
-    assert_eq!("Wow!", fs::read_to_string("test.bin").unwrap());
-    fs::remove_file("test.bin").unwrap();
+    assert_eq!("Wow!", fs::read_to_string("simple_section_2.bin").unwrap());
+    fs::remove_file("simple_section_2.bin").unwrap();
+}
+
+#[test]
+fn simple_section_3() {
+    let _cmd = Command::cargo_bin("roust")
+                .unwrap()
+                .arg("tests/simple_section_3.roust")
+                .assert()
+                .success();
+
+    // Verify output file is correct.  If so, then clean up.
+    assert_eq!("Wow!Bye", fs::read_to_string("simple_section_3.bin").unwrap());
+    fs::remove_file("simple_section_3.bin").unwrap();
 }
 
 #[test]
