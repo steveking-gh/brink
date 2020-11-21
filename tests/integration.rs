@@ -104,8 +104,9 @@ fn simple_section_1() {
     let p_is_empty = predicate::str::is_empty().from_utf8().from_file_path();
     assert!(p_is_empty.eval(Path::new("empty.bin")));
 
-    // File content good, clean up.
-    fs::remove_file("empty.bin").unwrap();
+    // Verify file is empty.  If so, then clean up.
+    assert!(fs::read_to_string("test.bin").unwrap().len() == 0);
+    fs::remove_file("test.bin").unwrap();
 
 }
 
@@ -117,11 +118,8 @@ fn simple_section_2() {
                 .assert()
                 .success();
 
-    // Verify output file is correct
-    let p_eq = predicates::path::eq_file(Path::new("test.bin")).utf8().unwrap();
-    assert!(p_eq.eval("Wow!"));
-
-    // File content good, clean up.
+    // Verify output file is correct.  If so, then clean up.
+    assert_eq!("Wow!", fs::read_to_string("test.bin").unwrap());
     fs::remove_file("test.bin").unwrap();
 }
 
