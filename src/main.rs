@@ -489,7 +489,10 @@ impl<'toks> ActionInfo for WrsActionInfo<'toks> {
     fn get_nid(&self) -> NodeId { self.nid}
     fn get_size(&self) -> usize { self.str_size }
     fn write(&self, file: &mut fs::File) {
-        file.write_all(self.strout.as_bytes()).expect("write failed"); // FIXME
+        let s = self.strout.trim_matches('\"').to_string()
+                     .replace("\\n", "\n")
+                     .replace("\\t", "\t");
+        file.write_all(s.as_bytes()).expect("write failed"); // FIXME
     }
     fn get_type_str(&self) -> &'static str {
         "wrs"

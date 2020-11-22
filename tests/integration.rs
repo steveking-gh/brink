@@ -137,6 +137,19 @@ fn simple_section_3() {
 }
 
 #[test]
+fn simple_section_4() {
+    let _cmd = Command::cargo_bin("roust")
+                .unwrap()
+                .arg("tests/simple_section_4.roust")
+                .assert()
+                .success();
+
+    // Verify output file is correct.  If so, then clean up.
+    assert_eq!("Wow!\nBye", fs::read_to_string("simple_section_4.bin").unwrap());
+    fs::remove_file("simple_section_4.bin").unwrap();
+}
+
+#[test]
 fn section_rename_err_1() {
     let _cmd = Command::cargo_bin("roust")
     .unwrap()
