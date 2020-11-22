@@ -456,7 +456,7 @@ trait ActionInfo {
     fn get_abs_addr(&self) -> usize;
     fn get_nid(&self) -> NodeId;
     fn get_size(&self) -> usize;
-    fn write(&self, file: &mut fs::File);
+    fn write(&self, file: &mut fs::File) -> anyhow::Result<()>;
     fn get_type_str(&self) -> &'static str;
 }
 
@@ -488,11 +488,13 @@ impl<'toks> ActionInfo for WrsActionInfo<'toks> {
     fn get_abs_addr(&self) -> usize { self.abs_addr}
     fn get_nid(&self) -> NodeId { self.nid}
     fn get_size(&self) -> usize { self.str_size }
-    fn write(&self, file: &mut fs::File) {
+    fn write(&self, file: &mut fs::File) -> anyhow::Result<()> {
         let s = self.strout.trim_matches('\"').to_string()
-                     .replace("\\n", "\n")
-                     .replace("\\t", "\t");
-        file.write_all(s.as_bytes()).expect("write failed"); // FIXME
+                    .replace("\\n", "\n")
+                    .replace("\\t", "\t");
+        file.write_all(s.as_bytes())
+                    .context(format!("Wrs failed to write string {}", s))?;
+        Ok(())
     }
     fn get_type_str(&self) -> &'static str {
         "wrs"
@@ -586,13 +588,16 @@ impl<'toks> ActionDB<'toks> {
         ActionDB { actions, output_nid, file_name_str }
     }
 
-    pub fn write(&self) {
-        let mut file = File::create(self.file_name_str).unwrap();  // FIXME with real error
+    pub fn write(&self) -> anyhow::Result<()> {
+        let mut file = File::create(self.file_name_str)
+                .context(format!("Unable to create output file {}", self.file_name_str))?;
 
         for ainfo in &self.actions {
             debug!("ActionDB::write: writing {} at nid {}", ainfo.get_type_str(), ainfo.get_nid());
-            ainfo.write(&mut file);  // FIXME
+            ainfo.write(&mut file)?;
         }
+
+        Ok(())
     }
 }
 
@@ -692,7 +697,7 @@ pub fn process(name: &str, fstr: &str) -> anyhow::Result<()> {
         linear_db.dump();
         let action_db = ActionDB::new(&linear_db, &mut helpers, &ast, &ast_db, 0);
         action_db.dump();
-        action_db.write();
+        action_db.write()?;
     }
     Ok(())
 }
