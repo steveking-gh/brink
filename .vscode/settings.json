@@ -10,6 +10,7 @@
         "indextree",
         "nidvec",
         "pretok",
+        "rdepth",
         "structs",
         "termcolor",
         "tinfo",

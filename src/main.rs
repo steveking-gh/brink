@@ -18,7 +18,7 @@ use clap::{Arg, App};
 use log::{error, warn, info, debug, trace};
 
 // codespan crate provide error reporting help
-use codespan_reporting::diagnostic::Diagnostic;
+use codespan_reporting::diagnostic::{Diagnostic,Label};
 use codespan_reporting::files::SimpleFile;
 use codespan_reporting::term;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
@@ -306,13 +306,13 @@ mod ast {
             *tok_num += 1;
         }
 
-        pub fn get_tok(&self, nid: NodeId) -> &'toks TokenInfo {
+        pub fn get_tinfo(&self, nid: NodeId) -> &'toks TokenInfo {
             let tok_num = *self.arena[nid].get();
             &self.ltv[tok_num]
         }
 
         fn dump_r(&self, nid: NodeId, depth: usize) {
-            debug!("AST: {}: {}{}", nid, " ".repeat(depth * 4), self.get_tok(nid).slice());
+            debug!("AST: {}: {}{}", nid, " ".repeat(depth * 4), self.get_tinfo(nid).slice());
             let children = nid.children(&self.arena);
             for child_nid in children {
                 self.dump_r(child_nid, depth+1);
@@ -342,7 +342,7 @@ mod ast {
 
     impl<'toks> Section<'toks> {
         pub fn new(ast: &'toks Ast, nid: NodeId) -> Section<'toks> {
-            Section { tinfo: ast.get_tok(nid), nid }
+            Section { tinfo: ast.get_tinfo(nid), nid }
         }
     }
 
@@ -363,9 +363,9 @@ mod ast {
             // the section name is the first child of the output
             // AST processing guarantees this exists.
             let sec_nid = children.next().unwrap();
-            let sec_tinfo = ast.get_tok(sec_nid);
+            let sec_tinfo = ast.get_tinfo(sec_nid);
             let sec_str = sec_tinfo.slice();
-            Output { tinfo: ast.get_tok(nid), nid, sec_nid, sec_str}
+            Output { tinfo: ast.get_tinfo(nid), nid, sec_nid, sec_str}
         }
     }
 
@@ -394,7 +394,7 @@ mod ast {
             // AST processing guarantees this exists, so unwrap
             let mut children = sec_nid.children(&ast.arena);
             let name_nid = children.next().unwrap();
-            let sec_tinfo = ast.get_tok(name_nid);
+            let sec_tinfo = ast.get_tinfo(name_nid);
             let sec_str = sec_tinfo.slice();
             if sections.contains_key(sec_str) {
                 // error, duplicate section names
@@ -434,7 +434,7 @@ mod ast {
             let mut outputs: Vec<Output<'toks>> = Vec::new();
 
             for nid in ast.root.children(&ast.arena) {
-                let tinfo = ast.get_tok(nid);
+                let tinfo = ast.get_tinfo(nid);
                 result = result && match tinfo.tok {
                     LexToken::Section => Self::record_section(helpers, nid, &ast, &mut sections),
                     LexToken::Output => Self::record_output(helpers, nid, &ast, &mut outputs),
@@ -473,7 +473,7 @@ impl<'toks> WrsActionInfo<'toks> {
         debug!("WrsActionInfo::new: >>>> ENTER for nid {} at {}", nid, abs_addr);
         let mut children = nid.children(&ast.arena);
         let str_nid = children.next().unwrap();
-        let str_tinfo = ast.get_tok(str_nid);
+        let str_tinfo = ast.get_tinfo(str_nid);
         // trim the leading and trailing quote characters
         let strout = str_tinfo.slice().trim_matches('\"');
         debug!("WrsActionInfo::new: output string at nid {} is {}", str_nid, strout);
@@ -538,12 +538,12 @@ impl<'toks> ActionDB<'toks> {
         // that the section name is legitimate, so unwrap().
         let mut children = output_nid.children(&ast.arena);
         let sec_name_nid = children.next().unwrap();
-        let sec_tinfo = ast.get_tok(sec_name_nid);
+        let sec_tinfo = ast.get_tinfo(sec_name_nid);
         let sec_str = sec_tinfo.slice();
         debug!("ActionDB::new: output section name is {}", sec_str);
 
         let file_name_nid = children.next().unwrap();
-        let file_tinfo = ast.get_tok(file_name_nid);
+        let file_tinfo = ast.get_tinfo(file_name_nid);
         // strip the surrounding quote chars from the string
         let file_name_str = file_tinfo.slice().trim_matches('\"');
         debug!("ActionDB::new: output file name is {}", file_name_str);
@@ -552,7 +552,7 @@ impl<'toks> ActionDB<'toks> {
         let mut start = abs_start;
         let mut new_size = 0;
         for &nid in &linear_db.nidvec {
-            let tinfo = ast.get_tok(nid);
+            let tinfo = ast.get_tinfo(nid);
             match tinfo.tok {
                 LexToken::Wrs => {
                     let wrsa = Box::new(WrsActionInfo::new(start, nid, ast));
@@ -607,31 +607,50 @@ struct LinearDB {
 }
 
 impl<'toks> LinearDB {
-    /// Recursively record information about the children of an AST object.
-    fn record_r(&mut self, parent_nid: NodeId, helpers: &mut Helpers,
-                            ast: &'toks Ast, ast_db: &AstDb) {
 
-        debug!("LinearDB::record_children_info: >>>> ENTER for parent nid: {}",
-                parent_nid);
+    // Control recursion to some safe level.  100 is just a guesstimate.
+    const MAX_RECURSION_DEPTH:usize = 100;
+
+    /// Recursively record information about the children of an AST object.
+    fn record_r(&mut self, rdepth: usize, parent_nid: NodeId, helpers: &mut Helpers,
+                            ast: &'toks Ast, ast_db: &AstDb) -> bool {
+
+        debug!("LinearDB::record_children_info: >>>> ENTER at depth {} for parent nid: {}",
+                rdepth, parent_nid);
+
+        if rdepth > LinearDB::MAX_RECURSION_DEPTH {
+            let tinfo = ast.get_tinfo(parent_nid);
+            let diag = Diagnostic::error()
+                    .with_code("ERR_11")
+                    .with_message(format!(
+                            "Maximum recursion depth ({}) exceeded when processing '{}'.",
+                            LinearDB::MAX_RECURSION_DEPTH, tinfo.slice()))
+                    .with_labels(vec![Label::primary((), tinfo.span())]);
+            helpers.diags.emit(&diag);
+            return false;
+        }
 
         self.nidvec.push(parent_nid);
         let children = parent_nid.children(&ast.arena);
+        let mut result = true;
         for nid in children {
-            self.record_r(nid, helpers, ast, ast_db);
+            result &= self.record_r(rdepth + 1, nid, helpers, ast, ast_db);
         }
-        debug!("LinearDB::record_r: <<<< EXIT for nid: {}", parent_nid);
+        debug!("LinearDB::record_r: <<<< EXIT({}) at depth {} for nid: {}",
+                result, rdepth, parent_nid);
+        result
     }
 
     /// The ActionDB object must start with an output statement
     pub fn new(output_nid: NodeId, helpers: &mut Helpers, ast: &'toks Ast,
-               ast_db: &'toks AstDb) -> LinearDB {
+               ast_db: &'toks AstDb) -> Option<LinearDB> {
 
         debug!("LinearDB::new: >>>> ENTER for output nid: {}", output_nid);
         let mut linear_db = LinearDB { output_nid, nidvec: Vec::new() };
 
         let mut children = output_nid.children(&ast.arena);
         let sec_name_nid = children.next().unwrap();
-        let sec_tinfo = ast.get_tok(sec_name_nid);
+        let sec_tinfo = ast.get_tinfo(sec_name_nid);
         let sec_str = sec_tinfo.slice();
         debug!("LinearDB::new: output section name is {}", sec_str);
 
@@ -641,10 +660,13 @@ impl<'toks> LinearDB {
         let section = ast_db.sections.get(sec_str).unwrap();
         let sec_nid = section.nid;
 
-        linear_db.record_r(sec_nid, helpers, ast, ast_db);
+        // To start recursion, rdepth = 1
+        if !linear_db.record_r(1, sec_nid, helpers, ast, ast_db) {
+            return None;
+        }
 
         debug!("LinearDB::new: <<<< EXIT for nid: {}", output_nid);
-        linear_db
+        Some(linear_db)
     }
 
     fn dump(&self) {
@@ -694,6 +716,10 @@ pub fn process(name: &str, fstr: &str) -> anyhow::Result<()> {
     // https://stackoverflow.com/q/43036279/233981
     for outp in &ast_db.outputs {
         let linear_db = LinearDB::new(outp.nid, &mut helpers, &ast, &ast_db);
+        if linear_db.is_none() {
+            bail!("Failed to construct the linear database.");
+        }
+        let linear_db = linear_db.unwrap();
         linear_db.dump();
         let action_db = ActionDB::new(&linear_db, &mut helpers, &ast, &ast_db, 0);
         action_db.dump();
