@@ -8,7 +8,6 @@ use std::{io,fs};
 use std::fs::File;
 use std::io::prelude::*;
 use anyhow::{Context,Result,bail};
-use logos::{Logos};
 use indextree::NodeId;
 extern crate clap;
 use clap::{Arg, App};
@@ -22,46 +21,6 @@ use codespan_reporting::diagnostic::{Diagnostic,Label};
 use codespan_reporting::files::SimpleFile;
 use codespan_reporting::term;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
-
-pub type Span = std::ops::Range<usize>;
-
-#[derive(Logos, Debug, Clone, PartialEq)]
-pub enum LexToken {
-    #[token("section")] Section,
-    #[token("wrs")] Wrs,
-    #[token("output")] Output,
-    #[token("{")] OpenBrace,
-    #[token("}")] CloseBrace,
-    #[token(";")] Semicolon,
-    #[regex("[_a-zA-Z][0-9a-zA-Z_]*")] Identifier,
-    #[regex("0x[0-9a-fA-F]+|[1-9][0-9]*|0")] Int,
-
-    // Not only is \ special in strings and must be escaped, but also special in
-    // regex.  We use raw string here to avoid having the escape the \ for the
-    // string itself. The \\ in this raw string are escape \ for the regex
-    // engine underneath.
-    #[regex(r#""(\\"|\\.|[^"])*""#)] QuotedString,
-
-    // These are 'stripped' from the input
-    #[regex(r#"/\*([^*]|\*[^/])+\*/"#, logos::skip)] // block comments
-    #[regex(r#"//[^\r\n]*(\r\n|\n)?"#, logos::skip)] // line comments
-    #[regex(r#"[ \t\n\f]+"#, logos::skip)]           // whitespace
-    #[error]
-    Unknown,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct TokenInfo<'toks> {
-    tok : LexToken,
-    loc : Span,
-    s : &'toks str,
-}
-
-impl<'toks> TokenInfo<'toks> {
-    pub fn span(&self) -> Span { self.loc.clone() }
-    pub fn slice(&self) -> &str { &self.s }
-}
-
 
 struct Diags<'a> {
     writer: StandardStream,
@@ -86,7 +45,6 @@ impl<'a> Diags<'a> {
     }
 }
 
-
 /// Helpers for most functions.  This struct is just a handy bundle
 /// of other structs used to keep function parameter lists under
 /// control.
@@ -97,16 +55,54 @@ pub struct Helpers<'a> {
 
 #[macro_use]
 mod ast {
+    use logos::{Logos};
     use indextree::{Arena,NodeId};
-    use super::TokenInfo;
+    pub type Span = std::ops::Range<usize>;
     use super::Helpers;
-    use super::LexToken;
     use codespan_reporting::diagnostic::{Diagnostic, Label};
     use std::collections::HashMap;
     use anyhow::{bail};
 
     #[allow(unused_imports)]
     use super::{error, warn, info, debug, trace};
+
+    #[derive(Logos, Debug, Clone, PartialEq)]
+    pub enum LexToken {
+        #[token("section")] Section,
+        #[token("wrs")] Wrs,
+        #[token("output")] Output,
+        #[token("{")] OpenBrace,
+        #[token("}")] CloseBrace,
+        #[token(";")] Semicolon,
+        #[regex("[_a-zA-Z][0-9a-zA-Z_]*")] Identifier,
+        #[regex("0x[0-9a-fA-F]+|[1-9][0-9]*|0")] Int,
+    
+        // Not only is \ special in strings and must be escaped, but also special in
+        // regex.  We use raw string here to avoid having the escape the \ for the
+        // string itself. The \\ in this raw string are escape \ for the regex
+        // engine underneath.
+        #[regex(r#""(\\"|\\.|[^"])*""#)] QuotedString,
+    
+        // These are 'stripped' from the input
+        #[regex(r#"/\*([^*]|\*[^/])+\*/"#, logos::skip)] // block comments
+        #[regex(r#"//[^\r\n]*(\r\n|\n)?"#, logos::skip)] // line comments
+        #[regex(r#"[ \t\n\f]+"#, logos::skip)]           // whitespace
+        #[error]
+        Unknown,
+    }
+    
+    #[derive(Debug, Clone, PartialEq)]
+    pub struct TokenInfo<'toks> {
+        tok : LexToken,
+        loc : Span,
+        s : &'toks str,
+    }
+
+    impl<'toks> TokenInfo<'toks> {
+        pub fn tok(&self) -> &LexToken { &self.tok }
+        pub fn span(&self) -> Span { self.loc.clone() }
+        pub fn slice(&self) -> &str { &self.s }
+    }
 
     /**
      * Abstract Syntax Tree
@@ -115,24 +111,30 @@ mod ast {
      */
     pub struct Ast<'toks> {
         pub arena: Arena<usize>,
-        pub ltv: &'toks[TokenInfo<'toks>],
+        pub tv: Vec<TokenInfo<'toks>>,
         pub root: NodeId,
     }
 
     impl<'toks> Ast<'toks> {
-        pub fn new(ltv: &'toks[TokenInfo<'toks>]) -> Self {
-            let mut a = Arena::new();
-            let root = a.new_node(usize::MAX);
-            Self { arena: a, ltv, root }
+        pub fn new(fstr: &'toks str) -> Self {
+            let mut arena = Arena::new();
+            let root = arena.new_node(usize::MAX);
+            let mut tv = Vec::new();
+            let mut lex = LexToken::lexer(fstr);
+            while let Some(t) = lex.next() {
+                tv.push(TokenInfo{tok: t, s:lex.slice(), loc: lex.span()});
+            }
+
+            Self { arena, tv, root }
         }
 
         pub fn parse(&mut self, helpers: &mut Helpers) -> bool {
-            let toks_end = self.ltv.len();
+            let toks_end = self.tv.len();
             let mut tok_num = 0;
             while tok_num < toks_end {
-                let tinfo = &self.ltv[tok_num];
+                let tinfo = &self.tv[tok_num];
                 debug!("Ast::parse: Parsing token {}: {:?}", &mut tok_num, tinfo);
-                match tinfo.tok {
+                match tinfo.tok() {
                     LexToken::Section => {
                         if !self.parse_section(&mut tok_num, self.root, helpers) {
                             return false;
@@ -152,17 +154,17 @@ mod ast {
         fn err_expected_after(&self, helpers: &mut Helpers, code: u32, msg: &str, tok_num: &usize) {
             let diag = Diagnostic::error()
                     .with_code(format!("ERR_{}", code))
-                    .with_message(format!("{}, but found '{}'", msg, self.ltv[*tok_num].slice()))
-                    .with_labels(vec![Label::primary((), self.ltv[*tok_num].span()),
-                                    Label::secondary((), self.ltv[*tok_num-1].span())]);
+                    .with_message(format!("{}, but found '{}'", msg, self.tv[*tok_num].slice()))
+                    .with_labels(vec![Label::primary((), self.tv[*tok_num].span()),
+                                    Label::secondary((), self.tv[*tok_num-1].span())]);
             helpers.diags.emit(&diag);
         }
 
         fn err_invalid_expression(&self, helpers: &mut Helpers, code: u32, tok_num: &usize) {
             let diag = Diagnostic::error()
                     .with_code(format!("ERR_{}", code))
-                    .with_message(format!("Invalid expression '{}'", self.ltv[*tok_num].slice()))
-                    .with_labels(vec![Label::primary((), self.ltv[*tok_num].span())]);
+                    .with_message(format!("Invalid expression '{}'", self.tv[*tok_num].slice()))
+                    .with_labels(vec![Label::primary((), self.tv[*tok_num].span())]);
             helpers.diags.emit(&diag);
         }
 
@@ -175,8 +177,8 @@ mod ast {
             *tok_num += 1;
 
             // After a section declaration, an identifier is expected
-            let tinfo = &self.ltv[*tok_num];
-            if let LexToken::Identifier = tinfo.tok {
+            let tinfo = &self.tv[*tok_num];
+            if let LexToken::Identifier = tinfo.tok() {
                 self.parse_leaf(tok_num, node);
             } else {
                 self.err_expected_after(helpers, 1, "Expected an identifier after 'section'", tok_num);
@@ -184,8 +186,8 @@ mod ast {
             }
 
             // After a section identifier, open brace
-            let tinfo = &self.ltv[*tok_num];
-            if let LexToken::OpenBrace = tinfo.tok {
+            let tinfo = &self.tv[*tok_num];
+            if let LexToken::OpenBrace = tinfo.tok() {
                 self.parse_leaf(tok_num, node);
             } else {
                 self.err_expected_after(helpers, 2, "Expected {{ after identifier", tok_num);
@@ -198,10 +200,10 @@ mod ast {
 
         fn parse_section_contents(&mut self, tok_num : &mut usize, parent : NodeId,
                                             helpers: &mut Helpers) -> bool {
-            let toks_end = self.ltv.len();
+            let toks_end = self.tv.len();
             while *tok_num < toks_end {
-                let tinfo = &self.ltv[*tok_num];
-                match tinfo.tok {
+                let tinfo = &self.tv[*tok_num];
+                match tinfo.tok() {
                     // For now, we only support writing strings in a section.
                     LexToken::Wrs => {
                         if !self.parse_wrs(tok_num, parent, helpers) {
@@ -236,8 +238,8 @@ mod ast {
             *tok_num += 1;
 
             // Next, a quoted string is expected
-            let tinfo = &self.ltv[*tok_num];
-            if let LexToken::QuotedString = tinfo.tok {
+            let tinfo = &self.tv[*tok_num];
+            if let LexToken::QuotedString = tinfo.tok() {
                 self.parse_leaf(tok_num, node);
             } else {
                 self.err_expected_after(helpers, 4, "Expected a quoted string after 'wrs'", tok_num);
@@ -245,8 +247,8 @@ mod ast {
             }
 
             // Finally a semicolon
-            let tinfo = &self.ltv[*tok_num];
-            if let LexToken::Semicolon = tinfo.tok {
+            let tinfo = &self.tv[*tok_num];
+            if let LexToken::Semicolon = tinfo.tok() {
                 self.parse_leaf(tok_num, node);
             } else {
                 self.err_expected_after(helpers, 5, "Expected ';' after string", tok_num);
@@ -265,8 +267,8 @@ mod ast {
             *tok_num += 1;
 
             // After a output declaration we expect a section identifier
-            let tinfo = &self.ltv[*tok_num];
-            if let LexToken::Identifier = tinfo.tok {
+            let tinfo = &self.tv[*tok_num];
+            if let LexToken::Identifier = tinfo.tok() {
                 self.parse_leaf(tok_num, node);
             } else {
                 self.err_expected_after(helpers, 7, "Expected a section name after output", tok_num);
@@ -274,8 +276,8 @@ mod ast {
             }
 
             // After the identifier, the file name as a quoted string
-            let tinfo = &self.ltv[*tok_num];
-            if let LexToken::QuotedString = tinfo.tok {
+            let tinfo = &self.tv[*tok_num];
+            if let LexToken::QuotedString = tinfo.tok() {
                 self.parse_leaf(tok_num, node);
             } else {
                 self.err_expected_after(helpers, 6, "Expected the file path as a quoted string after the section name", tok_num);
@@ -283,8 +285,8 @@ mod ast {
             }
 
             // After the identifier, a semicolon
-            let tinfo = &self.ltv[*tok_num];
-            if let LexToken::Semicolon = tinfo.tok {
+            let tinfo = &self.tv[*tok_num];
+            if let LexToken::Semicolon = tinfo.tok() {
                 self.parse_leaf(tok_num, node);
             } else {
                 self.err_expected_after(helpers, 8, "Expected ';' after identifier", tok_num);
@@ -299,7 +301,7 @@ mod ast {
          * the token index.
          */
         fn parse_leaf(&mut self, tok_num : &mut usize, parent : NodeId) {
-            let tinfo = &self.ltv[*tok_num]; // debug! only
+            let tinfo = &self.tv[*tok_num]; // debug! only
             debug!("Ast::parse_leaf: Parsing token {}: {:?}", *tok_num, tinfo);
             let node = self.arena.new_node(*tok_num);
             parent.append(node, &mut self.arena);
@@ -308,7 +310,7 @@ mod ast {
 
         pub fn get_tinfo(&self, nid: NodeId) -> &'toks TokenInfo {
             let tok_num = *self.arena[nid].get();
-            &self.ltv[tok_num]
+            &self.tv[tok_num]
         }
 
         fn dump_r(&self, nid: NodeId, depth: usize) {
@@ -435,7 +437,7 @@ mod ast {
 
             for nid in ast.root.children(&ast.arena) {
                 let tinfo = ast.get_tinfo(nid);
-                result = result && match tinfo.tok {
+                result = result && match tinfo.tok() {
                     LexToken::Section => Self::record_section(helpers, nid, &ast, &mut sections),
                     LexToken::Output => Self::record_output(helpers, nid, &ast, &mut outputs),
                     _ => { true }
@@ -553,8 +555,8 @@ impl<'toks> ActionDB<'toks> {
         let mut new_size = 0;
         for &nid in &linear_db.nidvec {
             let tinfo = ast.get_tinfo(nid);
-            match tinfo.tok {
-                LexToken::Wrs => {
+            match tinfo.tok() {
+                ast::LexToken::Wrs => {
                     let wrsa = Box::new(WrsActionInfo::new(start, nid, ast));
                     let sz = wrsa.get_size();
                     start += sz;
@@ -688,15 +690,9 @@ pub fn process(name: &str, fstr: &str) -> anyhow::Result<()> {
         diags: Diags::new(name,fstr),
     };
 
-    let mut tv = Vec::new();
-    let mut lex = LexToken::lexer(fstr);
-    while let Some(t) = lex.next() {
-        tv.push(TokenInfo{tok: t, s:lex.slice(), loc: lex.span()});
-    }
-
-    let mut ast = Ast::new(tv.as_slice());
+    let mut ast = Ast::new(fstr);
     if !ast.parse(&mut helpers) {
-        bail!("Parsing failed.")
+        bail!("Abstract syntax tree creation failed.")
     }
     ast.dump();
 
