@@ -1,0 +1,6 @@
+section foo {
+    wrs "Wow!";
+    wrs "Bye";
+}
+
+output foo "simple_section_3.bin";
