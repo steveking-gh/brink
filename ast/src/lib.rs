@@ -1,14 +1,14 @@
-#[macro_use]
 use logos::{Logos};
 use indextree::{Arena,NodeId};
 pub type Span = std::ops::Range<usize>;
-use super::Helpers;
-use codespan_reporting::diagnostic::{Diagnostic, Label};
 use std::collections::HashMap;
 use anyhow::{bail};
+use diags::Diags;
+
 
 #[allow(unused_imports)]
-use super::{error, warn, info, debug, trace};
+#[allow(unused_imports)]
+use log::{error, warn, info, debug, trace};
 
 #[derive(Logos, Debug, Clone, PartialEq)]
 pub enum LexToken {
@@ -72,7 +72,7 @@ impl<'toks> Ast<'toks> {
         Self { arena, tv, root }
     }
 
-    pub fn parse(&mut self, helpers: &mut Helpers) -> bool {
+    pub fn parse(&mut self, diags: &mut Diags) -> bool {
         let toks_end = self.tv.len();
         let mut tok_num = 0;
         while tok_num < toks_end {
@@ -80,12 +80,12 @@ impl<'toks> Ast<'toks> {
             debug!("Ast::parse: Parsing token {}: {:?}", &mut tok_num, tinfo);
             match tinfo.tok() {
                 LexToken::Section => {
-                    if !self.parse_section(&mut tok_num, self.root, helpers) {
+                    if !self.parse_section(&mut tok_num, self.root, diags) {
                         return false;
                     }
                 },
                 LexToken::Output => {
-                    if !self.parse_output(&mut tok_num, self.root, helpers) {
+                    if !self.parse_output(&mut tok_num, self.root, diags) {
                         return false;
                     }
                 },
@@ -95,25 +95,18 @@ impl<'toks> Ast<'toks> {
     true
     }
 
-    fn err_expected_after(&self, helpers: &mut Helpers, code: u32, msg: &str, tok_num: &usize) {
-        let diag = Diagnostic::error()
-                .with_code(format!("ERR_{}", code))
-                .with_message(format!("{}, but found '{}'", msg, self.tv[*tok_num].slice()))
-                .with_labels(vec![Label::primary((), self.tv[*tok_num].span()),
-                                Label::secondary((), self.tv[*tok_num-1].span())]);
-        helpers.diags.emit(&diag);
+    fn err_expected_after(&self, diags: &mut Diags, code: i32, msg: &str, tok_num: &usize) {
+        let m = format!("{}, but found '{}'", msg, self.tv[*tok_num].slice());
+        diags.err2(code, &m, self.tv[*tok_num].span(), self.tv[*tok_num-1].span());
     }
 
-    fn err_invalid_expression(&self, helpers: &mut Helpers, code: u32, tok_num: &usize) {
-        let diag = Diagnostic::error()
-                .with_code(format!("ERR_{}", code))
-                .with_message(format!("Invalid expression '{}'", self.tv[*tok_num].slice()))
-                .with_labels(vec![Label::primary((), self.tv[*tok_num].span())]);
-        helpers.diags.emit(&diag);
+    fn err_invalid_expression(&self, diags: &mut Diags, code: i32, tok_num: &usize) {
+        let m = format!("Invalid expression '{}'", self.tv[*tok_num].slice());
+        diags.err1(code, &m, self.tv[*tok_num].span());
     }
 
     fn parse_section(&mut self, tok_num : &mut usize, parent : NodeId,
-                    helpers: &mut Helpers) -> bool {
+                    diags: &mut Diags) -> bool {
 
         // Add the section keyword as a child of the parent and advance
         let node = self.arena.new_node(*tok_num);
@@ -125,7 +118,9 @@ impl<'toks> Ast<'toks> {
         if let LexToken::Identifier = tinfo.tok() {
             self.parse_leaf(tok_num, node);
         } else {
-            self.err_expected_after(helpers, 1, "Expected an identifier after 'section'", tok_num);
+            let m = format!("Expected an identifier after 'section', but found '{}'",
+                            self.tv[*tok_num].slice());
+            diags.err2(1, &m, self.tv[*tok_num].span(), self.tv[*tok_num-1].span());
             return false;
         }
 
@@ -134,23 +129,25 @@ impl<'toks> Ast<'toks> {
         if let LexToken::OpenBrace = tinfo.tok() {
             self.parse_leaf(tok_num, node);
         } else {
-            self.err_expected_after(helpers, 2, "Expected {{ after identifier", tok_num);
+            let m = format!("Expected {{ after identifier, but found '{}'",
+                            self.tv[*tok_num].slice());
+            diags.err2(2, &m, self.tv[*tok_num].span(), self.tv[*tok_num-1].span());
             return false;
         }
 
-        self.parse_section_contents(tok_num, node, helpers);
+        self.parse_section_contents(tok_num, node, diags);
         true
     }
 
     fn parse_section_contents(&mut self, tok_num : &mut usize, parent : NodeId,
-                                        helpers: &mut Helpers) -> bool {
+                                        diags: &mut Diags) -> bool {
         let toks_end = self.tv.len();
         while *tok_num < toks_end {
             let tinfo = &self.tv[*tok_num];
             match tinfo.tok() {
                 // For now, we only support writing strings in a section.
                 LexToken::Wrs => {
-                    if !self.parse_wrs(tok_num, parent, helpers) {
+                    if !self.parse_wrs(tok_num, parent, diags) {
                         return false;
                     }
                 }
@@ -160,7 +157,7 @@ impl<'toks> Ast<'toks> {
                     return true;
                 }
                 _ => {
-                    self.err_invalid_expression(helpers, 3, tok_num);
+                    self.err_invalid_expression(diags, 3, tok_num);
                     return false;
                 }
             }
@@ -169,7 +166,7 @@ impl<'toks> Ast<'toks> {
     }
 
     fn parse_wrs(&mut self, tok_num : &mut usize, parent : NodeId,
-                helpers: &mut Helpers) -> bool {
+                diags: &mut Diags) -> bool {
 
         // Add the wr keyword as a child of the parent
         // Parameters of the wr are children of the wr node
@@ -186,7 +183,7 @@ impl<'toks> Ast<'toks> {
         if let LexToken::QuotedString = tinfo.tok() {
             self.parse_leaf(tok_num, node);
         } else {
-            self.err_expected_after(helpers, 4, "Expected a quoted string after 'wrs'", tok_num);
+            self.err_expected_after(diags, 4, "Expected a quoted string after 'wrs'", tok_num);
             return false;
         }
 
@@ -195,7 +192,7 @@ impl<'toks> Ast<'toks> {
         if let LexToken::Semicolon = tinfo.tok() {
             self.parse_leaf(tok_num, node);
         } else {
-            self.err_expected_after(helpers, 5, "Expected ';' after string", tok_num);
+            self.err_expected_after(diags, 5, "Expected ';' after string", tok_num);
             return false;
         }
         debug!("parse_wrs success");
@@ -203,7 +200,7 @@ impl<'toks> Ast<'toks> {
     }
 
     fn parse_output(&mut self, tok_num : &mut usize, parent : NodeId,
-                        helpers: &mut Helpers) -> bool {
+                        diags: &mut Diags) -> bool {
 
         // Add the output keyword as a child of the parent and advance
         let node = self.arena.new_node(*tok_num);
@@ -215,7 +212,7 @@ impl<'toks> Ast<'toks> {
         if let LexToken::Identifier = tinfo.tok() {
             self.parse_leaf(tok_num, node);
         } else {
-            self.err_expected_after(helpers, 7, "Expected a section name after output", tok_num);
+            self.err_expected_after(diags, 7, "Expected a section name after output", tok_num);
             return false;
         }
 
@@ -224,7 +221,7 @@ impl<'toks> Ast<'toks> {
         if let LexToken::QuotedString = tinfo.tok() {
             self.parse_leaf(tok_num, node);
         } else {
-            self.err_expected_after(helpers, 6, "Expected the file path as a quoted string after the section name", tok_num);
+            self.err_expected_after(diags, 6, "Expected the file path as a quoted string after the section name", tok_num);
             return false;
         }
 
@@ -233,7 +230,7 @@ impl<'toks> Ast<'toks> {
         if let LexToken::Semicolon = tinfo.tok() {
             self.parse_leaf(tok_num, node);
         } else {
-            self.err_expected_after(helpers, 8, "Expected ';' after identifier", tok_num);
+            self.err_expected_after(diags, 8, "Expected ';' after identifier", tok_num);
             return false;
         }
         debug!("parse_output success");
@@ -330,8 +327,8 @@ pub struct AstDb<'toks> {
 impl<'toks> AstDb<'toks> {
 
     /// Processes a section in the AST
-    /// helpers: the system context
-    fn record_section(helpers: &mut Helpers, sec_nid: NodeId, ast: &'toks Ast,
+    /// diags: the system context
+    fn record_section(diags: &mut Diags, sec_nid: NodeId, ast: &'toks Ast,
                     sections: &mut HashMap<&'toks str, Section<'toks>> ) -> bool {
         debug!("AstDb::record_section: NodeId {}", sec_nid);
 
@@ -347,12 +344,8 @@ impl<'toks> AstDb<'toks> {
             // We know the section exists, so unwrap is fine.
             let orig_section = sections.get(sec_str).unwrap();
             let orig_tinfo = orig_section.tinfo;
-            let diag = Diagnostic::error()
-                    .with_code("ERR_9")
-                    .with_message(format!("Duplicate section name '{}'", sec_str))
-                    .with_labels(vec![Label::primary((), sec_tinfo.span()),
-                                        Label::secondary((), orig_tinfo.span())]);
-            helpers.diags.emit(&diag);
+            let m = format!("Duplicate section name '{}'", sec_str);
+            diags.err2(9, &m, sec_tinfo.span(), orig_tinfo.span());
             return false;
         }
         sections.insert(sec_str, Section::new(&ast,sec_nid));
@@ -362,7 +355,7 @@ impl<'toks> AstDb<'toks> {
     /**
      * Adds a new output to the vector of output structs.
      */
-    fn record_output(_ctxt: &mut Helpers, nid: NodeId, ast: &'toks Ast,
+    fn record_output(_ctxt: &mut Diags, nid: NodeId, ast: &'toks Ast,
                     outputs: &mut Vec<Output<'toks>>) -> bool {
         // nid points to 'output'
         // don't bother with semantic error checking yet.
@@ -372,7 +365,7 @@ impl<'toks> AstDb<'toks> {
         true
     }
 
-    pub fn new(helpers: &mut Helpers, ast: &'toks Ast) -> anyhow::Result<AstDb<'toks>> {
+    pub fn new(diags: &mut Diags, ast: &'toks Ast) -> anyhow::Result<AstDb<'toks>> {
         // Populate the AST database of critical structures.
         let mut result = true;
 
@@ -382,8 +375,8 @@ impl<'toks> AstDb<'toks> {
         for nid in ast.root.children(&ast.arena) {
             let tinfo = ast.get_tinfo(nid);
             result = result && match tinfo.tok() {
-                LexToken::Section => Self::record_section(helpers, nid, &ast, &mut sections),
-                LexToken::Output => Self::record_output(helpers, nid, &ast, &mut outputs),
+                LexToken::Section => Self::record_section(diags, nid, &ast, &mut sections),
+                LexToken::Output => Self::record_output(diags, nid, &ast, &mut outputs),
                 _ => { true }
             };
         }

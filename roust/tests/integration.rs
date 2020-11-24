@@ -165,7 +165,7 @@ fn no_output_warn_1() {
     .arg("tests/no_output_warn_1.roust")
     .assert()
     .success()
-    .stderr(predicates::str::contains("WARN_10"));
+    .stderr(predicates::str::contains("warning[10]"));
 }
 
 } // mod tests

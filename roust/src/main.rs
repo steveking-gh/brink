@@ -12,47 +12,12 @@ use indextree::NodeId;
 extern crate clap;
 use clap::{Arg, App};
 
+// Local libraries
+use diags::Diags;
+
 // Logging
 #[allow(unused_imports)]
 use log::{error, warn, info, debug, trace};
-
-// codespan crate provide error reporting help
-use codespan_reporting::diagnostic::{Diagnostic,Label};
-use codespan_reporting::files::SimpleFile;
-use codespan_reporting::term;
-use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
-
-struct Diags<'a> {
-    writer: StandardStream,
-    source_map: SimpleFile<&'a str, &'a str>,
-    config: codespan_reporting::term::Config,
-}
-
-impl<'a> Diags<'a> {
-    fn new(name: &'a str, fstr: &'a str) -> Self {
-        Self {
-            writer: StandardStream::stderr(ColorChoice::Always),
-            source_map: SimpleFile::new(name,fstr),
-            config: codespan_reporting::term::Config::default(),
-        }
-    }
-
-    /// Writes the diagnostic to the terminal and returns a BErr
-    /// with the diagnostic code
-    fn emit(&self, diag: &Diagnostic<()>) {
-        let _ = term::emit(&mut self.writer.lock(), &self.config,
-                           &self.source_map, diag);
-    }
-}
-
-/// Helpers for most functions.  This struct is just a handy bundle
-/// of other structs used to keep function parameter lists under
-/// control.
-pub struct Helpers<'a> {
-    /// Diagnostic interface, generally for error messages
-    diags: Diags<'a>,
-}
-
 
 trait ActionInfo {
     fn set_abs_addr(&mut self, abs: usize);
@@ -115,8 +80,6 @@ struct ActionDB<'toks> {
     file_name_str: &'toks str,
 }
 
-mod ast;
-
 use ast::{Ast,AstDb};
 
 impl<'toks> ActionDB<'toks> {
@@ -129,7 +92,7 @@ impl<'toks> ActionDB<'toks> {
         }
     }
 
-    pub fn new(linear_db: &LinearDB, helpers: &mut Helpers, ast: &'toks Ast,
+    pub fn new(linear_db: &LinearDB, diags: &mut Diags, ast: &'toks Ast,
                ast_db: &'toks AstDb, abs_start: usize) -> ActionDB<'toks> {
 
         debug!("ActionDB::new: >>>> ENTER for output nid: {} at {}", linear_db.output_nid,
@@ -217,7 +180,7 @@ impl<'toks> LinearDB {
     const MAX_RECURSION_DEPTH:usize = 100;
 
     /// Recursively record information about the children of an AST object.
-    fn record_r(&mut self, rdepth: usize, parent_nid: NodeId, helpers: &mut Helpers,
+    fn record_r(&mut self, rdepth: usize, parent_nid: NodeId, diags: &mut Diags,
                             ast: &'toks Ast, ast_db: &AstDb) -> bool {
 
         debug!("LinearDB::record_children_info: >>>> ENTER at depth {} for parent nid: {}",
@@ -225,13 +188,9 @@ impl<'toks> LinearDB {
 
         if rdepth > LinearDB::MAX_RECURSION_DEPTH {
             let tinfo = ast.get_tinfo(parent_nid);
-            let diag = Diagnostic::error()
-                    .with_code("ERR_11")
-                    .with_message(format!(
-                            "Maximum recursion depth ({}) exceeded when processing '{}'.",
-                            LinearDB::MAX_RECURSION_DEPTH, tinfo.slice()))
-                    .with_labels(vec![Label::primary((), tinfo.span())]);
-            helpers.diags.emit(&diag);
+            let m = format!("Maximum recursion depth ({}) exceeded when processing '{}'.",
+                            LinearDB::MAX_RECURSION_DEPTH, tinfo.slice());
+            diags.err1(11, &m, tinfo.span());
             return false;
         }
 
@@ -239,7 +198,7 @@ impl<'toks> LinearDB {
         let children = parent_nid.children(&ast.arena);
         let mut result = true;
         for nid in children {
-            result &= self.record_r(rdepth + 1, nid, helpers, ast, ast_db);
+            result &= self.record_r(rdepth + 1, nid, diags, ast, ast_db);
         }
         debug!("LinearDB::record_r: <<<< EXIT({}) at depth {} for nid: {}",
                 result, rdepth, parent_nid);
@@ -247,7 +206,7 @@ impl<'toks> LinearDB {
     }
 
     /// The ActionDB object must start with an output statement
-    pub fn new(output_nid: NodeId, helpers: &mut Helpers, ast: &'toks Ast,
+    pub fn new(output_nid: NodeId, diags: &mut Diags, ast: &'toks Ast,
                ast_db: &'toks AstDb) -> Option<LinearDB> {
 
         debug!("LinearDB::new: >>>> ENTER for output nid: {}", output_nid);
@@ -266,7 +225,7 @@ impl<'toks> LinearDB {
         let sec_nid = section.nid;
 
         // To start recursion, rdepth = 1
-        if !linear_db.record_r(1, sec_nid, helpers, ast, ast_db) {
+        if !linear_db.record_r(1, sec_nid, diags, ast, ast_db) {
             return None;
         }
 
@@ -289,23 +248,18 @@ pub fn process(name: &str, fstr: &str) -> anyhow::Result<()> {
     info!("Processing {}", name);
     debug!("File contains: {}", fstr);
 
-    let mut helpers = Helpers {
-        diags: Diags::new(name,fstr),
-    };
+    let mut diags = Diags::new(name,fstr);
 
     let mut ast = Ast::new(fstr);
-    if !ast.parse(&mut helpers) {
+    if !ast.parse(&mut diags) {
         bail!("Abstract syntax tree creation failed.")
     }
     ast.dump();
 
-    let ast_db = AstDb::new(&mut helpers, &ast)?;
+    let ast_db = AstDb::new(&mut diags, &ast)?;
 
     if ast_db.outputs.is_empty() {
-        let diag = Diagnostic::warning()
-                .with_code("WARN_10")
-                .with_message("No output statement, nothing to do.");
-        helpers.diags.emit(&diag);
+        diags.warn(10, "No output statement, nothing to do.");
         // this is not a bail
     }
 
@@ -314,13 +268,13 @@ pub fn process(name: &str, fstr: &str) -> anyhow::Result<()> {
     // http://xion.io/post/code/rust-for-loop.html
     // https://stackoverflow.com/q/43036279/233981
     for outp in &ast_db.outputs {
-        let linear_db = LinearDB::new(outp.nid, &mut helpers, &ast, &ast_db);
+        let linear_db = LinearDB::new(outp.nid, &mut diags, &ast, &ast_db);
         if linear_db.is_none() {
             bail!("Failed to construct the linear database.");
         }
         let linear_db = linear_db.unwrap();
         linear_db.dump();
-        let action_db = ActionDB::new(&linear_db, &mut helpers, &ast, &ast_db, 0);
+        let action_db = ActionDB::new(&linear_db, &mut diags, &ast, &ast_db, 0);
         action_db.dump();
         action_db.write()?;
     }
