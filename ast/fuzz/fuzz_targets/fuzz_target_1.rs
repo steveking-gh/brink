@@ -1,7 +1,7 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
-
 use ast::Ast;
+use std::io::Write;
 
 // The fuzzer calls this function repeatedly
 fuzz_target!(|data: &[u8]| {
