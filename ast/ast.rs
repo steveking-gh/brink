@@ -80,7 +80,7 @@ pub struct Ast<'toks> {
 impl<'toks> Ast<'toks> {
 
     /// Create a new abstract syntax tree.
-    pub fn new(fstr: &'toks str) -> Self {
+    pub fn new(fstr: &'toks str, diags: &mut Diags) -> Option<Self> {
         let mut arena = Arena::new();
         let root = arena.new_node(usize::MAX);
         let mut tv = Vec::new();
@@ -88,10 +88,15 @@ impl<'toks> Ast<'toks> {
         while let Some(tok) = lex.next() {
             tv.push(TokenInfo{tok, val:lex.slice(), loc: lex.span()});
         }
-        Self { arena, tv, root }
+        let mut ast = Self { arena, tv, root };
+        if !ast.parse(diags) {
+            return None;
+        }
+
+        Some(ast)
     }
 
-    pub fn parse(&mut self, diags: &mut Diags) -> bool {
+    fn parse(&mut self, diags: &mut Diags) -> bool {
         let toks_end = self.tv.len();
         let mut tok_num = 0;
 

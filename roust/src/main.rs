@@ -31,7 +31,6 @@ trait ActionInfo {
 struct WrsActionInfo<'toks> {
     abs_addr: usize,
     nid: NodeId,
-    str_nid: NodeId,
     str_size: usize,
     strout: &'toks str,
 }
@@ -47,7 +46,7 @@ impl<'toks> WrsActionInfo<'toks> {
         debug!("WrsActionInfo::new: output string at nid {} is {}", str_nid, strout);
         let str_size = strout.len();
         debug!("WrsActionInfo::new: <<<< EXIT for nid {}", nid);
-        WrsActionInfo{ abs_addr, nid, str_nid, str_size, strout}
+        WrsActionInfo{ abs_addr, nid, str_size, strout}
     }
 }
 
@@ -76,7 +75,6 @@ impl<'toks> ActionInfo for WrsActionInfo<'toks> {
  *****************************************************************************/
 struct ActionDB<'toks> {
     actions : Vec<Box<dyn ActionInfo + 'toks>>,
-    output_nid: NodeId,
     file_name_str: &'toks str,
 }
 
@@ -92,8 +90,8 @@ impl<'toks> ActionDB<'toks> {
         }
     }
 
-    pub fn new(linear_db: &LinearDB, diags: &mut Diags, ast: &'toks Ast,
-               ast_db: &'toks AstDb, abs_start: usize) -> ActionDB<'toks> {
+    pub fn new(linear_db: &LinearDB, _diags: &mut Diags, ast: &'toks Ast,
+               _ast_db: &'toks AstDb, abs_start: usize) -> ActionDB<'toks> {
 
         debug!("ActionDB::new: >>>> ENTER for output nid: {} at {}", linear_db.output_nid,
                 abs_start);
@@ -153,7 +151,7 @@ impl<'toks> ActionDB<'toks> {
         }
 
         debug!("ActionDB::new: <<<< EXIT with size {}", new_size);
-        ActionDB { actions, output_nid, file_name_str }
+        ActionDB { actions, file_name_str }
     }
 
     pub fn write(&self) -> anyhow::Result<()> {
@@ -250,10 +248,9 @@ pub fn process(name: &str, fstr: &str) -> anyhow::Result<()> {
 
     let mut diags = Diags::new(name,fstr);
 
-    let mut ast = Ast::new(fstr);
-    if !ast.parse(&mut diags) {
-        bail!("Abstract syntax tree creation failed.")
-    }
+    let ast = Ast::new(fstr, &mut diags)
+              .context("Abstract syntax tree creation failed")?;
+
     ast.dump();
 
     let ast_db = AstDb::new(&mut diags, &ast)?;
