@@ -43,7 +43,7 @@ impl<'toks> WrsActionInfo<'toks> {
         let str_nid = children.next().unwrap();
         let str_tinfo = ast.get_tinfo(str_nid);
         // trim the leading and trailing quote characters
-        let strout = str_tinfo.slice().trim_matches('\"');
+        let strout = str_tinfo.val.trim_matches('\"');
         debug!("WrsActionInfo::new: output string at nid {} is {}", str_nid, strout);
         let str_size = strout.len();
         debug!("WrsActionInfo::new: <<<< EXIT for nid {}", nid);
@@ -107,13 +107,13 @@ impl<'toks> ActionDB<'toks> {
         let mut children = output_nid.children(&ast.arena);
         let sec_name_nid = children.next().unwrap();
         let sec_tinfo = ast.get_tinfo(sec_name_nid);
-        let sec_str = sec_tinfo.slice();
+        let sec_str = sec_tinfo.val;
         debug!("ActionDB::new: output section name is {}", sec_str);
 
         let file_name_nid = children.next().unwrap();
         let file_tinfo = ast.get_tinfo(file_name_nid);
         // strip the surrounding quote chars from the string
-        let file_name_str = file_tinfo.slice().trim_matches('\"');
+        let file_name_str = file_tinfo.val.trim_matches('\"');
         debug!("ActionDB::new: output file name is {}", file_name_str);
 
         // Iterate until the size of the section stops changing.
@@ -121,7 +121,7 @@ impl<'toks> ActionDB<'toks> {
         let mut new_size = 0;
         for &nid in &linear_db.nidvec {
             let tinfo = ast.get_tinfo(nid);
-            match tinfo.tok() {
+            match tinfo.tok {
                 ast::LexToken::Wrs => {
                     let wrsa = Box::new(WrsActionInfo::new(start, nid, ast));
                     let sz = wrsa.get_size();
@@ -189,7 +189,7 @@ impl<'toks> LinearDB {
         if rdepth > LinearDB::MAX_RECURSION_DEPTH {
             let tinfo = ast.get_tinfo(parent_nid);
             let m = format!("Maximum recursion depth ({}) exceeded when processing '{}'.",
-                            LinearDB::MAX_RECURSION_DEPTH, tinfo.slice());
+                            LinearDB::MAX_RECURSION_DEPTH, tinfo.val);
             diags.err1(11, &m, tinfo.span());
             return false;
         }
@@ -215,7 +215,7 @@ impl<'toks> LinearDB {
         let mut children = output_nid.children(&ast.arena);
         let sec_name_nid = children.next().unwrap();
         let sec_tinfo = ast.get_tinfo(sec_name_nid);
-        let sec_str = sec_tinfo.slice();
+        let sec_str = sec_tinfo.val;
         debug!("LinearDB::new: output section name is {}", sec_str);
 
         // Using the name of the section, use the AST database to get a reference
