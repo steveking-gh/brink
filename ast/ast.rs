@@ -75,22 +75,17 @@ impl<'toks> Ast<'toks> {
     pub fn parse(&mut self, diags: &mut Diags) -> bool {
         let toks_end = self.tv.len();
         let mut tok_num = 0;
+
+        // We can't simply iterate on the token vector, since we consume
+        // tokens from the vector recursively in varying amounts.
         while tok_num < toks_end {
             let tinfo = &self.tv[tok_num];
             debug!("Ast::parse: Parsing token {}: {:?}", &mut tok_num, tinfo);
-            match tinfo.tok() {
-                LexToken::Section => {
-                    if !self.parse_section(&mut tok_num, self.root, diags) {
-                        return false;
-                    }
-                },
-                LexToken::Output => {
-                    if !self.parse_output(&mut tok_num, self.root, diags) {
-                        return false;
-                    }
-                },
-                _ => { return false; },
-            }
+            let success = match tinfo.tok() {
+                LexToken::Section => self.parse_section(&mut tok_num, self.root, diags),
+                LexToken::Output => self.parse_output(&mut tok_num, self.root, diags),
+                _ => false,
+            };
         }
         true
     }
