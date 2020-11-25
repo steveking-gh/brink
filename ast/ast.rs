@@ -92,7 +92,7 @@ impl<'toks> Ast<'toks> {
                 _ => { return false; },
             }
         }
-    true
+        true
     }
 
     fn err_expected_after(&self, diags: &mut Diags, code: i32, msg: &str, tok_num: &usize) {
@@ -105,13 +105,20 @@ impl<'toks> Ast<'toks> {
         diags.err1(code, &m, self.tv[*tok_num].span());
     }
 
+    /// Add the specified token as a child of the parent
+    /// Advance the token number and return the new node.
+    fn add_to_parent_and_advance(&mut self, tok_num: &mut usize, parent: NodeId) -> NodeId {
+        let nid = self.arena.new_node(*tok_num);
+        parent.append(nid, &mut self.arena);
+        *tok_num += 1;
+        nid
+    }
+
     fn parse_section(&mut self, tok_num : &mut usize, parent : NodeId,
                     diags: &mut Diags) -> bool {
 
         // Add the section keyword as a child of the parent and advance
-        let node = self.arena.new_node(*tok_num);
-        parent.append(node, &mut self.arena);
-        *tok_num += 1;
+        let node = self.add_to_parent_and_advance(tok_num, parent);
 
         // After a section declaration, an identifier is expected
         let tinfo = &self.tv[*tok_num];
@@ -168,15 +175,8 @@ impl<'toks> Ast<'toks> {
     fn parse_wrs(&mut self, tok_num : &mut usize, parent : NodeId,
                 diags: &mut Diags) -> bool {
 
-        // Add the wr keyword as a child of the parent
-        // Parameters of the wr are children of the wr node
-        let node = self.arena.new_node(*tok_num);
-
-        // wr must have a parent
-        parent.append(node, &mut self.arena);
-
-        // Advance the token number past 'wr'
-        *tok_num += 1;
+        // Add the section keyword as a child of the parent and advance
+        let node = self.add_to_parent_and_advance(tok_num, parent);
 
         // Next, a quoted string is expected
         let tinfo = &self.tv[*tok_num];
@@ -202,10 +202,8 @@ impl<'toks> Ast<'toks> {
     fn parse_output(&mut self, tok_num : &mut usize, parent : NodeId,
                         diags: &mut Diags) -> bool {
 
-        // Add the output keyword as a child of the parent and advance
-        let node = self.arena.new_node(*tok_num);
-        parent.append(node, &mut self.arena);
-        *tok_num += 1;
+        // Add the section keyword as a child of the parent and advance
+        let node = self.add_to_parent_and_advance(tok_num, parent);
 
         // After a output declaration we expect a section identifier
         let tinfo = &self.tv[*tok_num];
