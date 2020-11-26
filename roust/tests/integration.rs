@@ -188,5 +188,15 @@ fn fuzz_found_2() {
     .stderr(predicates::str::contains("[AST_13]"));
 }
 
+#[test]
+fn fuzz_found_3() {
+    let _cmd = Command::cargo_bin("roust")
+    .unwrap()
+    .arg("tests/fuzz_found_3.roust")
+    .assert()
+    .failure()
+    .stderr(predicates::str::contains("[AST_13]"));
+}
+
 } // mod tests
 
