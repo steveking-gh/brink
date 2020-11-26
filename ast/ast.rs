@@ -104,6 +104,7 @@ impl<'toks> Ast<'toks> {
     /// tree construction.
     fn parse(&mut self, diags: &mut Diags) -> bool {
         let toks_end = self.tv.len();
+        debug!("Ast::parse: >>>> ENTER - Parsing {} tokens", toks_end);
 
         let mut tok_num = 0;
 
@@ -119,18 +120,19 @@ impl<'toks> Ast<'toks> {
             success &= match tinfo.tok {
                 LexToken::Section => self.parse_section(&mut tok_num, self.root, diags),
                 LexToken::Output => self.parse_output(&mut tok_num, self.root, diags),
-                _ => false,
+                _ => {tok_num += 1; false },
             };
         }
+        debug!("Ast::parse: <<<< EXIT({})", success);
         success
     }
 
-    fn err_expected_after(&self, diags: &mut Diags, code: i32, msg: &str, tok_num: &usize) {
+    fn err_expected_after(&self, diags: &mut Diags, code: &str, msg: &str, tok_num: &usize) {
         let m = format!("{}, but found '{}'", msg, self.tv[*tok_num].val);
         diags.err2(code, &m, self.tv[*tok_num].span(), self.tv[*tok_num-1].span());
     }
 
-    fn err_invalid_expression(&self, diags: &mut Diags, code: i32, tok_num: &usize) {
+    fn err_invalid_expression(&self, diags: &mut Diags, code: &str, tok_num: &usize) {
         let m = format!("Invalid expression '{}'", self.tv[*tok_num].val);
         diags.err1(code, &m, self.tv[*tok_num].span());
     }
@@ -157,7 +159,7 @@ impl<'toks> Ast<'toks> {
             self.parse_leaf(tok_num, sec_nid);
         } else {
             let m = format!("Expected an identifier after 'section', but found '{}'", tinfo.val);
-            diags.err2(1, &m, tinfo.span(), self.tv[*tok_num-1].span());
+            diags.err2("AST_1", &m, tinfo.span(), self.tv[*tok_num-1].span());
             return false;
         }
 
@@ -167,7 +169,7 @@ impl<'toks> Ast<'toks> {
             self.parse_leaf(tok_num, sec_nid);
         } else {
             let m = format!("Expected {{ after identifier, but found '{}'", tinfo.val);
-            diags.err2(2, &m, tinfo.span(), self.tv[*tok_num-1].span());
+            diags.err2("AST_2", &m, tinfo.span(), self.tv[*tok_num-1].span());
             return false;
         }
 
@@ -193,7 +195,7 @@ impl<'toks> Ast<'toks> {
                     return true;
                 }
                 _ => {
-                    self.err_invalid_expression(diags, 3, tok_num);
+                    self.err_invalid_expression(diags, "AST_3", tok_num);
                     return false;
                 }
             }
@@ -212,7 +214,7 @@ impl<'toks> Ast<'toks> {
         if let LexToken::QuotedString = tinfo.tok {
             self.parse_leaf(tok_num, node);
         } else {
-            self.err_expected_after(diags, 4, "Expected a quoted string after 'wrs'", tok_num);
+            self.err_expected_after(diags, "AST_4", "Expected a quoted string after 'wrs'", tok_num);
             return false;
         }
 
@@ -221,7 +223,7 @@ impl<'toks> Ast<'toks> {
         if let LexToken::Semicolon = tinfo.tok {
             self.parse_leaf(tok_num, node);
         } else {
-            self.err_expected_after(diags, 5, "Expected ';' after string", tok_num);
+            self.err_expected_after(diags, "AST_5", "Expected ';' after string", tok_num);
             return false;
         }
         debug!("parse_wrs success");
@@ -239,7 +241,7 @@ impl<'toks> Ast<'toks> {
         if let LexToken::Identifier = tinfo.tok {
             self.parse_leaf(tok_num, node);
         } else {
-            self.err_expected_after(diags, 7, "Expected a section name after output", tok_num);
+            self.err_expected_after(diags, "AST_7", "Expected a section name after output", tok_num);
             return false;
         }
 
@@ -248,7 +250,7 @@ impl<'toks> Ast<'toks> {
         if let LexToken::QuotedString = tinfo.tok {
             self.parse_leaf(tok_num, node);
         } else {
-            self.err_expected_after(diags, 6, "Expected the file path as a quoted string after the section name", tok_num);
+            self.err_expected_after(diags, "AST_6", "Expected the file path as a quoted string after the section name", tok_num);
             return false;
         }
 
@@ -257,7 +259,7 @@ impl<'toks> Ast<'toks> {
         if let LexToken::Semicolon = tinfo.tok {
             self.parse_leaf(tok_num, node);
         } else {
-            self.err_expected_after(diags, 8, "Expected ';' after identifier", tok_num);
+            self.err_expected_after(diags, "AST_8", "Expected ';' after identifier", tok_num);
             return false;
         }
         debug!("parse_output success");
@@ -372,7 +374,7 @@ impl<'toks> AstDb<'toks> {
             let orig_section = sections.get(sec_str).unwrap();
             let orig_tinfo = orig_section.tinfo;
             let m = format!("Duplicate section name '{}'", sec_str);
-            diags.err2(9, &m, sec_tinfo.span(), orig_tinfo.span());
+            diags.err2("AST_9", &m, sec_tinfo.span(), orig_tinfo.span());
             return false;
         }
         sections.insert(sec_str, Section::new(&ast,sec_nid));

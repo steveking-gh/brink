@@ -15,6 +15,9 @@ libfuzzer-sys = "0.3"
 [dependencies.ast]
 path = ".."
 
+[dependencies.diags]
+path = "../../diags"
+
 # Prevent this from interfering with workspaces
 [workspace]
 members = ["."]

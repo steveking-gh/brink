@@ -22,9 +22,9 @@ impl<'a, 'msg> Diags<'a> {
 
     /// Writes the diagnostic to the terminal with primary
     /// code location.
-    pub fn warn(&self, code: i32, msg: &'msg str) {
+    pub fn warn(&self, code: &str, msg: &'msg str) {
         let diag = Diagnostic::warning()
-                .with_code(format!("{}", code))
+                .with_code(code)
                 .with_message(msg);
 
         let _ = term::emit(&mut self.writer.lock(), &self.config,
@@ -33,10 +33,10 @@ impl<'a, 'msg> Diags<'a> {
 
     /// Writes the diagnostic to the terminal with primary
     /// code location.
-    pub fn err1(&self, code: i32, msg: &'msg str,
+    pub fn err1(&self, code: &str, msg: &'msg str,
                      primary_code_ref: Range<usize>) {
         let diag = Diagnostic::error()
-                .with_code(format!("{}", code))
+                .with_code(code)
                 .with_message(msg)
                 .with_labels(vec![Label::primary((), primary_code_ref)]);
 
@@ -46,11 +46,11 @@ impl<'a, 'msg> Diags<'a> {
 
     /// Writes the diagnostic to the terminal with primary
     /// and secondary code locations.
-    pub fn err2(&self, code: i32, msg: &'msg str,
+    pub fn err2(&self, code: &str, msg: &'msg str,
                      primary_code_ref: Range<usize>,
                      secondary_code_ref: Range<usize>) {
         let diag = Diagnostic::error()
-                .with_code(format!("{}", code))
+                .with_code(code)
                 .with_message(msg)
                 .with_labels(vec![Label::primary((), primary_code_ref),
                                   Label::secondary((), secondary_code_ref)]);

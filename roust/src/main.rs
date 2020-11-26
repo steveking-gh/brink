@@ -188,7 +188,7 @@ impl<'toks> LinearDB {
             let tinfo = ast.get_tinfo(parent_nid);
             let m = format!("Maximum recursion depth ({}) exceeded when processing '{}'.",
                             LinearDB::MAX_RECURSION_DEPTH, tinfo.val);
-            diags.err1(11, &m, tinfo.span());
+            diags.err1("MAIN_11", &m, tinfo.span());
             return false;
         }
 
@@ -249,14 +249,14 @@ pub fn process(name: &str, fstr: &str) -> anyhow::Result<()> {
     let mut diags = Diags::new(name,fstr);
 
     let ast = Ast::new(fstr, &mut diags)
-              .context("Abstract syntax tree creation failed")?;
+              .context("Error[MAIN_1]: Abstract syntax tree creation failed")?;
 
     ast.dump();
 
     let ast_db = AstDb::new(&mut diags, &ast)?;
 
     if ast_db.outputs.is_empty() {
-        diags.warn(10, "No output statement, nothing to do.");
+        diags.warn("MAIN_10", "No output statement, nothing to do.");
         // this is not a bail
     }
 
