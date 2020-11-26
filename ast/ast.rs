@@ -142,6 +142,11 @@ impl<'toks> Ast<'toks> {
         diags.err1("AST_13", &m, self.tv[tok_num].span());
     }
 
+    fn err_no_close_brace(&self, diags: &mut Diags, brace_tok_num: usize) {
+        let m = format!("Missing '}}'.  The following open brace is unmatched.");
+        diags.err1("AST_14", &m, self.tv[brace_tok_num].span());
+    }
+
     /// Get a token information object for the specified token number
     /// This is variant 1 since we have at least one other get_tinfo
     fn get_tinfo1(&self, tok_num: usize) -> Option<&'toks TokenInfo> {
@@ -150,6 +155,19 @@ impl<'toks> Ast<'toks> {
         }
 
         Some(&self.tv[tok_num])
+    }
+
+    /// Attempts to advance the token number past the next simicolon
+    /// The token number returned may be invalid.
+    fn advance_past_semicolon(&self, tok_num: usize) -> usize {
+        let mut tnum = tok_num;
+        while let Some(tinfo) = self.get_tinfo1(tnum) {
+            if tinfo.tok == LexToken::Semicolon {
+                break;
+            }
+            tnum += 1;
+        }
+        tnum + 1
     }
 
     /// Add the specified token as a child of the parent
@@ -182,6 +200,9 @@ impl<'toks> Ast<'toks> {
         }
 
         // After a section identifier, expect an open brace
+        // Remember the location of the opening brace to help with
+        // user missing brace errors.
+        let brace_toknum = *tok_num;
         if let Some(tinfo) = self.get_tinfo1(*tok_num) {
             if let LexToken::OpenBrace = tinfo.tok {
                 self.parse_leaf(tok_num, sec_nid);
@@ -194,34 +215,42 @@ impl<'toks> Ast<'toks> {
             return false;
         }
 
-        self.parse_section_contents(tok_num, sec_nid, diags);
-        true
+        self.parse_section_contents(tok_num, sec_nid, diags, brace_toknum)
     }
 
     fn parse_section_contents(&mut self, tok_num : &mut usize, parent : NodeId,
-                                        diags: &mut Diags) -> bool {
-        let toks_end = self.tv.len();
-        while *tok_num < toks_end {
-            let tinfo = &self.tv[*tok_num];
-            match tinfo.tok {
-                // For now, we only support writing strings in a section.
-                LexToken::Wrs => {
-                    if !self.parse_wrs(tok_num, parent, diags) {
-                        return false;
-                    }
-                }
-                LexToken::CloseBrace => {
-                    // When we find a close brace, we're done with section content
-                    self.parse_leaf(tok_num, parent);
-                    return true;
-                }
+                              diags: &mut Diags, brace_tok_num: usize) -> bool {
+
+        let mut success = true;
+        while let Some(tinfo) = self.get_tinfo1(*tok_num) {
+            // When we find a close brace, we're done with section content
+            if tinfo.tok == LexToken::CloseBrace {
+                self.parse_leaf(tok_num, parent);
+                return success;
+            }
+
+            // Stay in the section even after errors to give the user
+            // more than one error at a time
+            let parse_ok = match tinfo.tok {
+                LexToken::Wrs => self.parse_wrs(tok_num, parent, diags),
                 _ => {
                     self.err_invalid_expression(diags, "AST_3", tok_num);
-                    return false;
+                    *tok_num += 1;
+                    false
                 }
+            };
+
+            // If something went wrong, then advance to the next semi
+            // and try to keep going to give users more errors to fix.
+            if !parse_ok {
+                *tok_num = self.advance_past_semicolon(*tok_num);
+                success = false;
             }
         }
-        true
+
+        // If we got here, we ran out of tokens before finding the close brace.
+        self.err_no_close_brace(diags, brace_tok_num);
+        false
     }
 
     fn parse_wrs(&mut self, tok_num : &mut usize, parent : NodeId,

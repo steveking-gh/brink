@@ -198,5 +198,15 @@ fn fuzz_found_3() {
     .stderr(predicates::str::contains("[AST_13]"));
 }
 
+#[test]
+fn missing_brace_1() {
+    let _cmd = Command::cargo_bin("roust")
+    .unwrap()
+    .arg("tests/missing_brace_1.roust")
+    .assert()
+    .failure()
+    .stderr(predicates::str::contains("[AST_14]"));
+}
+
 } // mod tests
 
