@@ -165,18 +165,27 @@ fn no_output_warn_1() {
     .arg("tests/no_output_warn_1.roust")
     .assert()
     .success()
-    .stderr(predicates::str::contains("warning[MAIN_10]"));
+    .stderr(predicates::str::contains("[MAIN_10]"));
 }
 
 #[test]
 fn fuzz_found_1() {
     let _cmd = Command::cargo_bin("roust")
     .unwrap()
-    .arg("tests/fuzz_found_1.roust")
+    .arg("tests/fuzz_found_2.roust")
     .assert()
     .failure()
-    .stderr(predicates::str::contains("Error[MAIN_1]"));
+    .stderr(predicates::str::contains("[MAIN_2]"));
+}
 
+#[test]
+fn fuzz_found_2() {
+    let _cmd = Command::cargo_bin("roust")
+    .unwrap()
+    .arg("tests/fuzz_found_2.roust")
+    .assert()
+    .failure()
+    .stderr(predicates::str::contains("[AST_13]"));
 }
 
 } // mod tests

@@ -33,6 +33,17 @@ impl<'a, 'msg> Diags<'a> {
 
     /// Writes the diagnostic to the terminal with primary
     /// code location.
+    pub fn err0(&self, code: &str, msg: &'msg str) {
+        let diag = Diagnostic::error()
+                .with_code(code)
+                .with_message(msg);
+
+        let _ = term::emit(&mut self.writer.lock(), &self.config,
+                           &self.source_map, &diag);
+    }
+
+    /// Writes the diagnostic to the terminal with primary
+    /// code location.
     pub fn err1(&self, code: &str, msg: &'msg str,
                      primary_code_ref: Range<usize>) {
         let diag = Diagnostic::error()

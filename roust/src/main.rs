@@ -248,8 +248,12 @@ pub fn process(name: &str, fstr: &str) -> anyhow::Result<()> {
 
     let mut diags = Diags::new(name,fstr);
 
-    let ast = Ast::new(fstr, &mut diags)
-              .context("Error[MAIN_1]: Abstract syntax tree creation failed")?;
+    let ast = Ast::new(fstr, &mut diags);
+    if ast.is_none() {
+        bail!("[MAIN_2]: Failed to construct the abstract syntax tree.");
+    }
+
+    let ast = ast.unwrap();
 
     ast.dump();
 

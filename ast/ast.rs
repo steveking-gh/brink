@@ -137,6 +137,21 @@ impl<'toks> Ast<'toks> {
         diags.err1(code, &m, self.tv[*tok_num].span());
     }
 
+    fn err_no_input(&self, diags: &mut Diags, tok_num: usize) {
+        let m = format!("Unexpected end of input after '{}'", self.tv[tok_num].val);
+        diags.err1("AST_13", &m, self.tv[tok_num].span());
+    }
+
+    /// Get a token information object for the specified token number
+    /// This is variant 1 since we have at least one other get_tinfo
+    fn get_tinfo1(&self, tok_num: usize) -> Option<&'toks TokenInfo> {
+        if tok_num >= self.tv.len() {
+            return None;
+        }
+
+        Some(&self.tv[tok_num])
+    }
+
     /// Add the specified token as a child of the parent
     /// Advance the token number and return the new node.
     fn add_to_parent_and_advance(&mut self, tok_num: &mut usize, parent: NodeId) -> NodeId {
@@ -236,12 +251,16 @@ impl<'toks> Ast<'toks> {
         // Add the section keyword as a child of the parent and advance
         let node = self.add_to_parent_and_advance(tok_num, parent);
 
-        // After a output declaration we expect a section identifier
-        let tinfo = &self.tv[*tok_num];
-        if let LexToken::Identifier = tinfo.tok {
-            self.parse_leaf(tok_num, node);
+        // After 'output' an identifier is expected
+        if let Some(tinfo) = self.get_tinfo1(*tok_num) {
+            if let LexToken::Identifier = tinfo.tok {
+                self.parse_leaf(tok_num, node);
+            } else {
+                self.err_expected_after(diags, "AST_7", "Expected a section name after output", tok_num);
+                return false;
+            }
         } else {
-            self.err_expected_after(diags, "AST_7", "Expected a section name after output", tok_num);
+            self.err_no_input(diags, *tok_num - 1);
             return false;
         }
 

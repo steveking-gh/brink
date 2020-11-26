@@ -8,12 +8,16 @@
         "ctxt",
         "fstr",
         "indextree",
+        "libfuzzer",
         "nidvec",
+        "outp",
         "pretok",
         "rdepth",
+        "strout",
         "structs",
         "termcolor",
         "tinfo",
-        "toks"
+        "toks",
+        "wrsa"
     ]
 }
