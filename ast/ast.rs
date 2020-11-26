@@ -90,20 +90,28 @@ impl<'toks> Ast<'toks> {
         }
         let mut ast = Self { arena, tv, root };
         if !ast.parse(diags) {
+            // ast construction failed.  Let the caller report
+            // this in whatever way they want.
             return None;
         }
 
         Some(ast)
     }
 
+    /// Parse the flat token vector to build the syntax tree. Unlike the flat
+    /// vector of tokens, the tree represents the semantic parent-child relation
+    /// between elements in the source file.  We check syntax and grammar during
+    /// tree construction.
     fn parse(&mut self, diags: &mut Diags) -> bool {
         let toks_end = self.tv.len();
+
         let mut tok_num = 0;
 
-        // We can't simply iterate on the token vector, since we consume
+        // We can't simply iterate on the token vector because the loop consumes
         // tokens from the vector recursively in varying amounts.
-        // Complete the loop even if some parsing fails to give the user
-        // more errors at a time.
+        //
+        // Complete the loop even if some parsing fails to give the user more
+        // errors at a time.
         let mut success = true;
         while tok_num < toks_end {
             let tinfo = &self.tv[tok_num];
@@ -139,32 +147,31 @@ impl<'toks> Ast<'toks> {
     fn parse_section(&mut self, tok_num : &mut usize, parent : NodeId,
                     diags: &mut Diags) -> bool {
 
-        // Add the section keyword as a child of the parent and advance
-        let node = self.add_to_parent_and_advance(tok_num, parent);
+        // Sections are always children of the root node, but no need to make
+        // that a special case here.
+        let sec_nid = self.add_to_parent_and_advance(tok_num, parent);
 
-        // After a section declaration, an identifier is expected
+        // After a section declaration, expect an identifier
         let tinfo = &self.tv[*tok_num];
         if let LexToken::Identifier = tinfo.tok {
-            self.parse_leaf(tok_num, node);
+            self.parse_leaf(tok_num, sec_nid);
         } else {
-            let m = format!("Expected an identifier after 'section', but found '{}'",
-                            self.tv[*tok_num].val);
-            diags.err2(1, &m, self.tv[*tok_num].span(), self.tv[*tok_num-1].span());
+            let m = format!("Expected an identifier after 'section', but found '{}'", tinfo.val);
+            diags.err2(1, &m, tinfo.span(), self.tv[*tok_num-1].span());
             return false;
         }
 
-        // After a section identifier, open brace
+        // After a section identifier, expect an open brace
         let tinfo = &self.tv[*tok_num];
         if let LexToken::OpenBrace = tinfo.tok {
-            self.parse_leaf(tok_num, node);
+            self.parse_leaf(tok_num, sec_nid);
         } else {
-            let m = format!("Expected {{ after identifier, but found '{}'",
-                            self.tv[*tok_num].val);
-            diags.err2(2, &m, self.tv[*tok_num].span(), self.tv[*tok_num-1].span());
+            let m = format!("Expected {{ after identifier, but found '{}'", tinfo.val);
+            diags.err2(2, &m, tinfo.span(), self.tv[*tok_num-1].span());
             return false;
         }
 
-        self.parse_section_contents(tok_num, node, diags);
+        self.parse_section_contents(tok_num, sec_nid, diags);
         true
     }
 
