@@ -182,11 +182,15 @@ impl<'toks> Ast<'toks> {
         }
 
         // After a section identifier, expect an open brace
-        let tinfo = &self.tv[*tok_num];
-        if let LexToken::OpenBrace = tinfo.tok {
-            self.parse_leaf(tok_num, sec_nid);
+        if let Some(tinfo) = self.get_tinfo1(*tok_num) {
+            if let LexToken::OpenBrace = tinfo.tok {
+                self.parse_leaf(tok_num, sec_nid);
+            } else {
+                self.err_expected_after(diags, "AST_2", "Expected {{ after identifier", tok_num);
+                return false;
+            }
         } else {
-            self.err_expected_after(diags, "AST_2", "Expected {{ after identifier", tok_num);
+            self.err_no_input(diags, *tok_num - 1);
             return false;
         }
 
@@ -267,22 +271,31 @@ impl<'toks> Ast<'toks> {
         }
 
         // After the identifier, the file name as a quoted string
-        let tinfo = &self.tv[*tok_num];
-        if let LexToken::QuotedString = tinfo.tok {
-            self.parse_leaf(tok_num, output_nid);
+        if let Some(tinfo) = self.get_tinfo1(*tok_num) {
+            if let LexToken::QuotedString = tinfo.tok {
+                self.parse_leaf(tok_num, output_nid);
+            } else {
+                self.err_expected_after(diags, "AST_6", "Expected the file path as a quoted string after the section name", tok_num);
+                return false;
+            }
         } else {
-            self.err_expected_after(diags, "AST_6", "Expected the file path as a quoted string after the section name", tok_num);
+            self.err_no_input(diags, *tok_num - 1);
             return false;
         }
 
         // After the identifier, a semicolon
-        let tinfo = &self.tv[*tok_num];
-        if let LexToken::Semicolon = tinfo.tok {
-            self.parse_leaf(tok_num, output_nid);
+        if let Some(tinfo) = self.get_tinfo1(*tok_num) {
+            if let LexToken::Semicolon = tinfo.tok {
+                self.parse_leaf(tok_num, output_nid);
+            } else {
+                self.err_expected_after(diags, "AST_8", "Expected ';' after identifier", tok_num);
+                return false;
+            }
         } else {
-            self.err_expected_after(diags, "AST_8", "Expected ';' after identifier", tok_num);
+            self.err_no_input(diags, *tok_num - 1);
             return false;
         }
+
         debug!("parse_output success");
         true
     }
