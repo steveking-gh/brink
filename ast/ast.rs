@@ -162,12 +162,12 @@ impl<'toks> Ast<'toks> {
     fn advance_past_semicolon(&self, tok_num: usize) -> usize {
         let mut tnum = tok_num;
         while let Some(tinfo) = self.get_tinfo1(tnum) {
+            tnum += 1;
             if tinfo.tok == LexToken::Semicolon {
                 break;
             }
-            tnum += 1;
         }
-        tnum + 1
+        tnum
     }
 
     /// Add the specified token as a child of the parent
