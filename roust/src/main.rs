@@ -204,9 +204,11 @@ impl<'toks> LinearDB {
     }
 
     /// The ActionDB object must start with an output statement
-    pub fn new(output_nid: NodeId, diags: &mut Diags, ast: &'toks Ast,
+    pub fn new(diags: &mut Diags, ast: &'toks Ast,
                ast_db: &'toks AstDb) -> Option<LinearDB> {
 
+        // Caller must verify the output exists
+        let output_nid = ast_db.output.as_ref()?.nid;
         debug!("LinearDB::new: >>>> ENTER for output nid: {}", output_nid);
         let mut linear_db = LinearDB { output_nid, nidvec: Vec::new() };
 
@@ -242,7 +244,7 @@ impl<'toks> LinearDB {
 /// Entry point for all processing on the input source file
 /// name: The name of the file
 /// fstr: A string containing the file
-pub fn process(name: &str, fstr: &str) -> anyhow::Result<()> {
+pub fn process(name: &str, fstr: &str, _args: &clap::ArgMatches) -> anyhow::Result<()> {
     info!("Processing {}", name);
     debug!("File contains: {}", fstr);
 
@@ -259,26 +261,21 @@ pub fn process(name: &str, fstr: &str) -> anyhow::Result<()> {
 
     let ast_db = AstDb::new(&mut diags, &ast)?;
 
-    if ast_db.outputs.is_empty() {
+    if ast_db.output.is_none() {
         diags.warn("MAIN_10", "No output statement, nothing to do.");
-        // this is not a bail
+        // this is not a bail, just a warning
+        return Ok(());
     }
 
-    // Take the reference to the ast_db to avoid a move due to the
-    // implicit into_iter().
-    // http://xion.io/post/code/rust-for-loop.html
-    // https://stackoverflow.com/q/43036279/233981
-    for outp in &ast_db.outputs {
-        let linear_db = LinearDB::new(outp.nid, &mut diags, &ast, &ast_db);
-        if linear_db.is_none() {
-            bail!("Failed to construct the linear database.");
-        }
-        let linear_db = linear_db.unwrap();
-        linear_db.dump();
-        let action_db = ActionDB::new(&linear_db, &mut diags, &ast, &ast_db, 0);
-        action_db.dump();
-        action_db.write()?;
+    let linear_db = LinearDB::new(&mut diags, &ast, &ast_db);
+    if linear_db.is_none() {
+        bail!("Failed to construct the linear database.");
     }
+    let linear_db = linear_db.unwrap();
+    linear_db.dump();
+    let action_db = ActionDB::new(&linear_db, &mut diags, &ast, &ast_db, 0);
+    action_db.dump();
+    action_db.write()?;
     Ok(())
 }
 
@@ -323,6 +320,11 @@ fn main() -> Result<()> {
                 .long("verbose")
                 .multiple(true)
                 .help("Sets the verbosity level. Use up to 4 times."))
+            .arg(Arg::with_name("output")
+                .short("o")
+                .long("output")
+                .multiple(false)
+                .help("Specifies output file name.  Default is output section name."))
             .arg(Arg::with_name("quiet")
                 .short("q")
                 .long("quiet")
@@ -349,7 +351,7 @@ fn main() -> Result<()> {
     let str_in = fs::read_to_string(in_file_name)
         .with_context(|| format!("Failed to read from file {}", in_file_name))?;
 
-    process(&in_file_name, &str_in)?;
+    process(&in_file_name, &str_in, &args)?;
 
     Ok(())
 }

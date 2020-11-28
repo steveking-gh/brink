@@ -393,7 +393,7 @@ impl<'toks> Output<'toks> {
  *****************************************************************************/
 pub struct AstDb<'toks> {
     pub sections: HashMap<&'toks str, Section<'toks>>,
-    pub outputs: Vec<Output<'toks>>,
+    pub output: Option<Output<'toks>>,
     //pub properties: HashMap<NodeId, NodeProperty>
 }
 
@@ -425,31 +425,18 @@ impl<'toks> AstDb<'toks> {
         true
     }
 
-    /**
-     * Adds a new output to the vector of output structs.
-     */
-    fn record_output(_ctxt: &mut Diags, nid: NodeId, ast: &'toks Ast,
-                    outputs: &mut Vec<Output<'toks>>) -> bool {
-        // nid points to 'output'
-        // don't bother with semantic error checking yet.
-        // The lexer already did basic checking
-        debug!("AstDb::record_output: NodeId {}", nid);
-        outputs.push(Output::new(&ast, nid));
-        true
-    }
-
     pub fn new(diags: &mut Diags, ast: &'toks Ast) -> anyhow::Result<AstDb<'toks>> {
         // Populate the AST database of critical structures.
         let mut result = true;
 
         let mut sections: HashMap<&'toks str, Section<'toks>> = HashMap::new();
-        let mut outputs: Vec<Output<'toks>> = Vec::new();
+        let mut output: Option<Output> = None;
 
         for nid in ast.root.children(&ast.arena) {
             let tinfo = ast.get_tinfo(nid);
             result = result && match tinfo.tok {
                 LexToken::Section => Self::record_section(diags, nid, &ast, &mut sections),
-                LexToken::Output => Self::record_output(diags, nid, &ast, &mut outputs),
+                LexToken::Output => { output = Some(Output::new(&ast,nid)); true },
                 _ => { true }
             };
         }
@@ -458,6 +445,6 @@ impl<'toks> AstDb<'toks> {
             bail!("AST construction failed");
         }
 
-        Ok(AstDb { sections, outputs })
+        Ok(AstDb { sections, output })
     }
 }
