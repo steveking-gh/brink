@@ -4,6 +4,7 @@
 #![warn(clippy::all)]
 
 use std::vec::Vec;
+use std::env;
 use std::{io,fs};
 use std::fs::File;
 use std::io::prelude::*;
@@ -75,7 +76,7 @@ impl<'toks> ActionInfo for WrsActionInfo<'toks> {
  *****************************************************************************/
 struct ActionDB<'toks> {
     actions : Vec<Box<dyn ActionInfo + 'toks>>,
-    file_name_str: &'toks str,
+    file_name_str: String,
 }
 
 use ast::{Ast,AstDb};
@@ -90,14 +91,21 @@ impl<'toks> ActionDB<'toks> {
         }
     }
 
-    pub fn new(linear_db: &LinearDB, _diags: &mut Diags, ast: &'toks Ast,
-               _ast_db: &'toks AstDb, abs_start: usize) -> ActionDB<'toks> {
+    pub fn new(linear_db: &LinearDB, _diags: &mut Diags, args: &'toks clap::ArgMatches,
+               ast: &'toks Ast, _ast_db: &'toks AstDb, abs_start: usize)
+               -> ActionDB<'toks> {
 
         debug!("ActionDB::new: >>>> ENTER for output nid: {} at {}", linear_db.output_nid,
                 abs_start);
         let mut actions : Vec<Box<dyn ActionInfo + 'toks>> = Vec::new();
         let output_nid = linear_db.output_nid;
 
+        // Determine if the user specified an output file on the command line
+        // Trim whitespace
+        let file_name_str = String::from(args.value_of("output")
+                                             .unwrap_or("output.bin")
+                                             .trim_matches(' '));
+        debug!("ActionDB::new: output file name is {}", file_name_str);
 
         // Using the name of the section, use the AST database to get a reference
         // to the section object.  ast_db processing has already guaranteed
@@ -107,12 +115,6 @@ impl<'toks> ActionDB<'toks> {
         let sec_tinfo = ast.get_tinfo(sec_name_nid);
         let sec_str = sec_tinfo.val;
         debug!("ActionDB::new: output section name is {}", sec_str);
-
-        let file_name_nid = children.next().unwrap();
-        let file_tinfo = ast.get_tinfo(file_name_nid);
-        // strip the surrounding quote chars from the string
-        let file_name_str = file_tinfo.val.trim_matches('\"');
-        debug!("ActionDB::new: output file name is {}", file_name_str);
 
         // Iterate until the size of the section stops changing.
         let mut start = abs_start;
@@ -155,7 +157,7 @@ impl<'toks> ActionDB<'toks> {
     }
 
     pub fn write(&self) -> anyhow::Result<()> {
-        let mut file = File::create(self.file_name_str)
+        let mut file = File::create(&self.file_name_str)
                 .context(format!("Unable to create output file {}", self.file_name_str))?;
 
         for ainfo in &self.actions {
@@ -203,13 +205,17 @@ impl<'toks> LinearDB {
         result
     }
 
-    /// The ActionDB object must start with an output statement
+    /// The LinearDB object must start with an output statement.
+    /// If the output doesn't exist, then we return None
     pub fn new(diags: &mut Diags, ast: &'toks Ast,
                ast_db: &'toks AstDb) -> Option<LinearDB> {
+        debug!("LinearDB::new: >>>> ENTER");
+        if ast_db.output.is_none() {
+            diags.err0("MAIN_1", "Missing output statement.");
+            return None;
+        }
 
-        // Caller must verify the output exists
         let output_nid = ast_db.output.as_ref()?.nid;
-        debug!("LinearDB::new: >>>> ENTER for output nid: {}", output_nid);
         let mut linear_db = LinearDB { output_nid, nidvec: Vec::new() };
 
         let mut children = output_nid.children(&ast.arena);
@@ -244,7 +250,7 @@ impl<'toks> LinearDB {
 /// Entry point for all processing on the input source file
 /// name: The name of the file
 /// fstr: A string containing the file
-pub fn process(name: &str, fstr: &str, _args: &clap::ArgMatches) -> anyhow::Result<()> {
+pub fn process(name: &str, fstr: &str, args: &clap::ArgMatches) -> anyhow::Result<()> {
     info!("Processing {}", name);
     debug!("File contains: {}", fstr);
 
@@ -260,20 +266,13 @@ pub fn process(name: &str, fstr: &str, _args: &clap::ArgMatches) -> anyhow::Resu
     ast.dump();
 
     let ast_db = AstDb::new(&mut diags, &ast)?;
-
-    if ast_db.output.is_none() {
-        diags.warn("MAIN_10", "No output statement, nothing to do.");
-        // this is not a bail, just a warning
-        return Ok(());
-    }
-
     let linear_db = LinearDB::new(&mut diags, &ast, &ast_db);
     if linear_db.is_none() {
         bail!("Failed to construct the linear database.");
     }
     let linear_db = linear_db.unwrap();
     linear_db.dump();
-    let action_db = ActionDB::new(&linear_db, &mut diags, &ast, &ast_db, 0);
+    let action_db = ActionDB::new(&linear_db, &mut diags, args, &ast, &ast_db, 0);
     action_db.dump();
     action_db.write()?;
     Ok(())
@@ -323,8 +322,9 @@ fn main() -> Result<()> {
             .arg(Arg::with_name("output")
                 .short("o")
                 .long("output")
-                .multiple(false)
-                .help("Specifies output file name.  Default is output section name."))
+                .value_name("output_file")
+                .takes_value(true)
+                .help("Specifies output file name.  Default is output.bin."))
             .arg(Arg::with_name("quiet")
                 .short("q")
                 .long("quiet")
@@ -348,8 +348,10 @@ fn main() -> Result<()> {
     let in_file_name = args.value_of("INPUT")
             .context("Unknown input file argument error.")?;
 
-    let str_in = fs::read_to_string(in_file_name)
-        .with_context(|| format!("Failed to read from file {}", in_file_name))?;
+    let str_in = fs::read_to_string(&in_file_name)
+        .with_context(|| format!(
+                "Failed to read from file {}.\nWorking directory is {}",
+                in_file_name, env::current_dir().unwrap().display()))?;
 
     process(&in_file_name, &str_in, &args)?;
 

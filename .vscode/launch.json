@@ -19,8 +19,8 @@
                     "kind": "bin"
                 }
             },
-            "args": ["./tests/simple_section_1.roust"],
-            "cwd": "${workspaceFolder}"
+            "args": ["-o empty_section_1.bin",
+                     "${workspaceFolder}/roust/tests/empty_section_1.roust"],
         },
         {
             "type": "lldb",

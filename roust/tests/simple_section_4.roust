@@ -3,4 +3,4 @@ section foo {
     wrs "Bye";
 }
 
-output foo "simple_section_4.bin";
+output foo;

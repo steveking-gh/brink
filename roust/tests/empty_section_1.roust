@@ -2,4 +2,4 @@ section foo {}
 /*
  test
  */
-output foo "empty_section_1.bin";
+output foo;

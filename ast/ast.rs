@@ -288,15 +288,9 @@ impl<'toks> Ast<'toks> {
         // Add the section keyword as a child of the parent and advance
         let output_nid = self.add_to_parent_and_advance(tok_num, parent);
 
-        // After 'output' an identifier is expected
+        // After 'output' a section identifier is expected
         if !self.expect_leaf(diags, tok_num, output_nid, LexToken::Identifier, "AST_7",
                              "Expected a section name after output") {
-            return false;
-        }
-
-        // After the identifier, the file name as a quoted string
-        if !self.expect_leaf(diags, tok_num, output_nid, LexToken::QuotedString, "AST_6",
-                             "Expected the file path as a quoted string after the section name") {
             return false;
         }
 

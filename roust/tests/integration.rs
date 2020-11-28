@@ -54,8 +54,9 @@ fn line_comment_1() {
                 .unwrap()
                 .arg("tests/line_comment_1.roust")
                 .assert()
-                .success();
-}
+                .failure()
+                .stderr(predicates::str::contains("[MAIN_1]"));
+            }
 
 #[test]
 fn line_comment_2() {
@@ -63,8 +64,9 @@ fn line_comment_2() {
                 .unwrap()
                 .arg("tests/line_comment_2.roust")
                 .assert()
-                .success();
-}
+                .failure()
+                .stderr(predicates::str::contains("[MAIN_1]"));
+            }
 
 #[test]
 fn multi_comment_1() {
@@ -72,8 +74,9 @@ fn multi_comment_1() {
                 .unwrap()
                 .arg("tests/multi_comment_1.roust")
                 .assert()
-                .success();
-}
+                .failure()
+                .stderr(predicates::str::contains("[MAIN_1]"));
+            }
 
 #[test]
 fn multi_comment_2() {
@@ -81,8 +84,9 @@ fn multi_comment_2() {
                 .unwrap()
                 .arg("tests/multi_comment_2.roust")
                 .assert()
-                .success();
-}
+                .failure()
+                .stderr(predicates::str::contains("[MAIN_1]"));
+            }
 
 #[test]
 fn multi_comment_3() {
@@ -90,19 +94,18 @@ fn multi_comment_3() {
                 .unwrap()
                 .arg("tests/multi_comment_3.roust")
                 .assert()
-                .success();
-}
+                .failure()
+                .stderr(predicates::str::contains("[MAIN_1]"));
+            }
 
 #[test]
 fn empty_section_1() {
     let _cmd = Command::cargo_bin("roust")
                 .unwrap()
                 .arg("tests/empty_section_1.roust")
+                .arg("-o empty_section_1.bin")
                 .assert()
                 .success();
-
-    let p_is_empty = predicate::str::is_empty().from_utf8().from_file_path();
-    assert!(p_is_empty.eval(Path::new("empty_section_1.bin")));
 
     // Verify file is empty.  If so, then clean up.
     assert!(fs::read_to_string("empty_section_1.bin").unwrap().len() == 0);
@@ -115,6 +118,7 @@ fn simple_section_2() {
     let _cmd = Command::cargo_bin("roust")
                 .unwrap()
                 .arg("tests/simple_section_2.roust")
+                .arg("-o simple_section_2.bin")
                 .assert()
                 .success();
 
@@ -128,6 +132,7 @@ fn simple_section_3() {
     let _cmd = Command::cargo_bin("roust")
                 .unwrap()
                 .arg("tests/simple_section_3.roust")
+                .arg("-o simple_section_3.bin")
                 .assert()
                 .success();
 
@@ -141,6 +146,7 @@ fn simple_section_4() {
     let _cmd = Command::cargo_bin("roust")
                 .unwrap()
                 .arg("tests/simple_section_4.roust")
+                .arg("-o simple_section_4.bin")
                 .assert()
                 .success();
 
@@ -156,16 +162,6 @@ fn section_rename_err_1() {
     .arg("tests/section_rename_err_1.roust")
     .assert()
     .failure();
-}
-
-#[test]
-fn no_output_warn_1() {
-    let _cmd = Command::cargo_bin("roust")
-    .unwrap()
-    .arg("tests/no_output_warn_1.roust")
-    .assert()
-    .success()
-    .stderr(predicates::str::contains("[MAIN_10]"));
 }
 
 #[test]
