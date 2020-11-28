@@ -260,22 +260,31 @@ impl<'toks> Ast<'toks> {
         let node = self.add_to_parent_and_advance(tok_num, parent);
 
         // Next, a quoted string is expected
-        let tinfo = &self.tv[*tok_num];
-        if let LexToken::QuotedString = tinfo.tok {
-            self.parse_leaf(tok_num, node);
+        if let Some(tinfo) = self.get_tinfo1(*tok_num) {
+            if let LexToken::QuotedString = tinfo.tok {
+                self.parse_leaf(tok_num, node);
+            } else {
+                self.err_expected_after(diags, "AST_4", "Expected a quoted string after 'wrs'", tok_num);
+                return false;
+            }
         } else {
-            self.err_expected_after(diags, "AST_4", "Expected a quoted string after 'wrs'", tok_num);
+            self.err_no_input(diags, *tok_num - 1);
             return false;
         }
 
         // Finally a semicolon
-        let tinfo = &self.tv[*tok_num];
-        if let LexToken::Semicolon = tinfo.tok {
-            self.parse_leaf(tok_num, node);
+        if let Some(tinfo) = self.get_tinfo1(*tok_num) {
+            if let LexToken::Semicolon = tinfo.tok {
+                self.parse_leaf(tok_num, node);
+            } else {
+                self.err_expected_after(diags, "AST_5", "Expected ';' after string", tok_num);
+                return false;
+            }
         } else {
-            self.err_expected_after(diags, "AST_5", "Expected ';' after string", tok_num);
+            self.err_no_input(diags, *tok_num - 1);
             return false;
         }
+
         debug!("parse_wrs success");
         true
     }
