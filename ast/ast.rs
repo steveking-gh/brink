@@ -179,6 +179,27 @@ impl<'toks> Ast<'toks> {
         nid
     }
 
+    fn expect_leaf(&mut self, diags: &mut Diags, tok_num : &mut usize,
+        parent : NodeId, expected_token: LexToken, code: &str,
+        context: &str) -> bool {
+
+        if let Some(tinfo) = self.get_tinfo1(*tok_num) {
+            if expected_token == tinfo.tok {
+                debug!("Ast::expect_leaf: Parsing token {}: {:?}", *tok_num, tinfo);
+                let node = self.arena.new_node(*tok_num);
+                parent.append(node, &mut self.arena);
+                *tok_num += 1;
+            } else {
+                self.err_expected_after(diags, code, context, tok_num);
+                return false;
+            }
+        } else {
+            self.err_no_input(diags, *tok_num - 1);
+            return false;
+        }
+        true
+    }
+
     fn parse_section(&mut self, tok_num : &mut usize, parent : NodeId,
                     diags: &mut Diags) -> bool {
 
@@ -187,31 +208,17 @@ impl<'toks> Ast<'toks> {
         let sec_nid = self.add_to_parent_and_advance(tok_num, parent);
 
         // After 'section' an identifier is expected
-        if let Some(tinfo) = self.get_tinfo1(*tok_num) {
-            if let LexToken::Identifier = tinfo.tok {
-                self.parse_leaf(tok_num, sec_nid);
-            } else {
-                self.err_expected_after(diags, "AST_1", "Expected an identifier after section", tok_num);
-                return false;
-            }
-        } else {
-            self.err_no_input(diags, *tok_num - 1);
+        if !self.expect_leaf(diags, tok_num, sec_nid, LexToken::Identifier, "AST_1",
+                             "Expected an identifier after section") {
             return false;
         }
 
-        // After a section identifier, expect an open brace
+        // After a section identifier, expect an open brace.
         // Remember the location of the opening brace to help with
         // user missing brace errors.
         let brace_toknum = *tok_num;
-        if let Some(tinfo) = self.get_tinfo1(*tok_num) {
-            if let LexToken::OpenBrace = tinfo.tok {
-                self.parse_leaf(tok_num, sec_nid);
-            } else {
-                self.err_expected_after(diags, "AST_2", "Expected {{ after identifier", tok_num);
-                return false;
-            }
-        } else {
-            self.err_no_input(diags, *tok_num - 1);
+        if !self.expect_leaf(diags, tok_num, sec_nid, LexToken::OpenBrace, "AST_2",
+                             "Expected {{ after identifier") {
             return false;
         }
 
@@ -253,35 +260,21 @@ impl<'toks> Ast<'toks> {
         false
     }
 
-    fn parse_wrs(&mut self, tok_num : &mut usize, parent : NodeId,
+    fn parse_wrs(&mut self, tok_num : &mut usize, parent_nid : NodeId,
                 diags: &mut Diags) -> bool {
 
         // Add the section keyword as a child of the parent and advance
-        let node = self.add_to_parent_and_advance(tok_num, parent);
+        let wrs_nid = self.add_to_parent_and_advance(tok_num, parent_nid);
 
         // Next, a quoted string is expected
-        if let Some(tinfo) = self.get_tinfo1(*tok_num) {
-            if let LexToken::QuotedString = tinfo.tok {
-                self.parse_leaf(tok_num, node);
-            } else {
-                self.err_expected_after(diags, "AST_4", "Expected a quoted string after 'wrs'", tok_num);
-                return false;
-            }
-        } else {
-            self.err_no_input(diags, *tok_num - 1);
+        if !self.expect_leaf(diags, tok_num, wrs_nid, LexToken::QuotedString, "AST_4",
+                             "Expected a quoted string after 'wrs'") {
             return false;
         }
 
-        // Finally a semicolon
-        if let Some(tinfo) = self.get_tinfo1(*tok_num) {
-            if let LexToken::Semicolon = tinfo.tok {
-                self.parse_leaf(tok_num, node);
-            } else {
-                self.err_expected_after(diags, "AST_5", "Expected ';' after string", tok_num);
-                return false;
-            }
-        } else {
-            self.err_no_input(diags, *tok_num - 1);
+        // After the string, a semicolon
+        if !self.expect_leaf(diags, tok_num, wrs_nid, LexToken::Semicolon, "AST_5",
+                             "Expected ';' after string") {
             return false;
         }
 
@@ -296,41 +289,20 @@ impl<'toks> Ast<'toks> {
         let output_nid = self.add_to_parent_and_advance(tok_num, parent);
 
         // After 'output' an identifier is expected
-        if let Some(tinfo) = self.get_tinfo1(*tok_num) {
-            if let LexToken::Identifier = tinfo.tok {
-                self.parse_leaf(tok_num, output_nid);
-            } else {
-                self.err_expected_after(diags, "AST_7", "Expected a section name after output", tok_num);
-                return false;
-            }
-        } else {
-            self.err_no_input(diags, *tok_num - 1);
+        if !self.expect_leaf(diags, tok_num, output_nid, LexToken::Identifier, "AST_7",
+                             "Expected a section name after output") {
             return false;
         }
 
         // After the identifier, the file name as a quoted string
-        if let Some(tinfo) = self.get_tinfo1(*tok_num) {
-            if let LexToken::QuotedString = tinfo.tok {
-                self.parse_leaf(tok_num, output_nid);
-            } else {
-                self.err_expected_after(diags, "AST_6", "Expected the file path as a quoted string after the section name", tok_num);
-                return false;
-            }
-        } else {
-            self.err_no_input(diags, *tok_num - 1);
+        if !self.expect_leaf(diags, tok_num, output_nid, LexToken::QuotedString, "AST_6",
+                             "Expected the file path as a quoted string after the section name") {
             return false;
         }
 
         // After the identifier, a semicolon
-        if let Some(tinfo) = self.get_tinfo1(*tok_num) {
-            if let LexToken::Semicolon = tinfo.tok {
-                self.parse_leaf(tok_num, output_nid);
-            } else {
-                self.err_expected_after(diags, "AST_8", "Expected ';' after identifier", tok_num);
-                return false;
-            }
-        } else {
-            self.err_no_input(diags, *tok_num - 1);
+        if !self.expect_leaf(diags, tok_num, output_nid, LexToken::Semicolon, "AST_8",
+                             "Expected ';' after identifier") {
             return false;
         }
 
