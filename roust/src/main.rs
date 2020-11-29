@@ -173,6 +173,8 @@ impl<'toks> LinearDB {
         debug!("LinearDB::record_children_info: >>>> ENTER at depth {} for parent nid: {}",
                 rdepth, parent_nid);
 
+        self.nidvec.push(parent_nid);
+
         if rdepth > LinearDB::MAX_RECURSION_DEPTH {
             let tinfo = ast.get_tinfo(parent_nid);
             let m = format!("Maximum recursion depth ({}) exceeded when processing '{}'.",
@@ -199,7 +201,6 @@ impl<'toks> LinearDB {
             _ => {
                 // Easy linearizing without dereferencing through a name.
                 // When no children exist, this case terminates recursion.
-                self.nidvec.push(parent_nid);
                 let children = parent_nid.children(&ast.arena);
                 for nid in children {
                     result &= self.record_r(rdepth + 1, nid, diags, ast, ast_db);

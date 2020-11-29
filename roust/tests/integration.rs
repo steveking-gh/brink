@@ -212,5 +212,19 @@ fn missing_brace_1() {
     .stderr(predicates::str::contains("[AST_14]"));
 }
 
+#[test]
+fn nested_section_1() {
+    let _cmd = Command::cargo_bin("roust")
+                .unwrap()
+                .arg("tests/nested_section_1.roust")
+                .arg("-o nested_section_1.bin")
+                .assert()
+                .success();
+
+    // Verify output file is correct.  If so, then clean up.
+    assert_eq!("foo!\nBye\nbar!\n", fs::read_to_string("nested_section_1.bin").unwrap());
+    fs::remove_file("nested_section_1.bin").unwrap();
+}
+
 } // mod tests
 

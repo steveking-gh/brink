@@ -1,0 +1,11 @@
+section bar {
+    wrs "bar!\n";
+}
+
+section foo {
+    wrs "foo!\n";
+    wrs "Bye\n";
+    wr bar;
+}
+
+output foo;
