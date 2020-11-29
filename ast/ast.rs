@@ -98,6 +98,17 @@ impl<'toks> Ast<'toks> {
         Some(ast)
     }
 
+    /// Returns the lexical value of the specified child of the specified
+    /// parent. The value is always a string reference to source code regardless
+    /// of the semantic meaning of the child.
+    pub fn get_child_str(&'toks self, parent_nid: NodeId, child_num: usize) -> &'toks str {
+        debug!("Ast::get_child_str: child number {} for parent nid {}", child_num, parent_nid);
+        let mut children = parent_nid.children(&self.arena);
+        let name_nid = children.nth(child_num).unwrap();
+        let tinfo = self.get_tinfo(name_nid);
+        tinfo.val
+    }
+
     /// Parse the flat token vector to build the syntax tree. Unlike the flat
     /// vector of tokens, the tree represents the semantic parent-child relation
     /// between elements in the source file.  We check syntax and grammar during
@@ -157,8 +168,9 @@ impl<'toks> Ast<'toks> {
         Some(&self.tv[tok_num])
     }
 
-    /// Attempts to advance the token number past the next simicolon
-    /// The token number returned may be invalid.
+    /// Attempts to advance the token number past the next semicolon
+    /// The token number returned may be invalid.  This function is
+    /// used to try to recover from syntax errors.
     fn advance_past_semicolon(&self, tok_num: usize) -> usize {
         let mut tnum = tok_num;
         while let Some(tinfo) = self.get_tinfo1(tnum) {

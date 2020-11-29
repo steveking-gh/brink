@@ -39,12 +39,8 @@ struct WrsActionInfo<'toks> {
 impl<'toks> WrsActionInfo<'toks> {
     pub fn new(abs_addr: usize, nid: NodeId, ast: &'toks Ast) -> WrsActionInfo<'toks> {
         debug!("WrsActionInfo::new: >>>> ENTER for nid {} at {}", nid, abs_addr);
-        let mut children = nid.children(&ast.arena);
-        let str_nid = children.next().unwrap();
-        let str_tinfo = ast.get_tinfo(str_nid);
-        // trim the leading and trailing quote characters
-        let strout = str_tinfo.val.trim_matches('\"');
-        debug!("WrsActionInfo::new: output string at nid {} is {}", str_nid, strout);
+        let strout = ast.get_child_str(nid, 0).trim_matches('\"');
+        debug!("WrsActionInfo::new: output string is {}", strout);
         let str_size = strout.len();
         debug!("WrsActionInfo::new: <<<< EXIT for nid {}", nid);
         WrsActionInfo{ abs_addr, nid, str_size, strout}
@@ -110,10 +106,7 @@ impl<'toks> ActionDB<'toks> {
         // Using the name of the section, use the AST database to get a reference
         // to the section object.  ast_db processing has already guaranteed
         // that the section name is legitimate, so unwrap().
-        let mut children = output_nid.children(&ast.arena);
-        let sec_name_nid = children.next().unwrap();
-        let sec_tinfo = ast.get_tinfo(sec_name_nid);
-        let sec_str = sec_tinfo.val;
+        let sec_str = ast.get_child_str(output_nid, 0);
         debug!("ActionDB::new: output section name is {}", sec_str);
 
         // Iterate until the size of the section stops changing.
@@ -218,16 +211,13 @@ impl<'toks> LinearDB {
         let output_nid = ast_db.output.as_ref()?.nid;
         let mut linear_db = LinearDB { output_nid, nidvec: Vec::new() };
 
-        let mut children = output_nid.children(&ast.arena);
-        let sec_name_nid = children.next().unwrap();
-        let sec_tinfo = ast.get_tinfo(sec_name_nid);
-        let sec_str = sec_tinfo.val;
-        debug!("LinearDB::new: output section name is {}", sec_str);
+        let sec_name_str = ast.get_child_str(output_nid, 0);
+        debug!("LinearDB::new: output section name is {}", sec_name_str);
 
         // Using the name of the section, use the AST database to get a reference
         // to the section object.  ast_db processing has already guaranteed
         // that the section name is legitimate, so unwrap().
-        let section = ast_db.sections.get(sec_str).unwrap();
+        let section = ast_db.sections.get(sec_name_str).unwrap();
         let sec_nid = section.nid;
 
         // To start recursion, rdepth = 1
