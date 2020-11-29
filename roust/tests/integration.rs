@@ -222,7 +222,7 @@ fn nested_section_1() {
                 .success();
 
     // Verify output file is correct.  If so, then clean up.
-    assert_eq!("foo!\nBye\nbar!\n", fs::read_to_string("nested_section_1.bin").unwrap());
+    assert_eq!("foo!\nBye\nbar!\nboo!\n", fs::read_to_string("nested_section_1.bin").unwrap());
     fs::remove_file("nested_section_1.bin").unwrap();
 }
 

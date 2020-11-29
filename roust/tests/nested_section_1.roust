@@ -6,6 +6,12 @@ section foo {
     wrs "foo!\n";
     wrs "Bye\n";
     wr bar;
+    wr boo;
+}
+
+// section after reference
+section boo {
+    wrs "boo!\n";
 }
 
 output foo;
