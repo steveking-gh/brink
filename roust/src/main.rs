@@ -95,7 +95,7 @@ impl<'toks> ActionDB<'toks> {
                 abs_start);
         let mut actions : Vec<Box<dyn ActionInfo + 'toks>> = Vec::new();
 
-        // Iterate until the size of the section stops changing.
+        // First pass to build sizes
         let mut start = abs_start;
         let mut new_size = 0;
         for &nid in &linear_db.nidvec {
@@ -114,6 +114,7 @@ impl<'toks> ActionDB<'toks> {
 
         let mut old_size = new_size;
         let mut iteration = 1;
+        // Iterate until the size of the section stops changing.
         loop {
             new_size = 0;
             for ainfo in &actions {
@@ -222,10 +223,11 @@ impl<'toks> LinearDB {
         Some(linear_db)
     }
 
-    fn dump(&self) {
+    fn dump(&self, ast: &Ast) {
         debug!("LinearDB: Output NID {}", self.output_nid);
-        for nid in &self.nidvec {
-            debug!("LinearDB: {}", nid);
+        for &nid in &self.nidvec {
+            let tinfo = ast.get_tinfo(nid);
+            debug!("LinearDB: {}: {}", nid, tinfo.val);
         }
     }
 }
@@ -252,10 +254,10 @@ pub fn process(name: &str, fstr: &str, args: &clap::ArgMatches, verbosity: u64)
     let ast_db = AstDb::new(&mut diags, &ast)?;
     let linear_db = LinearDB::new(&mut diags, &ast, &ast_db);
     if linear_db.is_none() {
-        bail!("Failed to construct the linear database.");
+        bail!("[MAIN_3]: Failed to construct the linear database.");
     }
     let linear_db = linear_db.unwrap();
-    linear_db.dump();
+    linear_db.dump(&ast);
     let action_db = ActionDB::new(&linear_db, &mut diags, args, &ast, &ast_db, 0);
     action_db.dump();
     action_db.write()?;

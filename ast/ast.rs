@@ -17,6 +17,7 @@ use log::{error, warn, info, debug, trace};
 pub enum LexToken {
     #[token("section")] Section,
     #[token("wrs")] Wrs,
+    #[token("wr")] Wr,
     #[token("output")] Output,
     #[token("{")] OpenBrace,
     #[token("}")] CloseBrace,
@@ -251,6 +252,7 @@ impl<'toks> Ast<'toks> {
             // Stay in the section even after errors to give the user
             // more than one error at a time
             let parse_ok = match tinfo.tok {
+                LexToken::Wr => self.parse_wr(tok_num, parent, diags),
                 LexToken::Wrs => self.parse_wrs(tok_num, parent, diags),
                 _ => {
                     self.err_invalid_expression(diags, "AST_3", tok_num);
@@ -272,10 +274,34 @@ impl<'toks> Ast<'toks> {
         false
     }
 
+    // Parser for writing a section
+    fn parse_wr(&mut self, tok_num : &mut usize, parent_nid : NodeId,
+                diags: &mut Diags) -> bool {
+
+        // Add the wr keyword as a child of the parent and advance
+        let wr_nid = self.add_to_parent_and_advance(tok_num, parent_nid);
+
+        // Next, an identifier (section name) is expected
+        if !self.expect_leaf(diags, tok_num, wr_nid, LexToken::Identifier, "AST_15",
+                             "Expected a section name after 'wr'") {
+            return false;
+        }
+
+        // After the section name, a semicolon
+        if !self.expect_leaf(diags, tok_num, wr_nid, LexToken::Semicolon, "AST_16",
+                             "Expected ';' after the section name") {
+            return false;
+        }
+
+        debug!("parse_wr success");
+        true
+    }
+
+    /// Parser for writing a string
     fn parse_wrs(&mut self, tok_num : &mut usize, parent_nid : NodeId,
                 diags: &mut Diags) -> bool {
 
-        // Add the section keyword as a child of the parent and advance
+        // Add the wrs keyword as a child of the parent and advance
         let wrs_nid = self.add_to_parent_and_advance(tok_num, parent_nid);
 
         // Next, a quoted string is expected
