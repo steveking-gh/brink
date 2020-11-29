@@ -230,7 +230,7 @@ impl<'toks> Ast<'toks> {
         // user missing brace errors.
         let brace_toknum = *tok_num;
         if !self.expect_leaf(diags, tok_num, sec_nid, LexToken::OpenBrace, "AST_2",
-                             "Expected {{ after identifier") {
+                             "Expected { after identifier") {
             return false;
         }
 
