@@ -181,12 +181,32 @@ impl<'toks> LinearDB {
             return false;
         }
 
-        self.nidvec.push(parent_nid);
-        let children = parent_nid.children(&ast.arena);
         let mut result = true;
-        for nid in children {
-            result &= self.record_r(rdepth + 1, nid, diags, ast, ast_db);
+        let tinfo = ast.get_tinfo(parent_nid);
+        match tinfo.tok {
+            ast::LexToken::Wr => {
+                // Write the contents of a section by dereferencing the section name
+                let sec_name_str = ast.get_child_str(parent_nid, 0);
+                debug!("LinearDB::record_r: wr section name is {}", sec_name_str);
+
+                // Using the name of the section, use the AST database to get a reference
+                // to the section object.  ast_db processing has already guaranteed
+                // that the section name is legitimate, so unwrap().
+                let section = ast_db.sections.get(sec_name_str).unwrap();
+                let sec_nid = section.nid;
+                result &= self.record_r(rdepth + 1, sec_nid, diags, ast, ast_db);
+            },
+            _ => {
+                // Easy linearizing without dereferencing through a name.
+                // When no children exist, this case terminates recursion.
+                self.nidvec.push(parent_nid);
+                let children = parent_nid.children(&ast.arena);
+                for nid in children {
+                    result &= self.record_r(rdepth + 1, nid, diags, ast, ast_db);
+                }
+            }
         }
+
         debug!("LinearDB::record_r: <<<< EXIT({}) at depth {} for nid: {}",
                 result, rdepth, parent_nid);
         result
