@@ -233,11 +233,12 @@ impl<'toks> LinearDB {
 /// Entry point for all processing on the input source file
 /// name: The name of the file
 /// fstr: A string containing the file
-pub fn process(name: &str, fstr: &str, args: &clap::ArgMatches) -> anyhow::Result<()> {
+pub fn process(name: &str, fstr: &str, args: &clap::ArgMatches, verbosity: u64)
+               -> anyhow::Result<()> {
     info!("Processing {}", name);
     debug!("File contains: {}", fstr);
 
-    let mut diags = Diags::new(name,fstr);
+    let mut diags = Diags::new(name,fstr,verbosity);
 
     let ast = Ast::new(fstr, &mut diags);
     if ast.is_none() {
@@ -311,7 +312,7 @@ fn main() -> Result<()> {
             .arg(Arg::with_name("quiet")
                 .short("q")
                 .long("quiet")
-                .help("Suppress non-error console output.  Overrides -v."))
+                .help("Suppress console output, including error messages.  Useful for fuzz testing.  Overrides -v."))
             .get_matches();
 
     // Default verbosity
@@ -336,7 +337,7 @@ fn main() -> Result<()> {
                 "Failed to read from file {}.\nWorking directory is {}",
                 in_file_name, env::current_dir().unwrap().display()))?;
 
-    process(&in_file_name, &str_in, &args)?;
+    process(&in_file_name, &str_in, &args, verbosity)?;
 
     Ok(())
 }
