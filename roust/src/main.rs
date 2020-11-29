@@ -94,20 +94,6 @@ impl<'toks> ActionDB<'toks> {
         debug!("ActionDB::new: >>>> ENTER for output nid: {} at {}", linear_db.output_nid,
                 abs_start);
         let mut actions : Vec<Box<dyn ActionInfo + 'toks>> = Vec::new();
-        let output_nid = linear_db.output_nid;
-
-        // Determine if the user specified an output file on the command line
-        // Trim whitespace
-        let file_name_str = String::from(args.value_of("output")
-                                             .unwrap_or("output.bin")
-                                             .trim_matches(' '));
-        debug!("ActionDB::new: output file name is {}", file_name_str);
-
-        // Using the name of the section, use the AST database to get a reference
-        // to the section object.  ast_db processing has already guaranteed
-        // that the section name is legitimate, so unwrap().
-        let sec_str = ast.get_child_str(output_nid, 0);
-        debug!("ActionDB::new: output section name is {}", sec_str);
 
         // Iterate until the size of the section stops changing.
         let mut start = abs_start;
@@ -144,6 +130,13 @@ impl<'toks> ActionDB<'toks> {
             old_size = new_size;
             iteration += 1;
         }
+
+        // Determine if the user specified an output file on the command line
+        // Trim whitespace
+        let file_name_str = String::from(args.value_of("output")
+                                             .unwrap_or("output.bin")
+                                             .trim_matches(' '));
+        debug!("ActionDB::new: output file name is {}", file_name_str);
 
         debug!("ActionDB::new: <<<< EXIT with size {}", new_size);
         ActionDB { actions, file_name_str }
