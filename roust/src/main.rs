@@ -66,32 +66,32 @@ impl<'toks> ActionInfo for WrsActionInfo<'toks> {
 }
 
 /*****************************************************************************
- * ActionDB
- * The ActionDB contains a map of the logical size in bytes of all items with a
+ * ActionDb
+ * The ActionDb contains a map of the logical size in bytes of all items with a
  * size in the AST. The key is the AST NodeID, the value is the size.
  *****************************************************************************/
-struct ActionDB<'toks> {
+struct ActionDb<'toks> {
     actions : Vec<Box<dyn ActionInfo + 'toks>>,
     file_name_str: String,
 }
 
 use ast::{Ast,AstDb};
 
-impl<'toks> ActionDB<'toks> {
+impl<'toks> ActionDb<'toks> {
 
     /// Dump the DB for debug
     pub fn dump(&self) {
         for a in &self.actions {
-            debug!("ActionDB: nid {} is {} bytes at absolute address {}",
+            debug!("ActionDb: nid {} is {} bytes at absolute address {}",
                     a.get_nid(), a.get_size(), a.get_abs_addr());
         }
     }
 
-    pub fn new(linear_db: &LinearDB, _diags: &mut Diags, args: &'toks clap::ArgMatches,
+    pub fn new(linear_db: &LinearDb, _diags: &mut Diags, args: &'toks clap::ArgMatches,
                ast: &'toks Ast, _ast_db: &'toks AstDb, abs_start: usize)
-               -> ActionDB<'toks> {
+               -> ActionDb<'toks> {
 
-        debug!("ActionDB::new: >>>> ENTER for output nid: {} at {}", linear_db.output_nid,
+        debug!("ActionDb::new: >>>> ENTER for output nid: {} at {}", linear_db.output_nid,
                 abs_start);
         let mut actions : Vec<Box<dyn ActionInfo + 'toks>> = Vec::new();
 
@@ -118,7 +118,7 @@ impl<'toks> ActionDB<'toks> {
         loop {
             new_size = 0;
             for ainfo in &actions {
-                debug!("ActionDB::new: Iterating for {} at nid {}", ainfo.get_type_str(), ainfo.get_nid());
+                debug!("ActionDb::new: Iterating for {} at nid {}", ainfo.get_type_str(), ainfo.get_nid());
                 let sz = ainfo.get_size();
                 start += sz;
                 new_size += sz;
@@ -127,7 +127,7 @@ impl<'toks> ActionDB<'toks> {
             if old_size == new_size {
                 break;
             }
-            debug!("ActionDB::new: Size for iteration {} is {}", iteration, new_size);
+            debug!("ActionDb::new: Size for iteration {} is {}", iteration, new_size);
             old_size = new_size;
             iteration += 1;
         }
@@ -137,10 +137,10 @@ impl<'toks> ActionDB<'toks> {
         let file_name_str = String::from(args.value_of("output")
                                              .unwrap_or("output.bin")
                                              .trim_matches(' '));
-        debug!("ActionDB::new: output file name is {}", file_name_str);
+        debug!("ActionDb::new: output file name is {}", file_name_str);
 
-        debug!("ActionDB::new: <<<< EXIT with size {}", new_size);
-        ActionDB { actions, file_name_str }
+        debug!("ActionDb::new: <<<< EXIT with size {}", new_size);
+        ActionDb { actions, file_name_str }
     }
 
     pub fn write(&self) -> anyhow::Result<()> {
@@ -148,7 +148,7 @@ impl<'toks> ActionDB<'toks> {
                 .context(format!("Unable to create output file {}", self.file_name_str))?;
 
         for ainfo in &self.actions {
-            debug!("ActionDB::write: writing {} at nid {}", ainfo.get_type_str(), ainfo.get_nid());
+            debug!("ActionDb::write: writing {} at nid {}", ainfo.get_type_str(), ainfo.get_nid());
             ainfo.write(&mut file)?;
         }
 
@@ -156,12 +156,12 @@ impl<'toks> ActionDB<'toks> {
     }
 }
 
-struct LinearDB {
+struct LinearDb {
     output_nid: NodeId,
     nidvec : Vec<NodeId>,
 }
 
-impl<'toks> LinearDB {
+impl<'toks> LinearDb {
 
     // Control recursion to some safe level.  100 is just a guesstimate.
     const MAX_RECURSION_DEPTH:usize = 100;
@@ -170,15 +170,15 @@ impl<'toks> LinearDB {
     fn record_r(&mut self, rdepth: usize, parent_nid: NodeId, diags: &mut Diags,
                             ast: &'toks Ast, ast_db: &AstDb) -> bool {
 
-        debug!("LinearDB::record_children_info: >>>> ENTER at depth {} for parent nid: {}",
+        debug!("LinearDb::record_children_info: >>>> ENTER at depth {} for parent nid: {}",
                 rdepth, parent_nid);
 
         self.nidvec.push(parent_nid);
 
-        if rdepth > LinearDB::MAX_RECURSION_DEPTH {
+        if rdepth > LinearDb::MAX_RECURSION_DEPTH {
             let tinfo = ast.get_tinfo(parent_nid);
             let m = format!("Maximum recursion depth ({}) exceeded when processing '{}'.",
-                            LinearDB::MAX_RECURSION_DEPTH, tinfo.val);
+                            LinearDb::MAX_RECURSION_DEPTH, tinfo.val);
             diags.err1("MAIN_11", &m, tinfo.span());
             return false;
         }
@@ -189,7 +189,7 @@ impl<'toks> LinearDB {
             ast::LexToken::Wr => {
                 // Write the contents of a section by dereferencing the section name
                 let sec_name_str = ast.get_child_str(parent_nid, 0);
-                debug!("LinearDB::record_r: wr section name is {}", sec_name_str);
+                debug!("LinearDb::record_r: wr section name is {}", sec_name_str);
 
                 // Using the name of the section, use the AST database to get a reference
                 // to the section object.  ast_db processing has already guaranteed
@@ -208,26 +208,26 @@ impl<'toks> LinearDB {
             }
         }
 
-        debug!("LinearDB::record_r: <<<< EXIT({}) at depth {} for nid: {}",
+        debug!("LinearDb::record_r: <<<< EXIT({}) at depth {} for nid: {}",
                 result, rdepth, parent_nid);
         result
     }
 
-    /// The LinearDB object must start with an output statement.
+    /// The LinearDb object must start with an output statement.
     /// If the output doesn't exist, then we return None
     pub fn new(diags: &mut Diags, ast: &'toks Ast,
-               ast_db: &'toks AstDb) -> Option<LinearDB> {
-        debug!("LinearDB::new: >>>> ENTER");
+               ast_db: &'toks AstDb) -> Option<LinearDb> {
+        debug!("LinearDb::new: >>>> ENTER");
         if ast_db.output.is_none() {
             diags.err0("MAIN_1", "Missing output statement.");
             return None;
         }
 
         let output_nid = ast_db.output.as_ref()?.nid;
-        let mut linear_db = LinearDB { output_nid, nidvec: Vec::new() };
+        let mut linear_db = LinearDb { output_nid, nidvec: Vec::new() };
 
         let sec_name_str = ast.get_child_str(output_nid, 0);
-        debug!("LinearDB::new: output section name is {}", sec_name_str);
+        debug!("LinearDb::new: output section name is {}", sec_name_str);
 
         // Using the name of the section, use the AST database to get a reference
         // to the section object.  ast_db processing has already guaranteed
@@ -240,15 +240,15 @@ impl<'toks> LinearDB {
             return None;
         }
 
-        debug!("LinearDB::new: <<<< EXIT for nid: {}", output_nid);
+        debug!("LinearDb::new: <<<< EXIT for nid: {}", output_nid);
         Some(linear_db)
     }
 
     fn dump(&self, ast: &Ast) {
-        debug!("LinearDB: Output NID {}", self.output_nid);
+        debug!("LinearDb: Output NID {}", self.output_nid);
         for &nid in &self.nidvec {
             let tinfo = ast.get_tinfo(nid);
-            debug!("LinearDB: {}: {}", nid, tinfo.val);
+            debug!("LinearDb: {}: {}", nid, tinfo.val);
         }
     }
 }
@@ -273,13 +273,13 @@ pub fn process(name: &str, fstr: &str, args: &clap::ArgMatches, verbosity: u64)
     ast.dump();
 
     let ast_db = AstDb::new(&mut diags, &ast)?;
-    let linear_db = LinearDB::new(&mut diags, &ast, &ast_db);
+    let linear_db = LinearDb::new(&mut diags, &ast, &ast_db);
     if linear_db.is_none() {
         bail!("[MAIN_3]: Failed to construct the linear database.");
     }
     let linear_db = linear_db.unwrap();
     linear_db.dump(&ast);
-    let action_db = ActionDB::new(&linear_db, &mut diags, args, &ast, &ast_db, 0);
+    let action_db = ActionDb::new(&linear_db, &mut diags, args, &ast, &ast_db, 0);
     action_db.dump();
     action_db.write()?;
     Ok(())
