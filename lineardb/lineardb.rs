@@ -1,8 +1,5 @@
-use logos::{Logos};
-use indextree::{Arena,NodeId};
+use indextree::{NodeId};
 pub type Span = std::ops::Range<usize>;
-use std::collections::HashMap;
-use anyhow::{bail};
 use diags::Diags;
 
 #[allow(unused_imports)]

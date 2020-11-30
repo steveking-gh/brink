@@ -1,0 +1,8 @@
+output foo;
+
+section foo {
+    wrs "Wow!\n";
+    wrs "Bye";
+}
+
+output foo;

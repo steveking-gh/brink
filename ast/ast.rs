@@ -431,8 +431,10 @@ pub struct AstDb<'toks> {
 
 impl<'toks> AstDb<'toks> {
 
+    // Control recursion to some safe level.  100 is just a guesstimate.
+    const MAX_RECURSION_DEPTH:usize = 100;
+
     /// Processes a section in the AST
-    /// diags: the system context
     fn record_section(diags: &mut Diags, sec_nid: NodeId, ast: &'toks Ast,
                     sections: &mut HashMap<&'toks str, Section<'toks>> ) -> bool {
         debug!("AstDb::record_section: NodeId {}", sec_nid);
@@ -454,20 +456,118 @@ impl<'toks> AstDb<'toks> {
         true
     }
 
+    /// Returns true if the first child of the specified node is a section
+    /// name that exists.  Otherwise, prints a diagnostic and returns false.
+    fn validate_section_name(diags: &mut Diags, parent_nid: NodeId, ast: &'toks Ast,
+                    sections: &HashMap<&'toks str, Section<'toks>> ) -> bool {
+        debug!("AstDb::validate_section_name: NodeId {}", parent_nid);
+
+        let mut children = parent_nid.children(&ast.arena);
+        let sec_name_nid = children.next().unwrap();
+        let sec_tinfo = ast.get_tinfo(sec_name_nid);
+        let sec_str = sec_tinfo.val;
+        if !sections.contains_key(sec_str) {
+            // error, specified section does not exist
+            let m = format!("Unknown section name '{}'", sec_str);
+            diags.err1("AST_16", &m, sec_tinfo.span());
+            return false;
+        }
+        true
+    }
+
+    /// Recursively record information about the children of an AST object.
+    fn record_r(rdepth: usize, parent_nid: NodeId, diags: &mut Diags,
+                ast: &'toks Ast, sections: &HashMap<&'toks str, Section<'toks>> ) -> bool {
+
+        debug!("AstDb::record_children_info: >>>> ENTER at depth {} for parent nid: {}",
+                rdepth, parent_nid);
+
+        if rdepth > AstDb::MAX_RECURSION_DEPTH {
+            let tinfo = ast.get_tinfo(parent_nid);
+            let m = format!("Maximum recursion depth ({}) exceeded when processing '{}'.",
+                            AstDb::MAX_RECURSION_DEPTH, tinfo.val);
+            diags.err1("AST_18", &m, tinfo.span());
+            return false;
+        }
+
+        let mut result = true;
+        let tinfo = ast.get_tinfo(parent_nid);
+        result &= match tinfo.tok {
+            // Wr statement must specify a valid section name
+            LexToken::Wr => Self::validate_section_name(diags, parent_nid, &ast, &sections),
+            _ => {
+                // When no children exist, this case terminates recursion.
+                let children = parent_nid.children(&ast.arena);
+                for nid in children {
+                    result &= AstDb::record_r(rdepth + 1, nid, diags, ast, sections);
+                }
+                result
+            }
+        };
+
+        debug!("AstDb::record_r: <<<< EXIT({}) at depth {} for nid: {}",
+                result, rdepth, parent_nid);
+        result
+    }
+
+
     pub fn new(diags: &mut Diags, ast: &'toks Ast) -> anyhow::Result<AstDb<'toks>> {
+        debug!("AstDb::new");
+
         // Populate the AST database of critical structures.
         let mut result = true;
 
         let mut sections: HashMap<&'toks str, Section<'toks>> = HashMap::new();
         let mut output: Option<Output> = None;
 
+        // First phase, record all sections.
         for nid in ast.root.children(&ast.arena) {
             let tinfo = ast.get_tinfo(nid);
             result = result && match tinfo.tok {
                 LexToken::Section => Self::record_section(diags, nid, &ast, &mut sections),
-                LexToken::Output => { output = Some(Output::new(&ast,nid)); true },
-                _ => { true }
+                _ => { true } // other statements are of no consequence here
             };
+        }
+
+        if !result {
+            bail!("AST construction failed");
+        }
+
+        // Second phase, record all statements that depend on a section name
+        for nid in ast.root.children(&ast.arena) {
+            let tinfo = ast.get_tinfo(nid);
+            result = result && match tinfo.tok {
+                // Output is unique and only occurs at top level
+                LexToken::Output => {
+                    if Self::validate_section_name(diags, nid, &ast, &sections) {
+                        // We can only have one output statement per source
+                        if output.is_some() {
+                            // error, specified section does not exist
+                            let m = "Multiple output statements are not allowed.";
+                            let orig_tinfo = output.as_ref().unwrap().tinfo;
+                            diags.err2("AST_17", &m, orig_tinfo.span(), tinfo.span());
+                            false // fail
+                        } else {
+                            output = Some(Output::new(&ast,nid));
+                            true // succeed
+                        }
+                    } else {
+                        false // validate failed
+                    }
+                },
+                // Wr statement must specify a valid section name
+                LexToken::Wr => Self::validate_section_name(diags, nid, &ast, &sections),
+                
+                // Everything else, just descend into children
+                _ => {
+                    // When no children exist, this case terminates recursion.
+                    let children = nid.children(&ast.arena);
+                    for nid in children {
+                        result &= AstDb::record_r(1, nid, diags, ast, &sections);
+                    }
+                    result
+                }
+            }
         }
 
         if !result {

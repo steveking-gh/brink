@@ -203,6 +203,26 @@ fn fuzz_found_4() {
 }
 
 #[test]
+fn fuzz_found_5() {
+    let _cmd = Command::cargo_bin("roust")
+    .unwrap()
+    .arg("tests/fuzz_found_5.roust")
+    .assert()
+    .failure()
+    .stderr(predicates::str::contains("[AST_16]"));
+}
+
+#[test]
+fn fuzz_found_6() {
+    let _cmd = Command::cargo_bin("roust")
+    .unwrap()
+    .arg("tests/fuzz_found_6.roust")
+    .assert()
+    .failure()
+    .stderr(predicates::str::contains("[AST_16]"));
+}
+
+#[test]
 fn missing_brace_1() {
     let _cmd = Command::cargo_bin("roust")
     .unwrap()
@@ -211,6 +231,17 @@ fn missing_brace_1() {
     .failure()
     .stderr(predicates::str::contains("[AST_14]"));
 }
+
+#[test]
+fn multiple_outputs_1() {
+    let _cmd = Command::cargo_bin("roust")
+    .unwrap()
+    .arg("tests/multiple_outputs_1.roust")
+    .assert()
+    .failure()
+    .stderr(predicates::str::contains("[AST_17]"));
+}
+
 
 #[test]
 fn nested_section_1() {
