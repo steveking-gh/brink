@@ -437,12 +437,9 @@ impl<'toks> AstDb<'toks> {
                     sections: &mut HashMap<&'toks str, Section<'toks>> ) -> bool {
         debug!("AstDb::record_section: NodeId {}", sec_nid);
 
-        // sec_nid points to 'section'
-        // the first child of section is the section identifier
-        // AST processing guarantees this exists, so unwrap
         let mut children = sec_nid.children(&ast.arena);
-        let name_nid = children.next().unwrap();
-        let sec_tinfo = ast.get_tinfo(name_nid);
+        let sec_name_nid = children.next().unwrap();
+        let sec_tinfo = ast.get_tinfo(sec_name_nid);
         let sec_str = sec_tinfo.val;
         if sections.contains_key(sec_str) {
             // error, duplicate section names

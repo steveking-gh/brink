@@ -9,6 +9,7 @@
         "fstr",
         "indextree",
         "libfuzzer",
+        "lineardb",
         "nidvec",
         "outp",
         "pretok",
