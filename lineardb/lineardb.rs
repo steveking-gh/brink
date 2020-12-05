@@ -70,12 +70,8 @@ impl<'toks> LinearDb {
     pub fn new(diags: &mut Diags, ast: &'toks Ast,
                ast_db: &'toks AstDb) -> Option<LinearDb> {
         debug!("LinearDb::new: >>>> ENTER");
-        if ast_db.output.is_none() {
-            diags.err0("MAIN_1", "Missing output statement.");
-            return None;
-        }
-
-        let output_nid = ast_db.output.as_ref()?.nid;
+        // AstDb already validated output exists
+        let output_nid = ast_db.output.nid;
         let mut linear_db = LinearDb { output_nid, nidvec: Vec::new() };
 
         let sec_name_str = ast.get_child_str(output_nid, 0);

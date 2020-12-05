@@ -1,0 +1,7 @@
+
+section foo {
+    wrs "Wow!";
+    wr foo;
+}
+
+output foo;

@@ -1,7 +1,8 @@
 use logos::{Logos};
 use indextree::{Arena,NodeId};
 pub type Span = std::ops::Range<usize>;
-use std::collections::HashMap;
+use std::collections::{HashMap,HashSet};
+use std::option;
 use anyhow::{bail};
 use diags::Diags;
 
@@ -383,7 +384,8 @@ impl<'toks> Ast<'toks> {
 /*******************************
  * Section
  ******************************/
-pub struct Section<'toks> {
+ #[derive(Debug)]
+ pub struct Section<'toks> {
     pub tinfo: &'toks TokenInfo<'toks>,
     pub nid: NodeId,
 }
@@ -397,6 +399,7 @@ impl<'toks> Section<'toks> {
 /*******************************
  * Output
  ******************************/
+#[derive(Clone, Debug)]
 pub struct Output<'toks> {
     pub tinfo: &'toks TokenInfo<'toks>,
     pub nid: NodeId,
@@ -425,7 +428,7 @@ impl<'toks> Output<'toks> {
  *****************************************************************************/
 pub struct AstDb<'toks> {
     pub sections: HashMap<&'toks str, Section<'toks>>,
-    pub output: Option<Output<'toks>>,
+    pub output: Output<'toks>,
     //pub properties: HashMap<NodeId, NodeProperty>
 }
 
@@ -475,11 +478,28 @@ impl<'toks> AstDb<'toks> {
         true
     }
 
-    /// Recursively record information about the children of an AST object.
-    fn record_r(rdepth: usize, parent_nid: NodeId, diags: &mut Diags,
-                ast: &'toks Ast, sections: &HashMap<&'toks str, Section<'toks>> ) -> bool {
+    pub fn record_output(diags: &mut Diags, nid: NodeId, ast: &'toks Ast,
+                         output: &mut option::Option<Output<'toks>>) -> bool {
+        let tinfo = ast.get_tinfo(nid);
+        if output.is_some() {
+            let m = "Multiple output statements are not allowed.";
+            let orig_tinfo = output.as_ref().unwrap().tinfo;
+            diags.err2("AST_17", &m, orig_tinfo.span(), tinfo.span());
+            return false;
+        }
 
-        debug!("AstDb::record_children_info: >>>> ENTER at depth {} for parent nid: {}",
+        *output = Some(Output::new(&ast,nid));
+        true // succeed
+    }
+
+    /// Recursively record information about the children of an AST object.
+    /// nested sections tracks the current hierarchy of section writes so we
+    /// catch cycles.
+    fn record_r(rdepth: usize, parent_nid: NodeId, diags: &mut Diags,
+        ast: &'toks Ast, sections: &HashMap<&'toks str, Section<'toks>>,
+        nested_sections: &mut HashSet<&'toks str> ) -> bool {
+
+        debug!("AstDb::record_r: >>>> ENTER at depth {} for parent nid: {}",
                 rdepth, parent_nid);
 
         if rdepth > AstDb::MAX_RECURSION_DEPTH {
@@ -494,12 +514,38 @@ impl<'toks> AstDb<'toks> {
         let tinfo = ast.get_tinfo(parent_nid);
         result &= match tinfo.tok {
             // Wr statement must specify a valid section name
-            LexToken::Wr => Self::validate_section_name(diags, parent_nid, &ast, &sections),
+            LexToken::Wr => {
+                if !Self::validate_section_name(diags, parent_nid, &ast, &sections) {
+                    return false;
+                }
+                let mut children = parent_nid.children(&ast.arena);
+                // the section name is the first child of the output
+                // AST processing guarantees this exists.
+                let sec_nid = children.next().unwrap();
+                let sec_tinfo = ast.get_tinfo(sec_nid);
+                let sec_str = sec_tinfo.val;
+
+                // Make sure we haven't already recursed through this section.
+                if nested_sections.contains(sec_str) {
+                    let m = "Writing section creates a cycle.";
+                    diags.err1("AST_19", &m, sec_tinfo.span());
+                    false
+                } else {
+                    // add this section to our nested sections tracker
+                    nested_sections.insert(sec_str);
+                    let section = sections.get(sec_str).unwrap();
+                    let children = section.nid.children(&ast.arena);
+                    for nid in children {
+                        result &= AstDb::record_r(rdepth + 1, nid, diags, ast, sections, nested_sections);
+                    }
+                    result
+                }
+            },
             _ => {
                 // When no children exist, this case terminates recursion.
                 let children = parent_nid.children(&ast.arena);
                 for nid in children {
-                    result &= AstDb::record_r(rdepth + 1, nid, diags, ast, sections);
+                    result &= AstDb::record_r(rdepth + 1, nid, diags, ast, sections, nested_sections);
                 }
                 result
             }
@@ -510,7 +556,6 @@ impl<'toks> AstDb<'toks> {
         result
     }
 
-
     pub fn new(diags: &mut Diags, ast: &'toks Ast) -> anyhow::Result<AstDb<'toks>> {
         debug!("AstDb::new");
 
@@ -518,14 +563,16 @@ impl<'toks> AstDb<'toks> {
         let mut result = true;
 
         let mut sections: HashMap<&'toks str, Section<'toks>> = HashMap::new();
-        let mut output: Option<Output> = None;
+        let mut output: Option<Output<'toks>> = None;
 
-        // First phase, record all sections.
+        // First phase, record all sections and the output.
+        // Sections are defined only at top level so no need for recursion.
         for nid in ast.root.children(&ast.arena) {
             let tinfo = ast.get_tinfo(nid);
             result = result && match tinfo.tok {
                 LexToken::Section => Self::record_section(diags, nid, &ast, &mut sections),
-                _ => { true } // other statements are of no consequence here
+                LexToken::Output => Self::record_output(diags, nid, &ast, &mut output),
+                _ => true, // other statements are of no consequence here
             };
         }
 
@@ -533,47 +580,40 @@ impl<'toks> AstDb<'toks> {
             bail!("AST construction failed");
         }
 
-        // Second phase, record all statements that depend on a section name
-        for nid in ast.root.children(&ast.arena) {
-            let tinfo = ast.get_tinfo(nid);
-            result = result && match tinfo.tok {
-                // Output is unique and only occurs at top level
-                LexToken::Output => {
-                    if Self::validate_section_name(diags, nid, &ast, &sections) {
-                        // We can only have one output statement per source
-                        if output.is_some() {
-                            // error, specified section does not exist
-                            let m = "Multiple output statements are not allowed.";
-                            let orig_tinfo = output.as_ref().unwrap().tinfo;
-                            diags.err2("AST_17", &m, orig_tinfo.span(), tinfo.span());
-                            false // fail
-                        } else {
-                            output = Some(Output::new(&ast,nid));
-                            true // succeed
-                        }
-                    } else {
-                        false // validate failed
-                    }
-                },
-                // Wr statement must specify a valid section name
-                LexToken::Wr => Self::validate_section_name(diags, nid, &ast, &sections),
-                
-                // Everything else, just descend into children
-                _ => {
-                    // When no children exist, this case terminates recursion.
-                    let children = nid.children(&ast.arena);
-                    for nid in children {
-                        result &= AstDb::record_r(1, nid, diags, ast, &sections);
-                    }
-                    result
-                }
-            }
+        // Make sure we found an output!
+        if output.is_none() {
+            diags.err0("AST_18", "Missing output statement");
+            bail!("AST construction failed");
+        }
+
+        //let mut nested_sections : HashSet<&'toks str> = HashSet::new();
+        let mut nested_sections = HashSet::new();
+
+        let output_nid = output.as_ref().unwrap().nid;
+
+        if !Self::validate_section_name(diags, output_nid, &ast, &sections) {
+            bail!("AST construction failed");
+        }
+
+        let mut children = output_nid.children(&ast.arena);
+        // the section name is the first child of the output
+        // AST processing guarantees this exists.
+        let sec_nid = children.next().unwrap();
+        let sec_tinfo = ast.get_tinfo(sec_nid);
+        let sec_str = sec_tinfo.val;
+
+        // add the output section to our nested sections tracker
+        nested_sections.insert(sec_str);
+        let section = sections.get(sec_str).unwrap();
+        let children = section.nid.children(&ast.arena);
+        for nid in children {
+            result &= AstDb::record_r(1, nid, diags, ast, &sections, &mut nested_sections);
         }
 
         if !result {
             bail!("AST construction failed");
         }
 
-        Ok(AstDb { sections, output })
+        Ok(AstDb { sections, output: output.unwrap()})
     }
 }

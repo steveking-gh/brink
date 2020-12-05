@@ -53,7 +53,7 @@ fn line_comment_1() {
                 .arg("tests/line_comment_1.roust")
                 .assert()
                 .failure()
-                .stderr(predicates::str::contains("[MAIN_1]"));
+                .stderr(predicates::str::contains("[AST_18]"));
             }
 
 #[test]
@@ -63,7 +63,7 @@ fn line_comment_2() {
                 .arg("tests/line_comment_2.roust")
                 .assert()
                 .failure()
-                .stderr(predicates::str::contains("[MAIN_1]"));
+                .stderr(predicates::str::contains("[AST_18]"));
             }
 
 #[test]
@@ -73,7 +73,7 @@ fn multi_comment_1() {
                 .arg("tests/multi_comment_1.roust")
                 .assert()
                 .failure()
-                .stderr(predicates::str::contains("[MAIN_1]"));
+                .stderr(predicates::str::contains("[AST_18]"));
             }
 
 #[test]
@@ -83,7 +83,7 @@ fn multi_comment_2() {
                 .arg("tests/multi_comment_2.roust")
                 .assert()
                 .failure()
-                .stderr(predicates::str::contains("[MAIN_1]"));
+                .stderr(predicates::str::contains("[AST_18]"));
             }
 
 #[test]
@@ -93,7 +93,7 @@ fn multi_comment_3() {
                 .arg("tests/multi_comment_3.roust")
                 .assert()
                 .failure()
-                .stderr(predicates::str::contains("[MAIN_1]"));
+                .stderr(predicates::str::contains("[AST_18]"));
             }
 
 #[test]
@@ -240,6 +240,26 @@ fn multiple_outputs_1() {
     .assert()
     .failure()
     .stderr(predicates::str::contains("[AST_17]"));
+}
+
+#[test]
+fn section_self_ref_1() {
+    let _cmd = Command::cargo_bin("roust")
+    .unwrap()
+    .arg("tests/section_self_ref_1.roust")
+    .assert()
+    .failure()
+    .stderr(predicates::str::contains("[AST_19]"));
+}
+
+#[test]
+fn section_self_ref_2() {
+    let _cmd = Command::cargo_bin("roust")
+    .unwrap()
+    .arg("tests/section_self_ref_2.roust")
+    .assert()
+    .failure()
+    .stderr(predicates::str::contains("[AST_19]"));
 }
 
 
