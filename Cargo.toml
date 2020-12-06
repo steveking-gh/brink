@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "roust",
+    "brink",
     "ast",
     "lineardb",
     "diags",

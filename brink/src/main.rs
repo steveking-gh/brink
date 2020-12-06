@@ -217,7 +217,7 @@ fn init_log(verbosity : u64) -> Result<(), fern::InitError>  {
 
 fn main() -> Result<()> {
     // clap processes args
-    let args = App::new("roust")
+    let args = App::new("brink")
             // See Cargo.toml for env! CARGO strings.
             .version(env!("CARGO_PKG_VERSION"))
             .author(env!("CARGO_PKG_AUTHORS"))
@@ -252,9 +252,9 @@ fn main() -> Result<()> {
 
     init_log(verbosity).expect("Unknown error initializing logging.");
 
-    info!("roust version {}", env!("CARGO_PKG_VERSION"));
+    info!("brink version {}", env!("CARGO_PKG_VERSION"));
 
-    // Read the roust file into a string and pass to parser.
+    // Read the brink file into a string and pass to parser.
     // A bland error message here is fine since clap already
     // provides nice error messages.
     let in_file_name = args.value_of("INPUT")
