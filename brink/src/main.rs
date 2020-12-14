@@ -80,14 +80,6 @@ struct ActionDb<'toks> {
 
 impl<'toks> ActionDb<'toks> {
 
-    /// Dump the DB for debug
-    pub fn dump(&self) {
-        for a in &self.actions {
-            debug!("ActionDb: nid {} is {} bytes at absolute address {}",
-                    a.get_nid(), a.get_size(), a.get_abs_addr());
-        }
-    }
-
     pub fn new(linear_db: &LinearDb, _diags: &mut Diags, args: &'toks clap::ArgMatches,
                ast: &'toks Ast, _ast_db: &'toks AstDb, abs_start: usize)
                -> ActionDb<'toks> {
@@ -119,7 +111,8 @@ impl<'toks> ActionDb<'toks> {
         loop {
             new_size = 0;
             for ainfo in &actions {
-                debug!("ActionDb::new: Iterating for {} at nid {}", ainfo.get_type_str(), ainfo.get_nid());
+                debug!("ActionDb::new: Iterating for {} at nid {}",
+                        ainfo.get_type_str(), ainfo.get_nid());
                 let sz = ainfo.get_size();
                 start += sz;
                 new_size += sz;
@@ -128,6 +121,7 @@ impl<'toks> ActionDb<'toks> {
             if old_size == new_size {
                 break;
             }
+
             debug!("ActionDb::new: Size for iteration {} is {}", iteration, new_size);
             old_size = new_size;
             iteration += 1;
@@ -142,6 +136,14 @@ impl<'toks> ActionDb<'toks> {
 
         debug!("ActionDb::new: <<<< EXIT with size {}", new_size);
         ActionDb { actions, file_name_str }
+    }
+
+    /// Dump the DB for debug
+    pub fn dump(&self) {
+        for a in &self.actions {
+            debug!("ActionDb: nid {} is {} bytes at absolute address {}",
+                    a.get_nid(), a.get_size(), a.get_abs_addr());
+        }
     }
 
     pub fn write(&self) -> anyhow::Result<()> {
