@@ -108,8 +108,13 @@ impl<'toks> Ast<'toks> {
 
     // Boilerplate entry for recursive descent parsing functions.
     fn dbg_enter(&self, func_name: &str, tok_num: usize) {
-        debug!("Ast::{} >>>> ENTER, {}:{} is {:?}", func_name, tok_num, self.tv[tok_num].val,
-                self.tv[tok_num].tok);
+        if tok_num < self.tv.len() {
+            debug!("Ast::{} >>>> ENTER, {}:{} is {:?}", func_name, tok_num,
+                   self.tv[tok_num].val, self.tv[tok_num].tok);
+        } else {
+            debug!("Ast::{} >>>> ENTER, {}:{} is {}", func_name, tok_num,
+                   "<tok out of range>", "<tok out of range>");
+        }
     }
 
     // Boilerplate exit for recursive descent parsing functions.
@@ -171,9 +176,8 @@ impl<'toks> Ast<'toks> {
         diags.err1(code, &m, self.tv[*tok_num].span());
     }
 
-    fn err_no_input(&self, diags: &mut Diags, tok_num: usize) {
-        let m = format!("Unexpected end of input after '{}'", self.tv[tok_num].val);
-        diags.err1("AST_13", &m, self.tv[tok_num].span());
+    fn err_no_input(&self, diags: &mut Diags) {
+        diags.err0("AST_13", "Unexpected end of input");
     }
 
     fn err_no_close_brace(&self, diags: &mut Diags, brace_tok_num: usize) {
@@ -230,7 +234,7 @@ impl<'toks> Ast<'toks> {
                 self.err_expected_after(diags, code, context, tok_num);
             }
         } else {
-            self.err_no_input(diags, *tok_num - 1);
+            self.err_no_input(diags);
         }
 
         self.dbg_exit("expect_leaf", result)
@@ -246,10 +250,10 @@ impl<'toks> Ast<'toks> {
                 self.add_to_parent_and_advance(tok_num, parent);
                 return true;
             } else {
-                self.err_expected_after(diags, "AST_13", "Expected ';'", tok_num);
+                self.err_expected_after(diags, "AST_17", "Expected ';'", tok_num);
             }
         } else {
-            self.err_no_input(diags, *tok_num - 1);
+            self.err_no_input(diags);
         }
 
         false
@@ -386,12 +390,12 @@ impl<'toks> Ast<'toks> {
                 _ => {
                     let m = format!("Invalid numeric expression '{}' was recognized as {:?}",
                                      tinfo.val, tinfo.tok);
-                    diags.err1("AST_23", &m, self.tv[*tok_num].span());
+                    diags.err1("AST_12", &m, self.tv[*tok_num].span());
                     return self.dbg_exit("parse_numeric", false);
                 }
             }
         } else {
-            self.err_no_input(diags, *tok_num);
+            self.err_no_input(diags);
             return self.dbg_exit("parse_numeric", false);
         }
 
@@ -423,7 +427,7 @@ impl<'toks> Ast<'toks> {
                 _ => {
                     // The caller may decide to skip to the next semicolon.
                     let m = format!("Invalid comparison operator '{}'", self.tv[*tok_num].val);
-                    diags.err1("AST_24", &m, self.tv[*tok_num].span());
+                    diags.err1("AST_11", &m, self.tv[*tok_num].span());
                     return self.dbg_exit("parse_op_numeric", false);
                 }
             }
@@ -434,7 +438,7 @@ impl<'toks> Ast<'toks> {
         }
 
         // We we get here, the loop ran out of input before finding a semicolon
-        self.err_no_input(diags, *tok_num);
+        self.err_no_input(diags);
         return self.dbg_exit("parse_op_numeric", false);
     }
 
@@ -596,7 +600,7 @@ impl<'toks> AstDb<'toks> {
         if output.is_some() {
             let m = "Multiple output statements are not allowed.";
             let orig_tinfo = output.as_ref().unwrap().tinfo;
-            diags.err2("AST_17", &m, orig_tinfo.span(), tinfo.span());
+            diags.err2("AST_10", &m, orig_tinfo.span(), tinfo.span());
             return false;
         }
 
@@ -618,7 +622,7 @@ impl<'toks> AstDb<'toks> {
             let tinfo = ast.get_tinfo(parent_nid);
             let m = format!("Maximum recursion depth ({}) exceeded when processing '{}'.",
                             AstDb::MAX_RECURSION_DEPTH, tinfo.val);
-            diags.err1("AST_18", &m, tinfo.span());
+            diags.err1("AST_5", &m, tinfo.span());
             return false;
         }
 
@@ -640,7 +644,7 @@ impl<'toks> AstDb<'toks> {
                 // Make sure we haven't already recursed through this section.
                 if nested_sections.contains(sec_str) {
                     let m = "Writing section creates a cycle.";
-                    diags.err1("AST_19", &m, sec_tinfo.span());
+                    diags.err1("AST_6", &m, sec_tinfo.span());
                     false
                 } else {
                     // add this section to our nested sections tracker
@@ -694,7 +698,7 @@ impl<'toks> AstDb<'toks> {
 
         // Make sure we found an output!
         if output.is_none() {
-            diags.err0("AST_18", "Missing output statement");
+            diags.err0("AST_8", "Missing output statement");
             bail!("AST construction failed");
         }
 

@@ -88,3 +88,7 @@ Flags: (strictly in form -flag=value)
  create_missing_dirs                 	0	Automatically attempt to create directories for arguments that would normally expect them to already exist (i.e. artifact_prefix, exact_artifact_path, features_dir, corpus)
 
 Flags starting with '--' will be ignored and will be passed verbatim to subprocesses.
+
+For example:
+> cd ast
+> cargo +nightly fuzz run fuzz_target_1 -- -timeout=5 -max_len=128

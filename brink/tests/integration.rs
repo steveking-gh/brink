@@ -53,7 +53,7 @@ fn line_comment_1() {
                 .arg("tests/line_comment_1.brink")
                 .assert()
                 .failure()
-                .stderr(predicates::str::contains("[AST_18]"));
+                .stderr(predicates::str::contains("[AST_8]"));
             }
 
 #[test]
@@ -63,7 +63,7 @@ fn line_comment_2() {
                 .arg("tests/line_comment_2.brink")
                 .assert()
                 .failure()
-                .stderr(predicates::str::contains("[AST_18]"));
+                .stderr(predicates::str::contains("[AST_8]"));
             }
 
 #[test]
@@ -73,7 +73,7 @@ fn multi_comment_1() {
                 .arg("tests/multi_comment_1.brink")
                 .assert()
                 .failure()
-                .stderr(predicates::str::contains("[AST_18]"));
+                .stderr(predicates::str::contains("[AST_8]"));
             }
 
 #[test]
@@ -83,7 +83,7 @@ fn multi_comment_2() {
                 .arg("tests/multi_comment_2.brink")
                 .assert()
                 .failure()
-                .stderr(predicates::str::contains("[AST_18]"));
+                .stderr(predicates::str::contains("[AST_8]"));
             }
 
 #[test]
@@ -93,7 +93,7 @@ fn multi_comment_3() {
                 .arg("tests/multi_comment_3.brink")
                 .assert()
                 .failure()
-                .stderr(predicates::str::contains("[AST_18]"));
+                .stderr(predicates::str::contains("[AST_8]"));
             }
 
 #[test]
@@ -237,6 +237,17 @@ fn fuzz_found_6() {
 }
 
 #[test]
+fn fuzz_found_7() {
+    let _cmd = Command::cargo_bin("brink")
+    .unwrap()
+    .arg("tests/fuzz_found_7.brink")
+    .assert()
+    .failure()
+    .stderr(predicates::str::contains("[AST_13]"))
+    .stderr(predicates::str::contains("[AST_14]"));
+}
+
+#[test]
 fn missing_brace_1() {
     let _cmd = Command::cargo_bin("brink")
     .unwrap()
@@ -253,7 +264,7 @@ fn multiple_outputs_1() {
     .arg("tests/multiple_outputs_1.brink")
     .assert()
     .failure()
-    .stderr(predicates::str::contains("[AST_17]"));
+    .stderr(predicates::str::contains("[AST_10]"));
 }
 
 #[test]
@@ -263,7 +274,7 @@ fn section_self_ref_1() {
     .arg("tests/section_self_ref_1.brink")
     .assert()
     .failure()
-    .stderr(predicates::str::contains("[AST_19]"));
+    .stderr(predicates::str::contains("[AST_6]"));
 }
 
 #[test]
@@ -273,7 +284,7 @@ fn section_self_ref_2() {
     .arg("tests/section_self_ref_2.brink")
     .assert()
     .failure()
-    .stderr(predicates::str::contains("[AST_19]"));
+    .stderr(predicates::str::contains("[AST_6]"));
 }
 
 
