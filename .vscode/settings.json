@@ -18,6 +18,7 @@
         "structs",
         "termcolor",
         "tinfo",
+        "toknum",
         "toks",
         "wrsa"
     ]

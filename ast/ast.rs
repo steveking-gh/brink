@@ -11,17 +11,22 @@ use diags::Diags;
 #[allow(unused_imports)]
 use log::{error, warn, info, debug, trace};
 
-/// All tokens in roust created with the logos macro.
+/// All tokens in brink created with the logos macro.
 /// Keep this simple and do not be tempted to attach
 /// unstructured values these enum.
 #[derive(Logos, Debug, Clone, PartialEq)]
 pub enum LexToken {
     #[token("section")] Section,
+    #[token("assert")] Assert,
     #[token("wrs")] Wrs,
     #[token("wr")] Wr,
     #[token("output")] Output,
+    #[token("==")] EqEq,
+    #[token("!=")] NEq,
     #[token("{")] OpenBrace,
     #[token("}")] CloseBrace,
+//    #[token("(")] OpenParen,
+//    #[token(")")] CloseParen,
     #[token(";")] Semicolon,
     #[regex("[_a-zA-Z][0-9a-zA-Z_]*")] Identifier,
     #[regex("0x[0-9a-fA-F]+|[1-9][0-9]*|0")] Int,
@@ -88,6 +93,7 @@ impl<'toks> Ast<'toks> {
         let mut tv = Vec::new();
         let mut lex = LexToken::lexer(fstr);
         while let Some(tok) = lex.next() {
+            debug!("ast::new: Token {} = {:?}", tv.len(), tok);
             tv.push(TokenInfo{tok, val:lex.slice(), loc: lex.span()});
         }
         let mut ast = Self { arena, tv, root };
@@ -99,6 +105,21 @@ impl<'toks> Ast<'toks> {
 
         Some(ast)
     }
+
+    // Boilerplate entry for recursive descent parsing functions.
+    fn dbg_enter(&self, func_name: &str, tok_num: usize) {
+        debug!("Ast::{} >>>> ENTER, {}:{} is {:?}", func_name, tok_num, self.tv[tok_num].val,
+                self.tv[tok_num].tok);
+    }
+
+    // Boilerplate exit for recursive descent parsing functions.
+    // This function returns the result and should be the last statement
+    // in each function
+    fn dbg_exit(&self, func_name: &str, result: bool) -> bool {
+        debug!("Ast::{} <<<< EXIT {:?}", func_name, result);
+        result
+    }
+
 
     /// Returns the lexical value of the specified child of the specified
     /// parent. The value is always a string reference to source code regardless
@@ -116,8 +137,9 @@ impl<'toks> Ast<'toks> {
     /// between elements in the source file.  We check syntax and grammar during
     /// tree construction.
     fn parse(&mut self, diags: &mut Diags) -> bool {
+        self.dbg_enter("parse", 0);
         let toks_end = self.tv.len();
-        debug!("Ast::parse: >>>> ENTER - Parsing {} tokens", toks_end);
+        debug!("Ast::parse: Total of {} tokens", toks_end);
 
         let mut tok_num = 0;
 
@@ -136,8 +158,7 @@ impl<'toks> Ast<'toks> {
                 _ => {tok_num += 1; false },
             };
         }
-        debug!("Ast::parse: <<<< EXIT({})", success);
-        success
+        self.dbg_exit("parse", success)
     }
 
     fn err_expected_after(&self, diags: &mut Diags, code: &str, msg: &str, tok_num: &usize) {
@@ -184,8 +205,8 @@ impl<'toks> Ast<'toks> {
         tnum
     }
 
-    /// Add the specified token as a child of the parent
-    /// Advance the token number and return the new node.
+    /// Add the specified token as a child of the parent.
+    /// Advance the token number and return the new node ID for the input token.
     fn add_to_parent_and_advance(&mut self, tok_num: &mut usize, parent: NodeId) -> NodeId {
         let nid = self.arena.new_node(*tok_num);
         parent.append(nid, &mut self.arena);
@@ -197,57 +218,81 @@ impl<'toks> Ast<'toks> {
         parent : NodeId, expected_token: LexToken, code: &str,
         context: &str) -> bool {
 
+        self.dbg_enter("expect_leaf", *tok_num);
+
+        let mut result = false;
+
         if let Some(tinfo) = self.get_tinfo1(*tok_num) {
             if expected_token == tinfo.tok {
-                debug!("Ast::expect_leaf: Parsing token {}: {:?}", *tok_num, tinfo);
-                let node = self.arena.new_node(*tok_num);
-                parent.append(node, &mut self.arena);
-                *tok_num += 1;
+                self.add_to_parent_and_advance(tok_num, parent);
+                result = true;
             } else {
                 self.err_expected_after(diags, code, context, tok_num);
-                return false;
             }
         } else {
             self.err_no_input(diags, *tok_num - 1);
-            return false;
         }
-        true
+
+        self.dbg_exit("expect_leaf", result)
+    }
+
+    /// Process an expected semicolon.  This function is just a convenient
+    /// specialization of expect_leaf().
+    fn expect_semi(&mut self, diags: &mut Diags, tok_num : &mut usize,
+                   parent : NodeId) -> bool {
+
+        if let Some(tinfo) = self.get_tinfo1(*tok_num) {
+            if LexToken::Semicolon == tinfo.tok {
+                self.add_to_parent_and_advance(tok_num, parent);
+                return true;
+            } else {
+                self.err_expected_after(diags, "AST_13", "Expected ';'", tok_num);
+            }
+        } else {
+            self.err_no_input(diags, *tok_num - 1);
+        }
+
+        false
     }
 
     fn parse_section(&mut self, tok_num : &mut usize, parent : NodeId,
                     diags: &mut Diags) -> bool {
 
+
+        self.dbg_enter("parse_section", *tok_num);
+        let mut result = false;
         // Sections are always children of the root node, but no need to make
         // that a special case here.
         let sec_nid = self.add_to_parent_and_advance(tok_num, parent);
 
         // After 'section' an identifier is expected
-        if !self.expect_leaf(diags, tok_num, sec_nid, LexToken::Identifier, "AST_1",
-                             "Expected an identifier after section") {
-            return false;
+        if self.expect_leaf(diags, tok_num, sec_nid, LexToken::Identifier, "AST_1",
+                            "Expected an identifier after section") {
+            // After a section identifier, expect an open brace.
+            // Remember the location of the opening brace to help with
+            // user missing brace errors.
+            let brace_toknum = *tok_num;
+            if self.expect_leaf(diags, tok_num, sec_nid, LexToken::OpenBrace, "AST_2",
+                                "Expected { after identifier") {
+                result = self.parse_section_contents(tok_num, sec_nid, diags, brace_toknum);
+            }
         }
-
-        // After a section identifier, expect an open brace.
-        // Remember the location of the opening brace to help with
-        // user missing brace errors.
-        let brace_toknum = *tok_num;
-        if !self.expect_leaf(diags, tok_num, sec_nid, LexToken::OpenBrace, "AST_2",
-                             "Expected { after identifier") {
-            return false;
-        }
-
-        self.parse_section_contents(tok_num, sec_nid, diags, brace_toknum)
+        self.dbg_exit("parse_section", result)
     }
 
+    /// Parse all possible content within a section.
     fn parse_section_contents(&mut self, tok_num : &mut usize, parent : NodeId,
                               diags: &mut Diags, brace_tok_num: usize) -> bool {
 
-        let mut success = true;
+        self.dbg_enter("parse_section_contents", *tok_num);
+        let mut success = true; // todo fixme
         while let Some(tinfo) = self.get_tinfo1(*tok_num) {
+            debug!("Ast::parse_section_contents: token {}:{}", *tok_num, tinfo.val);
+            // todo rewrite as match statement
             // When we find a close brace, we're done with section content
             if tinfo.tok == LexToken::CloseBrace {
                 self.parse_leaf(tok_num, parent);
-                return success;
+                return self.dbg_exit("parse_section_contents", success);
             }
 
             // Stay in the section even after errors to give the user
@@ -255,6 +300,7 @@ impl<'toks> Ast<'toks> {
             let parse_ok = match tinfo.tok {
                 LexToken::Wr => self.parse_wr(tok_num, parent, diags),
                 LexToken::Wrs => self.parse_wrs(tok_num, parent, diags),
+                LexToken::Assert => self.parse_assert(tok_num, parent, diags),
                 _ => {
                     self.err_invalid_expression(diags, "AST_3", tok_num);
                     *tok_num += 1;
@@ -265,6 +311,7 @@ impl<'toks> Ast<'toks> {
             // If something went wrong, then advance to the next semi
             // and try to keep going to give users more errors to fix.
             if !parse_ok {
+                debug!("Ast::parse_section_contents: skipping to next ; starting from {}", *tok_num);
                 *tok_num = self.advance_past_semicolon(*tok_num);
                 success = false;
             }
@@ -272,75 +319,140 @@ impl<'toks> Ast<'toks> {
 
         // If we got here, we ran out of tokens before finding the close brace.
         self.err_no_close_brace(diags, brace_tok_num);
-        false
+        return self.dbg_exit("parse_section_contents", false);
     }
 
     // Parser for writing a section
     fn parse_wr(&mut self, tok_num : &mut usize, parent_nid : NodeId,
                 diags: &mut Diags) -> bool {
 
+        self.dbg_enter("parse_wr", *tok_num);
+        let mut result = false;
+
         // Add the wr keyword as a child of the parent and advance
         let wr_nid = self.add_to_parent_and_advance(tok_num, parent_nid);
 
         // Next, an identifier (section name) is expected
-        if !self.expect_leaf(diags, tok_num, wr_nid, LexToken::Identifier, "AST_15",
+        if self.expect_leaf(diags, tok_num, wr_nid, LexToken::Identifier, "AST_15",
                              "Expected a section name after 'wr'") {
-            return false;
+            result = self.expect_semi(diags, tok_num, wr_nid);
         }
-
-        // After the section name, a semicolon
-        if !self.expect_leaf(diags, tok_num, wr_nid, LexToken::Semicolon, "AST_16",
-                             "Expected ';' after the section name") {
-            return false;
-        }
-
-        debug!("parse_wr success");
-        true
+        self.dbg_exit("parse_wr", result)
     }
 
     /// Parser for writing a string
     fn parse_wrs(&mut self, tok_num : &mut usize, parent_nid : NodeId,
                 diags: &mut Diags) -> bool {
 
+        self.dbg_enter("parse_wrs", *tok_num);
+        let mut result = false;
         // Add the wrs keyword as a child of the parent and advance
         let wrs_nid = self.add_to_parent_and_advance(tok_num, parent_nid);
 
         // Next, a quoted string is expected
-        if !self.expect_leaf(diags, tok_num, wrs_nid, LexToken::QuotedString, "AST_4",
+        if self.expect_leaf(diags, tok_num, wrs_nid, LexToken::QuotedString, "AST_4",
                              "Expected a quoted string after 'wrs'") {
-            return false;
+            result = self.expect_semi(diags, tok_num, wrs_nid);
+        }
+        self.dbg_exit("parse_wrs", result)
+    }
+
+    /// Parser for an assert statement
+    fn parse_assert(&mut self, tok_num: &mut usize, parent: NodeId,
+                    diags: &mut Diags) -> bool {
+
+        self.dbg_enter("parse_assert", *tok_num);
+        // Add the assert keyword as a child of the parent and advance
+        let assert_nid = self.add_to_parent_and_advance(tok_num, parent);
+
+        // Next, a numeric expression is expected
+        let result = self.parse_numeric(tok_num, assert_nid, diags);
+        self.dbg_exit("parse_assert", result)
+    }
+
+    /// Parses a numeric expression up to the next semicolon. Factors of the
+    /// expression are attached as children of the parent nid
+    fn parse_numeric(&mut self, tok_num : &mut usize, parent : NodeId,
+                        diags: &mut Diags) -> bool {
+
+        self.dbg_enter("parse_numeric", *tok_num);
+
+        // A numeric expression must begin with an integer or function
+        if let Some(tinfo) = self.get_tinfo1(*tok_num) {
+            match tinfo.tok {
+                LexToken::Int => {
+                    self.add_to_parent_and_advance(tok_num, parent);
+                },
+                _ => {
+                    let m = format!("Invalid numeric expression '{}' was recognized as {:?}",
+                                     tinfo.val, tinfo.tok);
+                    diags.err1("AST_23", &m, self.tv[*tok_num].span());
+                    return self.dbg_exit("parse_numeric", false);
+                }
+            }
+        } else {
+            self.err_no_input(diags, *tok_num);
+            return self.dbg_exit("parse_numeric", false);
         }
 
-        // After the string, a semicolon
-        if !self.expect_leaf(diags, tok_num, wrs_nid, LexToken::Semicolon, "AST_5",
-                             "Expected ';' after string") {
-            return false;
+        // After the initial numeric, the grammar allows zero or more pairs of
+        // operator followed numeric until a semicolon
+        let result = self.parse_op_numeric(tok_num, parent, diags);
+        self.dbg_exit("parse_numeric", result)
+    }
+
+    /// Parses zero or more of 'operator followed by numeric' expressions.
+    /// Recursion ends on an error or the first semicolon found. Zero operator
+    /// numeric pairs is considered success and returns true.
+    fn parse_op_numeric(&mut self, tok_num : &mut usize, parent : NodeId,
+                        diags: &mut Diags) -> bool {
+
+        self.dbg_enter("parse_op_numeric", *tok_num);
+
+        // A numeric expression must begin with an integer or function
+        if let Some(tinfo) = self.get_tinfo1(*tok_num) {
+
+            // first, expect an operator
+            match tinfo.tok {
+                LexToken::Semicolon => {
+                    self.add_to_parent_and_advance(tok_num, parent);
+                    return self.dbg_exit("parse_op_numeric", true);
+                },
+                LexToken::EqEq |
+                LexToken::NEq => { self.add_to_parent_and_advance(tok_num, parent); },
+                _ => {
+                    // The caller may decide to skip to the next semicolon.
+                    let m = format!("Invalid comparison operator '{}'", self.tv[*tok_num].val);
+                    diags.err1("AST_24", &m, self.tv[*tok_num].span());
+                    return self.dbg_exit("parse_op_numeric", false);
+                }
+            }
+
+            // Now expect a numeric, so recurse
+            let result = self.parse_numeric(tok_num, parent, diags);
+            return self.dbg_exit("parse_op_numeric", result);
         }
 
-        debug!("parse_wrs success");
-        true
+        // We we get here, the loop ran out of input before finding a semicolon
+        self.err_no_input(diags, *tok_num);
+        return self.dbg_exit("parse_op_numeric", false);
     }
 
     fn parse_output(&mut self, tok_num : &mut usize, parent : NodeId,
                         diags: &mut Diags) -> bool {
 
+        self.dbg_enter("parse_output", *tok_num);
+        let mut result = false;
         // Add the section keyword as a child of the parent and advance
         let output_nid = self.add_to_parent_and_advance(tok_num, parent);
 
         // After 'output' a section identifier is expected
-        if !self.expect_leaf(diags, tok_num, output_nid, LexToken::Identifier, "AST_7",
+        if self.expect_leaf(diags, tok_num, output_nid, LexToken::Identifier, "AST_7",
                              "Expected a section name after output") {
-            return false;
+            result = self.expect_semi(diags, tok_num, output_nid);
         }
 
-        // After the identifier, a semicolon
-        if !self.expect_leaf(diags, tok_num, output_nid, LexToken::Semicolon, "AST_8",
-                             "Expected ';' after identifier") {
-            return false;
-        }
-
-        debug!("parse_output success");
-        true
+        self.dbg_exit("parse_output", result)
     }
 
     /**

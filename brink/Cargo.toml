@@ -1,5 +1,5 @@
 [package]
-name = "roust"
+name = "brink"
 version = "0.1.0"
 authors = ["Steve King <sk@metrokings.com>"]
 edition = "2018"

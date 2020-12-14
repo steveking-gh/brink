@@ -7,34 +7,34 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'roust'",
+            "name": "Debug executable 'brink'",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=roust",
-                    "--package=roust"
+                    "--bin=brink",
+                    "--package=brink"
                 ],
                 "filter": {
-                    "name": "roust",
+                    "name": "brink",
                     "kind": "bin"
                 }
             },
             "args": ["-o empty_section_1.bin",
-                     "${workspaceFolder}/roust/tests/empty_section_1.roust"],
+                     "${workspaceFolder}/brink/tests/assert_1.brink"],
         },
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in executable 'roust'",
+            "name": "Debug unit tests in executable 'brink'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
-                    "--bin=roust",
-                    "--package=roust"
+                    "--bin=brink",
+                    "--package=brink"
                 ],
                 "filter": {
-                    "name": "roust",
+                    "name": "brink",
                     "kind": "bin"
                 }
             },
@@ -50,7 +50,7 @@
                     "test",
                     "--no-run",
                     "--test=integration",
-                    "--package=roust"
+                    "--package=brink"
                 ],
                 "filter": {
                     "name": "integration",
