@@ -17,6 +17,7 @@ use clap::{Arg, App};
 use diags::Diags;
 use ast::{Ast,AstDb};
 use lineardb::LinearDb;
+use addrdb::AddrDb;
 
 
 // Logging
@@ -24,37 +25,29 @@ use lineardb::LinearDb;
 use log::{error, warn, info, debug, trace};
 
 trait ActionInfo {
-    fn set_abs_addr(&mut self, abs: usize);
-    fn get_abs_addr(&self) -> usize;
     fn get_nid(&self) -> NodeId;
-    fn get_size(&self) -> usize;
     fn write(&self, file: &mut fs::File) -> anyhow::Result<()>;
     fn get_type_str(&self) -> &'static str;
 }
 
 struct WrsActionInfo<'toks> {
-    abs_addr: usize,
     nid: NodeId,
-    str_size: usize,
     strout: &'toks str,
+
 }
 
 impl<'toks> WrsActionInfo<'toks> {
-    pub fn new(abs_addr: usize, nid: NodeId, ast: &'toks Ast) -> WrsActionInfo<'toks> {
-        debug!("WrsActionInfo::new: >>>> ENTER for nid {} at {}", nid, abs_addr);
+    pub fn new(nid: NodeId, ast: &'toks Ast) -> WrsActionInfo<'toks> {
+        debug!("WrsActionInfo::new: >>>> ENTER for nid {}", nid);
         let strout = ast.get_child_str(nid, 0).trim_matches('\"');
         debug!("WrsActionInfo::new: output string is {}", strout);
-        let str_size = strout.len();
         debug!("WrsActionInfo::new: <<<< EXIT for nid {}", nid);
-        WrsActionInfo{ abs_addr, nid, str_size, strout}
+        WrsActionInfo{ nid, strout }
     }
 }
 
 impl<'toks> ActionInfo for WrsActionInfo<'toks> {
-    fn set_abs_addr(&mut self, abs: usize) { self.abs_addr = abs; }
-    fn get_abs_addr(&self) -> usize { self.abs_addr}
     fn get_nid(&self) -> NodeId { self.nid}
-    fn get_size(&self) -> usize { self.str_size }
     fn write(&self, file: &mut fs::File) -> anyhow::Result<()> {
         let s = self.strout.trim_matches('\"').to_string()
                     .replace("\\n", "\n")
@@ -80,7 +73,8 @@ struct ActionDb<'toks> {
 
 impl<'toks> ActionDb<'toks> {
 
-    pub fn new(linear_db: &LinearDb, _diags: &mut Diags, args: &'toks clap::ArgMatches,
+    pub fn new(addr_db: &AddrDb, linear_db: &LinearDb, _diags: &mut Diags,
+               args: &'toks clap::ArgMatches,
                ast: &'toks Ast, _ast_db: &'toks AstDb, abs_start: usize)
                -> ActionDb<'toks> {
 
@@ -88,44 +82,17 @@ impl<'toks> ActionDb<'toks> {
                 abs_start);
         let mut actions : Vec<Box<dyn ActionInfo + 'toks>> = Vec::new();
 
-        // First pass to build sizes
-        let mut start = abs_start;
-        let mut new_size = 0;
         for &nid in &linear_db.nidvec {
             let tinfo = ast.get_tinfo(nid);
             match tinfo.tok {
                 ast::LexToken::Wrs => {
-                    let wrsa = Box::new(WrsActionInfo::new(start, nid, ast));
-                    let sz = wrsa.get_size();
-                    start += sz;
-                    new_size += sz;
+                    let wrsa = Box::new(WrsActionInfo::new(nid, ast));
                     actions.push(wrsa);
                 },
                 _ => () // trivial zero size token like ';'.
             };
         }
 
-        let mut old_size = new_size;
-        let mut iteration = 1;
-        // Iterate until the size of the section stops changing.
-        loop {
-            new_size = 0;
-            for ainfo in &actions {
-                debug!("ActionDb::new: Iterating for {} at nid {}",
-                        ainfo.get_type_str(), ainfo.get_nid());
-                let sz = ainfo.get_size();
-                start += sz;
-                new_size += sz;
-            }
-
-            if old_size == new_size {
-                break;
-            }
-
-            debug!("ActionDb::new: Size for iteration {} is {}", iteration, new_size);
-            old_size = new_size;
-            iteration += 1;
-        }
 
         // Determine if the user specified an output file on the command line
         // Trim whitespace
@@ -134,16 +101,8 @@ impl<'toks> ActionDb<'toks> {
                                              .trim_matches(' '));
         debug!("ActionDb::new: output file name is {}", file_name_str);
 
-        debug!("ActionDb::new: <<<< EXIT with size {}", new_size);
+        debug!("ActionDb::new: <<<< EXIT");
         ActionDb { actions, file_name_str }
-    }
-
-    /// Dump the DB for debug
-    pub fn dump(&self) {
-        for a in &self.actions {
-            debug!("ActionDb: nid {} is {} bytes at absolute address {}",
-                    a.get_nid(), a.get_size(), a.get_abs_addr());
-        }
     }
 
     pub fn write(&self) -> anyhow::Result<()> {
@@ -186,8 +145,8 @@ pub fn process(name: &str, fstr: &str, args: &clap::ArgMatches, verbosity: u64)
     }
     let linear_db = linear_db.unwrap();
     linear_db.dump(&ast);
-    let action_db = ActionDb::new(&linear_db, &mut diags, args, &ast, &ast_db, 0);
-    action_db.dump();
+    let addr_db = AddrDb::new(&linear_db, &mut diags, &ast, &ast_db, 0);
+    let action_db = ActionDb::new(&addr_db, &linear_db, &mut diags, args, &ast, &ast_db, 0);
     action_db.write()?;
     Ok(())
 }
