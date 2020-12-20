@@ -1,14 +1,19 @@
 {
     "cSpell.words": [
+        "NIDs",
         "Pretoken",
         "Pretokenizer",
         "addrdb",
+        "addrs",
         "ainfo",
+        "basevec",
         "childvec",
         "codespan",
         "ctxt",
+        "fname",
         "fstr",
         "indextree",
+        "itype",
         "libfuzzer",
         "lineardb",
         "nidvec",
@@ -19,6 +24,7 @@
         "structs",
         "termcolor",
         "tinfo",
+        "tnum",
         "toknum",
         "toks",
         "wrsa"

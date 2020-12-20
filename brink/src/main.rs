@@ -3,13 +3,10 @@
 
 #![warn(clippy::all)]
 
-use std::vec::Vec;
 use std::env;
 use std::{io,fs};
 use std::fs::File;
-use std::io::prelude::*;
 use anyhow::{Context,Result,bail};
-use indextree::NodeId;
 extern crate clap;
 use clap::{Arg, App};
 
@@ -17,107 +14,11 @@ use clap::{Arg, App};
 use diags::Diags;
 use ast::{Ast,AstDb};
 use lineardb::LinearDb;
-use addrdb::AddrDb;
 
 
 // Logging
 #[allow(unused_imports)]
 use log::{error, warn, info, debug, trace};
-
-trait ActionInfo {
-    fn get_nid(&self) -> NodeId;
-    fn write(&self, file: &mut fs::File) -> anyhow::Result<()>;
-    fn get_type_str(&self) -> &'static str;
-}
-
-struct WrsActionInfo<'toks> {
-    nid: NodeId,
-    strout: &'toks str,
-
-}
-
-impl<'toks> WrsActionInfo<'toks> {
-    pub fn new(nid: NodeId, ast: &'toks Ast) -> WrsActionInfo<'toks> {
-        debug!("WrsActionInfo::new: >>>> ENTER for nid {}", nid);
-        let strout = ast.get_child_str(nid, 0).trim_matches('\"');
-        debug!("WrsActionInfo::new: output string is {}", strout);
-        debug!("WrsActionInfo::new: <<<< EXIT for nid {}", nid);
-        WrsActionInfo{ nid, strout }
-    }
-}
-
-impl<'toks> ActionInfo for WrsActionInfo<'toks> {
-    fn get_nid(&self) -> NodeId { self.nid}
-    fn write(&self, file: &mut fs::File) -> anyhow::Result<()> {
-        let s = self.strout.trim_matches('\"').to_string()
-                    .replace("\\n", "\n")
-                    .replace("\\t", "\t");
-        file.write_all(s.as_bytes())
-                    .context(format!("Wrs failed to write string {}", s))?;
-        Ok(())
-    }
-    fn get_type_str(&self) -> &'static str {
-        "wrs"
-    }
-}
-
-/*****************************************************************************
- * ActionDb
- * The ActionDb contains a map of the logical size in bytes of all items with a
- * size in the AST. The key is the AST NodeID, the value is the size.
- *****************************************************************************/
-struct ActionDb<'toks> {
-    actions : Vec<Box<dyn ActionInfo + 'toks>>,
-    file_name_str: String,
-}
-
-impl<'toks> ActionDb<'toks> {
-
-    pub fn new(addr_db: &AddrDb, linear_db: &LinearDb, _diags: &mut Diags,
-               args: &'toks clap::ArgMatches,
-               ast: &'toks Ast, _ast_db: &'toks AstDb, abs_start: usize)
-               -> ActionDb<'toks> {
-
-        debug!("ActionDb::new: >>>> ENTER for output nid: {} at {}", linear_db.output_nid,
-                abs_start);
-        let mut actions : Vec<Box<dyn ActionInfo + 'toks>> = Vec::new();
-
-        for &nid in &linear_db.nidvec {
-            let tinfo = ast.get_tinfo(nid);
-            match tinfo.tok {
-                ast::LexToken::Wrs => {
-                    let wrsa = Box::new(WrsActionInfo::new(nid, ast));
-                    actions.push(wrsa);
-                },
-                _ => () // trivial zero size token like ';'.
-            };
-        }
-
-
-        // Determine if the user specified an output file on the command line
-        // Trim whitespace
-        let file_name_str = String::from(args.value_of("output")
-                                             .unwrap_or("output.bin")
-                                             .trim_matches(' '));
-        debug!("ActionDb::new: output file name is {}", file_name_str);
-
-        debug!("ActionDb::new: <<<< EXIT");
-        ActionDb { actions, file_name_str }
-    }
-
-    pub fn write(&self) -> anyhow::Result<()> {
-        let mut file = File::create(&self.file_name_str)
-                .context(format!("Unable to create output file {}", self.file_name_str))?;
-
-        for ainfo in &self.actions {
-            debug!("ActionDb::write: writing {} at nid {}", ainfo.get_type_str(), ainfo.get_nid());
-            ainfo.write(&mut file)?;
-        }
-
-        Ok(())
-    }
-}
-
 
 /// Entry point for all processing on the input source file
 /// name: The name of the file
@@ -139,15 +40,24 @@ pub fn process(name: &str, fstr: &str, args: &clap::ArgMatches, verbosity: u64)
     ast.dump();
 
     let ast_db = AstDb::new(&mut diags, &ast)?;
-    let linear_db = LinearDb::new(&mut diags, &ast, &ast_db);
+    let linear_db = LinearDb::new(&mut diags, &ast, &ast_db, 0);
     if linear_db.is_none() {
         bail!("[MAIN_3]: Failed to construct the linear database.");
     }
     let linear_db = linear_db.unwrap();
-    linear_db.dump(&ast);
-    let addr_db = AddrDb::new(&linear_db, &mut diags, &ast, &ast_db, 0);
-    let action_db = ActionDb::new(&addr_db, &linear_db, &mut diags, args, &ast, &ast_db, 0);
-    action_db.write()?;
+    linear_db.dump();
+
+    // Determine if the user specified an output file on the command line
+    // Trim whitespace
+    let fname_str = String::from(args.value_of("output")
+                                            .unwrap_or("output.bin")
+                                            .trim_matches(' '));
+    debug!("process: output file name is {}", fname_str);
+
+    let mut file = File::create(&fname_str)
+            .context(format!("Unable to create output file {}", fname_str))?;
+
+    linear_db.write(&mut file)?;
     Ok(())
 }
 

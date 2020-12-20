@@ -3,6 +3,5 @@ members = [
     "brink",
     "ast",
     "lineardb",
-    "addrdb",
     "diags",
 ]
