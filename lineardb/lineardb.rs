@@ -13,6 +13,7 @@ use ast::{Ast,AstDb};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum LinearInfoType {
+    Assert,
     Wrs,
 }
 
@@ -74,6 +75,41 @@ impl<'toks> LinearInfo for WrsLinearInfo {
     }
 
 }
+
+pub struct AssertLinearInfo {
+    abs_addr: usize,
+    nid: NodeId,
+}
+
+impl<'toks> AssertLinearInfo {
+    pub fn new(abs_addr: usize, nid: NodeId, ast: &'toks Ast) -> WrsLinearInfo {
+        debug!("WrsLinearInfo::new: >>>> ENTER for nid {} at {}", nid, abs_addr);
+        // To calculate the correct size of the string, we have to
+        // complete all escape transforms.  Since we're changing the string
+        // we're not longer referring to a slice of the original token.
+        let strout = ast.get_child_str(nid, 0)
+                .trim_matches('\"')
+                .to_string()
+                .replace("\\n", "\n")
+                .replace("\\t", "\t");
+        debug!("WrsLinearInfo::new: output string is {}", strout);
+        let str_size = strout.len();
+        debug!("WrsLinearInfo::new: <<<< EXIT for nid {}", nid);
+        WrsLinearInfo{ abs_addr, nid, str_size, strout }
+    }
+}
+
+impl<'toks> LinearInfo for AssertLinearInfo {
+    fn set_abs_addr(&mut self, abs: usize) { self.abs_addr = abs; }
+    fn get_abs_addr(&self) -> usize { self.abs_addr}
+    fn get_size(&self) -> usize { 0 }
+    fn get_nid(&self) -> NodeId { self.nid}
+    fn get_type(&self) -> LinearInfoType { LinearInfoType::Assert }
+    fn execute(&self, _file: &mut File) -> anyhow::Result<()> {
+        Ok(())
+    }
+}
+
 
 impl<'toks> LinearDb {
 
@@ -147,7 +183,9 @@ impl<'toks> LinearDb {
         let section = ast_db.sections.get(sec_name_str).unwrap();
         let sec_nid = section.nid;
 
-        // To start recursion, rdepth = 1
+        // To start recursion, rdepth = 1.  The ONLY thing happening
+        // here is a flattening of the AST into the logical order
+        // of actions.
         if !linear_db.record_r(1, sec_nid, diags, ast, ast_db) {
             return None;
         }

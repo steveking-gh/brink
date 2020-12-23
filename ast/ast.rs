@@ -5,6 +5,9 @@ use std::collections::{HashMap,HashSet};
 use std::option;
 use anyhow::{bail};
 use diags::Diags;
+use anyhow::{Context};
+use std::fs::File;
+use std::io::prelude::*;
 
 
 #[allow(unused_imports)]
@@ -476,24 +479,47 @@ impl<'toks> Ast<'toks> {
         &self.tv[tok_num]
     }
 
-    fn dump_r(&self, nid: NodeId, depth: usize) {
+
+    fn dump_r(&self, nid: NodeId, depth: usize, file: &mut File) ->anyhow::Result<()> {
         debug!("AST: {}: {}{}", nid, " ".repeat(depth * 4), self.get_tinfo(nid).val);
+        let tinfo = self.get_tinfo(nid);
+
+        let label = match tinfo.tok {
+            LexToken::QuotedString => "<string>",
+            LexToken::Unknown => "<unknown>",
+            _ => tinfo.val,
+        };
+
+        file.write(format!("{} [label=\"{}\"]\n",nid,label).as_bytes()).context("ast.dot write failed")?;
         let children = nid.children(&self.arena);
         for child_nid in children {
-            self.dump_r(child_nid, depth+1);
+            file.write(format!("{} -> {}\n", nid, child_nid).as_bytes()).context("ast.dot write failed")?;
+            self.dump_r(child_nid, depth+1, file)?;
         }
+        Ok(())
     }
 
     /**
      * Recursively dumps the AST to the console.
      */
-    pub fn dump(&self) {
+    pub fn dump(&self) -> anyhow::Result<()> {
+
         debug!("");
-        let children = self.root.children(&self.arena);
-        for child_nid in children {
-            self.dump_r(child_nid, 0);
-        }
+
+        let mut file = File::create("ast.dot").context(
+            "Error attempting to create debug file 'ast.dot'")?;
+            file.write(b"digraph {\n").context("ast.dot write failed")?;
+
+            file.write(format!("{} [label=\"root\"]\n",self.root).as_bytes()).context("ast.dot write failed")?;
+            let children = self.root.children(&self.arena);
+            for child_nid in children {
+                file.write(format!("{} -> {}\n",self.root, child_nid).as_bytes()).context("ast.dot write failed")?;
+                self.dump_r(child_nid, 0, &mut file)?;
+            }
+
+        file.write(b"}\n").context("ast.dot write failed")?;
         debug!("");
+        Ok(())
     }
 }
 
