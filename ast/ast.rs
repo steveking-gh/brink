@@ -479,20 +479,35 @@ impl<'toks> Ast<'toks> {
         &self.tv[tok_num]
     }
 
+    const DOT_DEFAULT_FILL: &'static str = "#F2F2F2";
+    const DOT_DEFAULT_EDGE: &'static str = "#808080";
+    const DOT_DEFAULT_PEN: &'static str = "#808080";
 
     fn dump_r(&self, nid: NodeId, depth: usize, file: &mut File) ->anyhow::Result<()> {
         debug!("AST: {}: {}{}", nid, " ".repeat(depth * 4), self.get_tinfo(nid).val);
         let tinfo = self.get_tinfo(nid);
 
-        let label = match tinfo.tok {
-            LexToken::QuotedString => "<string>",
-            LexToken::Unknown => "<unknown>",
-            _ => tinfo.val,
+        let (label,color) = match tinfo.tok {
+            LexToken::Section |
+            LexToken::Wr |
+            LexToken::Wrs |
+            LexToken::Output => (tinfo.val, Ast::DOT_DEFAULT_FILL),
+            LexToken::Identifier => (tinfo.val, Ast::DOT_DEFAULT_FILL),
+            LexToken::QuotedString => ("<string>", Ast::DOT_DEFAULT_FILL),
+            LexToken::Unknown => ("<unknown>", "red"),
+            _ => (tinfo.val,Ast::DOT_DEFAULT_FILL)
         };
 
-        file.write(format!("{} [label=\"{}\"]\n",nid,label).as_bytes()).context("ast.dot write failed")?;
+        file.write(format!("{} [label=\"{}\",fillcolor=\"{}\"]\n",nid,label,color)
+                .as_bytes()).context("ast.dot write failed")?;
         let children = nid.children(&self.arena);
         for child_nid in children {
+
+            let child_tinfo = self.get_tinfo(child_nid);
+            if child_tinfo.tok == LexToken::Semicolon {
+                continue;
+            }
+
             file.write(format!("{} -> {}\n", nid, child_nid).as_bytes()).context("ast.dot write failed")?;
             self.dump_r(child_nid, depth+1, file)?;
         }
@@ -509,6 +524,10 @@ impl<'toks> Ast<'toks> {
         let mut file = File::create("ast.dot").context(
             "Error attempting to create debug file 'ast.dot'")?;
             file.write(b"digraph {\n").context("ast.dot write failed")?;
+            file.write(format!("node [style=filled,fillcolor=\"{}\",color=\"{}\"]\n",
+                    Ast::DOT_DEFAULT_FILL,Ast::DOT_DEFAULT_PEN).as_bytes()).context("ast.dot write failed")?;
+            file.write(format!("edge [color=\"{}\"]\n",
+                    Ast::DOT_DEFAULT_EDGE).as_bytes()).context("ast.dot write failed")?;
 
             file.write(format!("{} [label=\"root\"]\n",self.root).as_bytes()).context("ast.dot write failed")?;
             let children = self.root.children(&self.arena);
