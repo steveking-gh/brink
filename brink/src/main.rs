@@ -131,10 +131,12 @@ fn main() -> Result<()> {
     let in_file_name = args.value_of("INPUT")
             .context("Unknown input file argument error.")?;
 
+    // remove carriage return from line endings for windows platforms
     let str_in = fs::read_to_string(&in_file_name)
         .with_context(|| format!(
                 "Failed to read from file {}.\nWorking directory is {}",
-                in_file_name, env::current_dir().unwrap().display()))?;
+                in_file_name, env::current_dir().unwrap().display()))?
+        .replace("\r\n","\n");
 
     process(&in_file_name, &str_in, &args, verbosity)?;
 
