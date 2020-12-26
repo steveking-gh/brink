@@ -17,7 +17,7 @@ use log::{error, warn, info, debug, trace};
 /// All tokens in brink created with the logos macro.
 /// Keep this simple and do not be tempted to attach
 /// unstructured values these enum.
-#[derive(Logos, Debug, Clone, PartialEq)]
+#[derive(Logos, Debug, Clone, Copy, PartialEq)]
 pub enum LexToken {
     #[token("section")] Section,
     #[token("assert")] Assert,
@@ -364,7 +364,50 @@ impl<'toks> Ast<'toks> {
         self.dbg_exit("parse_wrs", result)
     }
 
+    /// Returns the (lhs,rhs) binding power for any token
+    /// Higher numbers are stronger binding.
+    fn get_binding_power(tok: LexToken) -> (u8,u8) {
+        match tok {
+            LexToken::NEq |
+            LexToken::EqEq => (1,2),
+            _ => (0,0),
+        }
+    }
+
+    /// Parse an expression with correct precedence up to the next semicolon.
+    fn parse_expr(&mut self, tok_num: &mut usize, parent: &mut NodeId,
+                  diags: &mut Diags, min_bp: u8) -> bool {
+
+        self.dbg_enter("parse_expr", *tok_num);
+
+        let mut result = false;
+        if let Some(tinfo) = self.get_tinfo1(*tok_num) {
+            let lhs_nid = self.arena.new_node(*tok_num);
+        } else {
+            self.err_no_input(diags);
+            result = false;
+            break;
+        }
+
+        loop {
+            if let Some(tinfo) = self.get_tinfo1(*tok_num) {
+                let (left_bp, right_bp) = Ast::get_binding_power(tinfo.tok);
+                if left_bp < min_bp {
+                    break;
+                }
+            } else {
+                self.err_no_input(diags);
+                result = false;
+                break;
+            }
+        }
+        self.dbg_exit("parse_expr", result)
+    }
+
     /// Parser for an assert statement
+    /// We do not yet have full mathematical expression evaluation.
+    /// The assert must be a 3 part expression with the middle lexical element
+    /// either a == or !=.
     fn parse_assert(&mut self, tok_num: &mut usize, parent: NodeId,
                     diags: &mut Diags) -> bool {
 
@@ -372,8 +415,22 @@ impl<'toks> Ast<'toks> {
         // Add the assert keyword as a child of the parent and advance
         let assert_nid = self.add_to_parent_and_advance(tok_num, parent);
 
-        // Next, a numeric expression is expected
-        let result = self.parse_numeric(tok_num, assert_nid, diags);
+        // Todo: Fix me.  This requires proper expression checking
+        let lhs_nid = self.arena.new_node(*tok_num);
+        *tok_num += 1;
+        let op_nid = self.arena.new_node(*tok_num);
+        *tok_num += 1;
+        let rhs_nid = self.arena.new_node(*tok_num);
+        *tok_num += 1;
+
+        // the operator is the child of the parent
+        assert_nid.append(op_nid, &mut self.arena);
+
+        // lhs and rhs and semicolon are children of the operator.
+        // lhs must come first.
+        op_nid.append(lhs_nid, &mut self.arena);
+        op_nid.append(rhs_nid, &mut self.arena);
+        let result = self.expect_semi(diags, tok_num, op_nid);
         self.dbg_exit("parse_assert", result)
     }
 
@@ -493,7 +550,13 @@ impl<'toks> Ast<'toks> {
             LexToken::Wrs |
             LexToken::Output => (tinfo.val, Ast::DOT_DEFAULT_FILL),
             LexToken::Identifier => (tinfo.val, Ast::DOT_DEFAULT_FILL),
-            LexToken::QuotedString => ("<string>", Ast::DOT_DEFAULT_FILL),
+            LexToken::QuotedString => {
+                if tinfo.val.len() <= 8 {
+                    (tinfo.val.trim_matches('\"'), Ast::DOT_DEFAULT_FILL)
+                } else {
+                    ("<string>", Ast::DOT_DEFAULT_FILL)
+                }
+            }
             LexToken::Unknown => ("<unknown>", "red"),
             _ => (tinfo.val,Ast::DOT_DEFAULT_FILL)
         };

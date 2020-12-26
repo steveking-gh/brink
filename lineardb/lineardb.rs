@@ -73,7 +73,6 @@ impl<'toks> LinearInfo for WrsLinearInfo {
                     .context(format!("WrsLinearInfo::execute: failed to write."))?;
         Ok(())
     }
-
 }
 
 pub struct AssertLinearInfo {
@@ -82,20 +81,10 @@ pub struct AssertLinearInfo {
 }
 
 impl<'toks> AssertLinearInfo {
-    pub fn new(abs_addr: usize, nid: NodeId, ast: &'toks Ast) -> WrsLinearInfo {
-        debug!("WrsLinearInfo::new: >>>> ENTER for nid {} at {}", nid, abs_addr);
-        // To calculate the correct size of the string, we have to
-        // complete all escape transforms.  Since we're changing the string
-        // we're not longer referring to a slice of the original token.
-        let strout = ast.get_child_str(nid, 0)
-                .trim_matches('\"')
-                .to_string()
-                .replace("\\n", "\n")
-                .replace("\\t", "\t");
-        debug!("WrsLinearInfo::new: output string is {}", strout);
-        let str_size = strout.len();
-        debug!("WrsLinearInfo::new: <<<< EXIT for nid {}", nid);
-        WrsLinearInfo{ abs_addr, nid, str_size, strout }
+    pub fn new(abs_addr: usize, nid: NodeId, ast: &'toks Ast) -> AssertLinearInfo {
+        debug!("AssertLinearInfo::new: >>>> ENTER for nid {} at {}", nid, abs_addr);
+        debug!("AssertLinearInfo::new: <<<< EXIT for nid {}", nid);
+        AssertLinearInfo{ abs_addr, nid }
     }
 }
 
@@ -109,7 +98,6 @@ impl<'toks> LinearInfo for AssertLinearInfo {
         Ok(())
     }
 }
-
 
 impl<'toks> LinearDb {
 
@@ -208,6 +196,10 @@ impl<'toks> LinearDb {
                     debug!("Setting size {} for nid {}", sz, base.nid);
                     base.info = Some(wrsa);
                 },
+                ast::LexToken::Assert => {
+                    let asrt = Box::new(AssertLinearInfo::new(start, base.nid, ast));
+                    base.info = Some(asrt);
+                },
                 _ => () // trivial zero size token like ';'.
             };
         }
@@ -240,16 +232,26 @@ impl<'toks> LinearDb {
             iteration += 1;
         }
 
+        // Sizes and addresses are known, so we can now evaluate assert statements
+        for base in &mut linear_db.basevec {
+            // We skip uninteresting elements that didn't create an info object
+            if let Some(info) = base.info.as_ref() {
+                if info.get_type() == LinearInfoType::Assert {
+                    debug!("LinearDb::new: Assert");
+                }
+            }
+        }
+
 
         debug!("LinearDb::new: <<<< EXIT for nid: {}", output_nid);
         Some(linear_db)
     }
 
-    pub fn write(&self, file: &mut File) -> anyhow::Result<()> {
+    pub fn execute(&self, file: &mut File) -> anyhow::Result<()> {
 
         for base in &self.basevec {
             if let Some(info) = &base.info {
-                debug!("ActionDb::write: writing {:?} for nid {}", info.get_type(),
+                debug!("LinearDb::execute: writing {:?} for nid {}", info.get_type(),
                                                                    info.get_nid());
                 info.execute(file).context(format!("Execution failed for {:?}",
                                                 info.get_type()))?;
