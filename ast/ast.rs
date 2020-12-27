@@ -26,6 +26,8 @@ pub enum LexToken {
     #[token("output")] Output,
     #[token("==")] EqEq,
     #[token("!=")] NEq,
+    #[token("+")] Plus,
+    #[token("-")] Minus,
     #[token("{")] OpenBrace,
     #[token("}")] CloseBrace,
 //    #[token("(")] OpenParen,
@@ -358,17 +360,24 @@ impl<'toks> Ast<'toks> {
     /// Higher numbers are stronger binding.
     fn get_binding_power(tok: LexToken) -> (u8,u8) {
         match tok {
+            LexToken::Int => (9,10),
             LexToken::NEq |
             LexToken::EqEq => (1,2),
-            _ => (9,10),
+            LexToken::Plus |
+            LexToken::Minus => (3,4),
+            _ => (0,0),
         }
     }
 
     /// Parse an expression with correct precedence up to the next semicolon.
-    fn parse_expr(&mut self, tok_num: &mut usize, prev_nid: NodeId,
-                  diags: &mut Diags, prev_rbp: u8) -> bool {
+    fn parse_expr(&mut self, tok_num: &mut usize, top_nid: &mut NodeId,
+                  diags: &mut Diags) -> bool {
 
-        self.dbg_enter("parse_expr", *tok_num);
+        self.dbg_enter("Ast::parse_expr", *tok_num);
+        let top_tinfo = self.get_tinfo(*top_nid);
+        let (_,top_rbp) = Ast::get_binding_power(top_tinfo.tok);
+        debug!("Ast::parse_expr: top nid {} is '{}' with rbp {}",
+               *top_nid, self.get_tinfo(*top_nid).val, top_rbp);
         let mut result = false;
 
         if let Some(tinfo) = self.tv.get(*tok_num) {
@@ -377,42 +386,60 @@ impl<'toks> Ast<'toks> {
             if tinfo.tok == LexToken::Semicolon {
                 result = true;
             } else {
+                // allocate a node ID for this token
                 let nid = self.arena.new_node(*tok_num);
                 let (lbp, rbp) = Ast::get_binding_power(tinfo.tok);
-                debug!("ast::parse_expr: tok = {} with ({},{})", tinfo.val, lbp, rbp);
-                if lbp < prev_rbp {
+                debug!("Ast::parse_expr: curret nid {} is '{}' with binding power ({},{})",
+                        nid, tinfo.val, lbp, rbp);
+                if lbp < top_rbp {
                     // The left side binding power (lbp) of the current token
-                    // is lower than the previous token's right side binding power (rbp).
-                    // Therefore, we must evaluate the previous token first.
-                    // The previous token becomes a child of the current token.
-                    // We detach the previous token from its former parent and
+                    // is lower than the top token's right side binding power (rbp).
+                    // Therefore, we must evaluate the top token first.
+                    // The top token becomes a child of the current token and the current
+                    // token becomes the new top.
+                    // We detach the old top token from its former parent and
                     // attach the current token in its place.
-                    debug!("{} is parent of {}", nid, prev_nid);
-                    // we expect only a single parent!
-                    assert!(prev_nid.ancestors(&mut self.arena).count() >= 2);
-                    // The first ancestor is the node itself (strange!)
-                    // The next ancestor is the actual parent node we're looking for.
+                    assert!(top_nid.ancestors(&mut self.arena).count() >= 2);
+                    // The first ancestor of the old top is the top itself, which is strange.
                     // Therefore, use a skip(1) to skip past this node.
-                    // additional ancestors exist all the way back to the root.
-                    let old_parent = prev_nid.ancestors(&mut self.arena).skip(1).next().unwrap();
-                    prev_nid.detach(&mut self.arena);
-                    old_parent.append(nid, &mut self.arena);
-                    nid.append(prev_nid, &mut self.arena);
+                    // Additional ancestors exist all the way back to the root, but
+                    // we stop as soon as we find a lower precedence.  The owner of the entire
+                    // expression, e.g. an assert, has precedence 0, so we always stop before
+                    // reaching the root.
+                    let mut ancestor_iter = top_nid.ancestors(&self.arena).skip(1);
+                    let mut ancestor_nid;
+                    let mut ancestor_tinfo;
+                    let mut ancestor_minus_1_nid = *top_nid;
+                    loop {
+                        ancestor_nid = ancestor_iter.next().unwrap();
+                        ancestor_tinfo = self.get_tinfo(ancestor_nid);
+                        let (_,ancestor_rbp) = Ast::get_binding_power(ancestor_tinfo.tok);
+                        debug!("Ast::parse_expr: Checking ancestor nid {} '{}' with rbp of {}",
+                                ancestor_nid, ancestor_tinfo.val, ancestor_rbp);
+                        if lbp >= ancestor_rbp {
+                            break;
+                        }
+                        ancestor_minus_1_nid = ancestor_nid;
+                    }
+                    debug!("Ast::parse_expr: found new parent nid {} is '{}'", ancestor_nid, ancestor_tinfo.val);
+                    ancestor_minus_1_nid.detach(&mut self.arena);
+                    ancestor_nid.append(nid, &mut self.arena);
+                    nid.append(ancestor_minus_1_nid, &mut self.arena);
+                    *top_nid = nid;
                 } else {
                     // The left side binding power (lbp) of the current token is
                     // greater or equal to the previous token's right side binding
                     // power (rbp). Therefore, we must evaluate the current token
-                    // first. The previous token becomes the parent of the current
-                    // token.
-                    // We take this path with the original assert as the previous
-                    // token.
-                    debug!("{} is child of {}", nid, prev_nid);
-                    prev_nid.append(nid, &mut self.arena);
+                    // first. The top_nid becomes the parent of the current nid.
+                    // We take this path with the original assert as the top.
+                    debug!("Ast::parse_expr: {} is child of {}", nid, top_nid);
+                    top_nid.append(nid, &mut self.arena);
+                    *top_nid = nid;
                 }
 
                 // Advance to the next token
                 *tok_num += 1;
-                result = self.parse_expr(tok_num, nid, diags, rbp);
+                result = self.parse_expr(tok_num, top_nid, diags);
             }
         } else {
             self.err_no_input(diags);
@@ -430,7 +457,8 @@ impl<'toks> Ast<'toks> {
         self.dbg_enter("parse_assert", *tok_num);
         // Add the assert keyword as a child of the parent
         let assert_nid = self.add_to_parent_and_advance(tok_num, parent);
-        let mut result = self.parse_expr(tok_num, assert_nid, diags, 0);
+        let mut top_nid = assert_nid;
+        let mut result = self.parse_expr(tok_num, &mut top_nid, diags);
         // we expect the current token to be a semicolon.
         if result {
             result = self.expect_semi(diags, tok_num, assert_nid);
