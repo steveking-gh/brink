@@ -1,0 +1,6 @@
+section foo {
+    wrs "Wow!";
+    assert 1 + 1 == 2;
+}
+
+output foo;
