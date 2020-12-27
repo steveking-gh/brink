@@ -188,22 +188,12 @@ impl<'toks> Ast<'toks> {
         diags.err1("AST_14", &m, self.tv[brace_tok_num].span());
     }
 
-    /// Get a token information object for the specified token number
-    /// This is variant 1 since we have at least one other get_tinfo
-    fn get_tinfo1(&self, tok_num: usize) -> Option<&'toks TokenInfo> {
-        if tok_num >= self.tv.len() {
-            return None;
-        }
-
-        Some(&self.tv[tok_num])
-    }
-
     /// Attempts to advance the token number past the next semicolon
     /// The token number returned may be invalid.  This function is
     /// used to try to recover from syntax errors.
     fn advance_past_semicolon(&self, tok_num: usize) -> usize {
         let mut tnum = tok_num;
-        while let Some(tinfo) = self.get_tinfo1(tnum) {
+        while let Some(tinfo) = self.tv.get(tnum) {
             tnum += 1;
             if tinfo.tok == LexToken::Semicolon {
                 break;
@@ -229,7 +219,7 @@ impl<'toks> Ast<'toks> {
 
         let mut result = false;
 
-        if let Some(tinfo) = self.get_tinfo1(*tok_num) {
+        if let Some(tinfo) = self.tv.get(*tok_num) {
             if expected_token == tinfo.tok {
                 self.add_to_parent_and_advance(tok_num, parent);
                 result = true;
@@ -248,7 +238,7 @@ impl<'toks> Ast<'toks> {
     fn expect_semi(&mut self, diags: &mut Diags, tok_num : &mut usize,
                    parent : NodeId) -> bool {
 
-        if let Some(tinfo) = self.get_tinfo1(*tok_num) {
+        if let Some(tinfo) = self.tv.get(*tok_num) {
             if LexToken::Semicolon == tinfo.tok {
                 self.add_to_parent_and_advance(tok_num, parent);
                 return true;
@@ -293,7 +283,7 @@ impl<'toks> Ast<'toks> {
 
         self.dbg_enter("parse_section_contents", *tok_num);
         let mut success = true; // todo fixme
-        while let Some(tinfo) = self.get_tinfo1(*tok_num) {
+        while let Some(tinfo) = self.tv.get(*tok_num) {
             debug!("Ast::parse_section_contents: token {}:{}", *tok_num, tinfo.val);
             // todo rewrite as match statement
             // When we find a close brace, we're done with section content
@@ -370,36 +360,62 @@ impl<'toks> Ast<'toks> {
         match tok {
             LexToken::NEq |
             LexToken::EqEq => (1,2),
-            _ => (0,0),
+            _ => (9,10),
         }
     }
 
     /// Parse an expression with correct precedence up to the next semicolon.
-    fn parse_expr(&mut self, tok_num: &mut usize, parent: &mut NodeId,
-                  diags: &mut Diags, min_bp: u8) -> bool {
+    fn parse_expr(&mut self, tok_num: &mut usize, prev_nid: NodeId,
+                  diags: &mut Diags, prev_rbp: u8) -> bool {
 
         self.dbg_enter("parse_expr", *tok_num);
-
         let mut result = false;
-        if let Some(tinfo) = self.get_tinfo1(*tok_num) {
-            let lhs_nid = self.arena.new_node(*tok_num);
+
+        if let Some(tinfo) = self.tv.get(*tok_num) {
+            // If we've finally found a semicolon, stop recursing.
+            // The caller will deal with where to attach the semicolon.
+            if tinfo.tok == LexToken::Semicolon {
+                result = true;
+            } else {
+                let nid = self.arena.new_node(*tok_num);
+                let (lbp, rbp) = Ast::get_binding_power(tinfo.tok);
+                debug!("ast::parse_expr: tok = {} with ({},{})", tinfo.val, lbp, rbp);
+                if lbp < prev_rbp {
+                    // The left side binding power (lbp) of the current token
+                    // is lower than the previous token's right side binding power (rbp).
+                    // Therefore, we must evaluate the previous token first.
+                    // The previous token becomes a child of the current token.
+                    // We detach the previous token from its former parent and
+                    // attach the current token in its place.
+                    debug!("{} is parent of {}", nid, prev_nid);
+                    // we expect only a single parent!
+                    assert!(prev_nid.ancestors(&mut self.arena).count() >= 2);
+                    // The first ancestor is the node itself (strange!)
+                    // The next ancestor is the actual parent node we're looking for.
+                    // Therefore, use a skip(1) to skip past this node.
+                    // additional ancestors exist all the way back to the root.
+                    let old_parent = prev_nid.ancestors(&mut self.arena).skip(1).next().unwrap();
+                    prev_nid.detach(&mut self.arena);
+                    old_parent.append(nid, &mut self.arena);
+                    nid.append(prev_nid, &mut self.arena);
+                } else {
+                    // The left side binding power (lbp) of the current token is
+                    // greater or equal to the previous token's right side binding
+                    // power (rbp). Therefore, we must evaluate the current token
+                    // first. The previous token becomes the parent of the current
+                    // token.
+                    // We take this path with the original assert as the previous
+                    // token.
+                    debug!("{} is child of {}", nid, prev_nid);
+                    prev_nid.append(nid, &mut self.arena);
+                }
+
+                // Advance to the next token
+                *tok_num += 1;
+                result = self.parse_expr(tok_num, nid, diags, rbp);
+            }
         } else {
             self.err_no_input(diags);
-            result = false;
-            break;
-        }
-
-        loop {
-            if let Some(tinfo) = self.get_tinfo1(*tok_num) {
-                let (left_bp, right_bp) = Ast::get_binding_power(tinfo.tok);
-                if left_bp < min_bp {
-                    break;
-                }
-            } else {
-                self.err_no_input(diags);
-                result = false;
-                break;
-            }
         }
         self.dbg_exit("parse_expr", result)
     }
@@ -412,25 +428,14 @@ impl<'toks> Ast<'toks> {
                     diags: &mut Diags) -> bool {
 
         self.dbg_enter("parse_assert", *tok_num);
-        // Add the assert keyword as a child of the parent and advance
+        // Add the assert keyword as a child of the parent
         let assert_nid = self.add_to_parent_and_advance(tok_num, parent);
+        let mut result = self.parse_expr(tok_num, assert_nid, diags, 0);
+        // we expect the current token to be a semicolon.
+        if result {
+            result = self.expect_semi(diags, tok_num, assert_nid);
+        }
 
-        // Todo: Fix me.  This requires proper expression checking
-        let lhs_nid = self.arena.new_node(*tok_num);
-        *tok_num += 1;
-        let op_nid = self.arena.new_node(*tok_num);
-        *tok_num += 1;
-        let rhs_nid = self.arena.new_node(*tok_num);
-        *tok_num += 1;
-
-        // the operator is the child of the parent
-        assert_nid.append(op_nid, &mut self.arena);
-
-        // lhs and rhs and semicolon are children of the operator.
-        // lhs must come first.
-        op_nid.append(lhs_nid, &mut self.arena);
-        op_nid.append(rhs_nid, &mut self.arena);
-        let result = self.expect_semi(diags, tok_num, op_nid);
         self.dbg_exit("parse_assert", result)
     }
 
@@ -442,7 +447,7 @@ impl<'toks> Ast<'toks> {
         self.dbg_enter("parse_numeric", *tok_num);
 
         // A numeric expression must begin with an integer or function
-        if let Some(tinfo) = self.get_tinfo1(*tok_num) {
+        if let Some(tinfo) = self.tv.get(*tok_num) {
             match tinfo.tok {
                 LexToken::Int => {
                     self.add_to_parent_and_advance(tok_num, parent);
@@ -474,7 +479,7 @@ impl<'toks> Ast<'toks> {
         self.dbg_enter("parse_op_numeric", *tok_num);
 
         // A numeric expression must begin with an integer or function
-        if let Some(tinfo) = self.get_tinfo1(*tok_num) {
+        if let Some(tinfo) = self.tv.get(*tok_num) {
 
             // first, expect an operator
             match tinfo.tok {
@@ -566,10 +571,12 @@ impl<'toks> Ast<'toks> {
         let children = nid.children(&self.arena);
         for child_nid in children {
 
+            /*
             let child_tinfo = self.get_tinfo(child_nid);
             if child_tinfo.tok == LexToken::Semicolon {
                 continue;
             }
+            */
 
             file.write(format!("{} -> {}\n", nid, child_nid).as_bytes()).context("ast.dot write failed")?;
             self.dump_r(child_nid, depth+1, file)?;
