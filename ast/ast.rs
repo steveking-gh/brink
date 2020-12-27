@@ -442,11 +442,15 @@ impl<'toks> Ast<'toks> {
 
                 // Advance to the next token
                 *tok_num += 1;
+                /*
+                self.dump(&format!("ast_{}.dot", nid)); // debug to show each step
+                */
                 result = self.parse_expr(tok_num, nid, diags);
             }
         } else {
             self.err_no_input(diags);
         }
+        debug!("Done with prev_nid {}", prev_nid);
         self.dbg_exit("parse_expr", result)
     }
 
@@ -549,12 +553,12 @@ impl<'toks> Ast<'toks> {
     /**
      * Recursively dumps the AST to the console.
      */
-    pub fn dump(&self) -> anyhow::Result<()> {
+    pub fn dump(&self, fname : &str) -> anyhow::Result<()> {
 
         debug!("");
 
-        let mut file = File::create("ast.dot").context(
-            "Error attempting to create debug file 'ast.dot'")?;
+        let mut file = File::create(fname).context(
+            format!("Error attempting to create debug file '{}'", fname))?;
             file.write(b"digraph {\n").context("ast.dot write failed")?;
             file.write(format!("node [style=filled,fillcolor=\"{}\",color=\"{}\"]\n",
                     Ast::DOT_DEFAULT_FILL,Ast::DOT_DEFAULT_PEN).as_bytes()).context("ast.dot write failed")?;

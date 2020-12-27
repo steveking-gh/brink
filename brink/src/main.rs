@@ -37,7 +37,7 @@ pub fn process(name: &str, fstr: &str, args: &clap::ArgMatches, verbosity: u64)
 
     let ast = ast.unwrap();
 
-    ast.dump()?;
+    ast.dump("ast.dot")?;
 
     let ast_db = AstDb::new(&mut diags, &ast)?;
     let linear_db = LinearDb::new(&mut diags, &ast, &ast_db, 0);
