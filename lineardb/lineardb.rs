@@ -23,7 +23,7 @@ trait LinearInfo {
     fn get_abs_addr(&self) -> usize;
     fn get_nid(&self) -> NodeId;
     fn get_size(&self) -> usize;
-    fn get_type(&self) -> IROpcode;
+    fn get_opcode(&self) -> IROpcode;
     fn execute(&self, file: &mut File) -> anyhow::Result<()>;
 }
 
@@ -67,7 +67,7 @@ impl<'toks> LinearInfo for WrsLinearInfo {
     fn get_abs_addr(&self) -> usize { self.abs_addr}
     fn get_nid(&self) -> NodeId { self.nid}
     fn get_size(&self) -> usize { self.str_size }
-    fn get_type(&self) -> IROpcode { IROpcode::Wrs }
+    fn get_opcode(&self) -> IROpcode { IROpcode::Wrs }
 
     fn execute(&self, file: &mut File) -> anyhow::Result<()> {
         file.write_all(self.strout.as_bytes())
@@ -94,7 +94,7 @@ impl<'toks> LinearInfo for AssertLinearInfo {
     fn get_abs_addr(&self) -> usize { self.abs_addr}
     fn get_size(&self) -> usize { 0 }
     fn get_nid(&self) -> NodeId { self.nid}
-    fn get_type(&self) -> IROpcode { IROpcode::Assert }
+    fn get_opcode(&self) -> IROpcode { IROpcode::Assert }
     fn execute(&self, _file: &mut File) -> anyhow::Result<()> {
         Ok(())
     }
@@ -216,7 +216,7 @@ impl<'toks> LinearDb {
                 // We skip uninteresting elements that didn't create an info object
                 if let Some(info) = base.info.as_mut() {
                     debug!("LinearDb::new: Iterating for {:?} at nid {}",
-                    info.get_type(), base.nid);
+                    info.get_opcode(), base.nid);
                     info.set_abs_addr(start);
                     let sz = info.get_size();
                     start += sz;
@@ -237,7 +237,7 @@ impl<'toks> LinearDb {
         for base in &mut linear_db.basevec {
             // We skip uninteresting elements that didn't create an info object
             if let Some(info) = base.info.as_ref() {
-                if info.get_type() == IROpcode::Assert {
+                if info.get_opcode() == IROpcode::Assert {
                     debug!("LinearDb::new: Assert");
                 }
             }
@@ -252,10 +252,10 @@ impl<'toks> LinearDb {
 
         for base in &self.basevec {
             if let Some(info) = &base.info {
-                debug!("LinearDb::execute: writing {:?} for nid {}", info.get_type(),
+                debug!("LinearDb::execute: writing {:?} for nid {}", info.get_opcode(),
                                                                    info.get_nid());
                 info.execute(file).context(format!("Execution failed for {:?}",
-                                                info.get_type()))?;
+                                                info.get_opcode()))?;
             }
         }
 
@@ -265,7 +265,7 @@ impl<'toks> LinearDb {
     pub fn dump(&self) {
         for base in &self.basevec {
             if let Some(info) = &base.info {
-                debug!("LinearDb: {}: {:?} at {:X}", base.nid, info.get_type(),
+                debug!("LinearDb: {}: {:?} at {:X}", base.nid, info.get_opcode(),
                                                      info.get_abs_addr());
             }
         }
