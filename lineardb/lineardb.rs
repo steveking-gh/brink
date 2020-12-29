@@ -12,7 +12,8 @@ use log::{error, warn, info, debug, trace};
 use ast::{Ast,AstDb};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-enum LinearInfoType {
+
+enum IROpcode {
     Assert,
     Wrs,
 }
@@ -22,7 +23,7 @@ trait LinearInfo {
     fn get_abs_addr(&self) -> usize;
     fn get_nid(&self) -> NodeId;
     fn get_size(&self) -> usize;
-    fn get_type(&self) -> LinearInfoType;
+    fn get_type(&self) -> IROpcode;
     fn execute(&self, file: &mut File) -> anyhow::Result<()>;
 }
 
@@ -66,7 +67,7 @@ impl<'toks> LinearInfo for WrsLinearInfo {
     fn get_abs_addr(&self) -> usize { self.abs_addr}
     fn get_nid(&self) -> NodeId { self.nid}
     fn get_size(&self) -> usize { self.str_size }
-    fn get_type(&self) -> LinearInfoType { LinearInfoType::Wrs }
+    fn get_type(&self) -> IROpcode { IROpcode::Wrs }
 
     fn execute(&self, file: &mut File) -> anyhow::Result<()> {
         file.write_all(self.strout.as_bytes())
@@ -93,7 +94,7 @@ impl<'toks> LinearInfo for AssertLinearInfo {
     fn get_abs_addr(&self) -> usize { self.abs_addr}
     fn get_size(&self) -> usize { 0 }
     fn get_nid(&self) -> NodeId { self.nid}
-    fn get_type(&self) -> LinearInfoType { LinearInfoType::Assert }
+    fn get_type(&self) -> IROpcode { IROpcode::Assert }
     fn execute(&self, _file: &mut File) -> anyhow::Result<()> {
         Ok(())
     }
@@ -236,7 +237,7 @@ impl<'toks> LinearDb {
         for base in &mut linear_db.basevec {
             // We skip uninteresting elements that didn't create an info object
             if let Some(info) = base.info.as_ref() {
-                if info.get_type() == LinearInfoType::Assert {
+                if info.get_type() == IROpcode::Assert {
                     debug!("LinearDb::new: Assert");
                 }
             }
