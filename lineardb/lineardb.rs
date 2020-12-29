@@ -18,7 +18,7 @@ enum IROpcode {
     Wrs,
 }
 
-trait LinearInfo {
+trait IRInstruction {
     fn set_abs_addr(&mut self, abs: usize);
     fn get_abs_addr(&self) -> usize;
     fn get_nid(&self) -> NodeId;
@@ -29,7 +29,7 @@ trait LinearInfo {
 
 pub struct LinearBase {
     nid: NodeId,
-    info: Option<Box<dyn LinearInfo>>
+    info: Option<Box<dyn IRInstruction>>
 }
 
 pub struct LinearDb {
@@ -62,7 +62,7 @@ impl<'toks> WrsLinearInfo {
     }
 }
 
-impl<'toks> LinearInfo for WrsLinearInfo {
+impl<'toks> IRInstruction for WrsLinearInfo {
     fn set_abs_addr(&mut self, abs: usize) { self.abs_addr = abs; }
     fn get_abs_addr(&self) -> usize { self.abs_addr}
     fn get_nid(&self) -> NodeId { self.nid}
@@ -89,7 +89,7 @@ impl<'toks> AssertLinearInfo {
     }
 }
 
-impl<'toks> LinearInfo for AssertLinearInfo {
+impl<'toks> IRInstruction for AssertLinearInfo {
     fn set_abs_addr(&mut self, abs: usize) { self.abs_addr = abs; }
     fn get_abs_addr(&self) -> usize { self.abs_addr}
     fn get_size(&self) -> usize { 0 }
