@@ -14,6 +14,7 @@ use ast::{Ast,AstDb};
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum LinearInfoType {
     Assert,
+    TempVar,
     Wrs,
 }
 
@@ -23,7 +24,7 @@ trait LinearInfo {
     fn get_nid(&self) -> NodeId;
     fn get_size(&self) -> usize;
     fn get_type(&self) -> LinearInfoType;
-    fn execute(&self, file: &mut File) -> anyhow::Result<()>;
+    fn execute(&self, file: &mut File, linear_db: &LinearDb) -> anyhow::Result<()>;
 }
 
 pub struct LinearBase {
@@ -34,6 +35,25 @@ pub struct LinearBase {
 pub struct LinearDb {
     pub output_nid: NodeId,
     pub basevec : Vec<LinearBase>,
+}
+
+enum ExprOps {
+    identity,
+    add,
+    sub,
+    multiply,
+    divide,
+}
+
+struct Term {
+    lhs : usize,
+    rhs : usize,
+    op : ExprOps,
+}
+
+struct Expr {
+    temps : Vec<usize>,
+    terms : Vec<Term>,
 }
 
 pub struct WrsLinearInfo {
@@ -68,7 +88,7 @@ impl<'toks> LinearInfo for WrsLinearInfo {
     fn get_size(&self) -> usize { self.str_size }
     fn get_type(&self) -> LinearInfoType { LinearInfoType::Wrs }
 
-    fn execute(&self, file: &mut File) -> anyhow::Result<()> {
+    fn execute(&self, file: &mut File, _linear_db: &LinearDb) -> anyhow::Result<()> {
         file.write_all(self.strout.as_bytes())
                     .context(format!("WrsLinearInfo::execute: failed to write."))?;
         Ok(())
@@ -94,15 +114,45 @@ impl<'toks> LinearInfo for AssertLinearInfo {
     fn get_size(&self) -> usize { 0 }
     fn get_nid(&self) -> NodeId { self.nid}
     fn get_type(&self) -> LinearInfoType { LinearInfoType::Assert }
-    fn execute(&self, _file: &mut File) -> anyhow::Result<()> {
+    fn execute(&self, _file: &mut File, linear_db: &LinearDb) -> anyhow::Result<()> {
+        linear_db.execute_expr(self.nid)
+    }
+}
+
+pub struct TempVarLinearInfo {
+    abs_addr: usize,
+    nid: NodeId,
+}
+
+impl<'toks> TempVarLinearInfo {
+    pub fn new(abs_addr: usize, nid: NodeId, ast: &'toks Ast) -> TempVarLinearInfo {
+        debug!("TempVarLinearInfo::new: >>>> ENTER for nid {} at {}", nid, abs_addr);
+        debug!("TempVarLinearInfo::new: <<<< EXIT for nid {}", nid);
+        TempVarLinearInfo{ abs_addr, nid }
+    }
+}
+
+impl<'toks> LinearInfo for TempVarLinearInfo {
+    fn set_abs_addr(&mut self, abs: usize) { self.abs_addr = abs; }
+    fn get_abs_addr(&self) -> usize { self.abs_addr}
+    fn get_size(&self) -> usize { 0 }
+    fn get_nid(&self) -> NodeId { self.nid}
+    fn get_type(&self) -> LinearInfoType { LinearInfoType::TempVar }
+    fn execute(&self, _file: &mut File, linear_db: &LinearDb) -> anyhow::Result<()> {
         Ok(())
     }
 }
+
 
 impl<'toks> LinearDb {
 
     // Control recursion to some safe level.  100 is just a guesstimate.
     const MAX_RECURSION_DEPTH:usize = 100;
+
+    fn record_expr_r(&mut self, rdepth: usize, parent_nid: NodeId, diags: &mut Diags,
+                      ast: &'toks Ast, ast_db: &AstDb) -> Option<Expr> {
+
+    }
 
     /// Recursively record information about the children of an AST object.
     fn record_r(&mut self, rdepth: usize, parent_nid: NodeId, diags: &mut Diags,
@@ -111,10 +161,6 @@ impl<'toks> LinearDb {
         debug!("LinearDb::record_children_info: >>>> ENTER at depth {} for parent nid: {}",
                 rdepth, parent_nid);
 
-        // During flattening, we just inventory the NIDs and don't yet attempt to
-        // process the node semantically.
-        self.basevec.push(LinearBase{nid:parent_nid, info:None});
-
         if rdepth > LinearDb::MAX_RECURSION_DEPTH {
             let tinfo = ast.get_tinfo(parent_nid);
             let m = format!("Maximum recursion depth ({}) exceeded when processing '{}'.",
@@ -122,6 +168,8 @@ impl<'toks> LinearDb {
             diags.err1("MAIN_11", &m, tinfo.span());
             return false;
         }
+
+        self.basevec.push(LinearBase{nid:parent_nid, info:None});
 
         let mut result = true;
         let tinfo = ast.get_tinfo(parent_nid);
@@ -137,6 +185,17 @@ impl<'toks> LinearDb {
                 let section = ast_db.sections.get(sec_name_str).unwrap();
                 let sec_nid = section.nid;
                 result &= self.record_r(rdepth + 1, sec_nid, diags, ast, ast_db);
+            },
+
+            // All statements that use an expression
+            ast::LexToken::Assert => {
+                // Expressions start as a single child: the operator.
+                assert!(parent_nid.children(&ast.arena).count() == 1);
+                let mut expr : Expr;
+                let child_nid = parent_nid.children(&ast.arena).next();
+
+
+
             },
             _ => {
                 // Easy linearizing without dereferencing through a name.
@@ -247,13 +306,18 @@ impl<'toks> LinearDb {
         Some(linear_db)
     }
 
-    pub fn execute(&self, file: &mut File) -> anyhow::Result<()> {
+    pub fn execute_expr(&self, nid: NodeId) -> anyhow::Result<()> {
+        debug!("LinearDb::execute_expr: >>>> ENTER");
+        debug!("LinearDb::execute_expr: <<<< Exit");
+        Ok(())
+    }
 
+    pub fn execute(&self, file: &mut File) -> anyhow::Result<()> {
         for base in &self.basevec {
             if let Some(info) = &base.info {
                 debug!("LinearDb::execute: writing {:?} for nid {}", info.get_type(),
                                                                    info.get_nid());
-                info.execute(file).context(format!("Execution failed for {:?}",
+                info.execute(file, self).context(format!("Execution failed for {:?}",
                                                 info.get_type()))?;
             }
         }

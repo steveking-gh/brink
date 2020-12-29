@@ -374,21 +374,25 @@ impl<'toks> Ast<'toks> {
     }
 
     /// Parse an expression with correct precedence up to the next semicolon.
-    fn parse_expr(&mut self, tok_num: &mut usize, prev_nid: NodeId,
+    fn parse_expr(&mut self, tok_num: &mut usize, start_nid: NodeId,
                   diags: &mut Diags) -> bool {
 
         self.dbg_enter("Ast::parse_expr", *tok_num);
-        let top_tinfo = self.get_tinfo(prev_nid);
-        let (_,top_rbp) = Ast::get_binding_power(top_tinfo.tok);
-        debug!("Ast::parse_expr: Previous nid {} is '{}' with rbp {}",
-               prev_nid, self.get_tinfo(prev_nid).val, top_rbp);
+        let mut prev_nid = start_nid;
         let mut result = false;
 
-        if let Some(tinfo) = self.tv.get(*tok_num) {
+        while let Some(tinfo) = self.tv.get(*tok_num) {
+
+            let prev_tinfo = self.get_tinfo(prev_nid);
+            let (_,top_rbp) = Ast::get_binding_power(prev_tinfo.tok);
+            debug!("Ast::parse_expr: Previous nid {} is '{}' with rbp {}",
+                prev_nid, self.get_tinfo(prev_nid).val, top_rbp);
+
             // If we've finally found a semicolon, stop recursing.
             // The caller will deal with where to attach the semicolon.
             if tinfo.tok == LexToken::Semicolon {
                 result = true;
+                break;
             } else {
                 // allocate a node ID for this token
                 let nid = self.arena.new_node(*tok_num);
@@ -442,14 +446,13 @@ impl<'toks> Ast<'toks> {
 
                 // Advance to the next token
                 *tok_num += 1;
-                /*
-                self.dump(&format!("ast_{}.dot", nid)); // debug to show each step
-                */
-                result = self.parse_expr(tok_num, nid, diags);
+                prev_nid = nid;
             }
-        } else {
+        }
+        if result == false {
             self.err_no_input(diags);
         }
+
         debug!("Done with prev_nid {}", prev_nid);
         self.dbg_exit("parse_expr", result)
     }
