@@ -46,7 +46,9 @@ enum ExprOps {
 }
 
 struct Term {
+    /// lhs is the index into the temp vector
     lhs : usize,
+    /// rhs is the index into the temp vector
     rhs : usize,
     op : ExprOps,
 }
@@ -151,7 +153,9 @@ impl<'toks> LinearDb {
 
     fn record_expr_r(&mut self, rdepth: usize, parent_nid: NodeId, diags: &mut Diags,
                       ast: &'toks Ast, ast_db: &AstDb) -> Option<Expr> {
-
+        let mut expr : Expr;
+        let child_nid = parent_nid.children(&ast.arena).next();
+        
     }
 
     /// Recursively record information about the children of an AST object.
