@@ -57,7 +57,7 @@ pub fn process(name: &str, fstr: &str, args: &clap::ArgMatches, verbosity: u64)
     let mut file = File::create(&fname_str)
             .context(format!("Unable to create output file {}", fname_str))?;
 
-    linear_db.execute(&mut file)?;
+    //linear_db.execute(&mut file)?;
     Ok(())
 }
 
