@@ -8,10 +8,11 @@ use ast::{Ast,AstDb};
 use lineardb::LinearDb;
 use std::collections::HashMap;
 
-trait AddrInfo {
-    fn get_abs_addr(&self) -> usize;
-    fn get_nid(&self) -> NodeId;
-    fn get_size(&self) -> usize;
+struct AddrInfo {
+    abs_addr: usize,
+    size: usize,
+    nid: NodeId,
+    lid: usize,
 }
 
 /*****************************************************************************
@@ -19,27 +20,27 @@ trait AddrInfo {
  * The AddrDb contains a map of the logical address and size of all items with a
  * size in the linear DB. The key is the AST NodeID, the value is the size.
  *****************************************************************************/
-pub struct AddrDb<'toks> {
-    addrs : HashMap<NodeId, Box<dyn AddrInfo + 'toks>>,
+pub struct AddrDb {
+    addr_vec : Vec<AddrInfo>,
 }
 
-impl<'toks> AddrDb<'toks> {
+impl<'toks> AddrDb {
 
     pub fn new(linear_db: &LinearDb, _diags: &mut Diags, ast: &'toks Ast,
-               _ast_db: &'toks AstDb, abs_start: usize) -> AddrDb<'toks> {
+               _ast_db: &'toks AstDb, abs_start: usize) -> AddrDb {
 
-        debug!("AddrDb::new: >>>> ENTER for output nid: {} at {}", linear_db.output_nid,
-                abs_start);
-        let mut addrs : HashMap<NodeId, Box<dyn AddrInfo + 'toks>> = HashMap::new();
+        debug!("AddrDb::new: >>>> ENTER at {}", abs_start);
 
-        AddrDb { addrs }
+        let mut addr_db = AddrDb { addr_vec: Vec::new() };
+
+        addr_db
     }
 
     /// Dump the DB for debug
     pub fn dump(&self) {
-        for (_nid, ainfo) in &self.addrs {
+        for ainfo in &self.addr_vec {
             debug!("AddrDb: nid {} is {} bytes at absolute address {}",
-                    ainfo.get_nid(), ainfo.get_size(), ainfo.get_abs_addr());
+                    ainfo.nid, ainfo.size, ainfo.abs_addr);
         }
     }
 }

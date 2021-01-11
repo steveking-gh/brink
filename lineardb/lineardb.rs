@@ -1,9 +1,8 @@
+use anyhow::{Error, Result};
 use indextree::{NodeId};
 pub type Span = std::ops::Range<usize>;
 use diags::Diags;
-use std::{collections::HashMap, fs::File};
-use std::io::prelude::*; // for write_all
-use anyhow::Context;
+use std::any::Any;
 
 #[allow(unused_imports)]
 #[allow(unused_imports)]
@@ -11,23 +10,52 @@ use log::{error, warn, info, debug, trace};
 
 use ast::{Ast,AstDb};
 
+pub struct IROperand {
+    nid: NodeId,
+    val: Box<dyn Any>,
+}
+
+impl<'toks> IROperand {
+    pub fn new(nid: NodeId, ast: &'toks Ast) -> IROperand {
+        let tinfo = ast.get_tinfo(nid);
+        IROperand { nid, val: Box::new(tinfo.val.to_string())}
+    }    
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
-enum LinearKind {
+pub enum IRKind {
     Assert,
+    EqEq,
+    Int,
+    Load,
+    Multiply,
+    Add,
     SectionStart,
     SectionEnd,
     Wrs,
 }
-#[derive(Debug)]
-pub struct LinearInfo {
+
+pub struct IR {
     nid: NodeId,
-    lid: usize,
-    kind: LinearKind,
+    op: IRKind,
+    // usize is the index into the operand vec
+    operand_vec: Vec<usize>,
+}
+
+impl IR {
+    pub fn new(nid: NodeId, op: IRKind) -> Self {
+        Self { nid, op, operand_vec: Vec::new() }
+    }
+
+    pub fn add_operand(&mut self, oper_num: usize) {
+        self.operand_vec.push(oper_num);
+    }
 }
 
 pub struct LinearDb {
     pub output_nid: NodeId,
-    pub info_vec : Vec<LinearInfo>,
+    pub ir_vec: Vec<IR>,
+    pub operand_vec: Vec<IROperand>, 
 }
 
 /**
@@ -40,9 +68,29 @@ boxed info object.
 */
 impl<'toks> LinearDb {
 
+    // Adds an existing operand by it's operanc_vec index to the specified IR
+    pub fn add_operand_idx_to_ir(&mut self, ir_lid: usize, idx: usize) {
+        self.ir_vec[ir_lid].add_operand(idx);
+    }
+
+    // Returns the inear operand index occupied by the new operand
+    pub fn add_operand_to_ir(&mut self, ir_lid: usize, oper: IROperand) -> usize {
+        let idx = self.operand_vec.len();
+        self.operand_vec.push(oper);
+        self.add_operand_idx_to_ir(ir_lid, idx);
+        idx
+    }
+
+    // returns the linear ID for the new IR
+    fn new_ir(&mut self, nid: NodeId, op: IRKind) -> usize {
+        let lid = self.ir_vec.len();
+        self.ir_vec.push(IR::new(nid,op));
+        lid
+    }
+
     // Control recursion to some safe level.  100 is just a guesstimate.
     const MAX_RECURSION_DEPTH:usize = 100;
-
+    
     fn depth_sanity(&self, rdepth: usize, parent_nid: NodeId, diags: &mut Diags, ast: &Ast) -> bool {
         if rdepth > LinearDb::MAX_RECURSION_DEPTH {
             let tinfo = ast.get_tinfo(parent_nid);
@@ -54,8 +102,20 @@ impl<'toks> LinearDb {
         true
     }
 
+    fn record_children_r(&mut self, rdepth: usize, parent_nid: NodeId, ir_lid: usize, diags: &mut Diags,
+                         ast: &'toks Ast, ast_db: &AstDb) -> bool {
+        // Easy linearizing without dereferencing through a name.
+        // When no children exist, this case terminates recursion.
+        let mut result = true;
+        let children = parent_nid.children(&ast.arena);
+        for nid in children {
+            result &= self.record_r(rdepth + 1, nid, ir_lid, diags, ast, ast_db);
+        }
+        result
+    }
+
     /// Recursively record information about the children of an AST object.
-    fn record_r(&mut self, rdepth: usize, parent_nid: NodeId, diags: &mut Diags,
+    fn record_r(&mut self, rdepth: usize, parent_nid: NodeId, ir_lid: usize, diags: &mut Diags,
                             ast: &'toks Ast, ast_db: &AstDb) -> bool {
 
         debug!("LinearDb::record_r: >>>> ENTER at depth {} for parent nid: {}",
@@ -67,7 +127,7 @@ impl<'toks> LinearDb {
 
         let mut result = true;
         let tinfo = ast.get_tinfo(parent_nid);
-
+        
         match tinfo.tok {
             ast::LexToken::Wr => {
                 // Write the contents of a section.  This isn't a simple recursion
@@ -80,23 +140,69 @@ impl<'toks> LinearDb {
                 // that the section name is legitimate, so unwrap().
                 let section = ast_db.sections.get(sec_name_str).unwrap();
                 let sec_nid = section.nid;
-
-                // Record the linear start of this section.
-                self.info_vec.push(LinearInfo {nid: sec_nid, lid: self.info_vec.len(), kind: LinearKind::SectionStart});
-                result &= self.record_r(rdepth + 1, sec_nid, diags, ast, ast_db);
-                self.info_vec.push(LinearInfo {nid: sec_nid, lid: self.info_vec.len(), kind: LinearKind::SectionEnd});
+                result &= self.record_children_r(rdepth + 1, sec_nid, ir_lid, diags, ast, ast_db);
             },
             ast::LexToken::Wrs => {
-                // Write a fixed string
-                self.info_vec.push( LinearInfo {nid:parent_nid, lid: self.info_vec.len(), kind: LinearKind::Wrs});
+                // Write a fixed string. The string is the operand
+                let lid = self.new_ir(parent_nid, IRKind::Wrs);
+                result &= self.record_children_r(rdepth + 1, parent_nid, lid, diags, ast, ast_db);
             },
+            ast::LexToken::Int |
+            ast::LexToken::Identifier |
+            ast::LexToken::QuotedString => {
+                // These are operands that just need loading into a variable
+                let lid = self.new_ir(parent_nid, IRKind::Load);
+                let idx = self.add_operand_to_ir(lid, IROperand::new(parent_nid,ast));
+                self.add_operand_idx_to_ir(ir_lid, idx);
+            },
+            ast::LexToken::Assert => {
+                // Assert an expression is not zero (false)
+                let lid = self.new_ir(parent_nid, IRKind::Assert);
+                result &= self.record_children_r(rdepth + 1, parent_nid, lid, diags, ast, ast_db);
+            },
+            ast::LexToken::EqEq => {
+                let lid = self.new_ir(parent_nid, IRKind::EqEq);
+                result &= self.record_children_r(rdepth + 1, parent_nid, lid, diags, ast, ast_db);
+                // Add a destination operand to the operation to hold the result
+                let idx = self.add_operand_to_ir(lid, IROperand::new(parent_nid,ast));
+                // Also add the detination operand to the parent
+                // The operand is presumably an input operand in the parent.
+                self.add_operand_idx_to_ir(ir_lid, idx);
+            },
+            ast::LexToken::Plus => {
+                let lid = self.new_ir(parent_nid, IRKind::Add);
+                result &= self.record_children_r(rdepth + 1, parent_nid, lid, diags, ast, ast_db);
+                // Add a destination operand to the operation to hold the result
+                let idx = self.add_operand_to_ir(lid, IROperand::new(parent_nid,ast));
+                // Also add the detination operand to the parent
+                // The operand is presumably an input operand in the parent.
+                self.add_operand_idx_to_ir(ir_lid, idx);
+            },
+            ast::LexToken::Asterisk => {
+                let lid = self.new_ir(parent_nid, IRKind::Multiply);
+                result &= self.record_children_r(rdepth + 1, parent_nid, lid, diags, ast, ast_db);
+                // Add a destination operand to the operation to hold the result
+                let idx = self.add_operand_to_ir(lid, IROperand::new(parent_nid,ast));
+                // Also add the detination operand to the parent
+                // The operand is presumably an input operand in the parent.
+                self.add_operand_idx_to_ir(ir_lid, idx);
+            },
+            ast::LexToken::Section => {
+                // Record the linear start of this section.
+                let lid = self.new_ir(parent_nid, IRKind::SectionStart);
+                result &= self.record_children_r(rdepth + 1, parent_nid, lid, diags, ast, ast_db);
+                self.new_ir(parent_nid, IRKind::SectionEnd);
+            },
+            ast::LexToken::Semicolon |
+            ast::LexToken::OpenBrace |
+            ast::LexToken::CloseBrace => {
+                // uninteresting syntactical elements
+            }
             _ => {
-                // Easy linearizing without dereferencing through a name.
-                // When no children exist, this case terminates recursion.
-                let children = parent_nid.children(&ast.arena);
-                for nid in children {
-                    result &= self.record_r(rdepth + 1, nid, diags, ast, ast_db);
-                }
+                // We forgot to handle something
+                let tinfo = ast.get_tinfo(parent_nid);
+                error!("Unhandled lexical token {:?}", tinfo);
+                assert!(false);
             }
         }
 
@@ -113,7 +219,8 @@ impl<'toks> LinearDb {
         debug!("LinearDb::new: >>>> ENTER");
         // AstDb already validated output exists
         let output_nid = ast_db.output.nid;
-        let mut linear_db = LinearDb { output_nid, info_vec: Vec::new() };
+        let mut linear_db = LinearDb { output_nid, ir_vec: Vec::new(),
+                                               operand_vec: Vec::new() };
 
         let sec_name_str = ast.get_child_str(output_nid, 0);
         debug!("LinearDb::new: output section name is {}", sec_name_str);
@@ -125,27 +232,24 @@ impl<'toks> LinearDb {
         let sec_nid = section.nid;
 
         // Record the linear start of this section.
-        linear_db.info_vec.push(LinearInfo {nid: sec_nid, lid: linear_db.info_vec.len(),
-                                kind: LinearKind::SectionStart});
+        let ir_lid = linear_db.new_ir(sec_nid, IRKind::SectionStart);
 
         // To start recursion, rdepth = 1.  The ONLY thing happening
         // here is a flattening of the AST into the logical order
-        // of actions.
-        if !linear_db.record_r(1, sec_nid, diags, ast, ast_db) {
+        // of instructions.  We're not calculating sizes and addresses yet.
+        if !linear_db.record_r(1, sec_nid, ir_lid, diags, ast, ast_db) {
             return None;
         }
 
-        // Record the linear end of this section.
-        linear_db.info_vec.push(LinearInfo {nid: sec_nid, lid: linear_db.info_vec.len(),
-                                kind: LinearKind::SectionEnd});
+        linear_db.new_ir(sec_nid, IRKind::SectionEnd);
 
         debug!("LinearDb::new: <<<< EXIT for nid: {}", output_nid);
         Some(linear_db)
     }
 
     pub fn dump(&self) {
-        for info in &self.info_vec {
-            debug!("LinearDb: lid {}: nid {} is {:?}", info.lid, info.nid, info.kind);
+        for (idx,ir) in self.ir_vec.iter().enumerate() {
+            debug!("LinearDb: lid {}: nid {} is {:?}", idx, ir.nid, ir.op);
         }
     }
 }

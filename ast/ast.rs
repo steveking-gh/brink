@@ -28,8 +28,8 @@ pub enum LexToken {
     #[token("!=")] NEq,
     #[token("+")] Plus,
     #[token("-")] Minus,
-    #[token("*")] Multiply,
-    #[token("/")] Devide,
+    #[token("*")] Asterisk,
+    #[token("/")] FSlash,
     #[token("{")] OpenBrace,
     #[token("}")] CloseBrace,
 //    #[token("(")] OpenParen,
@@ -367,8 +367,8 @@ impl<'toks> Ast<'toks> {
             LexToken::EqEq => (1,2),
             LexToken::Plus |
             LexToken::Minus => (3,4),
-            LexToken::Multiply |
-            LexToken::Devide => (5,6),
+            LexToken::Asterisk |
+            LexToken::FSlash => (5,6),
             _ => (0,0),
         }
     }
