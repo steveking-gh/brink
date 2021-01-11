@@ -10,15 +10,22 @@ use log::{error, warn, info, debug, trace};
 
 use ast::{Ast,AstDb};
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum OperandKind {
+    TempVar,
+    Immediate,
+}
+
 pub struct IROperand {
     nid: NodeId,
-    val: Box<dyn Any>,
+    val: String,
+    kind: OperandKind,
 }
 
 impl<'toks> IROperand {
-    pub fn new(nid: NodeId, ast: &'toks Ast) -> IROperand {
+    pub fn new(nid: NodeId, ast: &'toks Ast, kind: OperandKind) -> IROperand {
         let tinfo = ast.get_tinfo(nid);
-        IROperand { nid, val: Box::new(tinfo.val.to_string())}
+        IROperand { nid, val: tinfo.val.to_string(), kind }
     }    
 }
 
@@ -151,10 +158,8 @@ impl<'toks> LinearDb {
             ast::LexToken::Int |
             ast::LexToken::Identifier |
             ast::LexToken::QuotedString => {
-                // These are operands that just need loading into a variable
-                let lid = self.new_ir(parent_nid, IRKind::Load);
-                let idx = self.add_operand_to_ir(lid, IROperand::new(parent_nid,ast));
-                self.add_operand_idx_to_ir(ir_lid, idx);
+                // These are immediate operands.
+                self.add_operand_to_ir(ir_lid, IROperand::new(parent_nid,ast,OperandKind::Immediate));
             },
             ast::LexToken::Assert => {
                 // Assert an expression is not zero (false)
@@ -165,7 +170,7 @@ impl<'toks> LinearDb {
                 let lid = self.new_ir(parent_nid, IRKind::EqEq);
                 result &= self.record_children_r(rdepth + 1, parent_nid, lid, diags, ast, ast_db);
                 // Add a destination operand to the operation to hold the result
-                let idx = self.add_operand_to_ir(lid, IROperand::new(parent_nid,ast));
+                let idx = self.add_operand_to_ir(lid, IROperand::new(parent_nid, ast, OperandKind::TempVar));
                 // Also add the detination operand to the parent
                 // The operand is presumably an input operand in the parent.
                 self.add_operand_idx_to_ir(ir_lid, idx);
@@ -174,7 +179,7 @@ impl<'toks> LinearDb {
                 let lid = self.new_ir(parent_nid, IRKind::Add);
                 result &= self.record_children_r(rdepth + 1, parent_nid, lid, diags, ast, ast_db);
                 // Add a destination operand to the operation to hold the result
-                let idx = self.add_operand_to_ir(lid, IROperand::new(parent_nid,ast));
+                let idx = self.add_operand_to_ir(lid, IROperand::new(parent_nid,ast, OperandKind::TempVar));
                 // Also add the detination operand to the parent
                 // The operand is presumably an input operand in the parent.
                 self.add_operand_idx_to_ir(ir_lid, idx);
@@ -183,7 +188,7 @@ impl<'toks> LinearDb {
                 let lid = self.new_ir(parent_nid, IRKind::Multiply);
                 result &= self.record_children_r(rdepth + 1, parent_nid, lid, diags, ast, ast_db);
                 // Add a destination operand to the operation to hold the result
-                let idx = self.add_operand_to_ir(lid, IROperand::new(parent_nid,ast));
+                let idx = self.add_operand_to_ir(lid, IROperand::new(parent_nid,ast, OperandKind::TempVar));
                 // Also add the detination operand to the parent
                 // The operand is presumably an input operand in the parent.
                 self.add_operand_idx_to_ir(ir_lid, idx);
@@ -256,12 +261,14 @@ impl<'toks> LinearDb {
                 } else {
                     first = false;
                 }
-                let val = &operand.val;
-                if let Some(v) = val.downcast_ref::<String>() {
-                    op.push_str(&format!("(string){}",v));
+                if operand.kind == OperandKind::Immediate {
+                    op.push_str(&format!(" {}", operand.val));
+                } else if operand.kind == OperandKind::TempVar {
+                    op.push_str(&format!(" temp_{}", *child));
                 } else {
-                    op.push_str("UNKNOWN");
+                    assert!(false);
                 }
+                //op.push_str(&format!(" temp_{}", operand.val));
             }
             debug!("LinearDb: {}", op);
         }
