@@ -2,7 +2,7 @@ use anyhow::{Error, Result};
 use indextree::{NodeId};
 pub type Span = std::ops::Range<usize>;
 use diags::Diags;
-use std::any::Any;
+use std::any::{Any, TypeId};
 
 #[allow(unused_imports)]
 #[allow(unused_imports)]
@@ -25,6 +25,7 @@ impl<'toks> IROperand {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum IRKind {
     Assert,
+    Begin,
     EqEq,
     Int,
     Load,
@@ -231,17 +232,13 @@ impl<'toks> LinearDb {
         let section = ast_db.sections.get(sec_name_str).unwrap();
         let sec_nid = section.nid;
 
-        // Record the linear start of this section.
-        let ir_lid = linear_db.new_ir(sec_nid, IRKind::SectionStart);
-
+        let begin_lid = linear_db.new_ir(output_nid,IRKind::Begin);
         // To start recursion, rdepth = 1.  The ONLY thing happening
         // here is a flattening of the AST into the logical order
         // of instructions.  We're not calculating sizes and addresses yet.
-        if !linear_db.record_r(1, sec_nid, ir_lid, diags, ast, ast_db) {
+        if !linear_db.record_r(1, sec_nid, begin_lid, diags, ast, ast_db) {
             return None;
         }
-
-        linear_db.new_ir(sec_nid, IRKind::SectionEnd);
 
         debug!("LinearDb::new: <<<< EXIT for nid: {}", output_nid);
         Some(linear_db)
@@ -249,7 +246,24 @@ impl<'toks> LinearDb {
 
     pub fn dump(&self) {
         for (idx,ir) in self.ir_vec.iter().enumerate() {
-            debug!("LinearDb: lid {}: nid {} is {:?}", idx, ir.nid, ir.op);
+            let mut op = format!("lid {}: nid {} is {:?}", idx, ir.nid, ir.op);
+            // display the operand for this IR
+            let mut first = true;
+            for child in &ir.operand_vec {
+                let operand = &self.operand_vec[*child];
+                if !first {
+                    op.push_str(",");
+                } else {
+                    first = false;
+                }
+                let val = &operand.val;
+                if let Some(v) = val.downcast_ref::<String>() {
+                    op.push_str(&format!("(string){}",v));
+                } else {
+                    op.push_str("UNKNOWN");
+                }
+            }
+            debug!("LinearDb: {}", op);
         }
     }
 }
