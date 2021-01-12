@@ -162,6 +162,7 @@ impl<'toks> LinearDb {
                     self.add_operand_idx_to_ir(lid, local_operands.pop().unwrap());
                 }
             },
+            ast::LexToken::Identifier |
             ast::LexToken::Int |
             ast::LexToken::QuotedString => {
                 // These are immediate operands.
@@ -224,13 +225,13 @@ impl<'toks> LinearDb {
             ast::LexToken::Section => {
                 // Record the linear start of this section.
                 let mut local_operands = Vec::new();
-                self.new_ir(parent_nid, IRKind::SectionStart);
+                let start_lid = self.new_ir(parent_nid, IRKind::SectionStart);
                 result &= self.record_children_r(rdepth + 1, parent_nid, &mut local_operands, diags, ast, ast_db);
-                assert!(local_operands.is_empty());
-                self.new_ir(parent_nid, IRKind::SectionEnd);
-            },
-            ast::LexToken::Identifier => {
-                // identifiers are already processed
+                let end_lid = self.new_ir(parent_nid, IRKind::SectionEnd);
+                assert!(local_operands.len() == 1);
+                let sec_id_lid = local_operands.pop().unwrap();
+                self.add_operand_idx_to_ir(start_lid, sec_id_lid);
+                self.add_operand_idx_to_ir(end_lid, sec_id_lid);
             },
             ast::LexToken::Semicolon |
             ast::LexToken::OpenBrace |
@@ -270,7 +271,6 @@ impl<'toks> LinearDb {
         let section = ast_db.sections.get(sec_name_str).unwrap();
         let sec_nid = section.nid;
 
-        let begin_lid = linear_db.new_ir(output_nid,IRKind::Begin);
         // To start recursion, rdepth = 1.  The ONLY thing happening
         // here is a flattening of the AST into the logical order
         // of instructions.  We're not calculating sizes and addresses yet.
