@@ -89,6 +89,9 @@ Flags: (strictly in form -flag=value)
 
 Flags starting with '--' will be ignored and will be passed verbatim to subprocesses.
 
-For example:
+Initially, you must install cargo-fuzz
+> cargo install cargo-fuzz
+
+Then run the fuzz tests with hnightly build.  For example:
 > cd ast
 > cargo +nightly fuzz run fuzz_target_1 -- -timeout=5 -max_len=128
