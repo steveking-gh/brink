@@ -1,31 +1,48 @@
-use anyhow::{Error, Result};
 use indextree::{NodeId};
 pub type Span = std::ops::Range<usize>;
 use diags::Diags;
-use std::any::{Any, TypeId};
 
 #[allow(unused_imports)]
 #[allow(unused_imports)]
 use log::{error, warn, info, debug, trace};
 
-use ast::{Ast,AstDb};
+use ast::{Ast,AstDb,LexToken};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum OperandKind {
     TempVar,
     Immediate,
 }
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum DataType {
+    Int,
+    QuotedString,
+    Identifier,
+    Unknown,
+}
+
+fn LexToDataType(lxt: LexToken) -> DataType {
+    match lxt {
+        LexToken::Int => DataType::Int,
+        LexToken::QuotedString => DataType::QuotedString,
+        LexToken::Identifier => DataType::Identifier,
+        // In some cases, like the result of operations, we don't
+        // know the type of the operand during linearization.
+        _ =>  DataType::Unknown
+    }
+}
 
 pub struct IROperand {
     nid: NodeId,
     val: String,
     kind: OperandKind,
+    data_type: DataType,
 }
 
 impl<'toks> IROperand {
-    pub fn new(nid: NodeId, ast: &'toks Ast, kind: OperandKind) -> IROperand {
+    pub fn new(nid: NodeId, ast: &'toks Ast, kind: OperandKind, lxt: LexToken) -> IROperand {
         let tinfo = ast.get_tinfo(nid);
-        IROperand { nid, val: tinfo.val.to_string(), kind }
+        IROperand { nid, val: tinfo.val.to_string(), kind, data_type: LexToDataType(lxt) }
     }    
 }
 
@@ -167,7 +184,7 @@ impl<'toks> LinearDb {
             ast::LexToken::QuotedString => {
                 // These are immediate operands.
                 let idx = self.operand_vec.len();
-                self.operand_vec.push(IROperand::new(parent_nid,ast,OperandKind::Immediate));
+                self.operand_vec.push(IROperand::new(parent_nid,ast,OperandKind::Immediate, tinfo.tok));
                 returned_operands.push(idx);
             },
             ast::LexToken::Assert => {
@@ -189,7 +206,8 @@ impl<'toks> LinearDb {
                     self.add_operand_idx_to_ir(lid, local_operands.pop().unwrap());
                 }
                 // Add a destination operand to the operation to hold the result
-                let idx = self.add_operand_to_ir(lid, IROperand::new(parent_nid, ast, OperandKind::TempVar));
+                let idx = self.add_operand_to_ir(lid, IROperand::new(parent_nid, ast,
+                                                  OperandKind::TempVar, tinfo.tok));
                 // Also add the detination operand to the local operands
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);
@@ -203,7 +221,8 @@ impl<'toks> LinearDb {
                     self.add_operand_idx_to_ir(lid, local_operands.pop().unwrap());
                 }
                 // Add a destination operand to the operation to hold the result
-                let idx = self.add_operand_to_ir(lid, IROperand::new(parent_nid, ast, OperandKind::TempVar));
+                let idx = self.add_operand_to_ir(lid, IROperand::new(parent_nid, ast,
+                                                  OperandKind::TempVar, tinfo.tok));
                 // Also add the detination operand to the local operands
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);
@@ -217,7 +236,8 @@ impl<'toks> LinearDb {
                     self.add_operand_idx_to_ir(lid, local_operands.pop().unwrap());
                 }
                 // Add a destination operand to the operation to hold the result
-                let idx = self.add_operand_to_ir(lid, IROperand::new(parent_nid, ast, OperandKind::TempVar));
+                let idx = self.add_operand_to_ir(lid, IROperand::new(parent_nid, ast,
+                                                  OperandKind::TempVar, tinfo.tok));
                 // Also add the detination operand to the local operands
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);
@@ -298,7 +318,7 @@ impl<'toks> LinearDb {
                 if operand.kind == OperandKind::Immediate {
                     op.push_str(&format!(" {}", operand.val));
                 } else if operand.kind == OperandKind::TempVar {
-                    op.push_str(&format!(" temp_{}", *child));
+                    op.push_str(&format!(" tmp{}", *child));
                 } else {
                     assert!(false);
                 }
