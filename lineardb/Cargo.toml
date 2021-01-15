@@ -17,3 +17,4 @@ anyhow = "1.0.34"
 
 diags = { path = "../diags" }
 ast = { path = "../ast" }
+ir_base = { path = "../ir_base" }

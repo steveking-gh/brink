@@ -3,34 +3,10 @@ pub type Span = std::ops::Range<usize>;
 use diags::Diags;
 
 #[allow(unused_imports)]
-#[allow(unused_imports)]
 use log::{error, warn, info, debug, trace};
 
 use ast::{Ast,AstDb,LexToken};
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum OperandKind {
-    TempVar,
-    Immediate,
-}
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum DataType {
-    Int,
-    QuotedString,
-    Identifier,
-    Unknown,
-}
-
-fn LexToDataType(lxt: LexToken) -> DataType {
-    match lxt {
-        LexToken::Int => DataType::Int,
-        LexToken::QuotedString => DataType::QuotedString,
-        LexToken::Identifier => DataType::Identifier,
-        // In some cases, like the result of operations, we don't
-        // know the type of the operand during linearization.
-        _ =>  DataType::Unknown
-    }
-}
+use ir_base::{IRKind,OperandKind,DataType};
 
 pub struct IROperand {
     nid: NodeId,
@@ -39,25 +15,22 @@ pub struct IROperand {
     data_type: DataType,
 }
 
+fn lex_to_data_type(lxt: LexToken) -> DataType {
+    match lxt {
+        LexToken::Int => DataType::Int,
+        LexToken::QuotedString => DataType::QuotedString,
+        LexToken::Identifier => DataType::Identifier,
+        // In some cases, like the result of operations, we don't
+        // know the type of the operand during linearization.
+        _ => DataType::Unknown
+    }
+}
+
 impl<'toks> IROperand {
     pub fn new(nid: NodeId, ast: &'toks Ast, kind: OperandKind, lxt: LexToken) -> IROperand {
         let tinfo = ast.get_tinfo(nid);
-        IROperand { nid, val: tinfo.val.to_string(), kind, data_type: LexToDataType(lxt) }
+        IROperand { nid, val: tinfo.val.to_string(), kind, data_type: lex_to_data_type(lxt) }
     }    
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum IRKind {
-    Assert,
-    Begin,
-    EqEq,
-    Int,
-    Load,
-    Multiply,
-    Add,
-    SectionStart,
-    SectionEnd,
-    Wrs,
 }
 
 pub struct IR {

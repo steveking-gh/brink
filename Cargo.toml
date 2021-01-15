@@ -2,6 +2,7 @@
 members = [
     "brink",
     "ast",
+    "ir_base",
     "lineardb",
     "diags",
 ]
