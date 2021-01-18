@@ -15,7 +15,7 @@ anyhow = "1.0.34"
 ast = { path = "../ast" }
 diags = { path = "../diags" }
 lineardb = { path = "../lineardb" }
-ir = { path = "../ir" }
+irdb = { path = "../irdb" }
 addrdb = { path = "../addrdb" }
 
 [dev-dependencies]

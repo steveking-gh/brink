@@ -18,10 +18,8 @@ pub enum DataType {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum IRKind {
     Assert,
-    Begin,
     EqEq,
     Int,
-    Load,
     Multiply,
     Add,
     SectionStart,
@@ -41,6 +39,5 @@ pub struct IROperand {
 pub struct IR {
     pub kind: IRKind,
     pub operands: Vec<usize>,
-    pub abs_start: usize,
-    pub size: usize,
+    pub src_loc: Range<usize>,
 }

@@ -14,7 +14,7 @@ use clap::{Arg, App};
 use diags::Diags;
 use ast::{Ast,AstDb};
 use lineardb::LinearDb;
-use ir::IRDb;
+use irdb::IRDb;
 
 
 // Logging
