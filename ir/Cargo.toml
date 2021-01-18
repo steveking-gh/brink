@@ -1,12 +1,12 @@
 [package]
-name = "lineardb"
+name = "ir"
 version = "0.1.0"
 authors = ["Steve King <sk@metrokings.com>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
-path = "lineardb.rs"
+path = "ir.rs"
 
 [dependencies]
 indextree = "4.3.1"
@@ -14,6 +14,8 @@ codespan-reporting = "0.9.5"
 log = "0.4.11"
 anyhow = "1.0.34"
 
+# local dependencies
 diags = { path = "../diags" }
 ast = { path = "../ast" }
 ir_base = { path = "../ir_base" }
+lineardb = { path = "../lineardb" }

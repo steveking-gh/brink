@@ -7,12 +7,14 @@ use log::{error, warn, info, debug, trace};
 
 use ast::{Ast,AstDb,LexToken};
 use ir_base::{IRKind,OperandKind,DataType};
+use std::ops::Range;
 
-pub struct IROperand {
-    nid: NodeId,
-    val: String,
-    kind: OperandKind,
-    data_type: DataType,
+pub struct LinOperand {
+    pub nid: NodeId,
+    pub src_loc: Range<usize>,
+    pub val: String,
+    pub kind: OperandKind,
+    pub data_type: DataType,
 }
 
 fn lex_to_data_type(lxt: LexToken) -> DataType {
@@ -26,23 +28,28 @@ fn lex_to_data_type(lxt: LexToken) -> DataType {
     }
 }
 
-impl<'toks> IROperand {
-    pub fn new(nid: NodeId, ast: &'toks Ast, kind: OperandKind, lxt: LexToken) -> IROperand {
+impl<'toks> LinOperand {
+    pub fn new(nid: NodeId, ast: &'toks Ast, kind: OperandKind,
+               data_type: DataType) -> LinOperand {
         let tinfo = ast.get_tinfo(nid);
-        IROperand { nid, val: tinfo.val.to_string(), kind, data_type: lex_to_data_type(lxt) }
+        let src_loc = tinfo.loc.clone();
+        LinOperand { nid, src_loc, val: tinfo.val.to_string(), kind, data_type }
     }    
 }
 
-pub struct IR {
-    nid: NodeId,
-    op: IRKind,
+pub struct LinIR {
+    pub nid: NodeId,
+    pub src_loc: Range<usize>,
+    pub op: IRKind,
     // usize is the index into the operand vec
-    operand_vec: Vec<usize>,
+    pub operand_vec: Vec<usize>,
 }
 
-impl IR {
-    pub fn new(nid: NodeId, op: IRKind) -> Self {
-        Self { nid, op, operand_vec: Vec::new() }
+impl<'toks> LinIR {
+    pub fn new(nid: NodeId, ast: &'toks Ast, op: IRKind) -> Self {
+        let tinfo = ast.get_tinfo(nid);
+        let src_loc = tinfo.loc.clone();
+        Self { nid, src_loc, op, operand_vec: Vec::new() }
     }
 
     pub fn add_operand(&mut self, oper_num: usize) {
@@ -52,8 +59,8 @@ impl IR {
 
 pub struct LinearDb {
     pub output_nid: NodeId,
-    pub ir_vec: Vec<IR>,
-    pub operand_vec: Vec<IROperand>, 
+    pub ir_vec: Vec<LinIR>,
+    pub operand_vec: Vec<LinOperand>, 
 }
 
 /**
@@ -66,23 +73,23 @@ boxed info object.
 */
 impl<'toks> LinearDb {
 
-    // Adds an existing operand by it's operanc_vec index to the specified IR
+    // Adds an existing operand by it's operanc_vec index to the specified LinIR
     pub fn add_operand_idx_to_ir(&mut self, ir_lid: usize, idx: usize) {
         self.ir_vec[ir_lid].add_operand(idx);
     }
 
-    // Returns the inear operand index occupied by the new operand
-    pub fn add_operand_to_ir(&mut self, ir_lid: usize, oper: IROperand) -> usize {
+    // Returns the linear operand index occupied by the new operand
+    pub fn add_operand_to_ir(&mut self, ir_lid: usize, oper: LinOperand) -> usize {
         let idx = self.operand_vec.len();
         self.operand_vec.push(oper);
         self.add_operand_idx_to_ir(ir_lid, idx);
         idx
     }
 
-    // returns the linear ID for the new IR
-    fn new_ir(&mut self, nid: NodeId, op: IRKind) -> usize {
+    // returns the linear ID for the new LinIR
+    fn new_ir(&mut self, nid: NodeId, ast: &'toks Ast, op: IRKind) -> usize {
         let lid = self.ir_vec.len();
-        self.ir_vec.push(IR::new(nid,op));
+        self.ir_vec.push(LinIR::new(nid, ast, op));
         lid
     }
 
@@ -145,7 +152,7 @@ impl<'toks> LinearDb {
             ast::LexToken::Wrs => {
                 let mut local_operands = Vec::new();
                 // Write a fixed string. The string is the operand
-                let lid = self.new_ir(parent_nid, IRKind::Wrs);
+                let lid = self.new_ir(parent_nid, ast, IRKind::Wrs);
                 result &= self.record_children_r(rdepth + 1, parent_nid, &mut local_operands, diags, ast, ast_db);
                 assert!(local_operands.len() == 1);
                 while !local_operands.is_empty() {
@@ -157,14 +164,15 @@ impl<'toks> LinearDb {
             ast::LexToken::QuotedString => {
                 // These are immediate operands.
                 let idx = self.operand_vec.len();
-                self.operand_vec.push(IROperand::new(parent_nid,ast,OperandKind::Immediate, tinfo.tok));
+                self.operand_vec.push(LinOperand::new(parent_nid,ast,OperandKind::Constant,
+                     lex_to_data_type(tinfo.tok)));
                 returned_operands.push(idx);
             },
             ast::LexToken::Assert => {
                 // Assert an expression is not zero (false)
                 let mut local_operands = Vec::new();
                 result &= self.record_children_r(rdepth + 1, parent_nid, &mut local_operands, diags, ast, ast_db);
-                let lid = self.new_ir(parent_nid, IRKind::Assert);
+                let lid = self.new_ir(parent_nid, ast, IRKind::Assert);
                 assert!(local_operands.len() == 1);
                 while !local_operands.is_empty() {
                     self.add_operand_idx_to_ir(lid, local_operands.pop().unwrap());
@@ -173,14 +181,14 @@ impl<'toks> LinearDb {
             ast::LexToken::EqEq => {
                 let mut local_operands = Vec::new();
                 result &= self.record_children_r(rdepth + 1, parent_nid, &mut local_operands, diags, ast, ast_db);
-                let lid = self.new_ir(parent_nid, IRKind::EqEq);
+                let lid = self.new_ir(parent_nid, ast, IRKind::EqEq);
                 assert!(local_operands.len() == 2);
                 while !local_operands.is_empty() {
                     self.add_operand_idx_to_ir(lid, local_operands.pop().unwrap());
                 }
                 // Add a destination operand to the operation to hold the result
-                let idx = self.add_operand_to_ir(lid, IROperand::new(parent_nid, ast,
-                                                  OperandKind::TempVar, tinfo.tok));
+                let idx = self.add_operand_to_ir(lid, LinOperand::new(parent_nid, ast,
+                                                  OperandKind::Variable,DataType::Bool));
                 // Also add the detination operand to the local operands
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);
@@ -188,14 +196,14 @@ impl<'toks> LinearDb {
             ast::LexToken::Plus => {
                 let mut local_operands = Vec::new();
                 result &= self.record_children_r(rdepth + 1, parent_nid, &mut local_operands, diags, ast, ast_db);
-                let lid = self.new_ir(parent_nid, IRKind::Add);
+                let lid = self.new_ir(parent_nid, ast, IRKind::Add);
                 assert!(local_operands.len() == 2);
                 while !local_operands.is_empty() {
                     self.add_operand_idx_to_ir(lid, local_operands.pop().unwrap());
                 }
                 // Add a destination operand to the operation to hold the result
-                let idx = self.add_operand_to_ir(lid, IROperand::new(parent_nid, ast,
-                                                  OperandKind::TempVar, tinfo.tok));
+                let idx = self.add_operand_to_ir(lid, LinOperand::new(parent_nid, ast,
+                                                  OperandKind::Variable,DataType::Int));
                 // Also add the detination operand to the local operands
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);
@@ -203,14 +211,14 @@ impl<'toks> LinearDb {
             ast::LexToken::Asterisk => {
                 let mut local_operands = Vec::new();
                 result &= self.record_children_r(rdepth + 1, parent_nid, &mut local_operands, diags, ast, ast_db);
-                let lid = self.new_ir(parent_nid, IRKind::Multiply);
+                let lid = self.new_ir(parent_nid, ast, IRKind::Multiply);
                 assert!(local_operands.len() == 2);
                 while !local_operands.is_empty() {
                     self.add_operand_idx_to_ir(lid, local_operands.pop().unwrap());
                 }
                 // Add a destination operand to the operation to hold the result
-                let idx = self.add_operand_to_ir(lid, IROperand::new(parent_nid, ast,
-                                                  OperandKind::TempVar, tinfo.tok));
+                let idx = self.add_operand_to_ir(lid, LinOperand::new(parent_nid, ast,
+                                                  OperandKind::Variable,DataType::Int));
                 // Also add the detination operand to the local operands
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);
@@ -218,9 +226,9 @@ impl<'toks> LinearDb {
             ast::LexToken::Section => {
                 // Record the linear start of this section.
                 let mut local_operands = Vec::new();
-                let start_lid = self.new_ir(parent_nid, IRKind::SectionStart);
+                let start_lid = self.new_ir(parent_nid, ast, IRKind::SectionStart);
                 result &= self.record_children_r(rdepth + 1, parent_nid, &mut local_operands, diags, ast, ast_db);
-                let end_lid = self.new_ir(parent_nid, IRKind::SectionEnd);
+                let end_lid = self.new_ir(parent_nid, ast, IRKind::SectionEnd);
                 assert!(local_operands.len() == 1);
                 let sec_id_lid = local_operands.pop().unwrap();
                 self.add_operand_idx_to_ir(start_lid, sec_id_lid);
@@ -279,7 +287,7 @@ impl<'toks> LinearDb {
     pub fn dump(&self) {
         for (idx,ir) in self.ir_vec.iter().enumerate() {
             let mut op = format!("lid {}: nid {} is {:?}", idx, ir.nid, ir.op);
-            // display the operand for this IR
+            // display the operand for this LinIR
             let mut first = true;
             for child in &ir.operand_vec {
                 let operand = &self.operand_vec[*child];
@@ -288,9 +296,9 @@ impl<'toks> LinearDb {
                 } else {
                     first = false;
                 }
-                if operand.kind == OperandKind::Immediate {
+                if operand.kind == OperandKind::Constant {
                     op.push_str(&format!(" {}", operand.val));
-                } else if operand.kind == OperandKind::TempVar {
+                } else if operand.kind == OperandKind::Variable {
                     op.push_str(&format!(" tmp{}", *child));
                 } else {
                     assert!(false);

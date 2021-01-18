@@ -14,6 +14,7 @@ use clap::{Arg, App};
 use diags::Diags;
 use ast::{Ast,AstDb};
 use lineardb::LinearDb;
+use ir::IRDb;
 
 
 // Logging
@@ -46,6 +47,14 @@ pub fn process(name: &str, fstr: &str, args: &clap::ArgMatches, verbosity: u64)
     }
     let linear_db = linear_db.unwrap();
     linear_db.dump();
+    let ir_db = IRDb::new(&linear_db, &mut diags);
+    if ir_db.is_none() {
+        bail!("[MAIN_4]: Failed to construct the IR database.");
+    }
+    let ir_db = ir_db.unwrap();
+
+    debug!("Dumping ir_db");
+    ir_db.dump();
 
     // Determine if the user specified an output file on the command line
     // Trim whitespace

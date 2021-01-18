@@ -3,6 +3,7 @@ members = [
     "brink",
     "ast",
     "ir_base",
+    "ir",
     "lineardb",
     "diags",
 ]
