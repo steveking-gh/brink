@@ -137,7 +137,7 @@ impl<'toks> LinearDb {
             ast::LexToken::Wr => {
                 let mut local_operands = Vec::new();
                 // Write the contents of a section.  This isn't a simple recursion
-                // into the children.  Instead, we recurse into the specified section.
+                // into the children.  Instead, we redirect to the specified section.
                 let sec_name_str = ast.get_child_str(parent_nid, 0);
                 debug!("LinearDb::record_r: recursing into section {}", sec_name_str);
 
@@ -146,7 +146,12 @@ impl<'toks> LinearDb {
                 // that the section name is legitimate, so unwrap().
                 let section = ast_db.sections.get(sec_name_str).unwrap();
                 let sec_nid = section.nid;
-                result &= self.record_children_r(rdepth + 1, sec_nid, &mut local_operands, diags, ast, ast_db);
+
+                // Recurse into the referenced section.
+                result &= self.record_r(rdepth + 1, sec_nid, 
+                        &mut local_operands, diags, ast, ast_db);
+
+                // we expect the section name as a local parameter, but have no need for it.
                 assert!(local_operands.is_empty());
             },
             ast::LexToken::Wrs => {
@@ -163,6 +168,7 @@ impl<'toks> LinearDb {
             ast::LexToken::Int |
             ast::LexToken::QuotedString => {
                 // These are immediate operands.
+                // This case terminates recursion.
                 let idx = self.operand_vec.len();
                 self.operand_vec.push(LinOperand::new(parent_nid,ast,OperandKind::Constant,
                      lex_to_data_type(tinfo.tok)));

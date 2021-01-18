@@ -114,16 +114,16 @@ impl IRDb {
                     match operand.data_type {
                         DataType::Int => {
                             let v = operand.val.downcast_ref::<i64>().unwrap();
-                            op.push_str(&format!(" ({:?}){}", operand.data_type, v));
+                            op.push_str(&format!(" ({:?} {:?}){}", operand.kind, operand.data_type, v));
                         }
                         // order matters, must be last
                         _ => {
                             let v = operand.val.downcast_ref::<String>().unwrap();
-                            op.push_str(&format!(" ({:?}){}", operand.data_type, v));
+                            op.push_str(&format!(" ({:?} {:?}){}", operand.kind, operand.data_type, v));
                         },
                     }
                 } else if operand.kind == OperandKind::Variable {
-                    op.push_str(&format!(" ({:?})var{}", operand.data_type, *child));
+                    op.push_str(&format!(" ({:?} {:?})var{}", operand.kind, operand.data_type, *child));
                 } else {
                     assert!(false);
                 }

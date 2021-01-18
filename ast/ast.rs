@@ -636,7 +636,7 @@ impl<'toks> AstDb<'toks> {
 
     /// Processes a section in the AST
     fn record_section(diags: &mut Diags, sec_nid: NodeId, ast: &'toks Ast,
-                    sections: &mut HashMap<&'toks str, Section<'toks>> ) -> bool {
+                      sections: &mut HashMap<&'toks str, Section<'toks>> ) -> bool {
         debug!("AstDb::record_section: NodeId {}", sec_nid);
 
         let mut children = sec_nid.children(&ast.arena);
@@ -652,7 +652,7 @@ impl<'toks> AstDb<'toks> {
             diags.err2("AST_9", &m, sec_tinfo.span(), orig_tinfo.span());
             return false;
         }
-        sections.insert(sec_str, Section::new(&ast,sec_nid));
+        sections.insert(sec_str, Section::new(&ast, sec_nid));
         true
     }
 
