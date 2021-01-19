@@ -35,6 +35,18 @@ pub struct IROperand {
     pub val: Box<dyn Any>,
 }
 
+impl IROperand {
+    pub fn clone_val_box(&self) -> Box<dyn Any> {
+        match self.data_type {
+            DataType::Int => { Box::new(self.val.downcast_ref::<i64>().unwrap().clone()) },
+            DataType::QuotedString |
+            DataType::Identifier => {Box::new(self.val.downcast_ref::<String>().unwrap().clone())},
+            DataType::Bool =>  {Box::new(self.val.downcast_ref::<bool>().unwrap().clone())},
+            DataType::Unknown => {Box::new(self.val.downcast_ref::<String>().unwrap().clone())},
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct IR {
     pub kind: IRKind,

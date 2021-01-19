@@ -37,7 +37,7 @@ impl IRDb {
                         return Box::new(lop.val.clone());
                     }
                 } else {
-                    return Box::new(0);
+                    return Box::new(0i64);
                 }
             },
             DataType::Identifier => {

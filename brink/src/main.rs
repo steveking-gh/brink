@@ -15,6 +15,7 @@ use diags::Diags;
 use ast::{Ast,AstDb};
 use lineardb::LinearDb;
 use irdb::IRDb;
+use engine::Engine;
 
 
 // Logging
@@ -55,6 +56,8 @@ pub fn process(name: &str, fstr: &str, args: &clap::ArgMatches, verbosity: u64)
 
     debug!("Dumping ir_db");
     ir_db.dump();
+
+    let engine = Engine::new(&ir_db, &mut diags, 0);
 
     // Determine if the user specified an output file on the command line
     // Trim whitespace

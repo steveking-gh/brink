@@ -1,11 +1,9 @@
-use IRKind::SectionStart;
-use ir_base::{IR, IROperand, OperandKind, DataType, IRKind};
+use ir_base::{IR, IRKind, IROperand, OperandKind, DataType};
 use irdb::IRDb;
 use diags::Diags;
 use std::any::Any;
 use std::collections::HashMap;
-use std::convert::From;
-
+use std::cell::RefCell;
 
 #[allow(unused_imports)]
 use log::{error, warn, info, debug, trace};
@@ -45,7 +43,7 @@ impl Parameter {
 }
 
 pub struct Engine {
-    parms: Vec<Parameter>,
+    parms: Vec<RefCell<Parameter>>,
     ir_locs: Vec<Location>,
     id_locs: HashMap<String,Location>,
 }
@@ -59,7 +57,7 @@ impl Engine {
         // assert takes a single boolean parameter
         assert!(ir.operands.len() == 1);
         let parm_num = ir.operands[0];
-        let parm = &self.parms[parm_num];
+        let parm = self.parms[parm_num].borrow();
         if parm.stable && parm.to_bool() == false {
             let m = format!("assert failed");
             diags.err1("EXEC_1", &m, ir.src_loc.clone());
@@ -73,20 +71,20 @@ impl Engine {
     fn process_eqeq(&mut self, ir: &IR, diags: &mut Diags,
                       current: &Location) -> bool {
         trace!("Engine::process_eqeq: ENTER");
-        // assert takes a single boolean parameter
+        // eqeq takes two inputs and produces one output parameter
         assert!(ir.operands.len() == 3);
         let in_parm_num0 = ir.operands[0];
         let in_parm_num1 = ir.operands[1];
         let out_parm_num = ir.operands[2];
-        let in_parm0 = &self.parms[in_parm_num0];
-        let in_parm1 = &self.parms[in_parm_num1];
-        let mut out_parm = &mut self.parms[out_parm_num];
+        let in_parm0 = self.parms[in_parm_num0].borrow();
+        let in_parm1 = self.parms[in_parm_num1].borrow();
+        let mut out_parm = self.parms[out_parm_num].borrow_mut();
 
         // If the inputs are stable, we can compute the stable output
         if in_parm0.stable && in_parm1.stable {
             let in0 = in_parm0.to_i64();
             let in1 = in_parm1.to_i64();
-            let out = out_parm.val.downcast_ref::<bool>().unwrap();
+            let out = out_parm.val.downcast_mut::<bool>().unwrap();
             *out = in0 == in1;
             out_parm.stable = true;
         }
@@ -95,6 +93,55 @@ impl Engine {
         true
     }
 
+    fn process_add(&mut self, ir: &IR, diags: &mut Diags,
+                      current: &Location) -> bool {
+        trace!("Engine::process_add: ENTER");
+        // Takes two inputs and produces one output parameter
+        assert!(ir.operands.len() == 3);
+        let in_parm_num0 = ir.operands[0];
+        let in_parm_num1 = ir.operands[1];
+        let out_parm_num = ir.operands[2];
+        let in_parm0 = self.parms[in_parm_num0].borrow();
+        let in_parm1 = self.parms[in_parm_num1].borrow();
+        let mut out_parm = self.parms[out_parm_num].borrow_mut();
+
+        // If the inputs are stable, we can compute the stable output
+        if in_parm0.stable && in_parm1.stable {
+            let in0 = in_parm0.to_i64();
+            let in1 = in_parm1.to_i64();
+            let out = out_parm.val.downcast_mut::<i64>().unwrap();
+            *out = in0 + in1;
+            out_parm.stable = true;
+        }
+    
+        trace!("Engine::process_add: EXIT");
+        true
+    }
+
+    fn process_multiply(&mut self, ir: &IR, diags: &mut Diags,
+                      current: &Location) -> bool {
+        trace!("Engine::process_multiply: ENTER");
+        // Takes two inputs and produces one output parameter
+        assert!(ir.operands.len() == 3);
+        let in_parm_num0 = ir.operands[0];
+        let in_parm_num1 = ir.operands[1];
+        let out_parm_num = ir.operands[2];
+        let in_parm0 = self.parms[in_parm_num0].borrow();
+        let in_parm1 = self.parms[in_parm_num1].borrow();
+        let mut out_parm = self.parms[out_parm_num].borrow_mut();
+
+        // If the inputs are stable, we can compute the stable output
+        if in_parm0.stable && in_parm1.stable {
+            let in0 = in_parm0.to_i64();
+            let in1 = in_parm1.to_i64();
+            let out = out_parm.val.downcast_mut::<i64>().unwrap();
+            *out = in0 * in1;
+            out_parm.stable = true;
+        }
+    
+        trace!("Engine::process_multiply: EXIT");
+        true
+    }    
     pub fn new(irdb: &IRDb, diags: &mut Diags, abs_start: usize) {
         let mut engine = Engine { parms: Vec::new(), ir_locs: Vec::new(),
                                   id_locs: HashMap::new() };
@@ -102,10 +149,10 @@ impl Engine {
         // Initialize parameters from the IR operands.
         engine.parms.reserve(irdb.parms.len());
         for opnd in &irdb.parms {
-            let stable = if opnd.kind == OperandKind::Constant
-                        { true } else { false };
-            let parm = Parameter { stable, data_type: opnd.data_type, val: opnd.val };
-            engine.parms.push(parm);
+            let stable = if opnd.kind == OperandKind::Constant { true } else { false };
+            let parm = Parameter { stable, data_type: opnd.data_type,
+                    val: opnd.clone_val_box() };
+            engine.parms.push(RefCell::new(parm));
             
         }
         engine.iterate(&irdb, diags, abs_start);
@@ -118,24 +165,18 @@ impl Engine {
         let mut result = true;
         for ir in &irdb.ir_vec {
             result &= match ir.kind {
-                Assert => { self.process_assert(&ir, diags, &current) },
-                EqEq => { self.process_eqeq(&ir, diags, &current) },
-                Int => {
-                    true // just an integer, nothing to do
-                },
-                Multiply => {
-                    true // todo fix me
-                },
-                Add => {
-                    true // todo fix me
-                },
-                Wrs => {
+                IRKind::Assert => { self.process_assert(&ir, diags, &current) },
+                IRKind::EqEq => { self.process_eqeq(&ir, diags, &current) },
+                IRKind::Int => { true /* nothing to do */ },
+                IRKind::Multiply =>{ self.process_multiply(&ir, diags, &current) },
+                IRKind::Add =>{ self.process_add(&ir, diags, &current) },
+                IRKind::Wrs => {
                     true // todo fix me
                 },                
-                SectionStart => {
+                IRKind::SectionStart => {
                     true // todo fix me
                 },
-                SectionEnd => {
+                IRKind::SectionEnd => {
                     true // todo fix me
                 },
             }

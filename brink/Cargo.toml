@@ -16,7 +16,7 @@ ast = { path = "../ast" }
 diags = { path = "../diags" }
 lineardb = { path = "../lineardb" }
 irdb = { path = "../irdb" }
-addrdb = { path = "../addrdb" }
+engine = { path = "../engine" }
 
 [dev-dependencies]
 assert_cmd = "1.0.1"
