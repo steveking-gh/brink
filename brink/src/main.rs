@@ -42,7 +42,7 @@ pub fn process(name: &str, fstr: &str, args: &clap::ArgMatches, verbosity: u64)
     ast.dump("ast.dot")?;
 
     let ast_db = AstDb::new(&mut diags, &ast)?;
-    let linear_db = LinearDb::new(&mut diags, &ast, &ast_db, 0);
+    let linear_db = LinearDb::new(&mut diags, &ast, &ast_db);
     if linear_db.is_none() {
         bail!("[MAIN_3]: Failed to construct the linear database.");
     }
@@ -57,7 +57,7 @@ pub fn process(name: &str, fstr: &str, args: &clap::ArgMatches, verbosity: u64)
     debug!("Dumping ir_db");
     ir_db.dump();
 
-    let engine = Engine::new(&ir_db, &mut diags, 0);
+    let _engine = Engine::new(&ir_db, &mut diags, 0);
 
     // Determine if the user specified an output file on the command line
     // Trim whitespace
@@ -66,7 +66,7 @@ pub fn process(name: &str, fstr: &str, args: &clap::ArgMatches, verbosity: u64)
                                             .trim_matches(' '));
     debug!("process: output file name is {}", fname_str);
 
-    let mut file = File::create(&fname_str)
+    let mut _file = File::create(&fname_str)
             .context(format!("Unable to create output file {}", fname_str))?;
 
     //linear_db.execute(&mut file)?;

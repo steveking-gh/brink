@@ -56,9 +56,7 @@ impl IRDb {
     }
 
     fn process_lin_operands(&mut self, lin_db: &LinearDb, diags: &mut Diags) -> bool {
-        let mut result = true;
-
-        for (lid, lop) in lin_db.operand_vec.iter().enumerate() {
+        for lop in lin_db.operand_vec.iter() {
             let mut result = true;
             let kind = lop.kind;
             let data_type = lop.data_type;
@@ -67,11 +65,10 @@ impl IRDb {
             self.parms.push(IROperand{ kind, data_type, src_loc, val});
         }
 
-        result
+        true
     }
 
     fn process_linear_ir(&mut self, lin_db: &LinearDb, diags: &mut Diags) -> bool {
-        let mut result = true;
         for lir in &lin_db.ir_vec {
             let kind = lir.op;
             // The operands are just indices into the operands array
@@ -80,7 +77,7 @@ impl IRDb {
             
             self.ir_vec.push(IR{kind, operands, src_loc});
         }
-        result
+        true
     }
 
     pub fn new(lin_db: &LinearDb, diags: &mut Diags) -> Option<IRDb> {

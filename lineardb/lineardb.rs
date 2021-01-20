@@ -262,7 +262,7 @@ impl<'toks> LinearDb {
     /// If the output doesn't exist, then return None.  The linear_db
     /// records only elements with size > 0.
     pub fn new(diags: &mut Diags, ast: &'toks Ast,
-               ast_db: &'toks AstDb, abs_start: usize) -> Option<LinearDb> {
+               ast_db: &'toks AstDb) -> Option<LinearDb> {
         debug!("LinearDb::new: >>>> ENTER");
         // AstDb already validated output exists
         let output_nid = ast_db.output.nid;
