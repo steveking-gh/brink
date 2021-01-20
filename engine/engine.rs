@@ -8,11 +8,11 @@ use std::cell::RefCell;
 #[allow(unused_imports)]
 use log::{error, warn, info, debug, trace};
 
+#[derive(Clone,Debug,PartialEq)]
 pub struct Location {
     img: usize,
     abs: usize,
     sec: usize,
-    size: usize,
 }
 
 pub struct Parameter {
@@ -51,14 +51,16 @@ pub struct Engine {
 impl Engine {
 
     /// Process an assert statement if the boolean operand is stable.
-    fn process_assert(&mut self, ir: &IR, diags: &mut Diags,
+    // TODO can't iterate on this.  needs to happen in a special stable pass
+    // TODO future functions can't locally know if they're stable.
+    fn iterate_assert(&mut self, ir: &IR, diags: &mut Diags,
                       current: &Location) -> bool {
         trace!("Engine::process_assert: ENTER");
         // assert takes a single boolean parameter
         assert!(ir.operands.len() == 1);
         let parm_num = ir.operands[0];
         let parm = self.parms[parm_num].borrow();
-        if parm.stable && parm.to_bool() == false {
+        if parm.to_bool() == false {
             let m = format!("assert failed");
             diags.err1("EXEC_1", &m, ir.src_loc.clone());
             return false;
@@ -68,7 +70,7 @@ impl Engine {
         true
     }
 
-    fn process_eqeq(&mut self, ir: &IR, diags: &mut Diags,
+    fn iterate_eqeq(&mut self, ir: &IR, diags: &mut Diags,
                       current: &Location) -> bool {
         trace!("Engine::process_eqeq: ENTER");
         // eqeq takes two inputs and produces one output parameter
@@ -93,7 +95,7 @@ impl Engine {
         true
     }
 
-    fn process_add(&mut self, ir: &IR, diags: &mut Diags,
+    fn iterate_add(&mut self, ir: &IR, diags: &mut Diags,
                       current: &Location) -> bool {
         trace!("Engine::process_add: ENTER");
         // Takes two inputs and produces one output parameter
@@ -118,7 +120,7 @@ impl Engine {
         true
     }
 
-    fn process_multiply(&mut self, ir: &IR, diags: &mut Diags,
+    fn iterate_multiply(&mut self, ir: &IR, diags: &mut Diags,
                       current: &Location) -> bool {
         trace!("Engine::process_multiply: ENTER");
         // Takes two inputs and produces one output parameter
@@ -159,27 +161,51 @@ impl Engine {
         debug!("Engine::new: EXIT");
     }
 
+    fn dump_locations(locs: &Vec<Location>) {
+        for (idx,loc) in locs.iter().enumerate() {
+            debug!("{}: {:?}", idx, loc);
+        }
+    }
+
     pub fn iterate(&mut self, irdb: &IRDb, diags: &mut Diags, abs_start: usize) {
         debug!("Engine::iterate: abs_start = {}", abs_start);
-        let mut current = Location{ img: 0, abs: abs_start, sec: 0, size: 0 };
+        let mut current = Location{ img: 0, abs: abs_start, sec: 0 };
         let mut result = true;
-        for ir in &irdb.ir_vec {
-            result &= match ir.kind {
-                IRKind::Assert => { self.process_assert(&ir, diags, &current) },
-                IRKind::EqEq => { self.process_eqeq(&ir, diags, &current) },
-                IRKind::Int => { true /* nothing to do */ },
-                IRKind::Multiply =>{ self.process_multiply(&ir, diags, &current) },
-                IRKind::Add =>{ self.process_add(&ir, diags, &current) },
-                IRKind::Wrs => {
-                    true // todo fix me
-                },                
-                IRKind::SectionStart => {
-                    true // todo fix me
-                },
-                IRKind::SectionEnd => {
-                    true // todo fix me
-                },
+        let mut new_locations = Vec::new();
+        let mut old_locations = Vec::new();
+        let mut stable = false;
+        let mut iter_count = 0;
+        while result && !stable {
+            trace!("Engine::iterate: Iteration count {}", iter_count);
+            iter_count += 1;
+            for ir in &irdb.ir_vec {
+                // record our location after each IR
+                new_locations.push(current.clone());
+                result &= match ir.kind {
+                    IRKind::Assert => { self.iterate_assert(&ir, diags, &mut current) },
+                    IRKind::EqEq => { self.iterate_eqeq(&ir, diags, &mut current) },
+                    IRKind::Int => { true /* nothing to do */ },
+                    IRKind::Multiply =>{ self.iterate_multiply(&ir, diags, &mut current) },
+                    IRKind::Add =>{ self.iterate_add(&ir, diags, &mut current) },
+                    IRKind::Wrs => {
+                        true // todo fix me
+                    },                
+                    IRKind::SectionStart => {
+                        true // todo fix me
+                    },
+                    IRKind::SectionEnd => {
+                        true // todo fix me
+                    },
+                }
+            }
+            if new_locations == old_locations {
+                stable = true;
+            } else {
+                // This consumes new_locations, leaving it empty
+                // Is there a better way to express this?
+                old_locations = new_locations.drain(0..).collect();
             }
         }
+        Engine::dump_locations(&new_locations);
     }    
 }
