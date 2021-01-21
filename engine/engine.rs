@@ -57,8 +57,9 @@ impl Engine {
     // TODO can't iterate on this.  needs to happen in a special stable pass
     // TODO future functions can't locally know if they're stable.
     fn iterate_assert(&mut self, ir: &IR, diags: &mut Diags,
-                      _current: &Location) -> bool {
-        trace!("Engine::iterate_assert: ENTER");
+                    current: &Location) -> bool {
+        trace!("Engine::iterate_assert: ENTER, abs {}, img {}, sec {}",
+            current.abs, current.img, current.sec);
         // assert takes a single boolean parameter
         assert!(ir.operands.len() == 1);
         let parm_num = ir.operands[0];
@@ -74,8 +75,9 @@ impl Engine {
     }
 
     fn iterate_wrs(&mut self, ir: &IR, _diags: &mut Diags,
-                      current: &mut Location) -> bool {
-        trace!("Engine::iterate_wrs: ENTER");
+                    current: &mut Location) -> bool {
+        trace!("Engine::iterate_wrs: ENTER, abs {}, img {}, sec {}",
+            current.abs, current.img, current.sec);
         // wrs takes one input parameter
         assert!(ir.operands.len() == 1);
         let in_parm_num0 = ir.operands[0];
@@ -91,8 +93,9 @@ impl Engine {
     }
 
     fn iterate_eqeq(&mut self, ir: &IR, _diags: &mut Diags,
-                      _current: &Location) -> bool {
-        trace!("Engine::iterate_eqeq: ENTER");
+                    current: &Location) -> bool {
+        trace!("Engine::iterate_eqeq: ENTER, abs {}, img {}, sec {}",
+            current.abs, current.img, current.sec);
         // eqeq takes two inputs and produces one output parameter
         assert!(ir.operands.len() == 3);
         let in_parm_num0 = ir.operands[0];
@@ -113,8 +116,9 @@ impl Engine {
     }
 
     fn iterate_add(&mut self, ir: &IR, _diags: &mut Diags,
-                      _current: &Location) -> bool {
-        trace!("Engine::iterate_add: ENTER");
+                    current: &Location) -> bool {
+        trace!("Engine::iterate_add: ENTER, abs {}, img {}, sec {}",
+            current.abs, current.img, current.sec);
         // Takes two inputs and produces one output parameter
         assert!(ir.operands.len() == 3);
         let in_parm_num0 = ir.operands[0];
@@ -135,8 +139,9 @@ impl Engine {
     }
 
     fn iterate_multiply(&mut self, ir: &IR, _diags: &mut Diags,
-                      _current: &Location) -> bool {
-        trace!("Engine::iterate_multiply: ENTER");
+                      current: &Location) -> bool {
+        trace!("Engine::iterate_multiply: ENTER, abs {}, img {}, sec {}",
+            current.abs, current.img, current.sec);
         // Takes two inputs and produces one output parameter
         assert!(ir.operands.len() == 3);
         let in_parm_num0 = ir.operands[0];
