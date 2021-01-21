@@ -173,11 +173,13 @@ impl Engine {
             
         }
         engine.iterate(&irdb, diags, abs_start);
+        engine.dump_locations();
+
         debug!("Engine::new: EXIT");
     }
 
-    fn dump_locations(locs: &Vec<Location>) {
-        for (idx,loc) in locs.iter().enumerate() {
+    fn dump_locations(&self) {
+        for (idx,loc) in self.ir_locs.iter().enumerate() {
             debug!("{}: {:?}", idx, loc);
         }
     }
@@ -185,7 +187,6 @@ impl Engine {
     pub fn iterate(&mut self, irdb: &IRDb, diags: &mut Diags, abs_start: usize) {
         debug!("Engine::iterate: abs_start = {}", abs_start);
         let mut result = true;
-        let mut new_locations = Vec::new();
         let mut old_locations = Vec::new();
         let mut stable = false;
         let mut iter_count = 0;
@@ -195,7 +196,7 @@ impl Engine {
             let mut current = Location{ img: 0, abs: abs_start, sec: 0 };
             for ir in &irdb.ir_vec {
                 // record our location after each IR
-                new_locations.push(current.clone());
+                self.ir_locs.push(current.clone());
                 result &= match ir.kind {
                     IRKind::Assert => { self.iterate_assert(&ir, diags, &current) },
                     IRKind::EqEq => { self.iterate_eqeq(&ir, diags, &current) },
@@ -211,14 +212,13 @@ impl Engine {
                     },
                 }
             }
-            if new_locations == old_locations {
+            if self.ir_locs == old_locations {
                 stable = true;
             } else {
                 // This consumes new_locations, leaving it empty
                 // Is there a better way to express this?
-                old_locations = new_locations.drain(0..).collect();
+                old_locations = self.ir_locs.drain(0..).collect();
             }
         }
-        Engine::dump_locations(&new_locations);
     }    
 }
