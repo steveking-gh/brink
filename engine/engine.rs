@@ -250,13 +250,13 @@ impl Engine {
         for ir in &irdb.ir_vec {
             result &= match ir.kind {
                 IRKind::Assert => { self.execute_assert(ir, irdb, diags, file) }
+                IRKind::Wrs => { self.execute_wrs(ir, irdb, diags, file) }
                 IRKind::EqEq => { true }
                 IRKind::Int => { true }
                 IRKind::Multiply => { true }
                 IRKind::Add => { true }
                 IRKind::SectionStart => { true }
                 IRKind::SectionEnd => { true }
-                IRKind::Wrs => { self.execute_wrs(ir, irdb, diags, file) }
             }
         }
         trace!("Engine::execute: EXIT");

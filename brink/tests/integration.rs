@@ -182,6 +182,48 @@ fn assert_2() {
 }
 
 #[test]
+fn assert_3() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/assert_3.brink")
+                .arg("-o assert_3.bin")
+                .assert()
+                .success();
+
+    // Verify output file is correct.  If so, then clean up.
+    assert_eq!("Wow!", fs::read_to_string("assert_3.bin").unwrap());
+    fs::remove_file("assert_3.bin").unwrap();
+}
+
+#[test]
+fn assert_4() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/assert_4.brink")
+                .arg("-o assert_4.bin")
+                .assert()
+                .success();
+
+    // Verify output file is correct.  If so, then clean up.
+    assert_eq!("Wow!", fs::read_to_string("assert_4.bin").unwrap());
+    fs::remove_file("assert_4.bin").unwrap();
+}
+
+#[test]
+fn assert_5() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/assert_5.brink")
+                .arg("-o assert_5.bin")
+                .assert()
+                .success();
+
+    // Verify output file is correct.  If so, then clean up.
+    assert_eq!("Wow!", fs::read_to_string("assert_5.bin").unwrap());
+    fs::remove_file("assert_5.bin").unwrap();
+}
+
+#[test]
 fn section_rename_err_1() {
     let _cmd = Command::cargo_bin("brink")
     .unwrap()
