@@ -1,9 +1,10 @@
 use ir_base::{IR, IRKind, DataType};
 use irdb::IRDb;
 use diags::Diags;
-use std::any::Any;
+use std::{any::Any, io::Write};
 use std::collections::HashMap;
 use std::cell::RefCell;
+use std::fs::File;
 
 #[allow(unused_imports)]
 use log::{error, warn, info, debug, trace};
@@ -48,7 +49,7 @@ impl Parameter {
 pub struct Engine {
     parms: Vec<RefCell<Parameter>>,
     ir_locs: Vec<Location>,
-    id_locs: HashMap<String,Location>,
+    _id_locs: HashMap<String,Location>,
 }
 
 impl Engine {
@@ -160,9 +161,9 @@ impl Engine {
         trace!("Engine::iterate_multiply: EXIT");
         true
     }    
-    pub fn new(irdb: &IRDb, diags: &mut Diags, abs_start: usize) {
+    pub fn new(irdb: &IRDb, diags: &mut Diags, abs_start: usize) -> Engine{
         let mut engine = Engine { parms: Vec::new(), ir_locs: Vec::new(),
-                                  id_locs: HashMap::new() };
+                                        _id_locs: HashMap::new() };
         debug!("Engine::new: ENTER");
         // Initialize parameters from the IR operands.
         engine.parms.reserve(irdb.parms.len());
@@ -170,12 +171,11 @@ impl Engine {
             let parm = Parameter { data_type: opnd.data_type,
                     val: opnd.clone_val_box() };
             engine.parms.push(RefCell::new(parm));
-            
         }
         engine.iterate(&irdb, diags, abs_start);
         engine.dump_locations();
-
         debug!("Engine::new: EXIT");
+        engine
     }
 
     fn dump_locations(&self) {
@@ -185,7 +185,7 @@ impl Engine {
     }
 
     pub fn iterate(&mut self, irdb: &IRDb, diags: &mut Diags, abs_start: usize) {
-        debug!("Engine::iterate: abs_start = {}", abs_start);
+        trace!("Engine::iterate: abs_start = {}", abs_start);
         let mut result = true;
         let mut old_locations = Vec::new();
         let mut stable = false;
@@ -206,7 +206,7 @@ impl Engine {
                     IRKind::Wrs => { self.iterate_wrs(&ir, diags, &mut current) },
                     IRKind::SectionStart => {
                         true // todo fix me
-                    },
+                    }
                     IRKind::SectionEnd => {
                         true // todo fix me
                     },
@@ -220,5 +220,47 @@ impl Engine {
                 old_locations = self.ir_locs.drain(0..).collect();
             }
         }
-    }    
+    }
+
+    fn execute_assert(&self, ir: &IR, _irdb: &IRDb, diags: &mut Diags, _file: &File) -> bool {
+        trace!("Engine::execute_assert: ENTER");
+        let mut result = true;
+        if self.parms[ir.operands[0]].borrow().to_bool() == false {
+            let msg = format!("Assert expression failed");
+            diags.err1("EXEC_2", &msg, ir.src_loc.clone());
+            result = false;
+        }
+        trace!("Engine::execute_assert: EXIT");
+        result
+    }
+
+    fn execute_wrs(&self, ir: &IR, _irdb: &IRDb, _diags: &mut Diags, file: &mut File) -> bool {
+        trace!("Engine::execute_wrs: ENTER");
+        let mut result = true;
+        let buf = self.parms[ir.operands[0]].borrow();
+        let bufs = buf.to_str().as_bytes();
+        file.write_all(bufs); // TODO fix me with Result<>
+        trace!("Engine::execute_wrs: EXIT");
+        result
+    }
+
+    pub fn execute(&self, irdb: &IRDb, diags: &mut Diags, file: &mut File) -> bool {
+        trace!("Engine::execute: ENTER");
+        let mut result = true;
+        for ir in &irdb.ir_vec {
+            result &= match ir.kind {
+                IRKind::Assert => { self.execute_assert(ir, irdb, diags, file) }
+                IRKind::EqEq => { true }
+                IRKind::Int => { true }
+                IRKind::Multiply => { true }
+                IRKind::Add => { true }
+                IRKind::SectionStart => { true }
+                IRKind::SectionEnd => { true }
+                IRKind::Wrs => { self.execute_wrs(ir, irdb, diags, file) }
+            }
+        }
+        trace!("Engine::execute: EXIT");
+        result
+    }
+
 }

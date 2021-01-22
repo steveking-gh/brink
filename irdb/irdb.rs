@@ -68,7 +68,7 @@ impl IRDb {
         true
     }
 
-    fn process_linear_ir(&mut self, lin_db: &LinearDb, diags: &mut Diags) -> bool {
+    fn process_linear_ir(&mut self, lin_db: &LinearDb, _diags: &mut Diags) -> bool {
         for lir in &lin_db.ir_vec {
             let kind = lir.op;
             // The operands are just indices into the operands array

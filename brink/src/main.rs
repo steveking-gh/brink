@@ -57,7 +57,7 @@ pub fn process(name: &str, fstr: &str, args: &clap::ArgMatches, verbosity: u64)
     debug!("Dumping ir_db");
     ir_db.dump();
 
-    let _engine = Engine::new(&ir_db, &mut diags, 0);
+    let engine = Engine::new(&ir_db, &mut diags, 0);
 
     // Determine if the user specified an output file on the command line
     // Trim whitespace
@@ -66,10 +66,12 @@ pub fn process(name: &str, fstr: &str, args: &clap::ArgMatches, verbosity: u64)
                                             .trim_matches(' '));
     debug!("process: output file name is {}", fname_str);
 
-    let mut _file = File::create(&fname_str)
+    let mut file = File::create(&fname_str)
             .context(format!("Unable to create output file {}", fname_str))?;
 
-    //linear_db.execute(&mut file)?;
+    if !engine.execute(&ir_db, &mut diags, &mut file) {
+        bail!("[MAIN_4]: output file creation failed.");
+    }
     Ok(())
 }
 
