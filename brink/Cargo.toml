@@ -12,11 +12,7 @@ clap = { version = "2.33.0" }
 fern = "0.6.0"
 log = "0.4.11"
 anyhow = "1.0.34"
-ast = { path = "../ast" }
-diags = { path = "../diags" }
-lineardb = { path = "../lineardb" }
-irdb = { path = "../irdb" }
-engine = { path = "../engine" }
+process = { path = "../process" }
 
 [dev-dependencies]
 assert_cmd = "1.0.1"

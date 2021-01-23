@@ -5,7 +5,7 @@ use diags::Diags;
 #[allow(unused_imports)]
 use log::{error, warn, info, debug, trace};
 
-use ast::{Ast,AstDb,LexToken};
+use ast::{Ast, AstDb, LexToken, TokenInfo};
 use ir_base::{IRKind,OperandKind,DataType};
 use std::ops::Range;
 
@@ -107,35 +107,62 @@ impl<'toks> LinearDb {
         true
     }
 
-    fn record_children_r(&mut self, rdepth: usize, parent_nid: NodeId, local_operands: &mut Vec<usize>,
-                         diags: &mut Diags, ast: &'toks Ast, ast_db: &AstDb) -> bool {
+    fn record_children_r(&mut self, result: &mut bool, rdepth: usize, parent_nid: NodeId,
+                        lops: &mut Vec<usize>,
+                        diags: &mut Diags, ast: &'toks Ast, ast_db: &AstDb) {
         // Easy linearizing without dereferencing through a name.
         // When no children exist, this case terminates recursion.
-        let mut result = true;
         let children = parent_nid.children(&ast.arena);
         for nid in children {
-            result &= self.record_r(rdepth + 1, nid, local_operands, diags, ast, ast_db);
+            self.record_r(result, rdepth + 1, nid, lops, diags, ast, ast_db);
         }
-        result
     }
 
+    fn operand_count_is_valid(&self, expected: usize, lops: &Vec<usize>, diags: &mut Diags, tinfo: &TokenInfo) -> bool {
+        let found = lops.len();
+        if found != expected {
+            let m = format!("Expected {} operand(s), but found {} for '{}' expression",
+                                expected, found, tinfo.val);
+            diags.err1("LINEAR_5",&m, tinfo.span());
+            return false;
+        }
+        true
+    }
+
+    fn process_operands(&mut self, result: &mut bool, expected: usize, lops: &mut Vec<usize>, ir_lid: usize,
+                        diags: &mut Diags, tinfo: &TokenInfo) {
+
+        // If we found the expected number of operands, then add them to the new IR
+        // Otherwise, do nothing but indicate the error.
+        if self.operand_count_is_valid(expected, lops, diags, tinfo) {
+            while !lops.is_empty() {
+                self.add_operand_idx_to_ir(ir_lid, lops.pop().unwrap());
+            }
+        } else {
+            *result = false;
+        }
+    }
+
+
     /// Recursively record information about the children of an AST object.
-    fn record_r(&mut self, rdepth: usize, parent_nid: NodeId, returned_operands: &mut Vec<usize>,
-                diags: &mut Diags, ast: &'toks Ast, ast_db: &AstDb) -> bool {
+    fn record_r(&mut self, result: &mut bool, rdepth: usize, parent_nid: NodeId,
+                returned_operands: &mut Vec<usize>,
+                diags: &mut Diags, ast: &'toks Ast, ast_db: &AstDb) {
 
         debug!("LinearDb::record_r: >>>> ENTER at depth {} for parent nid: {}",
                 rdepth, parent_nid);
 
         if !self.depth_sanity(rdepth, parent_nid, diags, ast) {
-            return false;
+            *result = false;
+            return;
         }
 
-        let mut result = true;
         let tinfo = ast.get_tinfo(parent_nid);
         
         match tinfo.tok {
             ast::LexToken::Wr => {
-                let mut local_operands = Vec::new();
+                // A vector to track the operands of this expression.
+                let mut lops = Vec::new();
                 // Write the contents of a section.  This isn't a simple recursion
                 // into the children.  Instead, we redirect to the specified section.
                 let sec_name_str = ast.get_child_str(parent_nid, 0);
@@ -148,102 +175,106 @@ impl<'toks> LinearDb {
                 let sec_nid = section.nid;
 
                 // Recurse into the referenced section.
-                result &= self.record_r(rdepth + 1, sec_nid, 
-                        &mut local_operands, diags, ast, ast_db);
-
-                // we expect the section name as a local parameter, but have no need for it.
-                assert!(local_operands.is_empty());
+                self.record_r(result, rdepth + 1, sec_nid, 
+                &mut lops, diags, ast, ast_db);
+                // The 'wr' expression does not produce an IR of its own,
+                // but inserts an entire section in-place.  So, we don't have a
+                // linear ID for the 'wr' and expect no operands.
+                *result &= self.operand_count_is_valid(0, &lops, diags, tinfo);
             },
             ast::LexToken::Wrs => {
-                let mut local_operands = Vec::new();
-                // Write a fixed string. The string is the operand
-                let lid = self.new_ir(parent_nid, ast, IRKind::Wrs);
-                result &= self.record_children_r(rdepth + 1, parent_nid, &mut local_operands, diags, ast, ast_db);
-                assert!(local_operands.len() == 1);
-                while !local_operands.is_empty() {
-                    self.add_operand_idx_to_ir(lid, local_operands.pop().unwrap());
-                }
+                // A vector to track the operands of this expression.
+                let mut lops = Vec::new();
+                // Write a fixed string. The string is the operand.
+                let ir_lid = self.new_ir(parent_nid, ast, IRKind::Wrs);
+                self.record_children_r(result, rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
+                // 1 operand expected
+                self.process_operands(result, 1, &mut lops, ir_lid, diags, tinfo);
             },
             ast::LexToken::Identifier |
             ast::LexToken::Int |
             ast::LexToken::QuotedString => {
-                // These are immediate operands.
+                // These are immediate operands.  Add them to the main operand vector
+                // and return them as local operands.
                 // This case terminates recursion.
                 let idx = self.operand_vec.len();
                 self.operand_vec.push(LinOperand::new(parent_nid,ast,OperandKind::Constant,
-                     lex_to_data_type(tinfo.tok)));
+                                        lex_to_data_type(tinfo.tok)));
                 returned_operands.push(idx);
             },
             ast::LexToken::Assert => {
-                // Assert an expression is not zero (false)
-                let mut local_operands = Vec::new();
-                result &= self.record_children_r(rdepth + 1, parent_nid, &mut local_operands, diags, ast, ast_db);
-                let lid = self.new_ir(parent_nid, ast, IRKind::Assert);
-                assert!(local_operands.len() == 1);
-                while !local_operands.is_empty() {
-                    self.add_operand_idx_to_ir(lid, local_operands.pop().unwrap());
-                }
+                // A vector to track the operands of this expression.
+                let mut lops = Vec::new();
+                self.record_children_r(result, rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
+                let ir_lid = self.new_ir(parent_nid, ast, IRKind::Assert);
+                // 1 operand expected
+                self.process_operands(result, 1, &mut lops, ir_lid, diags, tinfo);
             },
             ast::LexToken::EqEq => {
-                let mut local_operands = Vec::new();
-                result &= self.record_children_r(rdepth + 1, parent_nid, &mut local_operands, diags, ast, ast_db);
-                let lid = self.new_ir(parent_nid, ast, IRKind::EqEq);
-                assert!(local_operands.len() == 2);
-                while !local_operands.is_empty() {
-                    self.add_operand_idx_to_ir(lid, local_operands.pop().unwrap());
-                }
+                // A vector to track the operands of this expression.
+                let mut lops = Vec::new();
+                self.record_children_r(result, rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
+                let ir_lid = self.new_ir(parent_nid, ast, IRKind::EqEq);
+                self.process_operands(result, 2, &mut lops, ir_lid, diags, tinfo);
                 // Add a destination operand to the operation to hold the result
-                let idx = self.add_operand_to_ir(lid, LinOperand::new(parent_nid, ast,
+                let idx = self.add_operand_to_ir(ir_lid, LinOperand::new(parent_nid, ast,
                                                   OperandKind::Variable,DataType::Bool));
                 // Also add the detination operand to the local operands
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);
             },
             ast::LexToken::Plus => {
-                let mut local_operands = Vec::new();
-                result &= self.record_children_r(rdepth + 1, parent_nid, &mut local_operands, diags, ast, ast_db);
-                let lid = self.new_ir(parent_nid, ast, IRKind::Add);
-                assert!(local_operands.len() == 2);
-                while !local_operands.is_empty() {
-                    self.add_operand_idx_to_ir(lid, local_operands.pop().unwrap());
-                }
+                // A vector to track the operands of this expression.
+                let mut lops = Vec::new();
+                self.record_children_r(result, rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
+                let ir_lid = self.new_ir(parent_nid, ast, IRKind::Add);
+                // 2 operands expected
+                self.process_operands(result, 2, &mut lops, ir_lid, diags, tinfo);
+
                 // Add a destination operand to the operation to hold the result
-                let idx = self.add_operand_to_ir(lid, LinOperand::new(parent_nid, ast,
+                let idx = self.add_operand_to_ir(ir_lid, LinOperand::new(parent_nid, ast,
                                                   OperandKind::Variable,DataType::Int));
                 // Also add the detination operand to the local operands
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);
             },
             ast::LexToken::Asterisk => {
-                let mut local_operands = Vec::new();
-                result &= self.record_children_r(rdepth + 1, parent_nid, &mut local_operands, diags, ast, ast_db);
-                let lid = self.new_ir(parent_nid, ast, IRKind::Multiply);
-                assert!(local_operands.len() == 2);
-                while !local_operands.is_empty() {
-                    self.add_operand_idx_to_ir(lid, local_operands.pop().unwrap());
-                }
+                let mut lops = Vec::new();
+                self.record_children_r(result, rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
+                let ir_lid = self.new_ir(parent_nid, ast, IRKind::Multiply);
+                // 2 operands expected
+                self.process_operands(result, 2, &mut lops, ir_lid, diags, tinfo);
                 // Add a destination operand to the operation to hold the result
-                let idx = self.add_operand_to_ir(lid, LinOperand::new(parent_nid, ast,
+                let idx = self.add_operand_to_ir(ir_lid, LinOperand::new(parent_nid, ast,
                                                   OperandKind::Variable,DataType::Int));
                 // Also add the detination operand to the local operands
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);
-            },
+            }
             ast::LexToken::Section => {
                 // Record the linear start of this section.
-                let mut local_operands = Vec::new();
+                let mut lops = Vec::new();
                 let start_lid = self.new_ir(parent_nid, ast, IRKind::SectionStart);
-                result &= self.record_children_r(rdepth + 1, parent_nid, &mut local_operands, diags, ast, ast_db);
+                self.record_children_r(result, rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
                 let end_lid = self.new_ir(parent_nid, ast, IRKind::SectionEnd);
-                assert!(local_operands.len() == 1);
-                let sec_id_lid = local_operands.pop().unwrap();
-                self.add_operand_idx_to_ir(start_lid, sec_id_lid);
-                self.add_operand_idx_to_ir(end_lid, sec_id_lid);
-            },
+                // 1 operand expected, which is the name of the section.
+                if self.operand_count_is_valid(1, &lops, diags, tinfo) {
+                    let sec_id_lid = lops.pop().unwrap();
+                    self.add_operand_idx_to_ir(start_lid, sec_id_lid);
+                    self.add_operand_idx_to_ir(end_lid, sec_id_lid);
+                } else {
+                    *result = false;
+                }
+            }
             ast::LexToken::Semicolon |
             ast::LexToken::OpenBrace |
             ast::LexToken::CloseBrace => {
-                // uninteresting syntactical elements
+                // Uninteresting syntactical elements that do not appear in the IR.
+            }
+            ast::LexToken::Unknown => {
+                let m = "Unexpected character.";
+                diags.err1("LINEAR_3", &m, tinfo.span());
+                *result = false;
             }
             _ => {
                 // We forgot to handle something
@@ -255,7 +286,6 @@ impl<'toks> LinearDb {
 
         debug!("LinearDb::record_r: <<<< EXIT({}) at depth {} for nid: {}",
                 result, rdepth, parent_nid);
-        result
     }
 
     /// The LinearDb object must start with an output statement.
@@ -281,8 +311,13 @@ impl<'toks> LinearDb {
         // To start recursion, rdepth = 1.  The ONLY thing happening
         // here is a flattening of the AST into the logical order
         // of instructions.  We're not calculating sizes and addresses yet.
-        let mut local_operands = Vec::new();
-        if !linear_db.record_r(1, sec_nid, &mut local_operands, diags, ast, ast_db) {
+        let mut lops = Vec::new();
+
+        // If an error occurs, result gets stuck at false.
+        let mut result = true;
+        linear_db.record_r(&mut result, 1, sec_nid, &mut lops,
+                            diags, ast, ast_db);
+        if !result {
             return None;
         }
 

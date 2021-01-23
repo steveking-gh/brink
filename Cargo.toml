@@ -5,6 +5,7 @@ members = [
     "ir_base",
     "lineardb",
     "engine",
+    "process",
     "irdb",
     "diags",
 ]

@@ -1,0 +1,71 @@
+digraph {
+node [style=filled,fillcolor="#F2F2F2",color="#808080"]
+edge [color="#808080"]
+1 [label="root"]
+1 -> 2
+2 [label="section",fillcolor="#F2F2F2"]
+2 -> 3
+3 [label="bar",fillcolor="#F2F2F2"]
+2 -> 4
+4 [label="{",fillcolor="#F2F2F2"]
+2 -> 5
+5 [label="wrs",fillcolor="#F2F2F2"]
+5 -> 6
+6 [label="bar!\n",fillcolor="#F2F2F2"]
+5 -> 7
+7 [label=";",fillcolor="#F2F2F2"]
+2 -> 8
+8 [label="}",fillcolor="#F2F2F2"]
+1 -> 9
+9 [label="section",fillcolor="#F2F2F2"]
+9 -> 10
+10 [label="foo",fillcolor="#F2F2F2"]
+9 -> 11
+11 [label="{",fillcolor="#F2F2F2"]
+9 -> 12
+12 [label="wrs",fillcolor="#F2F2F2"]
+12 -> 13
+13 [label="foo!\n",fillcolor="#F2F2F2"]
+12 -> 14
+14 [label=";",fillcolor="#F2F2F2"]
+9 -> 15
+15 [label="wrs",fillcolor="#F2F2F2"]
+15 -> 16
+16 [label="Bye\n",fillcolor="#F2F2F2"]
+15 -> 17
+17 [label=";",fillcolor="#F2F2F2"]
+9 -> 18
+18 [label="wr",fillcolor="#F2F2F2"]
+18 -> 19
+19 [label="bar",fillcolor="#F2F2F2"]
+18 -> 20
+20 [label=";",fillcolor="#F2F2F2"]
+9 -> 21
+21 [label="wr",fillcolor="#F2F2F2"]
+21 -> 22
+22 [label="boo",fillcolor="#F2F2F2"]
+21 -> 23
+23 [label=";",fillcolor="#F2F2F2"]
+9 -> 24
+24 [label="}",fillcolor="#F2F2F2"]
+1 -> 25
+25 [label="section",fillcolor="#F2F2F2"]
+25 -> 26
+26 [label="boo",fillcolor="#F2F2F2"]
+25 -> 27
+27 [label="{",fillcolor="#F2F2F2"]
+25 -> 28
+28 [label="wrs",fillcolor="#F2F2F2"]
+28 -> 29
+29 [label="boo!\n",fillcolor="#F2F2F2"]
+28 -> 30
+30 [label=";",fillcolor="#F2F2F2"]
+25 -> 31
+31 [label="}",fillcolor="#F2F2F2"]
+1 -> 32
+32 [label="output",fillcolor="#F2F2F2"]
+32 -> 33
+33 [label="foo",fillcolor="#F2F2F2"]
+32 -> 34
+34 [label=";",fillcolor="#F2F2F2"]
+}

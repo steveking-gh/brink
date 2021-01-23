@@ -248,7 +248,7 @@ fn fuzz_found_1() {
     .arg("tests/fuzz_found_2.brink")
     .assert()
     .failure()
-    .stderr(predicates::str::contains("[MAIN_2]"));
+    .stderr(predicates::str::contains("[PROC_1]"));
 }
 
 #[test]
@@ -310,6 +310,16 @@ fn fuzz_found_7() {
     .failure()
     .stderr(predicates::str::contains("[AST_13]"))
     .stderr(predicates::str::contains("[AST_14]"));
+}
+
+#[test]
+fn fuzz_found_8() {
+    let _cmd = Command::cargo_bin("brink")
+    .unwrap()
+    .arg("tests/fuzz_found_8.brink")
+    .assert()
+    .failure()
+    .stderr(predicates::str::contains("[LINEAR_3]"));
 }
 
 #[test]
