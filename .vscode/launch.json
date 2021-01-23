@@ -20,7 +20,7 @@
                 }
             },
             "args": ["-o empty_section_1.bin",
-                     "${workspaceFolder}/brink/tests/assert_5.brink"],
+                     "${workspaceFolder}/brink/tests/assert_1.brink"],
         },
         {
             "type": "lldb",

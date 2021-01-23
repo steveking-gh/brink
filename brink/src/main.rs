@@ -6,7 +6,7 @@
 use std::env;
 use std::{io,fs};
 use std::fs::File;
-use anyhow::{Context,Result,bail};
+use anyhow::{Result,Context,bail};
 extern crate clap;
 use clap::{Arg, App};
 
@@ -26,7 +26,7 @@ use log::{error, warn, info, debug, trace};
 /// name: The name of the file
 /// fstr: A string containing the file
 pub fn process(name: &str, fstr: &str, args: &clap::ArgMatches, verbosity: u64)
-               -> anyhow::Result<()> {
+               -> Result<()> {
     info!("Processing {}", name);
     debug!("File contains: {}", fstr);
 
@@ -69,7 +69,7 @@ pub fn process(name: &str, fstr: &str, args: &clap::ArgMatches, verbosity: u64)
     let mut file = File::create(&fname_str)
             .context(format!("Unable to create output file {}", fname_str))?;
 
-    if !engine.execute(&ir_db, &mut diags, &mut file) {
+    if engine.execute(&ir_db, &mut diags, &mut file).is_err() {
         bail!("[MAIN_4]: output file creation failed.");
     }
     Ok(())
@@ -152,7 +152,5 @@ fn main() -> Result<()> {
                 in_file_name, env::current_dir().unwrap().display()))?
         .replace("\r\n","\n");
 
-    process(&in_file_name, &str_in, &args, verbosity)?;
-
-    Ok(())
+    process(&in_file_name, &str_in, &args, verbosity)
 }

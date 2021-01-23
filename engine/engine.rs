@@ -5,6 +5,7 @@ use std::{any::Any, io::Write};
 use std::collections::HashMap;
 use std::cell::RefCell;
 use std::fs::File;
+use anyhow::{Result,anyhow};
 
 #[allow(unused_imports)]
 use log::{error, warn, info, debug, trace};
@@ -53,27 +54,6 @@ pub struct Engine {
 }
 
 impl Engine {
-
-    /// Process an assert statement if the boolean operand is stable.
-    // TODO can't iterate on this.  needs to happen in a special stable pass
-    // TODO future functions can't locally know if they're stable.
-    fn iterate_assert(&mut self, ir: &IR, diags: &mut Diags,
-                    current: &Location) -> bool {
-        trace!("Engine::iterate_assert: ENTER, abs {}, img {}, sec {}",
-            current.abs, current.img, current.sec);
-        // assert takes a single boolean parameter
-        assert!(ir.operands.len() == 1);
-        let parm_num = ir.operands[0];
-        let parm = self.parms[parm_num].borrow();
-        if parm.to_bool() == false {
-            let m = format!("assert failed");
-            diags.err1("EXEC_1", &m, ir.src_loc.clone());
-            return false;
-        }
-    
-        trace!("Engine::iterate_assert: EXIT");
-        true
-    }
 
     fn iterate_wrs(&mut self, ir: &IR, _diags: &mut Diags,
                     current: &mut Location) -> bool {
@@ -198,7 +178,7 @@ impl Engine {
                 // record our location after each IR
                 self.ir_locs.push(current.clone());
                 result &= match ir.kind {
-                    IRKind::Assert => { self.iterate_assert(&ir, diags, &current) },
+                    IRKind::Assert => { true /* evaluate assert at execute time */ },
                     IRKind::EqEq => { self.iterate_eqeq(&ir, diags, &current) },
                     IRKind::Int => { true /* nothing to do */ },
                     IRKind::Multiply =>{ self.iterate_multiply(&ir, diags, &current) },
@@ -222,45 +202,63 @@ impl Engine {
         }
     }
 
-    fn execute_assert(&self, ir: &IR, _irdb: &IRDb, diags: &mut Diags, _file: &File) -> bool {
+    fn execute_assert(&self, ir: &IR, _irdb: &IRDb, diags: &mut Diags, _file: &File)
+                      -> Result<()> {
         trace!("Engine::execute_assert: ENTER");
-        let mut result = true;
+        let mut result = Ok(());
         if self.parms[ir.operands[0]].borrow().to_bool() == false {
             let msg = format!("Assert expression failed");
             diags.err1("EXEC_2", &msg, ir.src_loc.clone());
-            result = false;
+            result = Err(anyhow!("Assert failed"));
         }
         trace!("Engine::execute_assert: EXIT");
         result
     }
 
-    fn execute_wrs(&self, ir: &IR, _irdb: &IRDb, _diags: &mut Diags, file: &mut File) -> bool {
+    fn execute_wrs(&self, ir: &IR, _irdb: &IRDb, diags: &mut Diags, file: &mut File)
+                   -> Result<()> {
         trace!("Engine::execute_wrs: ENTER");
-        let mut result = true;
         let buf = self.parms[ir.operands[0]].borrow();
         let bufs = buf.to_str().as_bytes();
-        file.write_all(bufs); // TODO fix me with Result<>
+        // the map_error lambda just converts io::error to a std::error
+        let result = file.write_all(bufs)
+                                     .map_err(|err|err.into());
+        if result.is_err() {
+            let msg = format!("Writing string failed");
+            diags.err1("EXEC_3", &msg, ir.src_loc.clone());
+        }
         trace!("Engine::execute_wrs: EXIT");
         result
     }
 
-    pub fn execute(&self, irdb: &IRDb, diags: &mut Diags, file: &mut File) -> bool {
+    pub fn execute(&self, irdb: &IRDb, diags: &mut Diags, file: &mut File)
+                   -> Result<()> {
         trace!("Engine::execute: ENTER");
-        let mut result = true;
+        let mut result;
+        let mut error_count = 0;
         for ir in &irdb.ir_vec {
-            result &= match ir.kind {
+            result = match ir.kind {
                 IRKind::Assert => { self.execute_assert(ir, irdb, diags, file) }
                 IRKind::Wrs => { self.execute_wrs(ir, irdb, diags, file) }
-                IRKind::EqEq => { true }
-                IRKind::Int => { true }
-                IRKind::Multiply => { true }
-                IRKind::Add => { true }
-                IRKind::SectionStart => { true }
-                IRKind::SectionEnd => { true }
+                IRKind::EqEq => { Ok(()) }
+                IRKind::Int => { Ok(()) }
+                IRKind::Multiply => { Ok(()) }
+                IRKind::Add => { Ok(()) }
+                IRKind::SectionStart => { Ok(()) }
+                IRKind::SectionEnd => { Ok(()) }
+            };
+
+            if result.is_err() {
+                error_count += 1;
+                if error_count > 10 { // todo parameterize max 10 errors
+                    break;
+                }
             }
         }
         trace!("Engine::execute: EXIT");
-        result
+        if error_count > 0 {
+            return Err(anyhow!("Error detected"));
+        }
+        Ok(())
     }
-
 }
