@@ -5,8 +5,8 @@ use lineardb::{LinOperand, LinearDb};
 #[allow(unused_imports)]
 use log::{error, warn, info, debug, trace};
 
-use ir_base::{OperandKind,DataType,IROperand,IR};
-use std::any::Any;
+use ir_base::{DataType, IR, IRKind, IROperand, OperandKind};
+use std::{any::Any};
 
 pub struct IRDb {
     pub ir_vec: Vec<IR>,
@@ -44,7 +44,23 @@ impl IRDb {
                 return Box::new(lop.val.clone());
             },
             DataType::Bool => {
-                return Box::new(false);
+                if lop.kind == OperandKind::Constant {
+                    let res = lop.val.parse::<i64>();
+                    if let Ok(v) = res {
+                        if v == 0 {
+                            return Box::new(false);
+                        } else {
+                            return Box::new(true);
+                        }
+                    } else {
+                        *result = false;
+                        let m = format!("Malformed boolean expression {}", lop.val);
+                        diags.err1("IR_3", &m, lop.src_loc.clone());
+                        return Box::new(lop.val.clone());
+                    }
+                } else {
+                    return Box::new(false);
+                }
             },
             DataType::Unknown => {
                 let m = format!("IR conversion failed for {}", lop.val);
@@ -68,16 +84,52 @@ impl IRDb {
         true
     }
 
-    fn process_linear_ir(&mut self, lin_db: &LinearDb, _diags: &mut Diags) -> bool {
+    // Expect 1 operand which is int or bool
+    fn validate_assert_operands(&self, ir: &IR, diags: &mut Diags) -> bool {
+        let len = ir.operands.len();
+        if len != 1 {
+            let m = format!("Assert expressions must evaluate to one boolean operand, but found {} operands.", len);
+            diags.err1("IR_4", &m, ir.src_loc.clone());
+            return false;
+        }
+        let opnd = &self.parms[ir.operands[0]];
+        if opnd.data_type != DataType::Int && opnd.data_type != DataType::Bool {
+            let m = format!("Assert expressions requires an integer or boolean operand, found {:?}.", opnd.data_type);
+            diags.err2("IR_5", &m, ir.src_loc.clone(), opnd.src_loc.clone());
+            return false;
+        }
+        true
+    }
+
+    fn validate_operands(&self, ir: &IR, diags: &mut Diags) -> bool {
+        let result = match ir.kind {
+            IRKind::Assert => { self.validate_assert_operands(ir, diags) }
+            IRKind::EqEq => { true }
+            IRKind::Int => { true }
+            IRKind::Multiply => { true }
+            IRKind::Add => { true }
+            IRKind::SectionStart => { true }
+            IRKind::SectionEnd => { true }
+            IRKind::Wrs => { true }
+        };
+        result
+    }
+
+    fn process_linear_ir(&mut self, lin_db: &LinearDb, diags: &mut Diags) -> bool {
+        let mut result = true;
         for lir in &lin_db.ir_vec {
             let kind = lir.op;
             // The operands are just indices into the operands array
             let operands = lir.operand_vec.clone();
             let src_loc = lir.src_loc.clone();
-            
-            self.ir_vec.push(IR{kind, operands, src_loc});
+            let ir = IR{kind, operands, src_loc};
+            if self.validate_operands(&ir, diags) {
+                self.ir_vec.push(ir);
+            } else {
+                result = false;
+            }
         }
-        true
+        result
     }
 
     pub fn new(lin_db: &LinearDb, diags: &mut Diags) -> Option<IRDb> {

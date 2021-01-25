@@ -1,0 +1,5 @@
+section foo {
+ assert  as ;
+}
+
+output foo;
