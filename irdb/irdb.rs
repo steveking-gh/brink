@@ -85,29 +85,48 @@ impl IRDb {
     }
 
     // Expect 1 operand which is int or bool
-    fn validate_assert_operands(&self, ir: &IR, diags: &mut Diags) -> bool {
+    fn validate_bool_operand(&self, ir: &IR, diags: &mut Diags) -> bool {
         let len = ir.operands.len();
         if len != 1 {
-            let m = format!("Assert expressions must evaluate to one boolean operand, but found {} operands.", len);
+            let m = format!("'{:?}' expressions must evaluate to one boolean operand, but found {} operands.", ir.kind, len);
             diags.err1("IR_4", &m, ir.src_loc.clone());
             return false;
         }
         let opnd = &self.parms[ir.operands[0]];
         if opnd.data_type != DataType::Int && opnd.data_type != DataType::Bool {
-            let m = format!("Assert expressions requires an integer or boolean operand, found {:?}.", opnd.data_type);
+            let m = format!("'{:?}' expressions require an integer or boolean operand, found '{:?}'.", ir.kind, opnd.data_type);
             diags.err2("IR_5", &m, ir.src_loc.clone(), opnd.src_loc.clone());
             return false;
         }
         true
     }
 
+    // Expect 1 operand which is int or bool
+    fn validate_arithmetic_operand(&self, ir: &IR, diags: &mut Diags) -> bool {
+        let len = ir.operands.len();
+        if len != 3 {
+            let m = format!("'{:?}' expressions must evaluate to 2 input and one output operands, but found {} total operands.", ir.kind, len);
+            diags.err1("IR_6", &m, ir.src_loc.clone());
+            return false;
+        }
+        for op_num in 0..2 {
+            let opnd = &self.parms[ir.operands[op_num]];
+            if opnd.data_type != DataType::Int {
+                let m = format!("'{:?}' expressions require an integer, found '{:?}'.", ir.kind, opnd.data_type);
+                diags.err2("IR_7", &m, ir.src_loc.clone(), opnd.src_loc.clone());
+                return false;
+            }
+        }
+        true
+    }
+
     fn validate_operands(&self, ir: &IR, diags: &mut Diags) -> bool {
         let result = match ir.kind {
-            IRKind::Assert => { self.validate_assert_operands(ir, diags) }
+            IRKind::Assert => { self.validate_bool_operand(ir, diags) }
             IRKind::EqEq => { true }
             IRKind::Int => { true }
-            IRKind::Multiply => { true }
-            IRKind::Add => { true }
+            IRKind::Multiply => { self.validate_arithmetic_operand(ir, diags) }
+            IRKind::Add => { self.validate_arithmetic_operand(ir, diags) }
             IRKind::SectionStart => { true }
             IRKind::SectionEnd => { true }
             IRKind::Wrs => { true }
