@@ -25,7 +25,6 @@ pub struct Parameter {
 impl Parameter {
     fn to_bool(&self) -> bool {
         match self.data_type {
-            DataType::Bool => { *self.val.downcast_ref::<bool>().unwrap() },
             DataType::Int => { *self.val.downcast_ref::<i64>().unwrap() != 0 },
             _ => { assert!(false); false },
         }
@@ -89,8 +88,12 @@ impl Engine {
         // If the inputs are stable, we can compute the stable output
         let in0 = in_parm0.to_i64();
         let in1 = in_parm1.to_i64();
-        let out = out_parm.val.downcast_mut::<bool>().unwrap();
-        *out = in0 == in1;
+        let out = out_parm.val.downcast_mut::<i64>().unwrap();
+        if in0 == in1 {
+            *out = 1;
+        } else {
+            *out = 0;
+        }
     
         trace!("Engine::iterate_eqeq: EXIT");
         true

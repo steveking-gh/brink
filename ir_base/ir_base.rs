@@ -12,7 +12,6 @@ pub enum DataType {
     Int,
     QuotedString,
     Identifier,
-    Bool,
     Unknown,
 }
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -41,7 +40,6 @@ impl IROperand {
             DataType::Int => { Box::new(self.val.downcast_ref::<i64>().unwrap().clone()) },
             DataType::QuotedString |
             DataType::Identifier => {Box::new(self.val.downcast_ref::<String>().unwrap().clone())},
-            DataType::Bool =>  {Box::new(self.val.downcast_ref::<bool>().unwrap().clone())},
             DataType::Unknown => {Box::new(self.val.downcast_ref::<String>().unwrap().clone())},
         }
     }

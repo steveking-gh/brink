@@ -218,7 +218,7 @@ impl<'toks> LinearDb {
                 self.process_operands(result, 2, &mut lops, ir_lid, diags, tinfo);
                 // Add a destination operand to the operation to hold the result
                 let idx = self.add_operand_to_ir(ir_lid, LinOperand::new(parent_nid, ast,
-                                                  OperandKind::Variable,DataType::Bool));
+                                                  OperandKind::Variable,DataType::Int));
                 // Also add the detination operand to the local operands
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);

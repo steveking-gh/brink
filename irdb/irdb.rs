@@ -43,25 +43,6 @@ impl IRDb {
             DataType::Identifier => {
                 return Box::new(lop.val.clone());
             },
-            DataType::Bool => {
-                if lop.kind == OperandKind::Constant {
-                    let res = lop.val.parse::<i64>();
-                    if let Ok(v) = res {
-                        if v == 0 {
-                            return Box::new(false);
-                        } else {
-                            return Box::new(true);
-                        }
-                    } else {
-                        *result = false;
-                        let m = format!("Malformed boolean expression {}", lop.val);
-                        diags.err1("IR_3", &m, lop.src_loc.clone());
-                        return Box::new(lop.val.clone());
-                    }
-                } else {
-                    return Box::new(false);
-                }
-            },
             DataType::Unknown => {
                 let m = format!("IR conversion failed for {}", lop.val);
                 diags.err1("IR_2", &m, lop.src_loc.clone());
@@ -85,7 +66,7 @@ impl IRDb {
     }
 
     // Expect 1 operand which is int or bool
-    fn validate_bool_operand(&self, ir: &IR, diags: &mut Diags) -> bool {
+    fn validate_bool_operands(&self, ir: &IR, diags: &mut Diags) -> bool {
         let len = ir.operands.len();
         if len != 1 {
             let m = format!("'{:?}' expressions must evaluate to one boolean operand, but found {} operands.", ir.kind, len);
@@ -93,7 +74,7 @@ impl IRDb {
             return false;
         }
         let opnd = &self.parms[ir.operands[0]];
-        if opnd.data_type != DataType::Int && opnd.data_type != DataType::Bool {
+        if opnd.data_type != DataType::Int {
             let m = format!("'{:?}' expressions require an integer or boolean operand, found '{:?}'.", ir.kind, opnd.data_type);
             diags.err2("IR_5", &m, ir.src_loc.clone(), opnd.src_loc.clone());
             return false;
@@ -102,7 +83,7 @@ impl IRDb {
     }
 
     // Expect 1 operand which is int or bool
-    fn validate_arithmetic_operand(&self, ir: &IR, diags: &mut Diags) -> bool {
+    fn validate_arithmetic_operands(&self, ir: &IR, diags: &mut Diags) -> bool {
         let len = ir.operands.len();
         if len != 3 {
             let m = format!("'{:?}' expressions must evaluate to 2 input and one output operands, but found {} total operands.", ir.kind, len);
@@ -122,11 +103,11 @@ impl IRDb {
 
     fn validate_operands(&self, ir: &IR, diags: &mut Diags) -> bool {
         let result = match ir.kind {
-            IRKind::Assert => { self.validate_bool_operand(ir, diags) }
-            IRKind::EqEq => { true }
+            IRKind::Assert => { self.validate_bool_operands(ir, diags) }
+            IRKind::EqEq => { self.validate_arithmetic_operands(ir, diags) }
             IRKind::Int => { true }
-            IRKind::Multiply => { self.validate_arithmetic_operand(ir, diags) }
-            IRKind::Add => { self.validate_arithmetic_operand(ir, diags) }
+            IRKind::Multiply => { self.validate_arithmetic_operands(ir, diags) }
+            IRKind::Add => { self.validate_arithmetic_operands(ir, diags) }
             IRKind::SectionStart => { true }
             IRKind::SectionEnd => { true }
             IRKind::Wrs => { true }
