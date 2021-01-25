@@ -57,6 +57,22 @@ impl<'toks> LinIR {
     }
 }
 
+fn tok_to_irkind(tok: LexToken) -> IRKind {
+    match tok {
+        LexToken::Wrs => { IRKind::Wrs }
+        LexToken::EqEq => { IRKind::EqEq }
+//            LexToken::NEq => { IRKind::NEq }
+        LexToken::Plus => { IRKind::Add }
+//            LexToken::Minus => { IRKind::Subtract }
+        LexToken::Asterisk => { IRKind:: Multiply }
+//            LexToken::FSlash => { IRKind::Divide }
+        bug => {
+            assert!( false, "Failed to convert LexToken to IRKind for {:?}", bug);
+            IRKind::Assert // keep compiler happy
+        }
+    }
+}
+
 pub struct LinearDb {
     pub output_nid: NodeId,
     pub ir_vec: Vec<LinIR>,
@@ -143,7 +159,6 @@ impl<'toks> LinearDb {
         }
     }
 
-
     /// Recursively record information about the children of an AST object.
     fn record_r(&mut self, result: &mut bool, rdepth: usize, parent_nid: NodeId,
                 returned_operands: &mut Vec<usize>,
@@ -210,24 +225,14 @@ impl<'toks> LinearDb {
                 // 1 operand expected
                 self.process_operands(result, 1, &mut lops, ir_lid, diags, tinfo);
             },
-            ast::LexToken::EqEq => {
-                // A vector to track the operands of this expression.
-                let mut lops = Vec::new();
-                self.record_children_r(result, rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
-                let ir_lid = self.new_ir(parent_nid, ast, IRKind::EqEq);
-                self.process_operands(result, 2, &mut lops, ir_lid, diags, tinfo);
-                // Add a destination operand to the operation to hold the result
-                let idx = self.add_operand_to_ir(ir_lid, LinOperand::new(parent_nid, ast,
-                                                  OperandKind::Variable,DataType::Int));
-                // Also add the detination operand to the local operands
-                // The destination operand is presumably an input operand in the parent.
-                returned_operands.push(idx);
-            },
+            
+            ast::LexToken::EqEq |
+            ast::LexToken::Asterisk |
             ast::LexToken::Plus => {
                 // A vector to track the operands of this expression.
                 let mut lops = Vec::new();
                 self.record_children_r(result, rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
-                let ir_lid = self.new_ir(parent_nid, ast, IRKind::Add);
+                let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tinfo.tok));
                 // 2 operands expected
                 self.process_operands(result, 2, &mut lops, ir_lid, diags, tinfo);
 
@@ -238,19 +243,6 @@ impl<'toks> LinearDb {
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);
             },
-            ast::LexToken::Asterisk => {
-                let mut lops = Vec::new();
-                self.record_children_r(result, rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
-                let ir_lid = self.new_ir(parent_nid, ast, IRKind::Multiply);
-                // 2 operands expected
-                self.process_operands(result, 2, &mut lops, ir_lid, diags, tinfo);
-                // Add a destination operand to the operation to hold the result
-                let idx = self.add_operand_to_ir(ir_lid, LinOperand::new(parent_nid, ast,
-                                                  OperandKind::Variable,DataType::Int));
-                // Also add the detination operand to the local operands
-                // The destination operand is presumably an input operand in the parent.
-                returned_operands.push(idx);
-            }
             ast::LexToken::Section => {
                 // Record the linear start of this section.
                 let mut lops = Vec::new();
