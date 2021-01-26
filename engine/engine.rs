@@ -99,7 +99,7 @@ impl Engine {
         true
     }
 
-    fn iterate_add(&mut self, ir: &IR, _diags: &mut Diags,
+    fn iterate_add(&mut self, ir: &IR, diags: &mut Diags,
                     current: &Location) -> bool {
         trace!("Engine::iterate_add: ENTER, abs {}, img {}, sec {}",
             current.abs, current.img, current.sec);
@@ -116,13 +116,20 @@ impl Engine {
         let in0 = in_parm0.to_i64();
         let in1 = in_parm1.to_i64();
         let out = out_parm.val.downcast_mut::<i64>().unwrap();
-        *out = in0 + in1;
+        //let check = checked_add(in0, in1);
+        let check = in0.checked_add(in1);
+        if check.is_none() {
+            let msg = format!("Add expression '{} + {}' will overflow", in0, in1);
+            diags.err1("EXEC_1", &msg, ir.src_loc.clone());
+            return false;
+        }
+        *out = check.unwrap();
 
         trace!("Engine::iterate_add: EXIT");
         true
     }
 
-    fn iterate_multiply(&mut self, ir: &IR, _diags: &mut Diags,
+    fn iterate_multiply(&mut self, ir: &IR, diags: &mut Diags,
                       current: &Location) -> bool {
         trace!("Engine::iterate_multiply: ENTER, abs {}, img {}, sec {}",
             current.abs, current.img, current.sec);
@@ -139,12 +146,20 @@ impl Engine {
         let in0 = in_parm0.to_i64();
         let in1 = in_parm1.to_i64();
         let out = out_parm.val.downcast_mut::<i64>().unwrap();
-        *out = in0 * in1;
-    
+
+        // Use checked arithmetic in case user is off the rails
+        let check = in0.checked_mul(in1);
+        if check.is_none() {
+            let msg = format!("Multiply expression '{} * {}' will overflow", in0, in1);
+            diags.err1("EXEC_4", &msg, ir.src_loc.clone());
+            return false;
+        }
+        *out = check.unwrap();
         trace!("Engine::iterate_multiply: EXIT");
         true
-    }    
-    pub fn new(irdb: &IRDb, diags: &mut Diags, abs_start: usize) -> Engine{
+    }
+
+    pub fn new(irdb: &IRDb, diags: &mut Diags, abs_start: usize) -> Option<Engine> {
         let mut engine = Engine { parms: Vec::new(), ir_locs: Vec::new(),
                                         _id_locs: HashMap::new() };
         debug!("Engine::new: ENTER");
@@ -155,19 +170,22 @@ impl Engine {
                     val: opnd.clone_val_box() };
             engine.parms.push(RefCell::new(parm));
         }
-        engine.iterate(&irdb, diags, abs_start);
-        engine.dump_locations();
+        let result = engine.iterate(&irdb, diags, abs_start);
+        if !result {
+            return None;
+        }
+
         debug!("Engine::new: EXIT");
-        engine
+        Some(engine)
     }
 
-    fn dump_locations(&self) {
+    pub fn dump_locations(&self) {
         for (idx,loc) in self.ir_locs.iter().enumerate() {
             debug!("{}: {:?}", idx, loc);
         }
     }
 
-    pub fn iterate(&mut self, irdb: &IRDb, diags: &mut Diags, abs_start: usize) {
+    pub fn iterate(&mut self, irdb: &IRDb, diags: &mut Diags, abs_start: usize) -> bool {
         trace!("Engine::iterate: abs_start = {}", abs_start);
         let mut result = true;
         let mut old_locations = Vec::new();
@@ -203,6 +221,8 @@ impl Engine {
                 old_locations = self.ir_locs.drain(0..).collect();
             }
         }
+
+        result
     }
 
     fn execute_assert(&self, ir: &IR, _irdb: &IRDb, diags: &mut Diags, _file: &File)

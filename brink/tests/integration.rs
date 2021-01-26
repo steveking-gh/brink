@@ -363,6 +363,16 @@ fn fuzz_found_12() {
 }
 
 #[test]
+fn fuzz_found_13() {
+    let _cmd = Command::cargo_bin("brink")
+    .unwrap()
+    .arg("tests/fuzz_found_13.brink")
+    .assert()
+    .failure()
+    .stderr(predicates::str::contains("[EXEC_4]"));
+}
+
+#[test]
 fn missing_brace_1() {
     let _cmd = Command::cargo_bin("brink")
     .unwrap()

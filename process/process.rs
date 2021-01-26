@@ -29,7 +29,9 @@ pub fn process(name: &str, fstr: &str, args: &clap::ArgMatches, verbosity: u64)
 
     let ast = ast.unwrap();
 
-    ast.dump("ast.dot")?;
+    if verbosity > 2 {
+        ast.dump("ast.dot")?;
+    }
 
     let ast_db = AstDb::new(&mut diags, &ast)?;
     let linear_db = LinearDb::new(&mut diags, &ast, &ast_db);
@@ -37,7 +39,9 @@ pub fn process(name: &str, fstr: &str, args: &clap::ArgMatches, verbosity: u64)
         return Err(anyhow!("[PROC_2]: Failed to construct the linear database."));
     }
     let linear_db = linear_db.unwrap();
-    linear_db.dump();
+    if verbosity > 2 {
+        linear_db.dump();
+    }
     let ir_db = IRDb::new(&linear_db, &mut diags);
     if ir_db.is_none() {
         return Err(anyhow!("[PROC_3]: Failed to construct the IR database."));
@@ -45,10 +49,19 @@ pub fn process(name: &str, fstr: &str, args: &clap::ArgMatches, verbosity: u64)
     let ir_db = ir_db.unwrap();
 
     debug!("Dumping ir_db");
-    ir_db.dump();
+    if verbosity > 2 {
+        ir_db.dump();
+    }
 
     let engine = Engine::new(&ir_db, &mut diags, 0);
+    if engine.is_none() {
+        return Err(anyhow!("[PROC_5]: Failed to construct the IR engine."));
+    }
 
+    let engine = engine.unwrap();
+    if verbosity > 2 {
+        engine.dump_locations();
+    }
     // Determine if the user specified an output file on the command line
     // Trim whitespace
     let fname_str = String::from(args.value_of("output")
