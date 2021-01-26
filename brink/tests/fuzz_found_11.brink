@@ -1,0 +1,5 @@
+section foo {
+    assert 8+
+output s  * 2;
+}
+output foo;

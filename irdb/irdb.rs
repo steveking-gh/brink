@@ -140,6 +140,7 @@ impl IRDb {
             return None;
         }
 
+        // To avoid panic, don't proceed into IR if the operands are bad.
         if !ir_db.process_linear_ir(lin_db, diags) {
             return None;
         }

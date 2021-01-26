@@ -196,7 +196,7 @@ impl<'toks> LinearDb {
                 // but inserts an entire section in-place.  So, we don't have a
                 // linear ID for the 'wr' and expect no operands.
                 *result &= self.operand_count_is_valid(0, &lops, diags, tinfo);
-            },
+            }
             ast::LexToken::Wrs => {
                 // A vector to track the operands of this expression.
                 let mut lops = Vec::new();
@@ -205,7 +205,7 @@ impl<'toks> LinearDb {
                 self.record_children_r(result, rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
                 // 1 operand expected
                 self.process_operands(result, 1, &mut lops, ir_lid, diags, tinfo);
-            },
+            }
             ast::LexToken::Identifier |
             ast::LexToken::Int |
             ast::LexToken::QuotedString => {
@@ -216,7 +216,7 @@ impl<'toks> LinearDb {
                 self.operand_vec.push(LinOperand::new(parent_nid,ast,OperandKind::Constant,
                                         lex_to_data_type(tinfo.tok)));
                 returned_operands.push(idx);
-            },
+            }
             ast::LexToken::Assert => {
                 // A vector to track the operands of this expression.
                 let mut lops = Vec::new();
@@ -224,8 +224,7 @@ impl<'toks> LinearDb {
                 let ir_lid = self.new_ir(parent_nid, ast, IRKind::Assert);
                 // 1 operand expected
                 self.process_operands(result, 1, &mut lops, ir_lid, diags, tinfo);
-            },
-            
+            }
             ast::LexToken::EqEq |
             ast::LexToken::Asterisk |
             ast::LexToken::Plus => {
@@ -242,7 +241,7 @@ impl<'toks> LinearDb {
                 // Also add the detination operand to the local operands
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);
-            },
+            }
             ast::LexToken::Section => {
                 // Record the linear start of this section.
                 let mut lops = Vec::new();
@@ -268,11 +267,10 @@ impl<'toks> LinearDb {
                 diags.err1("LINEAR_3", &m, tinfo.span());
                 *result = false;
             }
-            _ => {
-                // We forgot to handle something
-                let tinfo = ast.get_tinfo(parent_nid);
-                error!("Unhandled lexical token {:?}", tinfo);
-                assert!(false);
+            ast::LexToken::Output => {
+                let m = format!("Unexpected '{}' expression not allowed here.", tinfo.val);
+                diags.err1("LINEAR_4", &m, tinfo.span());
+                *result = false;
             }
         }
 
