@@ -15,51 +15,52 @@ pub struct IRDb {
 
 impl IRDb {
 
-    fn get_box_val(&mut self, lop: &LinOperand, diags: &mut Diags, result: &mut bool) -> Box<dyn Any> {
+    fn get_box_val(&mut self, lop: &LinOperand, diags: &mut Diags) -> Option<Box<dyn Any>> {
         match lop.data_type {
             DataType::QuotedString => {
                 // Trim surround quotes and convert escape characters
-                return Box::new(lop.val
+                return Some(Box::new(lop.val
                         .trim_matches('\"')
                         .to_string()
                         .replace("\\n", "\n")
-                        .replace("\\t", "\t"));
-            },
+                        .replace("\\t", "\t")));
+            }
             DataType::Int => {
                 if lop.kind == OperandKind::Constant {
                     let res = lop.val.parse::<i64>();
                     if let Ok(v) = res {
-                        return Box::new(v);
+                        return Some(Box::new(v));
                     } else {
-                        *result = false;
                         let m = format!("Malformed integer operand {}", lop.val);
                         diags.err1("IR_1", &m, lop.src_loc.clone());
-                        return Box::new(lop.val.clone());
+                        return None;
                     }
                 } else {
-                    return Box::new(0i64);
+                    return Some(Box::new(0i64));
                 }
-            },
+            }
             DataType::Identifier => {
-                return Box::new(lop.val.clone());
-            },
+                return Some(Box::new(lop.val.clone()));
+            }
             DataType::Unknown => {
                 let m = format!("IR conversion failed for {}", lop.val);
                 diags.err1("IR_2", &m, lop.src_loc.clone());
-                *result = false;
-                return Box::new(lop.val.clone());
-            },
+                return None;
+            }
         };
     }
 
     fn process_lin_operands(&mut self, lin_db: &LinearDb, diags: &mut Diags) -> bool {
         for lop in lin_db.operand_vec.iter() {
-            let mut result = true;
+            let val = self.get_box_val(lop, diags);
+            if val.is_none() {
+                return false;
+            }
+            let val = val.unwrap();
             let kind = lop.kind;
             let data_type = lop.data_type;
             let src_loc = lop.src_loc.clone();
-            let val = self.get_box_val(lop, diags, &mut result);
-            self.parms.push(IROperand{ kind, data_type, src_loc, val});
+            self.parms.push(IROperand{ kind, data_type, src_loc, val });
         }
 
         true
@@ -135,13 +136,14 @@ impl IRDb {
     pub fn new(lin_db: &LinearDb, diags: &mut Diags) -> Option<IRDb> {
         let mut ir_db = IRDb { ir_vec: Vec::new(), parms: Vec::new() };
 
-        let mut result = ir_db.process_lin_operands(lin_db, diags);
-        result &= ir_db.process_linear_ir(lin_db, diags);
-        
-        if !result {
+        if !ir_db.process_lin_operands(lin_db, diags) {
             return None;
         }
 
+        if !ir_db.process_linear_ir(lin_db, diags) {
+            return None;
+        }
+        
         Some(ir_db)
     }
 

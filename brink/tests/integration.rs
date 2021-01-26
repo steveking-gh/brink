@@ -339,7 +339,7 @@ fn fuzz_found_10() {
     .arg("tests/fuzz_found_10.brink")
     .assert()
     .failure()
-    .stderr(predicates::str::contains("[IR_5]"));
+    .stderr(predicates::str::contains("[IR_1]"));
 }
 
 #[test]
