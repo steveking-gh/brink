@@ -353,6 +353,16 @@ fn fuzz_found_11() {
 }
 
 #[test]
+fn fuzz_found_12() {
+    let _cmd = Command::cargo_bin("brink")
+    .unwrap()
+    .arg("tests/fuzz_found_12.brink")
+    .assert()
+    .failure()
+    .stderr(predicates::str::contains("[AST_11]"));
+}
+
+#[test]
 fn missing_brace_1() {
     let _cmd = Command::cargo_bin("brink")
     .unwrap()

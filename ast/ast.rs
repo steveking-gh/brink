@@ -663,7 +663,15 @@ impl<'toks> AstDb<'toks> {
         debug!("AstDb::validate_section_name: NodeId {}", parent_nid);
 
         let mut children = parent_nid.children(&ast.arena);
-        let sec_name_nid = children.next().unwrap();
+        let sec_name_nid_opt = children.next();
+        if sec_name_nid_opt.is_none() {
+            // error, specified section does not exist
+            let m = format!("Missing section name");
+            let section_tinfo = ast.get_tinfo(parent_nid);
+            diags.err1("AST_11", &m, section_tinfo.span());
+            return false;
+        }
+        let sec_name_nid = sec_name_nid_opt.unwrap();
         let sec_tinfo = ast.get_tinfo(sec_name_nid);
         let sec_str = sec_tinfo.val;
         if !sections.contains_key(sec_str) {
