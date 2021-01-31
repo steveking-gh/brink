@@ -245,7 +245,7 @@ fn section_rename_err_1() {
 fn fuzz_found_1() {
     let _cmd = Command::cargo_bin("brink")
     .unwrap()
-    .arg("tests/fuzz_found_2.brink")
+    .arg("tests/fuzz_found_1.brink")
     .assert()
     .failure()
     .stderr(predicates::str::contains("[PROC_1]"));
