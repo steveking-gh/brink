@@ -57,15 +57,15 @@ pub enum LexToken {
 #[derive(Debug, Clone, PartialEq)]
 pub struct TokenInfo<'toks> {
     /// The token enum as identified by logos
-    pub tok : LexToken,
+    pub tok: LexToken,
 
     /// The range of bytes in the source file occupied
     /// by this token.  Diagnostics require this range
     /// when producing errors.
-    pub loc : Span,
+    pub loc: Span,
 
     /// The value of the token.
-    pub val : &'toks str,
+    pub val: &'toks str,
 }
 
 impl<'toks> TokenInfo<'toks> {
@@ -85,13 +85,28 @@ pub struct Ast<'toks> {
 
     /// A vector of info about for tokens identified by logos.
     pub tv: Vec<TokenInfo<'toks>>,
-
+ 
     /// The artificial root of the tree.  The children of this
     /// tree are the top level tokens in the user's source file.
     pub root: NodeId,
+
+    /// The current token number pointer wihtin the tv
+    pub tok_num: usize,
 }
 
 impl<'toks> Ast<'toks> {
+
+    /// Peek at the next token info object, if any.
+    fn peek(&self) -> Option<&TokenInfo<'toks>> {
+        self.tv.get(self.tok_num)
+    }
+
+    /// Take the next token info object, if any.
+    fn take(&mut self) -> Option<&TokenInfo<'toks>> {
+        let tinfo = self.tv.get(self.tok_num);
+        self.tok_num += 1;
+        tinfo
+    }
 
     /// Create a new abstract syntax tree.
     pub fn new(fstr: &'toks str, diags: &mut Diags) -> Option<Self> {
@@ -103,7 +118,7 @@ impl<'toks> Ast<'toks> {
             debug!("ast::new: Token {} = {:?}", tv.len(), tok);
             tv.push(TokenInfo{tok, val:lex.slice(), loc: lex.span()});
         }
-        let mut ast = Self { arena, tv, root };
+        let mut ast = Self { arena, tv, root, tok_num: 0 };
         if !ast.parse(diags) {
             // ast construction failed.  Let the caller report
             // this in whatever way they want.
@@ -114,13 +129,13 @@ impl<'toks> Ast<'toks> {
     }
 
     // Boilerplate entry for recursive descent parsing functions.
-    fn dbg_enter(&self, func_name: &str, tok_num: usize) {
-        if tok_num < self.tv.len() {
-            debug!("Ast::{} >>>> ENTER, {}:{} is {:?}", func_name, tok_num,
-                   self.tv[tok_num].val, self.tv[tok_num].tok);
+    fn dbg_enter(&self, func_name: &str) {
+        if let Some(tinfo) = self.peek() {
+            debug!("Ast::{} >>>> ENTER, {}:{} is {:?}", func_name, self.tok_num,
+                   tinfo.val, tinfo.tok);
         } else {
-            debug!("Ast::{} >>>> ENTER, {}:{} is {}", func_name, tok_num,
-                   "<tok out of range>", "<tok out of range>");
+            debug!("Ast::{} >>>> ENTER, {}:{} is {}", func_name, self.tok_num,
+                   "<end of input>", "<end of input>");
         }
     }
 
@@ -149,38 +164,41 @@ impl<'toks> Ast<'toks> {
     /// between elements in the source file.  We check syntax and grammar during
     /// tree construction.
     fn parse(&mut self, diags: &mut Diags) -> bool {
-        self.dbg_enter("parse", 0);
+        self.dbg_enter("parse");
         let toks_end = self.tv.len();
         debug!("Ast::parse: Total of {} tokens", toks_end);
 
-        let mut tok_num = 0;
+        let mut result = true;
+        while let Some(tinfo) = self.peek() {
+            debug!("Ast::parse: Parsing token {}: {:?}", self.tok_num, tinfo);
+            result &= match tinfo.tok {
+                LexToken::Section => self.parse_section(self.root, diags),
+                LexToken::Output => self.parse_output(self.root, diags),
 
-        // We can't simply iterate on the token vector because the loop consumes
-        // tokens from the vector recursively in varying amounts.
-        //
-        // Complete the loop even if some parsing fails to give the user more
-        // errors at a time.
-        let mut success = true;
-        while tok_num < toks_end {
-            let tinfo = &self.tv[tok_num];
-            debug!("Ast::parse: Parsing token {}: {:?}", &mut tok_num, tinfo);
-            success &= match tinfo.tok {
-                LexToken::Section => self.parse_section(&mut tok_num, self.root, diags),
-                LexToken::Output => self.parse_output(&mut tok_num, self.root, diags),
-                _ => {tok_num += 1; false },
+                // Unrecognized top level token.  Report the error, but keep going
+                // to try to give the user more errors in batches.
+                _ => {
+                    let msg = format!("Unrecognized token '{}' at top level scope", tinfo.val);
+                    diags.err1("AST_18", &msg, tinfo.span());
+
+                    // Skip the bad token.
+                    self.tok_num += 1;
+                    false
+                },
             };
         }
-        self.dbg_exit("parse", success)
+        self.dbg_exit("parse", result)
     }
 
-    fn err_expected_after(&self, diags: &mut Diags, code: &str, msg: &str, tok_num: &usize) {
-        let m = format!("{}, but found '{}'", msg, self.tv[*tok_num].val);
-        diags.err2(code, &m, self.tv[*tok_num].span(), self.tv[*tok_num-1].span());
+    fn err_expected_after(&self, diags: &mut Diags, code: &str, msg: &str) {
+        let m = format!("{}, but found '{}'", msg, self.tv[self.tok_num].val);
+        diags.err2(code, &m, self.tv[self.tok_num].span(), 
+   self.tv[self.tok_num-1].span());
     }
 
-    fn err_invalid_expression(&self, diags: &mut Diags, code: &str, tok_num: &usize) {
-        let m = format!("Invalid expression '{}'", self.tv[*tok_num].val);
-        diags.err1(code, &m, self.tv[*tok_num].span());
+    fn err_invalid_expression(&self, diags: &mut Diags, code: &str) {
+        let m = format!("Invalid expression '{}'", self.tv[self.tok_num].val);
+        diags.err1(code, &m, self.tv[self.tok_num].span());
     }
 
     fn err_no_input(&self, diags: &mut Diags) {
@@ -193,42 +211,38 @@ impl<'toks> Ast<'toks> {
     }
 
     /// Attempts to advance the token number past the next semicolon
-    /// The token number returned may be invalid.  This function is
+    /// The final token number may be invalid.  This function is
     /// used to try to recover from syntax errors.
-    fn advance_past_semicolon(&self, tok_num: usize) -> usize {
-        let mut tnum = tok_num;
-        while let Some(tinfo) = self.tv.get(tnum) {
-            tnum += 1;
+    fn advance_past_semicolon(&mut self) {
+        while let Some(tinfo) = self.take() {
             if tinfo.tok == LexToken::Semicolon {
                 break;
             }
         }
-        tnum
     }
 
     /// Add the specified token as a child of the parent.
     /// Advance the token number and return the new node ID for the input token.
-    fn add_to_parent_and_advance(&mut self, tok_num: &mut usize, parent: NodeId) -> NodeId {
-        let nid = self.arena.new_node(*tok_num);
+    fn add_to_parent_and_advance(&mut self, parent: NodeId) -> NodeId {
+        let nid = self.arena.new_node(self.tok_num);
         parent.append(nid, &mut self.arena);
-        *tok_num += 1;
+        self.tok_num += 1;
         nid
     }
 
-    fn expect_leaf(&mut self, diags: &mut Diags, tok_num : &mut usize,
-        parent : NodeId, expected_token: LexToken, code: &str,
+    fn expect_leaf(&mut self, diags: &mut Diags, parent : NodeId, expected_token: LexToken, code: &str,
         context: &str) -> bool {
 
-        self.dbg_enter("expect_leaf", *tok_num);
+        self.dbg_enter("expect_leaf");
 
         let mut result = false;
 
-        if let Some(tinfo) = self.tv.get(*tok_num) {
+        if let Some(tinfo) = self.peek() {
             if expected_token == tinfo.tok {
-                self.add_to_parent_and_advance(tok_num, parent);
+                self.add_to_parent_and_advance(parent);
                 result = true;
             } else {
-                self.err_expected_after(diags, code, context, tok_num);
+                self.err_expected_after(diags, code, context);
             }
         } else {
             self.err_no_input(diags);
@@ -239,15 +253,14 @@ impl<'toks> Ast<'toks> {
 
     /// Process an expected semicolon.  This function is just a convenient
     /// specialization of expect_leaf().
-    fn expect_semi(&mut self, diags: &mut Diags, tok_num : &mut usize,
-                   parent : NodeId) -> bool {
+    fn expect_semi(&mut self, diags: &mut Diags, parent : NodeId) -> bool {
 
-        if let Some(tinfo) = self.tv.get(*tok_num) {
+        if let Some(tinfo) = self.peek() {
             if LexToken::Semicolon == tinfo.tok {
-                self.add_to_parent_and_advance(tok_num, parent);
+                self.add_to_parent_and_advance(parent);
                 return true;
             } else {
-                self.err_expected_after(diags, "AST_17", "Expected ';'", tok_num);
+                self.err_expected_after(diags, "AST_17", "Expected ';'");
             }
         } else {
             self.err_no_input(diags);
@@ -256,55 +269,53 @@ impl<'toks> Ast<'toks> {
         false
     }
 
-    fn parse_section(&mut self, tok_num : &mut usize, parent : NodeId,
-                    diags: &mut Diags) -> bool {
-
-
-        self.dbg_enter("parse_section", *tok_num);
+    /// Parse a section definition.
+    fn parse_section(&mut self, parent : NodeId, diags: &mut Diags) -> bool {
+        self.dbg_enter("parse_section");
         let mut result = false;
         // Sections are always children of the root node, but no need to make
         // that a special case here.
-        let sec_nid = self.add_to_parent_and_advance(tok_num, parent);
+        let sec_nid = self.add_to_parent_and_advance(parent);
 
         // After 'section' an identifier is expected
-        if self.expect_leaf(diags, tok_num, sec_nid, LexToken::Identifier, "AST_1",
-                            "Expected an identifier after section") {
+        if self.expect_leaf(diags, sec_nid, LexToken::Identifier, "AST_1",
+                     "Expected an identifier after section") {
             // After a section identifier, expect an open brace.
             // Remember the location of the opening brace to help with
             // user missing brace errors.
-            let brace_toknum = *tok_num;
-            if self.expect_leaf(diags, tok_num, sec_nid, LexToken::OpenBrace, "AST_2",
-                                "Expected { after identifier") {
-                result = self.parse_section_contents(tok_num, sec_nid, diags, brace_toknum);
+            let brace_toknum = self.tok_num;
+            if self.expect_leaf(diags, sec_nid, LexToken::OpenBrace, "AST_2",
+                         "Expected { after identifier") {
+                result = self.parse_section_contents(sec_nid, diags, brace_toknum);
             }
         }
         self.dbg_exit("parse_section", result)
     }
 
     /// Parse all possible content within a section.
-    fn parse_section_contents(&mut self, tok_num : &mut usize, parent : NodeId,
-                              diags: &mut Diags, brace_tok_num: usize) -> bool {
+    fn parse_section_contents(&mut self, parent : NodeId, diags: &mut Diags,
+                              brace_tok_num: usize) -> bool {
 
-        self.dbg_enter("parse_section_contents", *tok_num);
-        let mut success = true; // todo fixme
-        while let Some(tinfo) = self.tv.get(*tok_num) {
-            debug!("Ast::parse_section_contents: token {}:{}", *tok_num, tinfo.val);
+        self.dbg_enter("parse_section_contents");
+        let mut result = true; // todo fixme
+
+        while let Some(tinfo) = self.peek() {
+            debug!("Ast::parse_section_contents: token {}:{}", self.tok_num, tinfo.val);
             // todo rewrite as match statement
             // When we find a close brace, we're done with section content
             if tinfo.tok == LexToken::CloseBrace {
-                self.parse_leaf(tok_num, parent);
-                return self.dbg_exit("parse_section_contents", success);
+                self.parse_leaf(parent);
+                return self.dbg_exit("parse_section_contents", result);
             }
 
             // Stay in the section even after errors to give the user
             // more than one error at a time
             let parse_ok = match tinfo.tok {
-                LexToken::Wr => self.parse_wr(tok_num, parent, diags),
-                LexToken::Wrs => self.parse_wrs(tok_num, parent, diags),
-                LexToken::Assert => self.parse_assert(tok_num, parent, diags),
+                LexToken::Wr => self.parse_wr(parent, diags),
+                LexToken::Wrs => self.parse_wrs(parent, diags),
+                LexToken::Assert => self.parse_assert(parent, diags),
                 _ => {
-                    self.err_invalid_expression(diags, "AST_3", tok_num);
-                    *tok_num += 1;
+                    self.err_invalid_expression(diags, "AST_3");
                     false
                 }
             };
@@ -312,9 +323,9 @@ impl<'toks> Ast<'toks> {
             // If something went wrong, then advance to the next semi
             // and try to keep going to give users more errors to fix.
             if !parse_ok {
-                debug!("Ast::parse_section_contents: skipping to next ; starting from {}", *tok_num);
-                *tok_num = self.advance_past_semicolon(*tok_num);
-                success = false;
+                debug!("Ast::parse_section_contents: skipping to next ; starting from {}", self.tok_num);
+                self.advance_past_semicolon();
+                result = false;
             }
         }
 
@@ -324,36 +335,34 @@ impl<'toks> Ast<'toks> {
     }
 
     // Parser for writing a section
-    fn parse_wr(&mut self, tok_num : &mut usize, parent_nid : NodeId,
-                diags: &mut Diags) -> bool {
+    fn parse_wr(&mut self, parent_nid : NodeId, diags: &mut Diags) -> bool {
 
-        self.dbg_enter("parse_wr", *tok_num);
+        self.dbg_enter("parse_wr");
         let mut result = false;
 
         // Add the wr keyword as a child of the parent and advance
-        let wr_nid = self.add_to_parent_and_advance(tok_num, parent_nid);
+        let wr_nid = self.add_to_parent_and_advance(parent_nid);
 
         // Next, an identifier (section name) is expected
-        if self.expect_leaf(diags, tok_num, wr_nid, LexToken::Identifier, "AST_15",
-                             "Expected a section name after 'wr'") {
-            result = self.expect_semi(diags, tok_num, wr_nid);
+        if self.expect_leaf(diags, wr_nid, LexToken::Identifier, "AST_15",
+                    "Expected a section name after 'wr'") {
+            result = self.expect_semi(diags, wr_nid);
         }
         self.dbg_exit("parse_wr", result)
     }
 
     /// Parser for writing a string
-    fn parse_wrs(&mut self, tok_num : &mut usize, parent_nid : NodeId,
-                diags: &mut Diags) -> bool {
+    fn parse_wrs(&mut self, parent_nid : NodeId, diags: &mut Diags) -> bool {
 
-        self.dbg_enter("parse_wrs", *tok_num);
+        self.dbg_enter("parse_wrs");
         let mut result = false;
         // Add the wrs keyword as a child of the parent and advance
-        let wrs_nid = self.add_to_parent_and_advance(tok_num, parent_nid);
+        let wrs_nid = self.add_to_parent_and_advance(parent_nid);
 
         // Next, a quoted string is expected
-        if self.expect_leaf(diags, tok_num, wrs_nid, LexToken::QuotedString, "AST_4",
-                             "Expected a quoted string after 'wrs'") {
-            result = self.expect_semi(diags, tok_num, wrs_nid);
+        if self.expect_leaf(diags, wrs_nid, LexToken::QuotedString, "AST_4",
+                    "Expected a quoted string after 'wrs'") {
+            result = self.expect_semi(diags, wrs_nid);
         }
         self.dbg_exit("parse_wrs", result)
     }
@@ -374,24 +383,25 @@ impl<'toks> Ast<'toks> {
     }
 
     /// Parse an expression with correct precedence up to the next semicolon.
-    fn parse_expr(&mut self, tok_num: &mut usize, prev_nid: NodeId,
-                  diags: &mut Diags) -> bool {
+    fn parse_expr(&mut self, prev_nid: NodeId, diags: &mut Diags) -> bool {
 
-        self.dbg_enter("Ast::parse_expr", *tok_num);
+        self.dbg_enter("Ast::parse_expr");
         let top_tinfo = self.get_tinfo(prev_nid);
         let (_,top_rbp) = Ast::get_binding_power(top_tinfo.tok);
         debug!("Ast::parse_expr: Previous nid {} is '{}' with rbp {}",
                prev_nid, self.get_tinfo(prev_nid).val, top_rbp);
         let mut result = false;
 
-        if let Some(tinfo) = self.tv.get(*tok_num) {
+        // We can't use peek() here because the borrow checker needs to see
+        // what we're reading.  The problem is tinfo lifetime.
+        if let Some(tinfo) = self.tv.get(self.tok_num) {
             // If we've finally found a semicolon, stop recursing.
             // The caller will deal with where to attach the semicolon.
             if tinfo.tok == LexToken::Semicolon {
                 result = true;
             } else {
                 // allocate a node ID for this token
-                let nid = self.arena.new_node(*tok_num);
+                let nid = self.arena.new_node(self.tok_num);
                 let (lbp, rbp) = Ast::get_binding_power(tinfo.tok);
                 debug!("Ast::parse_expr: curret nid {} is '{}' with binding power ({},{})",
                         nid, tinfo.val, lbp, rbp);
@@ -441,11 +451,11 @@ impl<'toks> Ast<'toks> {
                 }
 
                 // Advance to the next token
-                *tok_num += 1;
+                self.tok_num += 1;
                 /*
                 self.dump(&format!("ast_{}.dot", nid)); // debug to show each step
                 */
-                result = self.parse_expr(tok_num, nid, diags);
+                result = self.parse_expr(nid, diags);
             }
         } else {
             self.err_no_input(diags);
@@ -458,48 +468,44 @@ impl<'toks> Ast<'toks> {
     /// We do not yet have full mathematical expression evaluation.
     /// The assert must be a 3 part expression with the middle lexical element
     /// either a == or !=.
-    fn parse_assert(&mut self, tok_num: &mut usize, parent: NodeId,
-                    diags: &mut Diags) -> bool {
+    fn parse_assert(&mut self, parent: NodeId, diags: &mut Diags) -> bool {
 
-        self.dbg_enter("parse_assert", *tok_num);
+        self.dbg_enter("parse_assert");
         // Add the assert keyword as a child of the parent
-        let assert_nid = self.add_to_parent_and_advance(tok_num, parent);
-        let mut result = self.parse_expr(tok_num, assert_nid, diags);
-        // we expect the current token to be a semicolon.
+        let assert_nid = self.add_to_parent_and_advance(parent);
+        let mut result = self.parse_expr(assert_nid, diags);
+        // We expect the current token to be a semicolon.
+        // If we're already in an error condition, don't bother.
         if result {
-            result = self.expect_semi(diags, tok_num, assert_nid);
+            result = self.expect_semi(diags, assert_nid);
         }
 
         self.dbg_exit("parse_assert", result)
     }
 
-    fn parse_output(&mut self, tok_num : &mut usize, parent : NodeId,
-                        diags: &mut Diags) -> bool {
+    fn parse_output(&mut self, parent : NodeId, diags: &mut Diags) -> bool {
 
-        self.dbg_enter("parse_output", *tok_num);
+        self.dbg_enter("parse_output");
         let mut result = false;
         // Add the section keyword as a child of the parent and advance
-        let output_nid = self.add_to_parent_and_advance(tok_num, parent);
+        let output_nid = self.add_to_parent_and_advance(parent);
 
         // After 'output' a section identifier is expected
-        if self.expect_leaf(diags, tok_num, output_nid, LexToken::Identifier, "AST_7",
-                             "Expected a section name after output") {
-            result = self.expect_semi(diags, tok_num, output_nid);
+        if self.expect_leaf(diags, output_nid, LexToken::Identifier, "AST_7",
+                    "Expected a section name after output") {
+            result = self.expect_semi(diags, output_nid);
         }
 
         self.dbg_exit("parse_output", result)
     }
 
-    /**
-     * Adds the token as a child of teh parent and advances
-     * the token index.
-     */
-    fn parse_leaf(&mut self, tok_num : &mut usize, parent : NodeId) {
-        let tinfo = &self.tv[*tok_num]; // debug! only
-        debug!("Ast::parse_leaf: Parsing token {}: {:?}", *tok_num, tinfo);
-        let node = self.arena.new_node(*tok_num);
-        parent.append(node, &mut self.arena);
-        *tok_num += 1;
+    
+     /// Adds the current token as a child of the parent and advances
+     /// the token index.  The current token MUST BE VALID!
+    fn parse_leaf(&mut self, parent : NodeId) {
+        let nid = self.arena.new_node(self.tok_num);
+        parent.append(nid, &mut self.arena);
+        self.tok_num += 1;
     }
 
     pub fn get_tinfo(&self, nid: NodeId) -> &'toks TokenInfo {
