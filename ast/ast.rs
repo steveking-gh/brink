@@ -1,5 +1,5 @@
 use logos::{Logos};
-use indextree::{Arena,NodeId};
+use indextree::{Arena, NodeId};
 pub type Span = std::ops::Range<usize>;
 use std::collections::{HashMap,HashSet};
 use std::option;
@@ -239,13 +239,12 @@ impl<'toks> Ast<'toks> {
 
     /// Process an expected semicolon.  This function is just a convenient
     /// specialization of expect_leaf().
-    fn expect_semi(&mut self, diags: &mut Diags, tok_num : &mut usize,
-                   parent : NodeId) -> bool {
-
+    fn expect_semi(&mut self, diags: &mut Diags, tok_num: &mut usize) -> Option<NodeId> {
+        let mut nid = None;
         if let Some(tinfo) = self.tv.get(*tok_num) {
             if LexToken::Semicolon == tinfo.tok {
-                self.add_to_parent_and_advance(tok_num, parent);
-                return true;
+                nid = Some(self.arena.new_node(*tok_num));
+                *tok_num += 1;
             } else {
                 self.err_expected_after(diags, "AST_17", "Expected ';'", tok_num);
             }
@@ -253,7 +252,7 @@ impl<'toks> Ast<'toks> {
             self.err_no_input(diags);
         }
 
-        false
+        nid
     }
 
     fn parse_section(&mut self, tok_num : &mut usize, parent : NodeId,
@@ -328,7 +327,7 @@ impl<'toks> Ast<'toks> {
                 diags: &mut Diags) -> bool {
 
         self.dbg_enter("parse_wr", *tok_num);
-        let mut result = false;
+        let mut result = true;
 
         // Add the wr keyword as a child of the parent and advance
         let wr_nid = self.add_to_parent_and_advance(tok_num, parent_nid);
@@ -336,7 +335,11 @@ impl<'toks> Ast<'toks> {
         // Next, an identifier (section name) is expected
         if self.expect_leaf(diags, tok_num, wr_nid, LexToken::Identifier, "AST_15",
                              "Expected a section name after 'wr'") {
-            result = self.expect_semi(diags, tok_num, wr_nid);
+            if let Some(nid) = self.expect_semi(diags, tok_num) {
+                wr_nid.append(nid, &mut self.arena);
+            } else {
+                result = false;
+            }
         }
         self.dbg_exit("parse_wr", result)
     }
@@ -346,14 +349,18 @@ impl<'toks> Ast<'toks> {
                 diags: &mut Diags) -> bool {
 
         self.dbg_enter("parse_wrs", *tok_num);
-        let mut result = false;
+        let mut result = true;
         // Add the wrs keyword as a child of the parent and advance
         let wrs_nid = self.add_to_parent_and_advance(tok_num, parent_nid);
 
         // Next, a quoted string is expected
         if self.expect_leaf(diags, tok_num, wrs_nid, LexToken::QuotedString, "AST_4",
                              "Expected a quoted string after 'wrs'") {
-            result = self.expect_semi(diags, tok_num, wrs_nid);
+            if let Some(nid) = self.expect_semi(diags, tok_num) {
+                wrs_nid.append(nid, &mut self.arena);
+            } else {
+                result = false;
+            }
         }
         self.dbg_exit("parse_wrs", result)
     }
@@ -467,7 +474,11 @@ impl<'toks> Ast<'toks> {
         let mut result = self.parse_expr(tok_num, assert_nid, diags);
         // we expect the current token to be a semicolon.
         if result {
-            result = self.expect_semi(diags, tok_num, assert_nid);
+            if let Some(nid) = self.expect_semi(diags, tok_num) {
+                assert_nid.append(nid, &mut self.arena);
+            } else {
+                result = false;
+            }
         }
 
         self.dbg_exit("parse_assert", result)
@@ -477,14 +488,19 @@ impl<'toks> Ast<'toks> {
                         diags: &mut Diags) -> bool {
 
         self.dbg_enter("parse_output", *tok_num);
-        let mut result = false;
+        let mut result = true;
         // Add the section keyword as a child of the parent and advance
         let output_nid = self.add_to_parent_and_advance(tok_num, parent);
 
         // After 'output' a section identifier is expected
         if self.expect_leaf(diags, tok_num, output_nid, LexToken::Identifier, "AST_7",
                              "Expected a section name after output") {
-            result = self.expect_semi(diags, tok_num, output_nid);
+            if let Some(nid) = self.expect_semi(diags, tok_num) {
+                output_nid.append(nid, &mut self.arena);
+            } else {
+                result = false;
+            }
+
         }
 
         self.dbg_exit("parse_output", result)
