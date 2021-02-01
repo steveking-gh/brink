@@ -1,0 +1,6 @@
+section foo {
+    wrs "Wow!";
+    assert 10 * 2 + 8 == 28;
+}
+
+output foo;

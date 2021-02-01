@@ -242,6 +242,20 @@ fn assert_7() {
 }
 
 #[test]
+fn assert_8() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/assert_8.brink")
+                .arg("-o assert_8.bin")
+                .assert()
+                .success();
+
+    // Verify output file is correct.  If so, then clean up.
+    assert_eq!("Wow!", fs::read_to_string("assert_8.bin").unwrap());
+    fs::remove_file("assert_8.bin").unwrap();
+}
+
+#[test]
 fn section_rename_err_1() {
     let _cmd = Command::cargo_bin("brink")
     .unwrap()
