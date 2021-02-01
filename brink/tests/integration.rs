@@ -319,7 +319,7 @@ fn fuzz_found_8() {
     .arg("tests/fuzz_found_8.brink")
     .assert()
     .failure()
-    .stderr(predicates::str::contains("[LINEAR_3]"));
+    .stderr(predicates::str::contains("[AST_19]"));
 }
 
 #[test]
@@ -329,7 +329,7 @@ fn fuzz_found_9() {
     .arg("tests/fuzz_found_9.brink")
     .assert()
     .failure()
-    .stderr(predicates::str::contains("[IR_5]"));
+    .stderr(predicates::str::contains("[AST_19]"));
 }
 
 #[test]
@@ -349,7 +349,7 @@ fn fuzz_found_11() {
     .arg("tests/fuzz_found_11.brink")
     .assert()
     .failure()
-    .stderr(predicates::str::contains("[LINEAR_4]"));
+    .stderr(predicates::str::contains("[AST_19]"));
 }
 
 #[test]
@@ -359,7 +359,7 @@ fn fuzz_found_12() {
     .arg("tests/fuzz_found_12.brink")
     .assert()
     .failure()
-    .stderr(predicates::str::contains("[AST_11]"));
+    .stderr(predicates::str::contains("[AST_19]"));
 }
 
 #[test]

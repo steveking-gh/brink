@@ -3,9 +3,8 @@ use indextree::{Arena,NodeId};
 pub type Span = std::ops::Range<usize>;
 use std::collections::{HashMap,HashSet};
 use std::option;
-use anyhow::{bail};
 use diags::Diags;
-use anyhow::{Context};
+use anyhow::{Context, bail};
 use std::fs::File;
 use std::io::prelude::*;
 
@@ -131,10 +130,10 @@ impl<'toks> Ast<'toks> {
     // Boilerplate entry for recursive descent parsing functions.
     fn dbg_enter(&self, func_name: &str) {
         if let Some(tinfo) = self.peek() {
-            debug!("Ast::{} >>>> ENTER, {}:{} is {:?}", func_name, self.tok_num,
+            debug!("Ast::{} ENTER, {}:{} is {:?}", func_name, self.tok_num,
                    tinfo.val, tinfo.tok);
         } else {
-            debug!("Ast::{} >>>> ENTER, {}:{} is {}", func_name, self.tok_num,
+            debug!("Ast::{} ENTER, {}:{} is {}", func_name, self.tok_num,
                    "<end of input>", "<end of input>");
         }
     }
@@ -143,7 +142,15 @@ impl<'toks> Ast<'toks> {
     // This function returns the result and should be the last statement
     // in each function
     fn dbg_exit(&self, func_name: &str, result: bool) -> bool {
-        debug!("Ast::{} <<<< EXIT {:?}", func_name, result);
+        debug!("Ast::{} EXIT {:?}", func_name, result);
+        result
+    }
+
+    // Boilerplate exit for recursive descent parsing functions.
+    // This function returns the result and should be the last statement
+    // in each function
+    fn dbg_exit_pratt(&self, func_name: &str, result: Option<NodeId>) -> Option<NodeId> {
+        debug!("Ast::{} EXIT {:?}", func_name, result);
         result
     }
 
@@ -383,85 +390,91 @@ impl<'toks> Ast<'toks> {
     }
 
     /// Parse an expression with correct precedence up to the next semicolon.
-    fn parse_expr(&mut self, prev_nid: NodeId, diags: &mut Diags) -> bool {
+    /// This is a Pratt parser that returns the NodeID at the top of the local AST.
+    /// See https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
+    /// for a nice explanation of Pratt parsers with Rust.
+    /// On return, the terminal semicolon will be the next unprocessed token.
+    fn parse_pratt(&mut self, min_bp: u8, diags: &mut Diags) -> Option<NodeId> {
 
-        self.dbg_enter("Ast::parse_expr");
-        let top_tinfo = self.get_tinfo(prev_nid);
-        let (_,top_rbp) = Ast::get_binding_power(top_tinfo.tok);
-        debug!("Ast::parse_expr: Previous nid {} is '{}' with rbp {}",
-               prev_nid, self.get_tinfo(prev_nid).val, top_rbp);
-        let mut result = false;
-
-        // We can't use peek() here because the borrow checker needs to see
-        // what we're reading.  The problem is tinfo lifetime.
-        if let Some(tinfo) = self.tv.get(self.tok_num) {
-            // If we've finally found a semicolon, stop recursing.
-            // The caller will deal with where to attach the semicolon.
-            if tinfo.tok == LexToken::Semicolon {
-                result = true;
-            } else {
-                // allocate a node ID for this token
-                let nid = self.arena.new_node(self.tok_num);
-                let (lbp, rbp) = Ast::get_binding_power(tinfo.tok);
-                debug!("Ast::parse_expr: curret nid {} is '{}' with binding power ({},{})",
-                        nid, tinfo.val, lbp, rbp);
-                if lbp < top_rbp {
-                    // The left side binding power (lbp) of the current token
-                    // is lower than the top token's right side binding power (rbp).
-                    // Therefore, we must evaluate the top token first.
-                    // The top token becomes a child of the current token and the current
-                    // token becomes the new top.
-                    // We detach the old top token from its former parent and
-                    // attach the current token in its place.
-                    assert!(prev_nid.ancestors(&mut self.arena).count() >= 2);
-                    // The first ancestor of the old top is the top itself, which is strange.
-                    // Therefore, use a skip(1) to skip past this node.
-                    // Additional ancestors exist all the way back to the root, but
-                    // we stop as soon as we find a lower precedence.  The owner of the entire
-                    // expression, e.g. an assert, has precedence 0, so we always stop before
-                    // reaching the root.
-                    let mut ancestor_iter = prev_nid.ancestors(&self.arena).skip(1);
-                    let mut ancestor_nid;
-                    let mut ancestor_tinfo;
-                    let mut ancestor_minus_1_nid = prev_nid;
-                    loop {
-                        ancestor_nid = ancestor_iter.next().unwrap();
-                        ancestor_tinfo = self.get_tinfo(ancestor_nid);
-                        let (_,ancestor_rbp) = Ast::get_binding_power(ancestor_tinfo.tok);
-                        debug!("Ast::parse_expr: Checking ancestor nid {} '{}' with rbp of {}",
-                                ancestor_nid, ancestor_tinfo.val, ancestor_rbp);
-                        if lbp >= ancestor_rbp {
-                            break;
-                        }
-                        ancestor_minus_1_nid = ancestor_nid;
-                    }
-                    debug!("Ast::parse_expr: found new parent nid {} is '{}'",
-                            ancestor_nid, ancestor_tinfo.val);
-                    ancestor_minus_1_nid.detach(&mut self.arena);
-                    ancestor_nid.append(nid, &mut self.arena);
-                    nid.append(ancestor_minus_1_nid, &mut self.arena);
-                } else {
-                    // The left side binding power (lbp) of the current token is
-                    // greater or equal to the previous token's right side binding
-                    // power (rbp). Therefore, we must evaluate the current token
-                    // first. The prev_nid becomes the parent of the current nid.
-                    // We take this path with the original assert as the top.
-                    debug!("Ast::parse_expr: {} is child of {}", nid, prev_nid);
-                    prev_nid.append(nid, &mut self.arena);
-                }
-
-                // Advance to the next token
-                self.tok_num += 1;
-                /*
-                self.dump(&format!("ast_{}.dot", nid)); // debug to show each step
-                */
-                result = self.parse_expr(nid, diags);
-            }
-        } else {
+        self.dbg_enter("parse_pratt");
+        debug!("Ast::parse_pratt: Min BP = {}", min_bp);
+        let lhs_tinfo = self.peek();
+        if lhs_tinfo.is_none() {
             self.err_no_input(diags);
+            return self.dbg_exit_pratt("parse_pratt", None);
         }
-        debug!("Done with prev_nid {}", prev_nid);
-        self.dbg_exit("parse_expr", result)
+
+        let lhs_tinfo = lhs_tinfo.unwrap();
+
+        match lhs_tinfo.tok {
+            LexToken::Semicolon => {
+                // Done!
+                return self.dbg_exit_pratt("parse_pratt", None);
+            }
+            LexToken::Int => {}
+            _ => {
+                let msg = format!("Invalid expression operand '{}'", lhs_tinfo.val);
+                diags.err1("AST_19", &msg, lhs_tinfo.span());
+                return self.dbg_exit_pratt("parse_pratt", None);
+            }
+        }
+
+        let mut lhs_nid = Some(self.arena.new_node(self.tok_num));
+        self.tok_num += 1;
+
+        loop {
+
+            // We expect an operation such as add, a semicolon, or EOF.
+            let op_tinfo = self.peek();
+            if op_tinfo.is_none() {
+                break;
+            }
+
+            let op_tinfo = op_tinfo.unwrap();
+            match op_tinfo.tok {
+                LexToken::Semicolon => { break; }
+                LexToken::EqEq |
+                LexToken::Plus |
+                LexToken::Asterisk => {}
+                _ => {
+                    let msg = format!("Invalid operation '{}'", op_tinfo.val);
+                    diags.err1("AST_18", &msg, op_tinfo.span());
+                    break;
+                }
+            }
+
+            let (lbp,rbp) = Ast::get_binding_power(op_tinfo.tok);
+
+            debug!("Ast::parse_pratt: operation '{}' with (lbp,rbp) = ({},{})",
+                    op_tinfo.val, lbp, rbp );
+
+            // A decrease in operator precedence ends the iteration.
+            if lbp < min_bp {
+                break;
+            }
+
+            let op_nid = self.arena.new_node(self.tok_num);
+            self.tok_num += 1;
+
+            // attach the left hand size as a child of the operation
+            op_nid.append(lhs_nid.unwrap(), &mut self.arena);
+
+            // The operation is the new left-hand-side from our caller's point of view
+            lhs_nid = Some(op_nid);
+
+            // Recurse into the right hand side of the operation, if any
+            let rhs_nid = self.parse_pratt(rbp, diags);
+
+            if let Some(rhs_nid) = rhs_nid {
+                op_nid.append(rhs_nid, &mut self.arena);
+            } else {
+                // RHS is none
+                break;
+            }
+        }
+
+    
+        self.dbg_exit_pratt("parse_pratt", lhs_nid)
     }
 
     /// Parser for an assert statement
@@ -471,12 +484,12 @@ impl<'toks> Ast<'toks> {
     fn parse_assert(&mut self, parent: NodeId, diags: &mut Diags) -> bool {
 
         self.dbg_enter("parse_assert");
+        let mut result = false;
         // Add the assert keyword as a child of the parent
         let assert_nid = self.add_to_parent_and_advance(parent);
-        let mut result = self.parse_expr(assert_nid, diags);
-        // We expect the current token to be a semicolon.
-        // If we're already in an error condition, don't bother.
-        if result {
+        let expression_nid = self.parse_pratt(0, diags);
+        if let Some(expression_nid) = expression_nid {
+            assert_nid.append(expression_nid, &mut self.arena);
             result = self.expect_semi(diags, assert_nid);
         }
 
