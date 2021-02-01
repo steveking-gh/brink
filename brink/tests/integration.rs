@@ -233,6 +233,15 @@ fn assert_6() {
 }
 
 #[test]
+fn assert_7() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/assert_7.brink")
+                .assert()
+                .failure();
+}
+
+#[test]
 fn section_rename_err_1() {
     let _cmd = Command::cargo_bin("brink")
     .unwrap()
