@@ -1,0 +1,6 @@
+section foo {
+    wrs "Wow!";
+    assert( 5 * (2 + 2) * 5 == (8+2) * 10); // 100 == 100
+}
+
+output foo;

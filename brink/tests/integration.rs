@@ -301,6 +301,20 @@ fn assert_12() {
                 .failure();
 }
 
+#[test]
+fn assert_13() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/assert_13.brink")
+                .arg("-o assert_13.bin")
+                .assert()
+                .success();
+
+    // Verify output file is correct.  If so, then clean up.
+    assert_eq!("Wow!", fs::read_to_string("assert_13.bin").unwrap());
+    fs::remove_file("assert_13.bin").unwrap();
+}
+
 
 #[test]
 fn section_rename_err_1() {
