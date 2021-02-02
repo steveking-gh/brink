@@ -284,6 +284,25 @@ fn assert_10() {
 }
 
 #[test]
+fn assert_11() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/assert_11.brink")
+                .assert()
+                .failure();
+}
+
+#[test]
+fn assert_12() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/assert_12.brink")
+                .assert()
+                .failure();
+}
+
+
+#[test]
 fn section_rename_err_1() {
     let _cmd = Command::cargo_bin("brink")
     .unwrap()
