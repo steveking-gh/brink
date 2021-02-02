@@ -31,8 +31,8 @@ pub enum LexToken {
 //    #[token("/")] FSlash,
     #[token("{")] OpenBrace,
     #[token("}")] CloseBrace,
-//    #[token("(")] OpenParen,
-//    #[token(")")] CloseParen,
+    #[token("(")] OpenParen,
+    #[token(")")] CloseParen,
     #[token(";")] Semicolon,
     #[regex("[_a-zA-Z][0-9a-zA-Z_]*")] Identifier,
     #[regex("0x[0-9a-fA-F]+|[1-9][0-9]*|0")] Int,
@@ -217,15 +217,19 @@ impl<'toks> Ast<'toks> {
         diags.err1("AST_14", &m, self.tv[brace_tok_num].span());
     }
 
-    /// Attempts to advance the token number past the next semicolon
+    /// Attempts to advance the token number past the next semicolon.
     /// The final token number may be invalid.  This function is
     /// used to try to recover from syntax errors.
     fn advance_past_semicolon(&mut self) {
+        self.dbg_enter("advance_past_semicolon");
+        assert!(self.tok_num != 0);
         while let Some(tinfo) = self.take() {
             if tinfo.tok == LexToken::Semicolon {
                 break;
             }
         }
+        debug!("Ast::advance_past_semicolon: Stopped on token {}", self.tok_num);
+        self.dbg_exit("advance_past_semicolon", true);
     }
 
     /// Add the specified token as a child of the parent.
@@ -327,10 +331,10 @@ impl<'toks> Ast<'toks> {
                 }
             };
 
-            // If something went wrong, then advance to the next semi
-            // and try to keep going to give users more errors to fix.
             if !parse_ok {
+                self.take();
                 debug!("Ast::parse_section_contents: skipping to next ; starting from {}", self.tok_num);
+                // Consume the bad token and skip formward    
                 self.advance_past_semicolon();
                 result = false;
             }
@@ -394,33 +398,54 @@ impl<'toks> Ast<'toks> {
     /// See https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
     /// for a nice explanation of Pratt parsers with Rust.
     /// On return, the terminal semicolon will be the next unprocessed token.
-    fn parse_pratt(&mut self, min_bp: u8, diags: &mut Diags) -> Option<NodeId> {
+    fn parse_pratt(&mut self, min_bp: u8, result: &mut bool, diags: &mut Diags) -> Option<NodeId> {
 
         self.dbg_enter("parse_pratt");
         debug!("Ast::parse_pratt: Min BP = {}", min_bp);
         let lhs_tinfo = self.peek();
         if lhs_tinfo.is_none() {
+            *result = false;
             self.err_no_input(diags);
             return self.dbg_exit_pratt("parse_pratt", None);
         }
 
         let lhs_tinfo = lhs_tinfo.unwrap();
 
-        match lhs_tinfo.tok {
-            LexToken::Semicolon => {
-                // Done!
-                return self.dbg_exit_pratt("parse_pratt", None);
+        let mut lhs_nid = match lhs_tinfo.tok {
+            LexToken::CloseParen |          // Finding a closing paren means we're done
+            LexToken::Semicolon => { None } // Finding a semicolon means we're done.
+            LexToken::OpenParen => {
+                self.tok_num += 1;
+                let mut lhs = self.parse_pratt(0, result, diags);
+                if lhs.is_some() {
+                    if let Some(paren_tinfo) = self.peek() {
+                        if paren_tinfo.tok == LexToken::CloseParen {
+                            self.tok_num += 1;
+                        } else {
+                            let msg = format!("Expected a closing ')' but found {}", paren_tinfo.val);
+                            diags.err1("AST_20", &msg, paren_tinfo.span());
+                            *result = false;
+                            lhs = None;
+                        }
+                    }
+                }
+                lhs
             }
-            LexToken::Int => {}
+            LexToken::Int => {
+                let lhs = Some(self.arena.new_node(self.tok_num));
+                self.tok_num += 1;
+                lhs
+            }
             _ => {
                 let msg = format!("Invalid expression operand '{}'", lhs_tinfo.val);
                 diags.err1("AST_19", &msg, lhs_tinfo.span());
-                return self.dbg_exit_pratt("parse_pratt", None);
+                None
             }
-        }
+        };
 
-        let mut lhs_nid = Some(self.arena.new_node(self.tok_num));
-        self.tok_num += 1;
+        if lhs_nid.is_none() {
+            return self.dbg_exit_pratt("parse_pratt", None);
+        }
 
         loop {
 
@@ -463,7 +488,7 @@ impl<'toks> Ast<'toks> {
             lhs_nid = Some(op_nid);
 
             // Recurse into the right hand side of the operation, if any
-            let rhs_nid = self.parse_pratt(rbp, diags);
+            let rhs_nid = self.parse_pratt(rbp, result, diags);
 
             if let Some(rhs_nid) = rhs_nid {
                 op_nid.append(rhs_nid, &mut self.arena);
@@ -484,13 +509,15 @@ impl<'toks> Ast<'toks> {
     fn parse_assert(&mut self, parent: NodeId, diags: &mut Diags) -> bool {
 
         self.dbg_enter("parse_assert");
-        let mut result = false;
+        let mut result = true;
         // Add the assert keyword as a child of the parent
         let assert_nid = self.add_to_parent_and_advance(parent);
-        let expression_nid = self.parse_pratt(0, diags);
-        if let Some(expression_nid) = expression_nid {
-            assert_nid.append(expression_nid, &mut self.arena);
-            result = self.expect_semi(diags, assert_nid);
+        let expression_nid = self.parse_pratt(0, &mut result, diags);
+        if result {
+            if let Some(expression_nid) = expression_nid {
+                assert_nid.append(expression_nid, &mut self.arena);
+                result &= self.expect_semi(diags, assert_nid);
+            }
         }
 
         self.dbg_exit("parse_assert", result)

@@ -258,6 +258,8 @@ impl<'toks> LinearDb {
                 }
             }
             ast::LexToken::Semicolon |
+            ast::LexToken::OpenParen |
+            ast::LexToken::CloseParen |
             ast::LexToken::OpenBrace |
             ast::LexToken::CloseBrace => {
                 // Uninteresting syntactical elements that do not appear in the IR.

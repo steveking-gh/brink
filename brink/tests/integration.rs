@@ -256,6 +256,20 @@ fn assert_8() {
 }
 
 #[test]
+fn assert_9() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/assert_9.brink")
+                .arg("-o assert_9.bin")
+                .assert()
+                .success();
+
+    // Verify output file is correct.  If so, then clean up.
+    assert_eq!("Wow!", fs::read_to_string("assert_9.bin").unwrap());
+    fs::remove_file("assert_9.bin").unwrap();
+}
+
+#[test]
 fn section_rename_err_1() {
     let _cmd = Command::cargo_bin("brink")
     .unwrap()
@@ -342,7 +356,7 @@ fn fuzz_found_8() {
     .arg("tests/fuzz_found_8.brink")
     .assert()
     .failure()
-    .stderr(predicates::str::contains("[AST_19]"));
+    .stderr(predicates::str::contains("[AST_20]"));
 }
 
 #[test]
@@ -402,7 +416,8 @@ fn missing_brace_1() {
     .arg("tests/missing_brace_1.brink")
     .assert()
     .failure()
-    .stderr(predicates::str::contains("[AST_14]"));
+    .stderr(predicates::str::contains("[AST_3]")) // bad output
+    .stderr(predicates::str::contains("[AST_14]")); // missing brace
 }
 
 #[test]
