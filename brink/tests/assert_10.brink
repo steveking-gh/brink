@@ -1,0 +1,8 @@
+section foo {
+    wrs "Wow!";
+    assert (1);
+    assert ((1));
+    assert (((1)));
+}
+
+output foo;

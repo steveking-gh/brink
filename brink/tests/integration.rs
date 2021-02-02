@@ -270,6 +270,20 @@ fn assert_9() {
 }
 
 #[test]
+fn assert_10() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/assert_10.brink")
+                .arg("-o assert_10.bin")
+                .assert()
+                .success();
+
+    // Verify output file is correct.  If so, then clean up.
+    assert_eq!("Wow!", fs::read_to_string("assert_10.bin").unwrap());
+    fs::remove_file("assert_10.bin").unwrap();
+}
+
+#[test]
 fn section_rename_err_1() {
     let _cmd = Command::cargo_bin("brink")
     .unwrap()
