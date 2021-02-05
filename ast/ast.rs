@@ -36,7 +36,7 @@ pub enum LexToken {
     #[token(")")] CloseParen,
     #[token(";")] Semicolon,
     #[regex("[_a-zA-Z][0-9a-zA-Z_]*")] Identifier,
-    #[regex("0x[0-9a-fA-F]+|[1-9][0-9]*|0")] Int,
+    #[regex("0x[0-9a-fA-F]+|[1-9][0-9]*|0")] U64,
 
     // Not only is \ special in strings and must be escaped, but also special in
     // regex.  We use raw string here to avoid having the escape the \ for the
@@ -419,7 +419,7 @@ impl<'toks> Ast<'toks> {
     /// Higher numbers are stronger binding.
     fn get_binding_power(tok: LexToken) -> (u8,u8) {
         match tok {
-            LexToken::Int => (9,10),
+            LexToken::U64 => (9,10),
 //            LexToken::NEq |
             LexToken::EqEq => (1,2),
 //            LexToken::Minus |
@@ -468,7 +468,7 @@ impl<'toks> Ast<'toks> {
                 }
                 lhs
             }
-            LexToken::Int => {
+            LexToken::U64 => {
                 let lhs = Some(self.arena.new_node(self.tok_num));
                 self.tok_num += 1;
                 lhs

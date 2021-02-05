@@ -1,0 +1,10 @@
+section bar {
+    wrs "bar!\n";
+}
+
+section foo {
+   wrs "Wow!";
+   assert sizeof(bar) == 5;
+}
+
+output foo;

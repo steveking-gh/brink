@@ -101,7 +101,7 @@ impl Engine {
         true
     }
 
-    fn iterate_sizeof(&mut self, ir: &IR, irdb: &IRDb, _diags: &mut Diags,
+    fn iterate_sizeof(&mut self, ir: &IR, irdb: &IRDb, diags: &mut Diags,
                     current: &Location) -> bool {
         trace!("Engine::iterate_sizeof: ENTER, abs {}, img {}, sec {}",
             current.abs, current.img, current.sec);
@@ -116,8 +116,17 @@ impl Engine {
         let sec_name = in_parm0.to_identifier();
         let out = out_parm.val.downcast_mut::<u64>().unwrap();
 
-        // We've already verified the section name, so unwrap.
-        let ir_rng = irdb.id_locs.get(sec_name).unwrap();
+        // We've already verified that the section identifier exists,
+        // but unless the section actually got used in the output,
+        // then we won't find location info for it.
+        let ir_rng = irdb.id_locs.get(sec_name);
+        if ir_rng.is_none() {
+            let msg = format!("Can't take sizeof() section '{}' not used in output.",
+                    sec_name);
+            diags.err1("EXEC_5", &msg, ir.src_loc.clone());
+            return false;
+        }
+        let ir_rng = ir_rng.unwrap();
         assert!(ir_rng.start <= ir_rng.end);
         let start_loc = &self.ir_locs[ir_rng.start];
         let end_loc = &self.ir_locs[ir_rng.end];

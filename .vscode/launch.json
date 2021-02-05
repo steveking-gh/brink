@@ -20,7 +20,7 @@
                 }
             },
             "args": ["-o empty_section_1.bin",
-                     "${workspaceFolder}/brink/tests/sizeof_1.brink"],
+                     "${workspaceFolder}/brink/tests/fuzz_found_14.brink"],
         },
         {
             "type": "lldb",

@@ -19,7 +19,7 @@ pub struct LinOperand {
 
 fn lex_to_data_type(lxt: LexToken) -> DataType {
     match lxt {
-        LexToken::Int => DataType::Int,
+        LexToken::U64 => DataType::Int,
         LexToken::QuotedString => DataType::QuotedString,
         LexToken::Identifier => DataType::Identifier,
         // In some cases, like the result of operations, we don't
@@ -225,7 +225,7 @@ impl<'toks> LinearDb {
 
             }
             ast::LexToken::Identifier |
-            ast::LexToken::Int |
+            ast::LexToken::U64 |
             ast::LexToken::QuotedString => {
                 // These are immediate operands.  Add them to the main operand vector
                 // and return them as local operands.
