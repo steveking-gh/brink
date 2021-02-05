@@ -1,0 +1,9 @@
+section empty_one {}
+section foo {
+    wrs "Wow!";
+    wr empty_one;
+    assert sizeof(empty_one) == 0;
+    assert sizeof(foo) == 4;
+}
+
+output foo;
