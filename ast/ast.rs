@@ -1,7 +1,7 @@
 use logos::{Logos};
 use indextree::{Arena,NodeId};
 pub type Span = std::ops::Range<usize>;
-use std::collections::{HashMap,HashSet};
+use std::{collections::{HashMap,HashSet}};
 use std::option;
 use diags::Diags;
 use anyhow::{Context, bail};
@@ -20,6 +20,7 @@ use log::{error, warn, info, debug, trace};
 pub enum LexToken {
     #[token("section")] Section,
     #[token("assert")] Assert,
+    #[token("sizeof")] Sizeof,
     #[token("wrs")] Wrs,
     #[token("wr")] Wr,
     #[token("output")] Output,
@@ -280,6 +281,42 @@ impl<'toks> Ast<'toks> {
         false
     }
 
+    /// Expect the specified token, add it to the parent and advance.
+    fn expect_token(&mut self, tok: LexToken, diags: &mut Diags, parent : NodeId) -> bool {
+
+        if let Some(tinfo) = self.peek() {
+            if tok == tinfo.tok {
+                self.add_to_parent_and_advance(parent);
+                return true;
+            } else {
+                let msg = format!("Expected {:?}", tok);
+                self.err_expected_after(diags, "AST_22", &msg);
+            }
+        } else {
+            self.err_no_input(diags);
+        }
+
+        false
+    }
+
+    /// Expect the specified token and advance without adding to the parent.
+    fn expect_token_no_add(&mut self, tok: LexToken, diags: &mut Diags) -> bool {
+
+        if let Some(tinfo) = self.peek() {
+            if tok == tinfo.tok {
+                self.tok_num += 1;
+                return true;
+            } else {
+                let msg = format!("Expected {:?}", tok);
+                self.err_expected_after(diags, "AST_22", &msg);
+            }
+        } else {
+            self.err_no_input(diags);
+        }
+
+        false
+    }    
+
     /// Parse a section definition.
     fn parse_section(&mut self, parent : NodeId, diags: &mut Diags) -> bool {
         self.dbg_enter("parse_section");
@@ -434,6 +471,24 @@ impl<'toks> Ast<'toks> {
             LexToken::Int => {
                 let lhs = Some(self.arena.new_node(self.tok_num));
                 self.tok_num += 1;
+                lhs
+            }
+            LexToken::Sizeof => {
+                // We expect 3 tokens: '(' 'identifier' ')', but don't bother to record
+                // the surrounding parens to simplify later linearization
+                let assert_nid = self.arena.new_node(self.tok_num);
+                self.tok_num += 1;
+                if !self.expect_token_no_add(LexToken::OpenParen, diags) {
+                    return self.dbg_exit_pratt("parse_pratt", None);
+                }
+                if !self.expect_token(LexToken::Identifier, diags, assert_nid) {
+                    return self.dbg_exit_pratt("parse_pratt", None);
+                }
+                if !self.expect_token_no_add(LexToken::CloseParen, diags) {
+                    return self.dbg_exit_pratt("parse_pratt", None);
+                }
+
+                let lhs = Some(assert_nid);
                 lhs
             }
             _ => {
@@ -704,11 +759,25 @@ impl<'toks> AstDb<'toks> {
 
     /// Returns true if the first child of the specified node is a section
     /// name that exists.  Otherwise, prints a diagnostic and returns false.
-    fn validate_section_name(diags: &mut Diags, parent_nid: NodeId, ast: &'toks Ast,
-                    sections: &HashMap<&'toks str, Section<'toks>> ) -> bool {
-        debug!("AstDb::validate_section_name: NodeId {}", parent_nid);
+    fn validate_section_name(child_num: usize, parent_nid: NodeId, ast: &'toks Ast,
+                    sections: &HashMap<&'toks str, Section<'toks>>, diags: &mut Diags) -> bool {
+        debug!("AstDb::validate_section_name: NodeId {} for child {}", parent_nid, child_num);
 
         let mut children = parent_nid.children(&ast.arena);
+
+        // First, advance to the specified child number
+        let mut cnum = 0;
+        while cnum < child_num {
+            let sec_name_nid_opt = children.next();
+            if sec_name_nid_opt.is_none() {
+                // error, not enough children to reach section name
+                let m = format!("Missing section name");
+                let section_tinfo = ast.get_tinfo(parent_nid);
+                diags.err1("AST_23", &m, section_tinfo.span());
+                return false;
+            }
+            cnum += 1;
+        }
         let sec_name_nid_opt = children.next();
         if sec_name_nid_opt.is_none() {
             // error, specified section does not exist
@@ -766,7 +835,7 @@ impl<'toks> AstDb<'toks> {
         result &= match tinfo.tok {
             // Wr statement must specify a valid section name
             LexToken::Wr => {
-                if !Self::validate_section_name(diags, parent_nid, &ast, &sections) {
+                if !Self::validate_section_name(0, parent_nid, &ast, &sections, diags) {
                     return false;
                 }
                 let mut children = parent_nid.children(&ast.arena);
@@ -791,7 +860,19 @@ impl<'toks> AstDb<'toks> {
                     }
                     result
                 }
-            },
+            }
+            // Sizeof statement must specify a valid section name enclosed in ()
+            LexToken::Sizeof => {
+                // child 0 is the identifier since we didn't record surround '()'
+                if !Self::validate_section_name(0, parent_nid, &ast, &sections, diags) {
+                    return false;
+                }
+                let children = parent_nid.children(&ast.arena);
+                for nid in children {
+                    result &= AstDb::record_r(rdepth + 1, nid, diags, ast, sections, nested_sections);
+                }
+                result
+            }
             _ => {
                 // When no children exist, this case terminates recursion.
                 let children = parent_nid.children(&ast.arena);
@@ -842,7 +923,7 @@ impl<'toks> AstDb<'toks> {
 
         let output_nid = output.as_ref().unwrap().nid;
 
-        if !Self::validate_section_name(diags, output_nid, &ast, &sections) {
+        if !Self::validate_section_name(0, output_nid, &ast, &sections, diags) {
             bail!("AST construction failed");
         }
 

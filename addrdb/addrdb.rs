@@ -29,7 +29,7 @@ impl<'toks> AddrDb {
     pub fn new(linear_db: &LinearDb, _diags: &mut Diags, ast: &'toks Ast,
                _ast_db: &'toks AstDb, abs_start: usize) -> AddrDb {
 
-        debug!("AddrDb::new: >>>> ENTER at {}", abs_start);
+        debug!("AddrDb::new: ENTER at {}", abs_start);
 
         let mut addr_db = AddrDb { addr_vec: Vec::new() };
 

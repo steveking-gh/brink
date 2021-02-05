@@ -315,6 +315,19 @@ fn assert_13() {
     fs::remove_file("assert_13.bin").unwrap();
 }
 
+#[test]
+fn assert_14() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/assert_14.brink")
+                .arg("-o assert_14.bin")
+                .assert()
+                .success();
+
+    // Verify output file is correct.  If so, then clean up.
+    assert_eq!("Wow!", fs::read_to_string("assert_14.bin").unwrap());
+    fs::remove_file("assert_14.bin").unwrap();
+}
 
 #[test]
 fn section_rename_err_1() {
@@ -511,6 +524,21 @@ fn nested_section_1() {
     assert_eq!("foo!\nBye\nbar!\nboo!\n", fs::read_to_string("nested_section_1.bin").unwrap());
     fs::remove_file("nested_section_1.bin").unwrap();
 }
+
+#[test]
+fn sizeof_1() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/sizeof_1.brink")
+                .arg("-o sizeof_1.bin")
+                .assert()
+                .success();
+
+    // Verify output file is correct.  If so, then clean up.
+    assert_eq!("Wow!", fs::read_to_string("sizeof_1.bin").unwrap());
+    fs::remove_file("sizeof_1.bin").unwrap();
+}
+
 
 } // mod tests
 

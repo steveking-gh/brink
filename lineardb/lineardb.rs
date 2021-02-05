@@ -130,7 +130,7 @@ impl<'toks> LinearDb {
         // When no children exist, this case terminates recursion.
         let children = parent_nid.children(&ast.arena);
         for nid in children {
-            self.record_r(result, rdepth + 1, nid, lops, diags, ast, ast_db);
+            self.record_r(result, rdepth, nid, lops, diags, ast, ast_db);
         }
     }
 
@@ -205,6 +205,24 @@ impl<'toks> LinearDb {
                 self.record_children_r(result, rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
                 // 1 operand expected
                 self.process_operands(result, 1, &mut lops, ir_lid, diags, tinfo);
+            }
+            ast::LexToken::Sizeof => {
+                // A vector to track the operands of this expression.
+                let mut lops = Vec::new();
+                // Get the size of the section.  Section name is an identifier operand.
+                let ir_lid = self.new_ir(parent_nid, ast, IRKind::Sizeof);
+                // There is child, which is the identifier
+                self.record_children_r(result, rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
+                // 1 operand expected
+                self.process_operands(result, 1, &mut lops, ir_lid, diags, tinfo);
+
+                // Add a destination operand to the operation to hold the result
+                let idx = self.add_operand_to_ir(ir_lid, LinOperand::new(parent_nid, ast,
+                                                  OperandKind::Variable, DataType::Int));
+                // Also add the detination operand to the local operands
+                // The destination operand is presumably an input operand in the parent.
+                returned_operands.push(idx);
+
             }
             ast::LexToken::Identifier |
             ast::LexToken::Int |

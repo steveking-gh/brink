@@ -1,8 +1,7 @@
 use ir_base::{IR, IRKind, DataType};
 use irdb::IRDb;
 use diags::Diags;
-use std::{any::Any, io::Write};
-use std::collections::HashMap;
+use std::{any::Any, convert::TryInto, io::Write};
 use std::cell::RefCell;
 use std::fs::File;
 use anyhow::{Result,anyhow};
@@ -25,14 +24,14 @@ pub struct Parameter {
 impl Parameter {
     fn to_bool(&self) -> bool {
         match self.data_type {
-            DataType::Int => { *self.val.downcast_ref::<i64>().unwrap() != 0 },
+            DataType::Int => { *self.val.downcast_ref::<u64>().unwrap() != 0 },
             _ => { assert!(false); false },
         }
     }
 
-    fn to_i64(&self) -> i64 {
+    fn to_u64(&self) -> u64 {
         match self.data_type {
-            DataType::Int => { *self.val.downcast_ref::<i64>().unwrap() },
+            DataType::Int => { *self.val.downcast_ref::<u64>().unwrap() },
             _ => { assert!(false); 0 },
         }
     }
@@ -44,17 +43,22 @@ impl Parameter {
         }
     }
 
+    fn to_identifier(&self) -> &str {
+        match self.data_type {
+            DataType::Identifier => { self.val.downcast_ref::<String>().unwrap() },
+            _ => { assert!(false); "" },
+        }
+    }
 }
 
 pub struct Engine {
     parms: Vec<RefCell<Parameter>>,
     ir_locs: Vec<Location>,
-    _id_locs: HashMap<String,Location>,
 }
 
 impl Engine {
 
-    fn iterate_wrs(&mut self, ir: &IR, _diags: &mut Diags,
+    fn iterate_wrs(&mut self, ir: &IR, _irdb: &IRDb, _diags: &mut Diags,
                     current: &mut Location) -> bool {
         trace!("Engine::iterate_wrs: ENTER, abs {}, img {}, sec {}",
             current.abs, current.img, current.sec);
@@ -63,7 +67,6 @@ impl Engine {
         let in_parm_num0 = ir.operands[0];
         let in_parm0 = self.parms[in_parm_num0].borrow();
 
-        // If the inputs are stable, we can compute the stable output
         let sz = in_parm0.to_str().len();
         current.img += sz;
         current.abs += sz;
@@ -72,7 +75,7 @@ impl Engine {
         true
     }
 
-    fn iterate_eqeq(&mut self, ir: &IR, _diags: &mut Diags,
+    fn iterate_eqeq(&mut self, ir: &IR, _irdb: &IRDb, _diags: &mut Diags,
                     current: &Location) -> bool {
         trace!("Engine::iterate_eqeq: ENTER, abs {}, img {}, sec {}",
             current.abs, current.img, current.sec);
@@ -85,10 +88,9 @@ impl Engine {
         let in_parm1 = self.parms[in_parm_num1].borrow();
         let mut out_parm = self.parms[out_parm_num].borrow_mut();
 
-        // If the inputs are stable, we can compute the stable output
-        let in0 = in_parm0.to_i64();
-        let in1 = in_parm1.to_i64();
-        let out = out_parm.val.downcast_mut::<i64>().unwrap();
+        let in0 = in_parm0.to_u64();
+        let in1 = in_parm1.to_u64();
+        let out = out_parm.val.downcast_mut::<u64>().unwrap();
         if in0 == in1 {
             *out = 1;
         } else {
@@ -99,7 +101,37 @@ impl Engine {
         true
     }
 
-    fn iterate_add(&mut self, ir: &IR, diags: &mut Diags,
+    fn iterate_sizeof(&mut self, ir: &IR, irdb: &IRDb, _diags: &mut Diags,
+                    current: &Location) -> bool {
+        trace!("Engine::iterate_sizeof: ENTER, abs {}, img {}, sec {}",
+            current.abs, current.img, current.sec);
+        // sizeof takes one input and produces one output
+        // we've already discarded surrounding () on the operand
+        assert!(ir.operands.len() == 2);
+        let in_parm_num0 = ir.operands[0]; // identifier
+        let out_parm_num = ir.operands[1];
+        let in_parm0 = self.parms[in_parm_num0].borrow();
+        let mut out_parm = self.parms[out_parm_num].borrow_mut();
+
+        let sec_name = in_parm0.to_identifier();
+        let out = out_parm.val.downcast_mut::<u64>().unwrap();
+
+        // We've already verified the section name, so unwrap.
+        let ir_rng = irdb.id_locs.get(sec_name).unwrap();
+        assert!(ir_rng.start <= ir_rng.end);
+        let start_loc = &self.ir_locs[ir_rng.start];
+        let end_loc = &self.ir_locs[ir_rng.end];
+        let sz = end_loc.abs - start_loc.abs;
+        debug!("Sizeof {} is currently {}", sec_name, sz);
+        // We'll at least panic at runtime if conversion from
+        // usize to u64 fails instead of bad output binary.
+        *out = sz.try_into().unwrap();
+    
+        trace!("Engine::iterate_sizeof: EXIT");
+        true
+    }
+
+    fn iterate_add(&mut self, ir: &IR, _irdb: &IRDb, diags: &mut Diags,
                     current: &Location) -> bool {
         trace!("Engine::iterate_add: ENTER, abs {}, img {}, sec {}",
             current.abs, current.img, current.sec);
@@ -113,10 +145,9 @@ impl Engine {
         let mut out_parm = self.parms[out_parm_num].borrow_mut();
 
         // If the inputs are stable, we can compute the stable output
-        let in0 = in_parm0.to_i64();
-        let in1 = in_parm1.to_i64();
-        let out = out_parm.val.downcast_mut::<i64>().unwrap();
-        //let check = checked_add(in0, in1);
+        let in0 = in_parm0.to_u64();
+        let in1 = in_parm1.to_u64();
+        let out = out_parm.val.downcast_mut::<u64>().unwrap();
         let check = in0.checked_add(in1);
         if check.is_none() {
             let msg = format!("Add expression '{} + {}' will overflow", in0, in1);
@@ -129,7 +160,7 @@ impl Engine {
         true
     }
 
-    fn iterate_multiply(&mut self, ir: &IR, diags: &mut Diags,
+    fn iterate_multiply(&mut self, ir: &IR, _irdb: &IRDb, diags: &mut Diags,
                       current: &Location) -> bool {
         trace!("Engine::iterate_multiply: ENTER, abs {}, img {}, sec {}",
             current.abs, current.img, current.sec);
@@ -143,9 +174,9 @@ impl Engine {
         let mut out_parm = self.parms[out_parm_num].borrow_mut();
 
         // If the inputs are stable, we can compute the stable output
-        let in0 = in_parm0.to_i64();
-        let in1 = in_parm1.to_i64();
-        let out = out_parm.val.downcast_mut::<i64>().unwrap();
+        let in0 = in_parm0.to_u64();
+        let in1 = in_parm1.to_u64();
+        let out = out_parm.val.downcast_mut::<u64>().unwrap();
 
         // Use checked arithmetic in case user is off the rails
         let check = in0.checked_mul(in1);
@@ -160,8 +191,11 @@ impl Engine {
     }
 
     pub fn new(irdb: &IRDb, diags: &mut Diags, abs_start: usize) -> Option<Engine> {
-        let mut engine = Engine { parms: Vec::new(), ir_locs: Vec::new(),
-                                        _id_locs: HashMap::new() };
+        // Initialize all ir_locs locations to zero.  The first iterate loop
+        // may access any IR location.
+        let ir_locs = vec![Location {img: 0, abs: 0, sec: 0}; irdb.ir_vec.len()];
+
+        let mut engine = Engine { parms: Vec::new(), ir_locs };
         debug!("Engine::new: ENTER");
         // Initialize parameters from the IR operands.
         engine.parms.reserve(irdb.parms.len());
@@ -170,6 +204,8 @@ impl Engine {
                     val: opnd.clone_val_box() };
             engine.parms.push(RefCell::new(parm));
         }
+
+
         let result = engine.iterate(&irdb, diags, abs_start);
         if !result {
             return None;
@@ -195,30 +231,26 @@ impl Engine {
             trace!("Engine::iterate: Iteration count {}", iter_count);
             iter_count += 1;
             let mut current = Location{ img: 0, abs: abs_start, sec: 0 };
-            for ir in &irdb.ir_vec {
+            for (lid,ir) in irdb.ir_vec.iter().enumerate() {
                 // record our location after each IR
-                self.ir_locs.push(current.clone());
+                self.ir_locs[lid] = current.clone();
                 result &= match ir.kind {
-                    IRKind::Assert => { true /* evaluate assert at execute time */ },
-                    IRKind::EqEq => { self.iterate_eqeq(&ir, diags, &current) },
-                    IRKind::Int => { true /* nothing to do */ },
-                    IRKind::Multiply =>{ self.iterate_multiply(&ir, diags, &current) },
-                    IRKind::Add =>{ self.iterate_add(&ir, diags, &current) },
-                    IRKind::Wrs => { self.iterate_wrs(&ir, diags, &mut current) },
-                    IRKind::SectionStart => {
-                        true // todo fix me
-                    }
-                    IRKind::SectionEnd => {
-                        true // todo fix me
-                    },
+                    IRKind::EqEq => { self.iterate_eqeq(&ir, irdb, diags, &current) }
+                    IRKind::Multiply =>{ self.iterate_multiply(&ir, irdb, diags, &current) }
+                    IRKind::Add =>{ self.iterate_add(&ir, irdb, diags, &current) }
+                    IRKind::Sizeof => { self.iterate_sizeof(&ir, irdb, diags, &mut current) }
+                    IRKind::Wrs => { self.iterate_wrs(&ir, irdb, diags, &mut current) }
+                    IRKind::Assert | /* evaluate assert only at execute time */
+                    IRKind::Int |
+                    IRKind::SectionStart |
+                    IRKind::SectionEnd => { true }
                 }
             }
             if self.ir_locs == old_locations {
                 stable = true;
             } else {
-                // This consumes new_locations, leaving it empty
-                // Is there a better way to express this?
-                old_locations = self.ir_locs.drain(0..).collect();
+                // Record the current location information
+                old_locations = self.ir_locs.clone();
             }
         }
 
@@ -263,6 +295,7 @@ impl Engine {
             result = match ir.kind {
                 IRKind::Assert => { self.execute_assert(ir, irdb, diags, file) }
                 IRKind::Wrs => { self.execute_wrs(ir, irdb, diags, file) }
+                IRKind::Sizeof => { Ok(()) } // sizeof computed during iteration
                 IRKind::EqEq => { Ok(()) }
                 IRKind::Int => { Ok(()) }
                 IRKind::Multiply => { Ok(()) }

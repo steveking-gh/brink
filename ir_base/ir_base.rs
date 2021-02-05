@@ -23,6 +23,7 @@ pub enum IRKind {
     Add,
     SectionStart,
     SectionEnd,
+    Sizeof,
     Wrs,
 }
 
@@ -37,12 +38,42 @@ pub struct IROperand {
 impl IROperand {
     pub fn clone_val_box(&self) -> Box<dyn Any> {
         match self.data_type {
-            DataType::Int => { Box::new(self.val.downcast_ref::<i64>().unwrap().clone()) },
+            DataType::Int => { Box::new(self.val.downcast_ref::<u64>().unwrap().clone()) },
             DataType::QuotedString |
             DataType::Identifier => {Box::new(self.val.downcast_ref::<String>().unwrap().clone())},
             DataType::Unknown => {Box::new(self.val.downcast_ref::<String>().unwrap().clone())},
         }
     }
+}
+
+impl IROperand {
+    pub fn to_bool(&self) -> bool {
+        match self.data_type {
+            DataType::Int => { *self.val.downcast_ref::<u64>().unwrap() != 0 },
+            _ => { assert!(false); false },
+        }
+    }
+
+    pub fn to_u64(&self) -> u64 {
+        match self.data_type {
+            DataType::Int => { *self.val.downcast_ref::<u64>().unwrap() },
+            _ => { assert!(false); 0 },
+        }
+    }
+
+    pub fn to_str(&self) -> &str {
+        match self.data_type {
+            DataType::QuotedString => { self.val.downcast_ref::<String>().unwrap() },
+            _ => { assert!(false); "" },
+        }
+    }
+    pub fn to_identifier(&self) -> &str {
+        match self.data_type {
+            DataType::Identifier => { self.val.downcast_ref::<String>().unwrap() },
+            _ => { assert!(false); "" },
+        }
+    }
+
 }
 
 #[derive(Debug, Clone)]

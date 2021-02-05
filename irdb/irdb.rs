@@ -6,16 +6,20 @@ use lineardb::{LinOperand, LinearDb};
 use log::{error, warn, info, debug, trace};
 
 use ir_base::{DataType, IR, IRKind, IROperand, OperandKind};
-use std::{any::Any};
+use std::{any::Any, collections::HashMap, ops::Range};
 
 pub struct IRDb {
     pub ir_vec: Vec<IR>,
     pub parms: Vec<IROperand>,
+
+    /// Maps an identifier to the (start,stop) indices in
+    /// the ir_vec.
+    pub id_locs: HashMap<String,Range<usize>>,
 }
 
 impl IRDb {
 
-    fn get_box_val(&mut self, lop: &LinOperand, diags: &mut Diags) -> Option<Box<dyn Any>> {
+    fn make_box_val(&mut self, lop: &LinOperand, diags: &mut Diags) -> Option<Box<dyn Any>> {
         match lop.data_type {
             DataType::QuotedString => {
                 // Trim surround quotes and convert escape characters
@@ -27,7 +31,7 @@ impl IRDb {
             }
             DataType::Int => {
                 if lop.kind == OperandKind::Constant {
-                    let res = lop.val.parse::<i64>();
+                    let res = lop.val.parse::<u64>();
                     if let Ok(v) = res {
                         return Some(Box::new(v));
                     } else {
@@ -36,7 +40,7 @@ impl IRDb {
                         return None;
                     }
                 } else {
-                    return Some(Box::new(0i64));
+                    return Some(Box::new(0u64));
                 }
             }
             DataType::Identifier => {
@@ -50,9 +54,18 @@ impl IRDb {
         };
     }
 
+    /// Returns the value of the specified operand for the specified IR.
+    /// The operand number is for the *IR*, not the absolute operand
+    /// index in the central operands vector.
+    pub fn get_opnd_as_identifier(&self, ir: &IR, opnd_num: usize) -> &str {
+        let &op_num = ir.operands.get(opnd_num).unwrap();
+        let opnd = self.parms.get(op_num).unwrap();
+        opnd.to_identifier()
+    }
+
     fn process_lin_operands(&mut self, lin_db: &LinearDb, diags: &mut Diags) -> bool {
         for lop in lin_db.operand_vec.iter() {
-            let val = self.get_box_val(lop, diags);
+            let val = self.make_box_val(lop, diags);
             if val.is_none() {
                 return false;
             }
@@ -111,6 +124,7 @@ impl IRDb {
             IRKind::Add => { self.validate_arithmetic_operands(ir, diags) }
             IRKind::SectionStart => { true }
             IRKind::SectionEnd => { true }
+            IRKind::Sizeof => { true }
             IRKind::Wrs => { true }
         };
         result
@@ -124,7 +138,23 @@ impl IRDb {
             let operands = lir.operand_vec.clone();
             let src_loc = lir.src_loc.clone();
             let ir = IR{kind, operands, src_loc};
+            let ir_num = self.ir_vec.len();
             if self.validate_operands(&ir, diags) {
+                match kind {
+                    IRKind::SectionStart => {
+                        // create the section entry and set the starting IR number
+                        let sec_name = self.get_opnd_as_identifier(&ir, 0).to_string();
+                        let rng = Range {start: ir_num, end: 0};
+                        self.id_locs.insert(sec_name, rng);
+                    }
+                    IRKind::SectionEnd => {
+                        // Update the end of the range for this section
+                        let sec_name = self.get_opnd_as_identifier(&ir, 0).to_string();
+                        let rng = self.id_locs.get_mut(&sec_name).unwrap();
+                        rng.end = ir_num;
+                    }
+                    _ => {}
+                }
                 self.ir_vec.push(ir);
             } else {
                 result = false;
@@ -134,7 +164,8 @@ impl IRDb {
     }
 
     pub fn new(lin_db: &LinearDb, diags: &mut Diags) -> Option<IRDb> {
-        let mut ir_db = IRDb { ir_vec: Vec::new(), parms: Vec::new() };
+        let mut ir_db = IRDb { ir_vec: Vec::new(), parms: Vec::new(),
+                                    id_locs: HashMap::new() };
 
         if !ir_db.process_lin_operands(lin_db, diags) {
             return None;
@@ -163,7 +194,7 @@ impl IRDb {
                 if operand.kind == OperandKind::Constant {
                     match operand.data_type {
                         DataType::Int => {
-                            let v = operand.val.downcast_ref::<i64>().unwrap();
+                            let v = operand.val.downcast_ref::<u64>().unwrap();
                             op.push_str(&format!(" ({:?} {:?}){}", operand.kind, operand.data_type, v));
                         }
                         // order matters, must be last

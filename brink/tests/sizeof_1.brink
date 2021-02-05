@@ -1,0 +1,8 @@
+section foo {
+    wrs "Wow!";
+    assert sizeof(foo) == 4;
+    assert sizeof (foo) == 4;
+    assert sizeof ( foo ) == 4;
+}
+
+output foo;

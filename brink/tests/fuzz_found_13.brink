@@ -1,5 +1,5 @@
 section foo {
-   assert 9999999999999*999999+ 2;
+   assert 999999999999999999*999999+ 2;
 }
 
 output foo;
