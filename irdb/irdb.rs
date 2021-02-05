@@ -119,7 +119,7 @@ impl IRDb {
         let result = match ir.kind {
             IRKind::Assert => { self.validate_bool_operands(ir, diags) }
             IRKind::EqEq => { self.validate_arithmetic_operands(ir, diags) }
-            IRKind::Int => { true }
+            IRKind::U64 => { true }
             IRKind::Multiply => { self.validate_arithmetic_operands(ir, diags) }
             IRKind::Add => { self.validate_arithmetic_operands(ir, diags) }
             IRKind::SectionStart => { true }

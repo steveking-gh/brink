@@ -241,7 +241,7 @@ impl Engine {
                     IRKind::Sizeof => { self.iterate_sizeof(&ir, irdb, diags, &mut current) }
                     IRKind::Wrs => { self.iterate_wrs(&ir, irdb, diags, &mut current) }
                     IRKind::Assert | /* evaluate assert only at execute time */
-                    IRKind::Int |
+                    IRKind::U64 |
                     IRKind::SectionStart |
                     IRKind::SectionEnd => { true }
                 }
@@ -297,7 +297,7 @@ impl Engine {
                 IRKind::Wrs => { self.execute_wrs(ir, irdb, diags, file) }
                 IRKind::Sizeof => { Ok(()) } // sizeof computed during iteration
                 IRKind::EqEq => { Ok(()) }
-                IRKind::Int => { Ok(()) }
+                IRKind::U64 => { Ok(()) }
                 IRKind::Multiply => { Ok(()) }
                 IRKind::Add => { Ok(()) }
                 IRKind::SectionStart => { Ok(()) }

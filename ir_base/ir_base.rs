@@ -18,7 +18,7 @@ pub enum DataType {
 pub enum IRKind {
     Assert,
     EqEq,
-    Int,
+    U64,
     Multiply,
     Add,
     SectionStart,
