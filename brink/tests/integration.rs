@@ -539,6 +539,20 @@ fn sizeof_1() {
     fs::remove_file("sizeof_1.bin").unwrap();
 }
 
+#[test]
+fn sizeof_2() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/sizeof_2.brink")
+                .arg("-o sizeof_2.bin")
+                .assert()
+                .success();
+
+    // Verify output file is correct.  If so, then clean up.
+    assert_eq!("Wow!bar!\n", fs::read_to_string("sizeof_2.bin").unwrap());
+    fs::remove_file("sizeof_2.bin").unwrap();
+}
+
 
 } // mod tests
 
