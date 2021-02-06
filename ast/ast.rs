@@ -81,17 +81,17 @@ pub struct Ast<'toks> {
     /// The arena from the indextree crate holding all nodes
     /// in the AST.  Arenas are one idiomatic rust way to nicely
     /// manage the pointer craziness of trees
-    pub arena: Arena<usize>,
+    arena: Arena<usize>,
 
     /// A vector of info about for tokens identified by logos.
-    pub tv: Vec<TokenInfo<'toks>>,
+    tv: Vec<TokenInfo<'toks>>,
  
     /// The artificial root of the tree.  The children of this
     /// tree are the top level tokens in the user's source file.
-    pub root: NodeId,
+    root: NodeId,
 
-    /// The current token number pointer wihtin the tv
-    pub tok_num: usize,
+    /// The current token number pointer within the tv
+    tok_num: usize,
 }
 
 impl<'toks> Ast<'toks> {
@@ -155,6 +155,10 @@ impl<'toks> Ast<'toks> {
         result
     }
 
+    /// Return an iterator over the children of the specified AST node
+    pub fn children(&'toks self, nid: NodeId) -> indextree::Children<usize>{
+        return nid.children(&self.arena)
+    }
 
     /// Returns the lexical value of the specified child of the specified
     /// parent. The value is always a string reference to source code regardless

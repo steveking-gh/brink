@@ -128,7 +128,7 @@ impl<'toks> LinearDb {
                         diags: &mut Diags, ast: &'toks Ast, ast_db: &AstDb) {
         // Easy linearizing without dereferencing through a name.
         // When no children exist, this case terminates recursion.
-        let children = parent_nid.children(&ast.arena);
+        let children = ast.children(parent_nid);
         for nid in children {
             self.record_r(result, rdepth, nid, lops, diags, ast, ast_db);
         }
