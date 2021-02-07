@@ -1,9 +1,17 @@
 section foo {
+    // decimal and hex equivalence
     assert 42 == 42;
     assert 0x42 == 0x42;
     assert 0x42 == 66;
     assert 0x4_2 == 66;
     assert 0x42 == 6_6;
+
+    // binary and hex equivalence
+    assert 0b0 == 0;
+    assert 0b01000010 == 0x42;
+    assert 0b0100_0010 == 0x42;
+    assert 0b101000010 == 0x142;
+    assert 0b0000000001000010 == 0x42;
 }
 
 output foo;

@@ -270,6 +270,7 @@ impl Engine {
                       -> Result<()> {
         trace!("Engine::execute_assert: ENTER");
         let mut result = Ok(());
+        debug!("engine::execute_assert: checking operand {}", ir.operands[0]);
         if self.parms[ir.operands[0]].borrow().to_bool() == false {
             let msg = format!("Assert expression failed");
             diags.err1("EXEC_2", &msg, ir.src_loc.clone());
