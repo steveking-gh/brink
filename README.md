@@ -1,20 +1,29 @@
 # brink
 
-Brink is a domain specific language for general linking and compositing of
-output files.  Brink simplifies construction of complex files by managing sizes,
+Brink is a domain specific language for linking and compositing of
+an output file.  Brink simplifies construction of complex files by managing sizes,
 offsets and ordering in a readable declarative style.  Brink was created with
 flash and other NVM images in mind, but tries to be generally useful.
 
 ## Examples
 
+For a source file called my_file.brink:
+
+    /*
+     * A section defines part of an output.
+     */
     section foo {
+        // wrs writes a quoted string to the output
         wrs "Hello World!\n";
     }
+
+    // An output statement outputs the section
     output foo;
 
-Produces a file containing the string above.
+Running the command 
+`brink my_file.brink` Produces a file containing the string `Hello World!\n`.
 
-Brink supports assert expressions for error checking.
+Brink supports assert expressions for error checking.  This example verifies that the size of the section is 13 bytes long.
 
     section bar {
         wrs "Hello World!\n";
@@ -38,6 +47,13 @@ To run fuzz tests:
 
     cd process
     cargo +nightly fuzz run fuzz_target_1
+
+    cd lineardb
+    cargo +nightly fuzz run fuzz_target_1
+
+    cd ast
+    cargo +nightly fuzz run fuzz_target_1
+
 
 Fuzz tests run until stopped with Ctrl-C.  In my experience, fuzz tests will catch a problem in 60 seconds or not at all.
 
