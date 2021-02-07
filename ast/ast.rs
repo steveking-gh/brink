@@ -36,6 +36,9 @@ pub enum LexToken {
     #[token(")")] CloseParen,
     #[token(";")] Semicolon,
     #[regex("[_a-zA-Z][0-9a-zA-Z_]*")] Identifier,
+
+    // Support the forms accepted by the nice parse_int crate:
+    // 0b, 0o, 0x and regular decimal
     #[regex("0b[01][_01]*|0x[0-9a-fA-F][_0-9a-fA-F]*|[1-9][_0-9]*|0")] U64,
 
     // Not only is \ special in strings and must be escaped, but also special in
@@ -44,7 +47,9 @@ pub enum LexToken {
     // engine underneath.
     #[regex(r#""(\\"|\\.|[^"])*""#)] QuotedString,
 
-    // These are 'stripped' from the input
+    // Comments and whitespace are stripped from user input during processing.
+    // This stripping happens *after* we record all the line/offset infor
+    // with codespace for error reporting.
     #[regex(r#"/\*([^*]|\*[^/])+\*/"#, logos::skip)] // block comments
     #[regex(r#"//[^\r\n]*(\r\n|\n)?"#, logos::skip)] // line comments
     #[regex(r#"[ \t\n\f]+"#, logos::skip)]           // whitespace
@@ -64,7 +69,7 @@ pub struct TokenInfo<'toks> {
     /// when producing errors.
     pub loc: Span,
 
-    /// The value of the token.
+    /// The value of the token trimmed of whitespace
     pub val: &'toks str,
 }
 
@@ -139,17 +144,17 @@ impl<'toks> Ast<'toks> {
         }
     }
 
-    // Boilerplate exit for recursive descent parsing functions.
-    // This function returns the result and should be the last statement
-    // in each function
+    /// Boilerplate exit for recursive descent parsing functions.
+    /// This function returns the result and should be the last statement
+    /// in each function
     fn dbg_exit(&self, func_name: &str, result: bool) -> bool {
         debug!("Ast::{} EXIT {:?}", func_name, result);
         result
     }
 
-    // Boilerplate exit for recursive descent parsing functions.
-    // This function returns the result and should be the last statement
-    // in each function
+    /// Boilerplate exit for recursive descent parsing functions.
+    /// This function returns the result and should be the last statement
+    /// in each function
     fn dbg_exit_pratt(&self, func_name: &str, result: Option<NodeId>) -> Option<NodeId> {
         debug!("Ast::{} EXIT {:?}", func_name, result);
         result
