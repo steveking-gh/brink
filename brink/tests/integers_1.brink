@@ -1,6 +1,9 @@
 section foo {
-    assert 1 == 1;
-    assert 0x1 == 1;
+    assert 42 == 42;
+    assert 0x42 == 0x42;
+    assert 0x42 == 66;
+    assert 0x4_2 == 66;
+    assert 0x42 == 6_6;
 }
 
 output foo;

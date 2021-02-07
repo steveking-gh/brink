@@ -36,7 +36,7 @@ pub enum LexToken {
     #[token(")")] CloseParen,
     #[token(";")] Semicolon,
     #[regex("[_a-zA-Z][0-9a-zA-Z_]*")] Identifier,
-    #[regex("0x[0-9a-fA-F]+|[1-9][0-9]*|0")] U64,
+    #[regex("0x[0-9a-fA-F][_0-9a-fA-F]*|[1-9][_0-9]*|0")] U64,
 
     // Not only is \ special in strings and must be escaped, but also special in
     // regex.  We use raw string here to avoid having the escape the \ for the
