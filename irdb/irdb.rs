@@ -7,6 +7,7 @@ use log::{error, warn, info, debug, trace};
 
 use ir_base::{DataType, IR, IRKind, IROperand, OperandKind};
 use std::{any::Any, collections::HashMap, ops::Range};
+use parse_int::parse;
 
 pub struct IRDb {
     pub ir_vec: Vec<IR>,
@@ -31,7 +32,7 @@ impl IRDb {
             }
             DataType::Int => {
                 if lop.kind == OperandKind::Constant {
-                    let res = lop.val.parse::<u64>();
+                    let res = parse::<u64>(&lop.val);
                     if let Ok(v) = res {
                         return Some(Box::new(v));
                     } else {

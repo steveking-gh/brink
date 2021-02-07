@@ -577,6 +577,17 @@ fn sizeof_3() {
     fs::remove_file("sizeof_3.bin").unwrap();
 }
 
+#[test]
+fn integers_1() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/integers_1.brink")
+                .assert()
+                .success();
+
+    fs::remove_file("output.bin").unwrap();
+}
+
 
 } // mod tests
 

@@ -11,5 +11,4 @@ path = "diags.rs"
 
 [dependencies]
 codespan-reporting = "0.9.5"
-codespan = "0.9.5"
 
