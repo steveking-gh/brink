@@ -1,5 +1,8 @@
 # Brink
 
+<span style="color:red">WARNING: Brink is under construction.  Please come back later!</span>.
+
+
 Brink is a domain specific language for linking and compositing of
 an output file.  Brink simplifies construction of complex files by managing sizes,
 offsets and ordering in a readable declarative style.  Brink was created with
@@ -94,3 +97,7 @@ Numbers are 64-bit unsigned (u64) by default.
 ### Quoted Strings
 
 Brink allows utf-8 quoted strings with escape characters tab (\t) and newline (\n).  Newlines are Linux style, so "A\n" is a two byte string everywhere.
+
+## Basic Structure of a Brink Program
+
+A brink source file consists of one or more sections and exactly one output statement.  Starting from the output statement, brink evaluates each section and products the output file.
