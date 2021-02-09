@@ -1,6 +1,9 @@
 # Brink
 
-<span style="color:red">WARNING: Brink is under construction.  Please come back later!</span>.
+__WARNING: Brink is under construction.  Please come back later!__
+
+__^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^__
+
 
 
 Brink is a domain specific language for linking and compositing of
