@@ -103,4 +103,38 @@ Brink allows utf-8 quoted strings with escape characters tab (\t) and newline (\
 
 ## Basic Structure of a Brink Program
 
-A brink source file consists of one or more sections and exactly one output statement.  Starting from the output statement, brink evaluates each section and products the output file.
+A brink source file consists of one or more section definitions and exactly one output statement.    Each section has a unique name.  The output statement specifies the name of the top level section.  Starting from the top section, Brink recursively evaluates each section and produces the output file.  For example, we can define a section with a write-string (wrs) expression:
+
+    section foo {
+        wrs "I'm foo";
+    }
+
+    output foo;
+
+Produces a default output named `output.bin`.
+
+    $ cat output.bin
+    I'm foo
+
+
+
+Using a write (wr) statement, sections can write other sections:
+
+    section foo {
+        wrs "I'm foo\n";
+    }
+
+    section bar {
+        wrs "I'm bar\n";
+        wr foo;
+    }
+
+    output bar;
+
+Produces `output.bin`:
+
+    $ cat output.bin
+    I'm bar
+    I'm foo
+
+
