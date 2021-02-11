@@ -25,7 +25,7 @@ pub enum LexToken {
     #[token("wr")] Wr,
     #[token("output")] Output,
     #[token("==")] EqEq,
-//    #[token("!=")] NEq,
+    #[token("!=")] NEq,
     #[token("+")] Plus,
 //    #[token("-")] Minus,
     #[token("*")] Asterisk,
@@ -429,7 +429,7 @@ impl<'toks> Ast<'toks> {
     fn get_binding_power(tok: LexToken) -> (u8,u8) {
         match tok {
             LexToken::U64 => (9,10),
-//            LexToken::NEq |
+            LexToken::NEq |
             LexToken::EqEq => (1,2),
 //            LexToken::Minus |
             LexToken::Plus => (3,4),
@@ -522,6 +522,7 @@ impl<'toks> Ast<'toks> {
             let op_tinfo = op_tinfo.unwrap();
             match op_tinfo.tok {
                 LexToken::Semicolon => { break; }
+                LexToken::NEq |
                 LexToken::EqEq |
                 LexToken::Plus |
                 LexToken::Asterisk => {}

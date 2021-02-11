@@ -60,6 +60,7 @@ impl<'toks> LinIR {
 fn tok_to_irkind(tok: LexToken) -> IRKind {
     match tok {
         LexToken::Wrs => { IRKind::Wrs }
+        LexToken::NEq => { IRKind::NEq }
         LexToken::EqEq => { IRKind::EqEq }
 //            LexToken::NEq => { IRKind::NEq }
         LexToken::Plus => { IRKind::Add }
@@ -243,6 +244,7 @@ impl<'toks> LinearDb {
                 // 1 operand expected
                 self.process_operands(result, 1, &mut lops, ir_lid, diags, tinfo);
             }
+            ast::LexToken::NEq |
             ast::LexToken::EqEq |
             ast::LexToken::Asterisk |
             ast::LexToken::Plus => {

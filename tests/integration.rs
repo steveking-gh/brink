@@ -588,6 +588,17 @@ fn integers_1() {
     fs::remove_file("output.bin").unwrap();
 }
 
+#[test]
+fn neq_1() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/neq_1.brink")
+                .assert()
+                .success();
+
+    fs::remove_file("output.bin").unwrap();
+}
+
 
 } // mod tests
 

@@ -75,6 +75,33 @@ impl Engine {
         true
     }
 
+    // todo - Merge this with eqeq
+    fn iterate_neq(&mut self, ir: &IR, _irdb: &IRDb, _diags: &mut Diags,
+                    current: &Location) -> bool {
+        trace!("Engine::iterate_neq: ENTER, abs {}, img {}, sec {}",
+            current.abs, current.img, current.sec);
+        // neq takes two inputs and produces one output parameter
+        assert!(ir.operands.len() == 3);
+        let in_parm_num0 = ir.operands[0];
+        let in_parm_num1 = ir.operands[1];
+        let out_parm_num = ir.operands[2];
+        let in_parm0 = self.parms[in_parm_num0].borrow();
+        let in_parm1 = self.parms[in_parm_num1].borrow();
+        let mut out_parm = self.parms[out_parm_num].borrow_mut();
+
+        let in0 = in_parm0.to_u64();
+        let in1 = in_parm1.to_u64();
+        let out = out_parm.val.downcast_mut::<u64>().unwrap();
+        if in0 != in1 {
+            *out = 1;
+        } else {
+            *out = 0;
+        }
+    
+        trace!("Engine::iterate_neq: EXIT");
+        true
+    }
+
     fn iterate_eqeq(&mut self, ir: &IR, _irdb: &IRDb, _diags: &mut Diags,
                     current: &Location) -> bool {
         trace!("Engine::iterate_eqeq: ENTER, abs {}, img {}, sec {}",
@@ -244,6 +271,7 @@ impl Engine {
                 // record our location after each IR
                 self.ir_locs[lid] = current.clone();
                 result &= match ir.kind {
+                    IRKind::NEq => { self.iterate_neq(&ir, irdb, diags, &current) }
                     IRKind::EqEq => { self.iterate_eqeq(&ir, irdb, diags, &current) }
                     IRKind::Multiply =>{ self.iterate_multiply(&ir, irdb, diags, &current) }
                     IRKind::Add =>{ self.iterate_add(&ir, irdb, diags, &current) }
@@ -306,6 +334,7 @@ impl Engine {
                 IRKind::Assert => { self.execute_assert(ir, irdb, diags, file) }
                 IRKind::Wrs => { self.execute_wrs(ir, irdb, diags, file) }
                 IRKind::Sizeof => { Ok(()) } // sizeof computed during iteration
+                IRKind::NEq => { Ok(()) }
                 IRKind::EqEq => { Ok(()) }
                 IRKind::U64 => { Ok(()) }
                 IRKind::Multiply => { Ok(()) }

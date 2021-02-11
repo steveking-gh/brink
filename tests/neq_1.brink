@@ -1,0 +1,8 @@
+section foo {
+    assert 1 != 2;
+    assert 1 != 0;
+    assert 0 != 1;
+    assert 100000000000 != 200000000000;
+}
+
+output foo;

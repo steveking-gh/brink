@@ -17,6 +17,7 @@ pub enum DataType {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum IRKind {
     Assert,
+    NEq,
     EqEq,
     U64,
     Multiply,
