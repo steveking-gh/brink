@@ -155,5 +155,5 @@ Brink supports the following arithmetic operators with same relative precedence 
 |            | &&       | n/a                   | Logical-AND                                   |
 | Lowest     | \|\|     | n/a                   | Logical-OR                                    |
 
-All arithmetic operations are checked for over/underflow.
+As shown in the table, Brink will check some operations for arithmetic under/overflow.
 

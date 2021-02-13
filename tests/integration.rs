@@ -681,5 +681,17 @@ fn multiply_2() {
     .stderr(predicates::str::contains("[EXEC_6]"));
 }
 
+#[test]
+fn divide_1() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/divide_1.brink")
+                .assert()
+                .success();
+
+    fs::remove_file("output.bin").unwrap();
+}
+
+
 } // mod tests
 
