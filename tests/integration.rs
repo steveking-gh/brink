@@ -640,5 +640,46 @@ fn subtract_1() {
     fs::remove_file("output.bin").unwrap();
 }
 
+#[test]
+fn subtract_2() {
+    let _cmd = Command::cargo_bin("brink")
+    .unwrap()
+    .arg("tests/subtract_2.brink")
+    .assert()
+    .failure()
+    .stderr(predicates::str::contains("[EXEC_4]"));
+}
+
+#[test]
+fn subtract_3() {
+    let _cmd = Command::cargo_bin("brink")
+    .unwrap()
+    .arg("tests/subtract_3.brink")
+    .assert()
+    .failure()
+    .stderr(predicates::str::contains("[EXEC_4]"));
+}
+
+#[test]
+fn multiply_1() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/multiply_1.brink")
+                .assert()
+                .success();
+
+    fs::remove_file("output.bin").unwrap();
+}
+
+#[test]
+fn multiply_2() {
+    let _cmd = Command::cargo_bin("brink")
+    .unwrap()
+    .arg("tests/multiply_2.brink")
+    .assert()
+    .failure()
+    .stderr(predicates::str::contains("[EXEC_6]"));
+}
+
 } // mod tests
 

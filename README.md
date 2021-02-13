@@ -141,19 +141,19 @@ Brink allows utf-8 quoted strings with escape characters tab (\t) and newline (\
 
 Brink supports the following arithmetic operators with same relative precedence as the Rust language.
 
-| Precedence | Operator | Description                                   |
-|------------|----------|-----------------------------------------------|
-| Highest    | (   )    | Paren grouping                                |
-|            | *   /    | Multiply and divide                           |
-|            | +   -    | Add and subtract                              |
-|            | &        | Bitwise-AND                                   |
-|            | \|       | Bitwise-OR                                    |
-|            | <<  >>   | Bitwise shift up and down                     |
-|            | ==  !=   | Equals and non-equal                          |
-|            | =>       | Greater-than-or-equal (same precedence as ==) |
-|            | <=       | less-than-or-equalLTE (same precedence as ==) |
-|            | &&       | Logical-AND                                   |
-|            | \|\|     | Logical-OR                                    |
+| Precedence | Operator | Under/Overflow Check? | Description                                   |
+|------------|----------|-----------------------|-----------------------------------------------|
+| Highest    | (   )    | n/a                   | Paren grouping                                |
+|            | *   /    | yes                   | Multiply and divide                           |
+|            | +   -    | yes                   | Add and subtract                              |
+|            | &        | n/a                   | Bitwise-AND                                   |
+|            | \|       | n/a                   | Bitwise-OR                                    |
+|            | <<  >>   | no                    | Bitwise shift up and down                     |
+|            | ==  !=   | n/a                   | Equals and non-equal                          |
+|            | =>       | n/a                   | Greater-than-or-equal (same precedence as ==) |
+|            | <=       | n/a                   | less-than-or-equalLTE (same precedence as ==) |
+|            | &&       | n/a                   | Logical-AND                                   |
+| Lowest     | \|\|     | n/a                   | Logical-OR                                    |
 
 All arithmetic operations are checked for over/underflow.
 

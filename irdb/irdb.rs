@@ -121,6 +121,8 @@ impl IRDb {
             IRKind::Assert => { self.validate_bool_operands(ir, diags) }
             IRKind::NEq |
             IRKind::EqEq |
+            IRKind::LeftShift |
+            IRKind::RightShift |
             IRKind::Multiply |
             IRKind::Divide |
             IRKind::Subtract |

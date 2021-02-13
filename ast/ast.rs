@@ -30,6 +30,8 @@ pub enum LexToken {
     #[token("-")] Minus,
     #[token("*")] Asterisk,
     #[token("/")] FSlash,
+    #[token("<<")] DoubleLess,
+    #[token(">>")] DoubleGreater,
     #[token("{")] OpenBrace,
     #[token("}")] CloseBrace,
     #[token("(")] OpenParen,
@@ -429,12 +431,14 @@ impl<'toks> Ast<'toks> {
     fn get_binding_power(tok: LexToken) -> (u8,u8) {
         match tok {
             LexToken::U64 => (9,10),
+            LexToken::FSlash |
+            LexToken::Asterisk => (7,8),
+            LexToken::Minus |
+            LexToken::Plus => (5,6),
+            LexToken::DoubleGreater |
+            LexToken::DoubleLess => (3,4),
             LexToken::NEq |
             LexToken::EqEq => (1,2),
-            LexToken::Minus |
-            LexToken::Plus => (3,4),
-            LexToken::FSlash |
-            LexToken::Asterisk => (5,6),
             _ => (0,0),
         }
     }
@@ -524,6 +528,8 @@ impl<'toks> Ast<'toks> {
                 LexToken::Semicolon => { break; }
                 LexToken::NEq |
                 LexToken::EqEq |
+                LexToken::DoubleGreater |
+                LexToken::DoubleLess |
                 LexToken::Plus |
                 LexToken::Minus |
                 LexToken::Asterisk |

@@ -62,9 +62,11 @@ fn tok_to_irkind(tok: LexToken) -> IRKind {
         LexToken::Wrs => { IRKind::Wrs }
         LexToken::NEq => { IRKind::NEq }
         LexToken::EqEq => { IRKind::EqEq }
+        LexToken::DoubleGreater => { IRKind::RightShift }
+        LexToken::DoubleLess => { IRKind::LeftShift }
         LexToken::Plus => { IRKind::Add }
         LexToken::Minus => { IRKind::Subtract }
-        LexToken::Asterisk => { IRKind:: Multiply }
+        LexToken::Asterisk => { IRKind::Multiply }
         LexToken::FSlash => { IRKind::Divide }
         bug => {
             assert!( false, "Failed to convert LexToken to IRKind for {:?}", bug);
@@ -176,7 +178,7 @@ impl<'toks> LinearDb {
         let tinfo = ast.get_tinfo(parent_nid);
         
         match tinfo.tok {
-            ast::LexToken::Wr => {
+            LexToken::Wr => {
                 // A vector to track the operands of this expression.
                 let mut lops = Vec::new();
                 // Write the contents of a section.  This isn't a simple recursion
@@ -198,7 +200,7 @@ impl<'toks> LinearDb {
                 // linear ID for the 'wr' and expect no operands.
                 *result &= self.operand_count_is_valid(0, &lops, diags, tinfo);
             }
-            ast::LexToken::Wrs => {
+            LexToken::Wrs => {
                 // A vector to track the operands of this expression.
                 let mut lops = Vec::new();
                 // Write a fixed string. The string is the operand.
@@ -207,7 +209,7 @@ impl<'toks> LinearDb {
                 // 1 operand expected
                 self.process_operands(result, 1, &mut lops, ir_lid, diags, tinfo);
             }
-            ast::LexToken::Sizeof => {
+            LexToken::Sizeof => {
                 // A vector to track the operands of this expression.
                 let mut lops = Vec::new();
                 // Get the size of the section.  Section name is an identifier operand.
@@ -225,9 +227,9 @@ impl<'toks> LinearDb {
                 returned_operands.push(idx);
 
             }
-            ast::LexToken::Identifier |
-            ast::LexToken::U64 |
-            ast::LexToken::QuotedString => {
+            LexToken::Identifier |
+            LexToken::U64 |
+            LexToken::QuotedString => {
                 // These are immediate operands.  Add them to the main operand vector
                 // and return them as local operands.
                 // This case terminates recursion.
@@ -236,7 +238,7 @@ impl<'toks> LinearDb {
                                         lex_to_data_type(tinfo.tok)));
                 returned_operands.push(idx);
             }
-            ast::LexToken::Assert => {
+            LexToken::Assert => {
                 // A vector to track the operands of this expression.
                 let mut lops = Vec::new();
                 self.record_children_r(result, rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
@@ -244,12 +246,14 @@ impl<'toks> LinearDb {
                 // 1 operand expected
                 self.process_operands(result, 1, &mut lops, ir_lid, diags, tinfo);
             }
-            ast::LexToken::NEq |
-            ast::LexToken::EqEq |
-            ast::LexToken::Asterisk |
-            ast::LexToken::FSlash |
-            ast::LexToken::Minus |
-            ast::LexToken::Plus => {
+            LexToken::NEq |
+            LexToken::EqEq |
+            LexToken::DoubleGreater |
+            LexToken::DoubleLess |
+            LexToken::Asterisk |
+            LexToken::FSlash |
+            LexToken::Minus |
+            LexToken::Plus => {
                 // A vector to track the operands of this expression.
                 let mut lops = Vec::new();
                 self.record_children_r(result, rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
@@ -264,7 +268,7 @@ impl<'toks> LinearDb {
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);
             }
-            ast::LexToken::Section => {
+            LexToken::Section => {
                 // Record the linear start of this section.
                 let mut lops = Vec::new();
                 let start_lid = self.new_ir(parent_nid, ast, IRKind::SectionStart);
@@ -279,19 +283,19 @@ impl<'toks> LinearDb {
                     *result = false;
                 }
             }
-            ast::LexToken::Semicolon |
-            ast::LexToken::OpenParen |
-            ast::LexToken::CloseParen |
-            ast::LexToken::OpenBrace |
-            ast::LexToken::CloseBrace => {
+            LexToken::Semicolon |
+            LexToken::OpenParen |
+            LexToken::CloseParen |
+            LexToken::OpenBrace |
+            LexToken::CloseBrace => {
                 // Uninteresting syntactical elements that do not appear in the IR.
             }
-            ast::LexToken::Unknown => {
+            LexToken::Unknown => {
                 let m = "Unexpected character.";
                 diags.err1("LINEAR_3", &m, tinfo.span());
                 *result = false;
             }
-            ast::LexToken::Output => {
+            LexToken::Output => {
                 let m = format!("Unexpected '{}' expression not allowed here.", tinfo.val);
                 diags.err1("LINEAR_4", &m, tinfo.span());
                 *result = false;

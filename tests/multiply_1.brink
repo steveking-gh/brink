@@ -1,0 +1,12 @@
+section foo {
+    assert 0 == 0 * 0;
+    assert 0 == 0 * 1;
+    assert 15 == 0xF * 1;
+    assert 0x10 * 0x10 == 0x100;
+    // max value in u64
+    assert 18446744073709551615 * 0 == 0;
+    assert 18446744073709551615 * 1 == 18446744073709551615;
+    assert 10 * 10 == 100;
+}
+
+output foo;

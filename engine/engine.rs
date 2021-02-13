@@ -1,3 +1,4 @@
+use std::convert::TryFrom;
 use ir_base::{IR, IRKind, DataType};
 use irdb::IRDb;
 use diags::Diags;
@@ -75,6 +76,84 @@ impl Engine {
         true
     }
 
+    fn do_add(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
+        let check = in0.checked_add(in1);
+        if check.is_none() {
+            let msg = format!("Add expression '{} + {}' will overflow", in0, in1);
+            diags.err1("EXEC_1", &msg, ir.src_loc.clone());
+            false
+        } else {
+            *out = check.unwrap();
+            true
+        }
+    }
+
+    fn do_sub(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
+        let check = in0.checked_sub(in1);
+        if check.is_none() {
+            let msg = format!("Subtract expression '{} - {}' will underflow", in0, in1);
+            diags.err1("EXEC_4", &msg, ir.src_loc.clone());
+            false
+        } else {
+            *out = check.unwrap();
+            true
+        }
+    }
+
+    fn do_mul(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
+        let check = in0.checked_mul(in1);
+        if check.is_none() {
+            let msg = format!("Multiply expression '{} * {}' will overflow", in0, in1);
+            diags.err1("EXEC_6", &msg, ir.src_loc.clone());
+            false
+        } else {
+            *out = check.unwrap();
+            true
+        }
+    }
+
+    fn do_div(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
+        let check = in0.checked_div(in1);
+        if check.is_none() {
+            let msg = format!("Exception in divide expression '{} / {}'", in0, in1);
+            diags.err1("EXEC_7", &msg, ir.src_loc.clone());
+            false
+        } else {
+            *out = check.unwrap();
+            true
+        }
+    }
+
+    fn do_shl(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
+
+        // Use checked arithmetic in case user is off the rails
+        let mut result = true;
+        let shift_amount = u32::try_from(in1);
+        if shift_amount.is_err() {
+            let msg = format!("Shift amount {} is too large in Left Shift expression '{} << {}'", in1, in0, in1);
+            diags.err1("EXEC_9", &msg, ir.src_loc.clone());
+            result = false;
+        } else {
+            *out = in0 << in1;
+        }
+        result
+    }
+
+    fn do_shr(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
+
+        // Use checked arithmetic in case user is off the rails
+        let mut result = true;
+        let shift_amount = u32::try_from(in1);
+        if shift_amount.is_err() {
+            let msg = format!("Shift amount {} is too large in Right Shift expression '{} >> {}'", in1, in0, in1);
+            diags.err1("EXEC_10", &msg, ir.src_loc.clone());
+            result = false;
+        } else {
+            *out = in0 >> in1;
+        }
+        result
+    }
+
     fn iterate_arithmetic(&mut self, ir: &IR, _irdb: &IRDb, operation: IRKind,
                     current: &Location, diags: &mut Diags) -> bool {
         trace!("Engine::iterate_arithmetic: ENTER, abs {}, img {}, sec {}",
@@ -92,70 +171,15 @@ impl Engine {
         let in1 = in_parm1.to_u64();
         let out = out_parm.val.downcast_mut::<u64>().unwrap();
 
-        let mut result = true;
-
-        *out = match operation {
-            IRKind::NEq => {
-                if in0 != in1 {
-                    1
-                } else {
-                    0
-                }
-            }
-            IRKind::EqEq => {
-                if in0 == in1 {
-                    1
-                } else {
-                    0
-                }
-            }
-            IRKind::Add => {
-                let check = in0.checked_add(in1);
-                if check.is_none() {
-                    let msg = format!("Add expression '{} + {}' will overflow", in0, in1);
-                    diags.err1("EXEC_1", &msg, ir.src_loc.clone());
-                    result = false;
-                    0
-                } else {
-                    check.unwrap()
-                }
-            }
-            IRKind::Subtract => {
-                let check = in0.checked_sub(in1);
-                if check.is_none() {
-                    let msg = format!("Subtract expression '{} - {}' will underflow", in0, in1);
-                    diags.err1("EXEC_4", &msg, ir.src_loc.clone());
-                    result = false;
-                    0
-                } else {
-                    check.unwrap()
-                }
-            }
-            IRKind::Multiply => {
-                // Use checked arithmetic in case user is off the rails
-                let check = in0.checked_mul(in1);
-                if check.is_none() {
-                    let msg = format!("Multiply expression '{} * {}' will overflow", in0, in1);
-                    diags.err1("EXEC_6", &msg, ir.src_loc.clone());
-                    result = false;
-                    0
-                } else {
-                    check.unwrap()
-                }
-            }
-            IRKind::Divide => {
-                // Use checked arithmetic in case user is off the rails
-                let check = in0.checked_div(in1);
-                if check.is_none() {
-                    let msg = format!("Bad divide expression '{} * {}'", in0, in1);
-                    diags.err1("EXEC_7", &msg, ir.src_loc.clone());
-                    result = false;
-                    0
-                } else {
-                    check.unwrap()
-                }
-            }
-
+        let result = match operation {
+            IRKind::NEq => { if in0 != in1 { *out = 1; } else { *out = 0; } true }
+            IRKind::EqEq => { if in0 == in1 { *out = 1; } else { *out = 0; } true }
+            IRKind::Add => { self.do_add(ir, in0, in1, out, diags) }
+            IRKind::Subtract => { self.do_sub(ir, in0, in1, out, diags) }
+            IRKind::Multiply => { self.do_mul(ir, in0, in1, out, diags) }
+            IRKind::Divide => { self.do_div(ir, in0, in1, out, diags) }
+            IRKind::LeftShift => { self.do_shl(ir, in0, in1, out, diags) }
+            IRKind::RightShift => { self.do_shr(ir, in0, in1, out, diags) }
             bad => {
                 panic!("Called iterate_arithmetic with bad IRKind operation {:?}", bad);
             }
@@ -254,6 +278,8 @@ impl Engine {
                     // Arithmetic with two operands in, one out
                     IRKind::Add |
                     IRKind::Subtract |
+                    IRKind::RightShift |
+                    IRKind::LeftShift |
                     IRKind::Multiply |
                     IRKind::Divide |
                     IRKind::EqEq |
@@ -317,16 +343,19 @@ impl Engine {
             result = match ir.kind {
                 IRKind::Assert => { self.execute_assert(ir, irdb, diags, file) }
                 IRKind::Wrs => { self.execute_wrs(ir, irdb, diags, file) }
-                IRKind::Sizeof => { Ok(()) } // sizeof computed during iteration
-                IRKind::NEq => { Ok(()) }
-                IRKind::EqEq => { Ok(()) }
-                IRKind::U64 => { Ok(()) }
-                IRKind::Multiply => { Ok(()) }
-                IRKind::Divide => { Ok(()) }
-                IRKind::Add => { Ok(()) }
-                IRKind::Subtract => { Ok(()) }
-                IRKind::SectionStart => { Ok(()) }
-                IRKind::SectionEnd => { Ok(()) }
+                // the rest of these operations are computed during iteration
+                IRKind::Sizeof |
+                IRKind::NEq |
+                IRKind::EqEq |
+                IRKind::U64 |
+                IRKind::Multiply |
+                IRKind::Divide |
+                IRKind::Add |
+                IRKind::Subtract |
+                IRKind::SectionStart |
+                IRKind::SectionEnd |
+                IRKind::LeftShift |
+                IRKind::RightShift => { Ok(()) }
             };
 
             if result.is_err() {

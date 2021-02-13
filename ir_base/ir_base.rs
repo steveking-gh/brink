@@ -24,6 +24,8 @@ pub enum IRKind {
     Divide,
     Add,
     Subtract,
+    LeftShift,
+    RightShift,
     SectionStart,
     SectionEnd,
     Sizeof,
