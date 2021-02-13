@@ -52,8 +52,8 @@ impl<'toks> LinIR {
         Self { nid, src_loc, op, operand_vec: Vec::new() }
     }
 
-    pub fn add_operand(&mut self, oper_num: usize) {
-        self.operand_vec.push(oper_num);
+    pub fn add_operand(&mut self, operand_num: usize) {
+        self.operand_vec.push(operand_num);
     }
 }
 
@@ -62,11 +62,10 @@ fn tok_to_irkind(tok: LexToken) -> IRKind {
         LexToken::Wrs => { IRKind::Wrs }
         LexToken::NEq => { IRKind::NEq }
         LexToken::EqEq => { IRKind::EqEq }
-//            LexToken::NEq => { IRKind::NEq }
         LexToken::Plus => { IRKind::Add }
-//            LexToken::Minus => { IRKind::Subtract }
+        LexToken::Minus => { IRKind::Subtract }
         LexToken::Asterisk => { IRKind:: Multiply }
-//            LexToken::FSlash => { IRKind::Divide }
+        LexToken::FSlash => { IRKind::Divide }
         bug => {
             assert!( false, "Failed to convert LexToken to IRKind for {:?}", bug);
             IRKind::Assert // keep compiler happy
@@ -90,15 +89,15 @@ boxed info object.
 */
 impl<'toks> LinearDb {
 
-    // Adds an existing operand by it's operanc_vec index to the specified LinIR
+    // Adds an existing operand by it's operand_vec index to the specified LinIR
     pub fn add_operand_idx_to_ir(&mut self, ir_lid: usize, idx: usize) {
         self.ir_vec[ir_lid].add_operand(idx);
     }
 
     // Returns the linear operand index occupied by the new operand
-    pub fn add_operand_to_ir(&mut self, ir_lid: usize, oper: LinOperand) -> usize {
+    pub fn add_operand_to_ir(&mut self, ir_lid: usize, operand: LinOperand) -> usize {
         let idx = self.operand_vec.len();
-        self.operand_vec.push(oper);
+        self.operand_vec.push(operand);
         self.add_operand_idx_to_ir(ir_lid, idx);
         idx
     }
@@ -152,8 +151,9 @@ impl<'toks> LinearDb {
         // If we found the expected number of operands, then add them to the new IR
         // Otherwise, do nothing but indicate the error.
         if self.operand_count_is_valid(expected, lops, diags, tinfo) {
-            while !lops.is_empty() {
-                self.add_operand_idx_to_ir(ir_lid, lops.pop().unwrap());
+            // Preserve the order of the operands front to back.
+            for idx in lops {
+                self.add_operand_idx_to_ir(ir_lid, *idx);
             }
         } else {
             *result = false;
@@ -220,7 +220,7 @@ impl<'toks> LinearDb {
                 // Add a destination operand to the operation to hold the result
                 let idx = self.add_operand_to_ir(ir_lid, LinOperand::new(parent_nid, ast,
                                                   OperandKind::Variable, DataType::Int));
-                // Also add the detination operand to the local operands
+                // Also add the destination operand to the local operands
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);
 
@@ -247,6 +247,8 @@ impl<'toks> LinearDb {
             ast::LexToken::NEq |
             ast::LexToken::EqEq |
             ast::LexToken::Asterisk |
+            ast::LexToken::FSlash |
+            ast::LexToken::Minus |
             ast::LexToken::Plus => {
                 // A vector to track the operands of this expression.
                 let mut lops = Vec::new();
@@ -258,7 +260,7 @@ impl<'toks> LinearDb {
                 // Add a destination operand to the operation to hold the result
                 let idx = self.add_operand_to_ir(ir_lid, LinOperand::new(parent_nid, ast,
                                                   OperandKind::Variable,DataType::Int));
-                // Also add the detination operand to the local operands
+                // Also add the destination operand to the local operands
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);
             }

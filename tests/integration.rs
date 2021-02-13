@@ -466,7 +466,7 @@ fn fuzz_found_13() {
     .arg("tests/fuzz_found_13.brink")
     .assert()
     .failure()
-    .stderr(predicates::str::contains("[EXEC_4]"));
+    .stderr(predicates::str::contains("[EXEC_6]"));
 }
 
 #[test]
@@ -519,7 +519,6 @@ fn section_self_ref_2() {
     .failure()
     .stderr(predicates::str::contains("[AST_6]"));
 }
-
 
 #[test]
 fn nested_section_1() {
@@ -599,6 +598,47 @@ fn neq_1() {
     fs::remove_file("output.bin").unwrap();
 }
 
+#[test]
+fn neq_2() {
+    let _cmd = Command::cargo_bin("brink")
+    .unwrap()
+    .arg("tests/neq_2.brink")
+    .assert()
+    .failure()
+    .stderr(predicates::str::contains("[EXEC_2]"));
+}
+
+#[test]
+fn add_1() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/add_1.brink")
+                .assert()
+                .success();
+
+    fs::remove_file("output.bin").unwrap();
+}
+
+#[test]
+fn add_2() {
+    let _cmd = Command::cargo_bin("brink")
+    .unwrap()
+    .arg("tests/add_2.brink")
+    .assert()
+    .failure()
+    .stderr(predicates::str::contains("[EXEC_1]"));
+}
+
+#[test]
+fn subtract_1() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/subtract_1.brink")
+                .assert()
+                .success();
+
+    fs::remove_file("output.bin").unwrap();
+}
 
 } // mod tests
 

@@ -75,12 +75,11 @@ impl Engine {
         true
     }
 
-    // todo - Merge this with eqeq
-    fn iterate_neq(&mut self, ir: &IR, _irdb: &IRDb, _diags: &mut Diags,
-                    current: &Location) -> bool {
-        trace!("Engine::iterate_neq: ENTER, abs {}, img {}, sec {}",
+    fn iterate_arithmetic(&mut self, ir: &IR, _irdb: &IRDb, operation: IRKind,
+                    current: &Location, diags: &mut Diags) -> bool {
+        trace!("Engine::iterate_arithmetic: ENTER, abs {}, img {}, sec {}",
             current.abs, current.img, current.sec);
-        // neq takes two inputs and produces one output parameter
+        // All operations here take two inputs and produces one output parameter
         assert!(ir.operands.len() == 3);
         let in_parm_num0 = ir.operands[0];
         let in_parm_num1 = ir.operands[1];
@@ -92,40 +91,78 @@ impl Engine {
         let in0 = in_parm0.to_u64();
         let in1 = in_parm1.to_u64();
         let out = out_parm.val.downcast_mut::<u64>().unwrap();
-        if in0 != in1 {
-            *out = 1;
-        } else {
-            *out = 0;
-        }
-    
-        trace!("Engine::iterate_neq: EXIT");
-        true
-    }
 
-    fn iterate_eqeq(&mut self, ir: &IR, _irdb: &IRDb, _diags: &mut Diags,
-                    current: &Location) -> bool {
-        trace!("Engine::iterate_eqeq: ENTER, abs {}, img {}, sec {}",
-            current.abs, current.img, current.sec);
-        // eqeq takes two inputs and produces one output parameter
-        assert!(ir.operands.len() == 3);
-        let in_parm_num0 = ir.operands[0];
-        let in_parm_num1 = ir.operands[1];
-        let out_parm_num = ir.operands[2];
-        let in_parm0 = self.parms[in_parm_num0].borrow();
-        let in_parm1 = self.parms[in_parm_num1].borrow();
-        let mut out_parm = self.parms[out_parm_num].borrow_mut();
+        let mut result = true;
 
-        let in0 = in_parm0.to_u64();
-        let in1 = in_parm1.to_u64();
-        let out = out_parm.val.downcast_mut::<u64>().unwrap();
-        if in0 == in1 {
-            *out = 1;
-        } else {
-            *out = 0;
-        }
+        *out = match operation {
+            IRKind::NEq => {
+                if in0 != in1 {
+                    1
+                } else {
+                    0
+                }
+            }
+            IRKind::EqEq => {
+                if in0 == in1 {
+                    1
+                } else {
+                    0
+                }
+            }
+            IRKind::Add => {
+                let check = in0.checked_add(in1);
+                if check.is_none() {
+                    let msg = format!("Add expression '{} + {}' will overflow", in0, in1);
+                    diags.err1("EXEC_1", &msg, ir.src_loc.clone());
+                    result = false;
+                    0
+                } else {
+                    check.unwrap()
+                }
+            }
+            IRKind::Subtract => {
+                let check = in0.checked_sub(in1);
+                if check.is_none() {
+                    let msg = format!("Subtract expression '{} - {}' will underflow", in0, in1);
+                    diags.err1("EXEC_4", &msg, ir.src_loc.clone());
+                    result = false;
+                    0
+                } else {
+                    check.unwrap()
+                }
+            }
+            IRKind::Multiply => {
+                // Use checked arithmetic in case user is off the rails
+                let check = in0.checked_mul(in1);
+                if check.is_none() {
+                    let msg = format!("Multiply expression '{} * {}' will overflow", in0, in1);
+                    diags.err1("EXEC_6", &msg, ir.src_loc.clone());
+                    result = false;
+                    0
+                } else {
+                    check.unwrap()
+                }
+            }
+            IRKind::Divide => {
+                // Use checked arithmetic in case user is off the rails
+                let check = in0.checked_div(in1);
+                if check.is_none() {
+                    let msg = format!("Bad divide expression '{} * {}'", in0, in1);
+                    diags.err1("EXEC_7", &msg, ir.src_loc.clone());
+                    result = false;
+                    0
+                } else {
+                    check.unwrap()
+                }
+            }
+
+            bad => {
+                panic!("Called iterate_arithmetic with bad IRKind operation {:?}", bad);
+            }
+        };
     
-        trace!("Engine::iterate_eqeq: EXIT");
-        true
+        trace!("Engine::iterate_arithmetic: EXIT");
+        result
     }
 
     fn iterate_sizeof(&mut self, ir: &IR, irdb: &IRDb, diags: &mut Diags,
@@ -164,65 +201,6 @@ impl Engine {
         *out = sz.try_into().unwrap();
     
         trace!("Engine::iterate_sizeof: EXIT");
-        true
-    }
-
-    fn iterate_add(&mut self, ir: &IR, _irdb: &IRDb, diags: &mut Diags,
-                    current: &Location) -> bool {
-        trace!("Engine::iterate_add: ENTER, abs {}, img {}, sec {}",
-            current.abs, current.img, current.sec);
-        // Takes two inputs and produces one output parameter
-        assert!(ir.operands.len() == 3);
-        let in_parm_num0 = ir.operands[0];
-        let in_parm_num1 = ir.operands[1];
-        let out_parm_num = ir.operands[2];
-        let in_parm0 = self.parms[in_parm_num0].borrow();
-        let in_parm1 = self.parms[in_parm_num1].borrow();
-        let mut out_parm = self.parms[out_parm_num].borrow_mut();
-
-        // If the inputs are stable, we can compute the stable output
-        let in0 = in_parm0.to_u64();
-        let in1 = in_parm1.to_u64();
-        let out = out_parm.val.downcast_mut::<u64>().unwrap();
-        let check = in0.checked_add(in1);
-        if check.is_none() {
-            let msg = format!("Add expression '{} + {}' will overflow", in0, in1);
-            diags.err1("EXEC_1", &msg, ir.src_loc.clone());
-            return false;
-        }
-        *out = check.unwrap();
-
-        trace!("Engine::iterate_add: EXIT");
-        true
-    }
-
-    fn iterate_multiply(&mut self, ir: &IR, _irdb: &IRDb, diags: &mut Diags,
-                      current: &Location) -> bool {
-        trace!("Engine::iterate_multiply: ENTER, abs {}, img {}, sec {}",
-            current.abs, current.img, current.sec);
-        // Takes two inputs and produces one output parameter
-        assert!(ir.operands.len() == 3);
-        let in_parm_num0 = ir.operands[0];
-        let in_parm_num1 = ir.operands[1];
-        let out_parm_num = ir.operands[2];
-        let in_parm0 = self.parms[in_parm_num0].borrow();
-        let in_parm1 = self.parms[in_parm_num1].borrow();
-        let mut out_parm = self.parms[out_parm_num].borrow_mut();
-
-        // If the inputs are stable, we can compute the stable output
-        let in0 = in_parm0.to_u64();
-        let in1 = in_parm1.to_u64();
-        let out = out_parm.val.downcast_mut::<u64>().unwrap();
-
-        // Use checked arithmetic in case user is off the rails
-        let check = in0.checked_mul(in1);
-        if check.is_none() {
-            let msg = format!("Multiply expression '{} * {}' will overflow", in0, in1);
-            diags.err1("EXEC_4", &msg, ir.src_loc.clone());
-            return false;
-        }
-        *out = check.unwrap();
-        trace!("Engine::iterate_multiply: EXIT");
         true
     }
 
@@ -270,11 +248,17 @@ impl Engine {
             for (lid,ir) in irdb.ir_vec.iter().enumerate() {
                 // record our location after each IR
                 self.ir_locs[lid] = current.clone();
-                result &= match ir.kind {
-                    IRKind::NEq => { self.iterate_neq(&ir, irdb, diags, &current) }
-                    IRKind::EqEq => { self.iterate_eqeq(&ir, irdb, diags, &current) }
-                    IRKind::Multiply =>{ self.iterate_multiply(&ir, irdb, diags, &current) }
-                    IRKind::Add =>{ self.iterate_add(&ir, irdb, diags, &current) }
+                let operation = ir.kind;
+                result &= match operation {
+
+                    // Arithmetic with two operands in, one out
+                    IRKind::Add |
+                    IRKind::Subtract |
+                    IRKind::Multiply |
+                    IRKind::Divide |
+                    IRKind::EqEq |
+                    IRKind::NEq => { self.iterate_arithmetic(&ir, irdb, operation, &current, diags) }
+
                     IRKind::Sizeof => { self.iterate_sizeof(&ir, irdb, diags, &mut current) }
                     IRKind::Wrs => { self.iterate_wrs(&ir, irdb, diags, &mut current) }
                     IRKind::Assert | /* evaluate assert only at execute time */
@@ -338,7 +322,9 @@ impl Engine {
                 IRKind::EqEq => { Ok(()) }
                 IRKind::U64 => { Ok(()) }
                 IRKind::Multiply => { Ok(()) }
+                IRKind::Divide => { Ok(()) }
                 IRKind::Add => { Ok(()) }
+                IRKind::Subtract => { Ok(()) }
                 IRKind::SectionStart => { Ok(()) }
                 IRKind::SectionEnd => { Ok(()) }
             };

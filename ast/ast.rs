@@ -27,9 +27,9 @@ pub enum LexToken {
     #[token("==")] EqEq,
     #[token("!=")] NEq,
     #[token("+")] Plus,
-//    #[token("-")] Minus,
+    #[token("-")] Minus,
     #[token("*")] Asterisk,
-//    #[token("/")] FSlash,
+    #[token("/")] FSlash,
     #[token("{")] OpenBrace,
     #[token("}")] CloseBrace,
     #[token("(")] OpenParen,
@@ -48,8 +48,8 @@ pub enum LexToken {
     #[regex(r#""(\\"|\\.|[^"])*""#)] QuotedString,
 
     // Comments and whitespace are stripped from user input during processing.
-    // This stripping happens *after* we record all the line/offset infor
-    // with codespace for error reporting.
+    // This stripping happens *after* we record all the line/offset info
+    // with codespan for error reporting.
     #[regex(r#"/\*([^*]|\*[^/])+\*/"#, logos::skip)] // block comments
     #[regex(r#"//[^\r\n]*(\r\n|\n)?"#, logos::skip)] // line comments
     #[regex(r#"[ \t\n\f]+"#, logos::skip)]           // whitespace
@@ -380,7 +380,7 @@ impl<'toks> Ast<'toks> {
             if !parse_ok {
                 self.take();
                 debug!("Ast::parse_section_contents: skipping to next ; starting from {}", self.tok_num);
-                // Consume the bad token and skip formward    
+                // Consume the bad token and skip forward    
                 self.advance_past_semicolon();
                 result = false;
             }
@@ -431,9 +431,9 @@ impl<'toks> Ast<'toks> {
             LexToken::U64 => (9,10),
             LexToken::NEq |
             LexToken::EqEq => (1,2),
-//            LexToken::Minus |
+            LexToken::Minus |
             LexToken::Plus => (3,4),
-//            LexToken::FSlash |
+            LexToken::FSlash |
             LexToken::Asterisk => (5,6),
             _ => (0,0),
         }
@@ -525,7 +525,9 @@ impl<'toks> Ast<'toks> {
                 LexToken::NEq |
                 LexToken::EqEq |
                 LexToken::Plus |
-                LexToken::Asterisk => {}
+                LexToken::Minus |
+                LexToken::Asterisk |
+                LexToken::FSlash => {}
                 _ => {
                     let msg = format!("Invalid operation '{}'", op_tinfo.val);
                     diags.err1("AST_18", &msg, op_tinfo.span());
@@ -776,8 +778,8 @@ impl<'toks> AstDb<'toks> {
         let mut children = parent_nid.children(&ast.arena);
 
         // First, advance to the specified child number
-        let mut cnum = 0;
-        while cnum < child_num {
+        let mut child_num = 0;
+        while child_num < child_num {
             let sec_name_nid_opt = children.next();
             if sec_name_nid_opt.is_none() {
                 // error, not enough children to reach section name
@@ -786,7 +788,7 @@ impl<'toks> AstDb<'toks> {
                 diags.err1("AST_23", &m, section_tinfo.span());
                 return false;
             }
-            cnum += 1;
+            child_num += 1;
         }
         let sec_name_nid_opt = children.next();
         if sec_name_nid_opt.is_none() {

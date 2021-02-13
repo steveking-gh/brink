@@ -73,34 +73,6 @@ For example, setting a smaller 5 second timeout for hangs and maximum input leng
 
     cargo +nightly fuzz run fuzz_target_1 -- -timeout=5 -max_len=256
 
-# Brink Language Reference
-
-This section documents the brink language.
-
-## Literals
-
-### Numbers
-
-Brink supports number literals in decimal, hex, octal and binary forms.  You can use '_' within number literals to help with readability.  Brink uses the [parse_int](https://crates.io/crates/parse_int) crate for conversion from string to value.
-
-    assert 42 == 42;
-    assert 0x42 == 0x42;
-    assert 0x42 == 66;
-    assert 0x4_2 == 66;
-    assert 0x42 == 6_6;
-
-    assert 0b0 == 0;
-    assert 0b01000010 == 0x42;
-    assert 0b0100_0010 == 0x42;
-    assert 0b101000010 == 0x142;
-    assert 0b0000000001000010 == 0x42;
-
-Numbers are 64-bit unsigned (u64) by default.
-
-### Quoted Strings
-
-Brink allows utf-8 quoted strings with escape characters tab (\t) and newline (\n).  Newlines are Linux style, so "A\n" is a two byte string everywhere.
-
 ## Basic Structure of a Brink Program
 
 A brink source file consists of one or more section definitions and exactly one output statement.    Each section has a unique name.  The output statement specifies the name of the top level section.  Starting from the top section, Brink recursively evaluates each section and produces the output file.  For example, we can define a section with a write-string (wrs) expression:
@@ -137,4 +109,51 @@ Produces `output.bin`:
     I'm bar
     I'm foo
 
+# Brink Language Reference
+
+This section documents the brink language.
+
+## Literals
+
+### Numbers
+
+Brink supports number literals in decimal, hex (0x) and binary (0b) forms.  After the first digit, you can use '_' within number literals to help with readability.  Brink uses the [parse_int](https://crates.io/crates/parse_int) library for conversion from string to value.
+
+    assert 42 == 42;
+    assert 0x42 == 0x42;
+    assert 0x42 == 66;
+    assert 0x4_2 == 66;
+    assert 0x42 == 6_6;
+
+    assert 0b0 == 0;
+    assert 0b01000010 == 0x42;
+    assert 0b0100_0010 == 0x42;
+    assert 0b101000010 == 0x142;
+    assert 0b0000000001000010 == 0x42;
+
+Numbers are 64-bit unsigned (u64) by default.
+
+### Quoted Strings
+
+Brink allows utf-8 quoted strings with escape characters tab (\t) and newline (\n).  Newlines are Linux style, so "A\n" is a two byte string on all platforms.
+
+## Arithmetic Operators
+
+Brink supports the following arithmetic operators with same relative precedence as the Rust language.
+
+| Precedence | Operator | Description                                   |
+|------------|----------|-----------------------------------------------|
+| Highest    | (   )    | Paren grouping                                |
+|            | *   /    | Multiply and divide                           |
+|            | +   -    | Add and subtract                              |
+|            | &        | Bitwise-AND                                   |
+|            | \|       | Bitwise-OR                                    |
+|            | <<  >>   | Bitwise shift up and down                     |
+|            | ==  !=   | Equals and non-equal                          |
+|            | =>       | Greater-than-or-equal (same precedence as ==) |
+|            | <=       | less-than-or-equalLTE (same precedence as ==) |
+|            | &&       | Logical-AND                                   |
+|            | \|\|     | Logical-OR                                    |
+
+All arithmetic operations are checked for over/underflow.
 

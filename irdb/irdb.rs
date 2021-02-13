@@ -119,11 +119,13 @@ impl IRDb {
     fn validate_operands(&self, ir: &IR, diags: &mut Diags) -> bool {
         let result = match ir.kind {
             IRKind::Assert => { self.validate_bool_operands(ir, diags) }
-            IRKind::NEq => { self.validate_arithmetic_operands(ir, diags) }
-            IRKind::EqEq => { self.validate_arithmetic_operands(ir, diags) }
-            IRKind::U64 => { true }
-            IRKind::Multiply => { self.validate_arithmetic_operands(ir, diags) }
+            IRKind::NEq |
+            IRKind::EqEq |
+            IRKind::Multiply |
+            IRKind::Divide |
+            IRKind::Subtract |
             IRKind::Add => { self.validate_arithmetic_operands(ir, diags) }
+            IRKind::U64 => { true }
             IRKind::SectionStart => { true }
             IRKind::SectionEnd => { true }
             IRKind::Sizeof => { true }
