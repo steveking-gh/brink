@@ -24,6 +24,8 @@ pub enum IRKind {
     Divide,
     Add,
     Subtract,
+    BitAnd,
+    BitOr,
     LeftShift,
     RightShift,
     SectionStart,

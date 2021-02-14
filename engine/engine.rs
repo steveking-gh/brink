@@ -126,7 +126,6 @@ impl Engine {
 
     fn do_shl(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
 
-        // Use checked arithmetic in case user is off the rails
         let mut result = true;
         let shift_amount = u32::try_from(in1);
         if shift_amount.is_err() {
@@ -141,7 +140,6 @@ impl Engine {
 
     fn do_shr(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
 
-        // Use checked arithmetic in case user is off the rails
         let mut result = true;
         let shift_amount = u32::try_from(in1);
         if shift_amount.is_err() {
@@ -174,6 +172,8 @@ impl Engine {
         let result = match operation {
             IRKind::NEq => { if in0 != in1 { *out = 1; } else { *out = 0; } true }
             IRKind::EqEq => { if in0 == in1 { *out = 1; } else { *out = 0; } true }
+            IRKind::BitAnd => { *out = in0 & in1; true }
+            IRKind::BitOr => { *out = in0 | in1; true }
             IRKind::Add => { self.do_add(ir, in0, in1, out, diags) }
             IRKind::Subtract => { self.do_sub(ir, in0, in1, out, diags) }
             IRKind::Multiply => { self.do_mul(ir, in0, in1, out, diags) }
@@ -280,6 +280,8 @@ impl Engine {
                     IRKind::Subtract |
                     IRKind::RightShift |
                     IRKind::LeftShift |
+                    IRKind::BitAnd |
+                    IRKind::BitOr |
                     IRKind::Multiply |
                     IRKind::Divide |
                     IRKind::EqEq |
@@ -348,6 +350,8 @@ impl Engine {
                 IRKind::NEq |
                 IRKind::EqEq |
                 IRKind::U64 |
+                IRKind::BitAnd |
+                IRKind::BitOr |
                 IRKind::Multiply |
                 IRKind::Divide |
                 IRKind::Add |

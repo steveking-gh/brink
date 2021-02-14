@@ -26,6 +26,8 @@ pub enum LexToken {
     #[token("output")] Output,
     #[token("==")] EqEq,
     #[token("!=")] NEq,
+    #[token("&")] Ampersand,
+    #[token("|")] Pipe,
     #[token("+")] Plus,
     #[token("-")] Minus,
     #[token("*")] Asterisk,
@@ -430,11 +432,13 @@ impl<'toks> Ast<'toks> {
     /// Higher numbers are stronger binding.
     fn get_binding_power(tok: LexToken) -> (u8,u8) {
         match tok {
-            LexToken::U64 => (9,10),
+            LexToken::U64 => (11,12),
             LexToken::FSlash |
-            LexToken::Asterisk => (7,8),
+            LexToken::Asterisk => (9,10),
             LexToken::Minus |
-            LexToken::Plus => (5,6),
+            LexToken::Plus => (7,8),
+            LexToken::Ampersand |
+            LexToken::Pipe => (5,6),
             LexToken::DoubleGreater |
             LexToken::DoubleLess => (3,4),
             LexToken::NEq |
@@ -530,6 +534,8 @@ impl<'toks> Ast<'toks> {
                 LexToken::EqEq |
                 LexToken::DoubleGreater |
                 LexToken::DoubleLess |
+                LexToken::Ampersand |
+                LexToken::Pipe |
                 LexToken::Plus |
                 LexToken::Minus |
                 LexToken::Asterisk |

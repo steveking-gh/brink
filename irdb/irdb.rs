@@ -125,6 +125,8 @@ impl IRDb {
             IRKind::RightShift |
             IRKind::Multiply |
             IRKind::Divide |
+            IRKind::BitAnd |
+            IRKind::BitOr |
             IRKind::Subtract |
             IRKind::Add => { self.validate_arithmetic_operands(ir, diags) }
             IRKind::U64 => { true }

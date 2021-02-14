@@ -1,0 +1,11 @@
+section foo {
+    assert 0 == 0 | 0;
+    assert 1 == 0 | 1;
+    assert 1 == 1 | 1;
+    assert 0xFF == 0xF0 | 0xF;
+    assert 0xFFFF_FFFF_FFFF_FFFF | 1 == 0xFFFF_FFFF_FFFF_FFFF;
+    assert 0xFFFF_FFFF_FFFF_FFFE | 1 == 0xFFFF_FFFF_FFFF_FFFF;
+    assert 0x7FFF_FFFF_FFFF_FFFF | 0x8000_0000_0000_0000 == 0xFFFF_FFFF_FFFF_FFFF;
+}
+
+output foo;

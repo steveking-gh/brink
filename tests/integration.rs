@@ -2,6 +2,12 @@
 mod tests {
 use assert_cmd::{Command};
 use std::fs;
+use serial_test::serial;
+
+// Many tests just use the default output file "ouput.bin".
+// This creates a race condition since each test deletes this
+// file when done.
+// Use #[serial] on tests the produce output.bin to fix this race condition.
 
 #[test]
 fn help_only() {
@@ -577,6 +583,7 @@ fn sizeof_3() {
 }
 
 #[test]
+#[serial]
 fn integers_1() {
     let _cmd = Command::cargo_bin("brink")
                 .unwrap()
@@ -588,6 +595,7 @@ fn integers_1() {
 }
 
 #[test]
+#[serial]
 fn neq_1() {
     let _cmd = Command::cargo_bin("brink")
                 .unwrap()
@@ -609,6 +617,7 @@ fn neq_2() {
 }
 
 #[test]
+#[serial]
 fn add_1() {
     let _cmd = Command::cargo_bin("brink")
                 .unwrap()
@@ -630,6 +639,7 @@ fn add_2() {
 }
 
 #[test]
+#[serial]
 fn subtract_1() {
     let _cmd = Command::cargo_bin("brink")
                 .unwrap()
@@ -661,6 +671,7 @@ fn subtract_3() {
 }
 
 #[test]
+#[serial]
 fn multiply_1() {
     let _cmd = Command::cargo_bin("brink")
                 .unwrap()
@@ -682,6 +693,7 @@ fn multiply_2() {
 }
 
 #[test]
+#[serial]
 fn divide_1() {
     let _cmd = Command::cargo_bin("brink")
                 .unwrap()
@@ -693,6 +705,7 @@ fn divide_1() {
 }
 
 #[test]
+#[serial]
 fn shl_1() {
     let _cmd = Command::cargo_bin("brink")
                 .unwrap()
@@ -704,6 +717,7 @@ fn shl_1() {
 }
 
 #[test]
+#[serial]
 fn shr_1() {
     let _cmd = Command::cargo_bin("brink")
                 .unwrap()
@@ -714,6 +728,29 @@ fn shr_1() {
     fs::remove_file("output.bin").unwrap();
 }
 
+#[test]
+#[serial]
+fn bit_and_1() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/bit_and_1.brink")
+                .assert()
+                .success();
+
+    fs::remove_file("output.bin").unwrap();
+}
+
+#[test]
+#[serial]
+fn bit_or_1() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/bit_or_1.brink")
+                .assert()
+                .success();
+
+    fs::remove_file("output.bin").unwrap();
+}
 
 } // mod tests
 

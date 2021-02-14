@@ -68,6 +68,8 @@ fn tok_to_irkind(tok: LexToken) -> IRKind {
         LexToken::Minus => { IRKind::Subtract }
         LexToken::Asterisk => { IRKind::Multiply }
         LexToken::FSlash => { IRKind::Divide }
+        LexToken::Ampersand => { IRKind::BitAnd }
+        LexToken::Pipe => { IRKind::BitOr }
         bug => {
             assert!( false, "Failed to convert LexToken to IRKind for {:?}", bug);
             IRKind::Assert // keep compiler happy
@@ -251,6 +253,8 @@ impl<'toks> LinearDb {
             LexToken::DoubleGreater |
             LexToken::DoubleLess |
             LexToken::Asterisk |
+            LexToken::Ampersand |
+            LexToken::Pipe |
             LexToken::FSlash |
             LexToken::Minus |
             LexToken::Plus => {
