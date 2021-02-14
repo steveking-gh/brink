@@ -61,7 +61,9 @@ fn tok_to_irkind(tok: LexToken) -> IRKind {
     match tok {
         LexToken::Wrs => { IRKind::Wrs }
         LexToken::NEq => { IRKind::NEq }
-        LexToken::EqEq => { IRKind::EqEq }
+        LexToken::DoubleEq => { IRKind::DoubleEq }
+        LexToken::GEq => { IRKind::GEq }
+        LexToken::LEq => { IRKind::LEq }
         LexToken::DoubleGreater => { IRKind::RightShift }
         LexToken::DoubleLess => { IRKind::LeftShift }
         LexToken::Plus => { IRKind::Add }
@@ -69,7 +71,9 @@ fn tok_to_irkind(tok: LexToken) -> IRKind {
         LexToken::Asterisk => { IRKind::Multiply }
         LexToken::FSlash => { IRKind::Divide }
         LexToken::Ampersand => { IRKind::BitAnd }
+        LexToken::DoubleAmpersand => { IRKind::LogicalAnd }
         LexToken::Pipe => { IRKind::BitOr }
+        LexToken::DoublePipe => { IRKind::LogicalOr }
         bug => {
             assert!( false, "Failed to convert LexToken to IRKind for {:?}", bug);
             IRKind::Assert // keep compiler happy
@@ -249,12 +253,16 @@ impl<'toks> LinearDb {
                 self.process_operands(result, 1, &mut lops, ir_lid, diags, tinfo);
             }
             LexToken::NEq |
-            LexToken::EqEq |
+            LexToken::LEq |
+            LexToken::GEq |
+            LexToken::DoubleEq |
             LexToken::DoubleGreater |
             LexToken::DoubleLess |
             LexToken::Asterisk |
             LexToken::Ampersand |
+            LexToken::DoubleAmpersand |
             LexToken::Pipe |
+            LexToken::DoublePipe |
             LexToken::FSlash |
             LexToken::Minus |
             LexToken::Plus => {

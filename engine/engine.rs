@@ -170,10 +170,14 @@ impl Engine {
         let out = out_parm.val.downcast_mut::<u64>().unwrap();
 
         let result = match operation {
-            IRKind::NEq => { if in0 != in1 { *out = 1; } else { *out = 0; } true }
-            IRKind::EqEq => { if in0 == in1 { *out = 1; } else { *out = 0; } true }
+            IRKind::DoubleEq => { *out = (in0 == in1) as u64; true }
+            IRKind::NEq => { *out = (in0 != in1) as u64; true }
+            IRKind::GEq => { *out = (in0 >= in1) as u64; true }
+            IRKind::LEq => { *out = (in0 <= in1) as u64; true }
             IRKind::BitAnd => { *out = in0 & in1; true }
+            IRKind::LogicalAnd => { *out = ((in0 != 0) && (in1 != 0)) as u64; true }
             IRKind::BitOr => { *out = in0 | in1; true }
+            IRKind::LogicalOr => { *out = ((in0 != 0) || (in1 != 0)) as u64; true }
             IRKind::Add => { self.do_add(ir, in0, in1, out, diags) }
             IRKind::Subtract => { self.do_sub(ir, in0, in1, out, diags) }
             IRKind::Multiply => { self.do_mul(ir, in0, in1, out, diags) }
@@ -281,10 +285,14 @@ impl Engine {
                     IRKind::RightShift |
                     IRKind::LeftShift |
                     IRKind::BitAnd |
+                    IRKind::LogicalAnd |
                     IRKind::BitOr |
+                    IRKind::LogicalOr |
                     IRKind::Multiply |
                     IRKind::Divide |
-                    IRKind::EqEq |
+                    IRKind::DoubleEq |
+                    IRKind::GEq |
+                    IRKind::LEq |
                     IRKind::NEq => { self.iterate_arithmetic(&ir, irdb, operation, &current, diags) }
 
                     IRKind::Sizeof => { self.iterate_sizeof(&ir, irdb, diags, &mut current) }
@@ -348,10 +356,14 @@ impl Engine {
                 // the rest of these operations are computed during iteration
                 IRKind::Sizeof |
                 IRKind::NEq |
-                IRKind::EqEq |
+                IRKind::GEq |
+                IRKind::LEq |
+                IRKind::DoubleEq |
                 IRKind::U64 |
                 IRKind::BitAnd |
+                IRKind::LogicalAnd |
                 IRKind::BitOr |
+                IRKind::LogicalOr |
                 IRKind::Multiply |
                 IRKind::Divide |
                 IRKind::Add |

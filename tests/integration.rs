@@ -752,5 +752,53 @@ fn bit_or_1() {
     fs::remove_file("output.bin").unwrap();
 }
 
+#[test]
+#[serial]
+fn geq_1() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/geq_1.brink")
+                .assert()
+                .success();
+
+    fs::remove_file("output.bin").unwrap();
+}
+
+#[test]
+#[serial]
+fn leq_1() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/leq_1.brink")
+                .assert()
+                .success();
+
+    fs::remove_file("output.bin").unwrap();
+}
+
+#[test]
+#[serial]
+fn logical_and_1() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/logical_and_1.brink")
+                .assert()
+                .success();
+
+    fs::remove_file("output.bin").unwrap();
+}
+
+#[test]
+#[serial]
+fn logical_or_1() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/logical_or_1.brink")
+                .assert()
+                .success();
+
+    fs::remove_file("output.bin").unwrap();
+}
+
 } // mod tests
 

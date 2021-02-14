@@ -24,8 +24,12 @@ pub enum LexToken {
     #[token("wrs")] Wrs,
     #[token("wr")] Wr,
     #[token("output")] Output,
-    #[token("==")] EqEq,
+    #[token("==")] DoubleEq,
     #[token("!=")] NEq,
+    #[token(">=")] GEq,
+    #[token("<=")] LEq,
+    #[token("&&")] DoubleAmpersand,
+    #[token("||")] DoublePipe,
     #[token("&")] Ampersand,
     #[token("|")] Pipe,
     #[token("+")] Plus,
@@ -432,17 +436,21 @@ impl<'toks> Ast<'toks> {
     /// Higher numbers are stronger binding.
     fn get_binding_power(tok: LexToken) -> (u8,u8) {
         match tok {
-            LexToken::U64 => (11,12),
+            LexToken::U64 => (15,16),
             LexToken::FSlash |
-            LexToken::Asterisk => (9,10),
+            LexToken::Asterisk => (13,14),
             LexToken::Minus |
-            LexToken::Plus => (7,8),
+            LexToken::Plus => (11,12),
             LexToken::Ampersand |
-            LexToken::Pipe => (5,6),
+            LexToken::Pipe => (9,10),
             LexToken::DoubleGreater |
-            LexToken::DoubleLess => (3,4),
+            LexToken::DoubleLess => (7,8),
+            LexToken::DoubleEq |
             LexToken::NEq |
-            LexToken::EqEq => (1,2),
+            LexToken::LEq |
+            LexToken::GEq => (5,6),
+            LexToken::DoubleAmpersand => (3,4),
+            LexToken::DoublePipe => (1,2),
             _ => (0,0),
         }
     }
@@ -531,11 +539,15 @@ impl<'toks> Ast<'toks> {
             match op_tinfo.tok {
                 LexToken::Semicolon => { break; }
                 LexToken::NEq |
-                LexToken::EqEq |
+                LexToken::DoubleEq |
                 LexToken::DoubleGreater |
                 LexToken::DoubleLess |
                 LexToken::Ampersand |
                 LexToken::Pipe |
+                LexToken::DoubleAmpersand |
+                LexToken::DoublePipe |
+                LexToken::GEq |
+                LexToken::LEq |
                 LexToken::Plus |
                 LexToken::Minus |
                 LexToken::Asterisk |

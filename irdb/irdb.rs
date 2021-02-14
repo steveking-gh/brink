@@ -120,13 +120,17 @@ impl IRDb {
         let result = match ir.kind {
             IRKind::Assert => { self.validate_bool_operands(ir, diags) }
             IRKind::NEq |
-            IRKind::EqEq |
+            IRKind::LEq |
+            IRKind::GEq |
+            IRKind::DoubleEq |
             IRKind::LeftShift |
             IRKind::RightShift |
             IRKind::Multiply |
             IRKind::Divide |
             IRKind::BitAnd |
+            IRKind::LogicalAnd |
             IRKind::BitOr |
+            IRKind::LogicalOr |
             IRKind::Subtract |
             IRKind::Add => { self.validate_arithmetic_operands(ir, diags) }
             IRKind::U64 => { true }

@@ -1,0 +1,12 @@
+section foo {
+    assert (0 || 0) == 0;
+    assert (1 || 0) == 1;
+    assert (0 || 1) == 1;
+    assert (1 || 1) == 1;
+    assert (11111 || 1) == 1;
+    assert (11111 || 0) == 1;
+    assert (0xFFFF_FFFF_FFFF_FFFF || 0) == 1;
+    assert (0xFFFF_FFFF_FFFF_FFFF || 1) == 1;
+}
+
+output foo;

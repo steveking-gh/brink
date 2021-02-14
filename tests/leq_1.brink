@@ -1,0 +1,11 @@
+section foo {
+    assert 0 <= 2;
+    assert 1 <= 2;
+    assert 2 <= 2;
+    assert 0xFFFF_FFFF_FFFF_FFFE <= 0xFFFF_FFFF_FFFF_FFFF;
+    assert 0xFFFF_FFFF_FFFF_FFFF <= 0xFFFF_FFFF_FFFF_FFFF;
+    assert 0x3FFF_FFFF_FFFF_FFFF <= 0x7FFF_FFFF_FFFF_FFFF;
+    assert 0x7FFF_FFFF_FFFF_FFFF <= 0x7FFF_FFFF_FFFF_FFFF;
+}
+
+output foo;
