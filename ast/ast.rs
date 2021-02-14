@@ -41,7 +41,7 @@ pub enum LexToken {
 
     // Support the forms accepted by the nice parse_int crate:
     // 0b, 0o, 0x and regular decimal
-    #[regex("0b[01][_01]*|0x[0-9a-fA-F][_0-9a-fA-F]*|[1-9][_0-9]*|0")] U64,
+    #[regex("0[bB][01][_01]*|0[xX][0-9a-fA-F][_0-9a-fA-F]*|[1-9][_0-9]*|0")] U64,
 
     // Not only is \ special in strings and must be escaped, but also special in
     // regex.  We use raw string here to avoid having the escape the \ for the
