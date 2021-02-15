@@ -2,7 +2,6 @@ use logos::{Logos};
 use indextree::{Arena,NodeId};
 pub type Span = std::ops::Range<usize>;
 use std::{collections::{HashMap,HashSet}};
-use std::option;
 use diags::Diags;
 use anyhow::{Context, bail};
 use std::fs::File;
@@ -184,12 +183,14 @@ impl<'toks> Ast<'toks> {
     /// Returns the lexical value of the specified child of the specified
     /// parent. The value is always a string reference to source code regardless
     /// of the semantic meaning of the child.
-    pub fn get_child_str(&'toks self, parent_nid: NodeId, child_num: usize) -> &'toks str {
+    pub fn get_child_str(&'toks self, parent_nid: NodeId, child_num: usize) -> Option<&'toks str> {
         debug!("Ast::get_child_str: child number {} for parent nid {}", child_num, parent_nid);
         let mut children = parent_nid.children(&self.arena);
-        let name_nid = children.nth(child_num).unwrap();
-        let tinfo = self.get_tinfo(name_nid);
-        tinfo.val
+        if let Some(name_nid) = children.nth(child_num) {
+            let tinfo = self.get_tinfo(name_nid);
+            return Some(tinfo.val);
+        }
+        None
     }
 
     /// Parse the flat token vector to build the syntax tree. Unlike the flat
@@ -668,7 +669,12 @@ impl<'toks> Ast<'toks> {
         // After 'output' a section identifier is expected
         if self.expect_leaf(diags, output_nid, LexToken::Identifier, "AST_7",
                     "Expected a section name after output") {
-            result = self.expect_semi(diags, output_nid);
+
+            // After the section identifier, an optional absolute starting address
+            result = self.optional_token(LexToken::U64, diags, output_nid);
+                        
+            // finally a semicolon
+            result &= self.expect_semi(diags, output_nid);
         }
 
         self.dbg_exit("parse_output", result)
@@ -782,7 +788,7 @@ pub struct Output<'toks> {
     pub tinfo: &'toks TokenInfo<'toks>,
     pub nid: NodeId,
     pub sec_nid: NodeId,
-    pub sec_str: &'toks str,
+    pub addr_nid: Option<NodeId>,
 }
 
 impl<'toks> Output<'toks> {
@@ -792,9 +798,10 @@ impl<'toks> Output<'toks> {
         // the section name is the first child of the output
         // AST processing guarantees this exists.
         let sec_nid = children.next().unwrap();
-        let sec_tinfo = ast.get_tinfo(sec_nid);
-        let sec_str = sec_tinfo.val;
-        Output { tinfo: ast.get_tinfo(nid), nid, sec_nid, sec_str}
+
+        // Optional start address is the second child.
+        let addr_nid = children.next();
+        Output { tinfo: ast.get_tinfo(nid), nid, sec_nid, addr_nid}
     }
 }
 
@@ -879,7 +886,7 @@ impl<'toks> AstDb<'toks> {
     }
 
     pub fn record_output(diags: &mut Diags, nid: NodeId, ast: &'toks Ast,
-                         output: &mut option::Option<Output<'toks>>) -> bool {
+                         output: &mut Option<Output<'toks>>) -> bool {
         let tinfo = ast.get_tinfo(nid);
         if output.is_some() {
             let m = "Multiple output statements are not allowed.";

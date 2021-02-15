@@ -109,9 +109,9 @@ Produces `output.bin`:
     I'm bar
     I'm foo
 
-# Brink Language Reference
-
-This section documents the brink language.
+---
+## Brink Language Reference
+---
 
 ## Literals
 
@@ -157,3 +157,52 @@ Brink supports the following arithmetic operators with same relative precedence 
 
 As shown in the table, Brink will check some operations for arithmetic under/overflow.
 
+## Address and Offset
+
+Bring allows programs to query three kinds of location information:
+* abs() returns current absolute address
+* img() returns the current offset relative to the start of the output
+* sec() returns the current offset relative to the start of a section
+
+For example:
+
+    section fiz {
+        assert abs() == 6;
+        assert img() == 6;
+        assert sec() == 0;
+        wrs "fiz";
+        assert abs() == 9;
+        assert img() == 9;
+        assert sec() == 3;
+    }
+    
+    section bar {
+        assert abs() == 3;
+        assert img() == 3;
+        assert sec() == 0;
+        wrs "bar";
+        assert abs() == 6;
+        assert img() == 6;
+        assert sec() == 3;
+        wr fiz;
+        assert abs() == 9;
+        assert img() == 9;
+        assert sec() == 6;
+    }
+    
+    // top level section
+    section foo {
+        assert abs() == 0;
+        assert img() == 0;
+        assert sec() == 0;
+        wrs "foo";
+        assert abs() == 3;
+        assert img() == 3;
+        assert sec() == 3;
+        wr bar;
+        assert abs() == 9;
+        assert img() == 9;
+        assert sec() == 9;
+    }
+    
+    output foo;

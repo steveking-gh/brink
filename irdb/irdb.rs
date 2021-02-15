@@ -13,6 +13,10 @@ pub struct IRDb {
     pub ir_vec: Vec<IR>,
     pub parms: Vec<IROperand>,
 
+    /// The optional absolute starting address specified
+    /// in the output statement.  Zero by default.
+    pub start_addr: u64,
+
     /// Maps an identifier to the (start,stop) indices in
     /// the ir_vec.
     pub id_locs: HashMap<String,Range<usize>>,
@@ -184,8 +188,24 @@ impl IRDb {
     }
 
     pub fn new(lin_db: &LinearDb, diags: &mut Diags) -> Option<IRDb> {
+
+        // If the user specified a starting address in the output statement
+        // then convert to a real number
+        let mut start_addr = 0;
+
+        if let Some(addr_str) = lin_db.output_addr_str.as_ref() {
+            if let Ok(addr) = parse::<u64>(addr_str) {
+                start_addr = addr;
+            } else {
+                let m = format!("Malformed integer operand {}", addr_str);
+                let primary_code_ref = lin_db.output_addr_loc.as_ref().unwrap();
+                diags.err1("IR_3", &m, primary_code_ref.clone());
+                return None;                
+            }
+        }
+
         let mut ir_db = IRDb { ir_vec: Vec::new(), parms: Vec::new(),
-                                    id_locs: HashMap::new() };
+            id_locs: HashMap::new(), start_addr };
 
         if !ir_db.process_lin_operands(lin_db, diags) {
             return None;

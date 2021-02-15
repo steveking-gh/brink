@@ -87,9 +87,12 @@ fn tok_to_irkind(tok: LexToken) -> IRKind {
 }
 
 pub struct LinearDb {
-    pub output_nid: NodeId,
     pub ir_vec: Vec<LinIR>,
-    pub operand_vec: Vec<LinOperand>, 
+    pub operand_vec: Vec<LinOperand>,
+    pub output_sec_str: String,
+    pub output_sec_loc: Range<usize>,
+    pub output_addr_str: Option<String>,
+    pub output_addr_loc: Option<Range<usize>>,
 }
 
 /**
@@ -209,7 +212,7 @@ impl<'toks> LinearDb {
                 let mut lops = Vec::new();
                 // Write the contents of a section.  This isn't a simple recursion
                 // into the children.  Instead, we redirect to the specified section.
-                let sec_name_str = ast.get_child_str(parent_nid, 0);
+                let sec_name_str = ast.get_child_str(parent_nid, 0).unwrap();
                 debug!("LinearDb::record_r: recursing into section {}", sec_name_str);
 
                 // Using the name of the section, use the AST database to get a reference
@@ -364,18 +367,37 @@ impl<'toks> LinearDb {
     pub fn new(diags: &mut Diags, ast: &'toks Ast,
                ast_db: &'toks AstDb) -> Option<LinearDb> {
         debug!("LinearDb::new: >>>> ENTER");
+
         // AstDb already validated output exists
         let output_nid = ast_db.output.nid;
-        let mut linear_db = LinearDb { output_nid, ir_vec: Vec::new(),
-                                               operand_vec: Vec::new() };
+        let output_sec_tinfo = ast.get_tinfo(ast_db.output.sec_nid);
+        let output_sec_str = output_sec_tinfo.val.to_string();
+        let output_sec_loc = output_sec_tinfo.loc.clone();
+        debug!("LinearDb::new: Output section name is {}", output_sec_str);
 
-        let sec_name_str = ast.get_child_str(output_nid, 0);
-        debug!("LinearDb::new: output section name is {}", sec_name_str);
+        let output_addr_nid = ast_db.output.addr_nid;
+        let mut output_addr_str = None;
+        let mut output_addr_loc = None;
+
+        if output_addr_nid.is_some() {
+            let output_addr_tinfo = ast.get_tinfo(ast_db.output.addr_nid.unwrap());
+            if output_addr_tinfo.tok == LexToken::U64 {
+                output_addr_str = Some(output_addr_tinfo.val.to_string());
+                output_addr_loc = Some(output_addr_tinfo.loc.clone());
+                debug!("LinearDb::new: Output address is {}", output_addr_str.as_ref().unwrap());
+            } else {
+                // If not a u64, then trailing semicolon
+                assert!(output_addr_tinfo.tok == LexToken::Semicolon);
+            }
+        }
+
+        let mut linear_db = LinearDb { ir_vec: Vec::new(), operand_vec: Vec::new(),
+                    output_sec_str, output_sec_loc, output_addr_str, output_addr_loc };
 
         // Using the name of the section, use the AST database to get a reference
         // to the section object.  ast_db processing has already guaranteed
         // that the section name is legitimate, so unwrap().
-        let section = ast_db.sections.get(sec_name_str).unwrap();
+        let section = ast_db.sections.get(linear_db.output_sec_str.as_str()).unwrap();
         let sec_nid = section.nid;
 
         // To start recursion, rdepth = 1.  The ONLY thing happening

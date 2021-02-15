@@ -12,9 +12,9 @@ use log::{error, warn, info, debug, trace};
 
 #[derive(Clone,Debug,PartialEq)]
 pub struct Location {
-    img: usize,
-    abs: usize,
-    sec: usize,
+    img: u64,
+    abs: u64,
+    sec: u64,
 }
 pub struct Parameter {
     data_type: DataType,
@@ -58,7 +58,7 @@ pub struct Engine {
     /// Stack of section offsets.  Each time processing enters
     /// a new section, we push the old section offset onto the stack
     /// and pop when return back to the parent section.
-    sec_offsets: Vec<usize>,
+    sec_offsets: Vec<u64>,
 
     /// Stack of sections for debug use
     sec_names: Vec<String>,
@@ -86,7 +86,8 @@ impl Engine {
         let in_parm_num0 = ir.operands[0];
         let in_parm0 = self.parms[in_parm_num0].borrow();
 
-        let sz = in_parm0.to_str().len();
+        // Will panic if usize does not fit in u64
+        let sz = in_parm0.to_str().len() as u64;
         current.img += sz;
         current.abs += sz;
         current.sec += sz;
@@ -405,7 +406,7 @@ impl Engine {
         while result && !stable {
             self.trace(format!("Engine::iterate: Iteration count {}", iter_count).as_str());
             iter_count += 1;
-            let mut current = Location{ img: 0, abs: abs_start, sec: 0 };
+            let mut current = Location{ img: 0, abs: irdb.start_addr, sec: 0 };
 
             // make sure we exited as many sections as we entered on each iteration
             assert!(self.sec_offsets.len() == 0);
