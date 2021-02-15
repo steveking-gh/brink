@@ -1,0 +1,56 @@
+section fiz {
+    assert abs() == 6;
+    assert img() == 6;
+    assert sec() == 0;
+    wrs "fiz";
+    assert abs() == 9;
+    assert img() == 9;
+    assert sec() == 3;
+}
+
+
+section bar {
+    assert abs() == 3;
+    assert img() == 3;
+    assert sec() == 0;
+    wrs "bar";
+    assert abs() == 6;
+    assert img() == 6;
+    assert sec() == 3;
+    wr fiz;
+    assert abs() == 9;
+    assert img() == 9;
+    assert sec() == 6;
+}
+
+// top level section
+section foo {
+    assert abs() == 0;
+    assert img() == 0;
+    assert sec() == 0;
+    wrs "foo";
+    assert abs() == 3;
+    assert img() == 3;
+    assert sec() == 3;
+    wr bar;
+    assert abs() == 9;
+    assert img() == 9;
+    assert sec() == 9;
+    wr boo;
+    assert abs() == 12;
+    assert img() == 12;
+    assert sec() == 12;
+}
+
+// section after reference
+section boo {
+    assert abs() == 9;
+    assert img() == 9;
+    assert sec() == 0;
+    wrs "boo";
+    assert abs() == 12;
+    assert img() == 12;
+    assert sec() == 3;
+}
+
+output foo;

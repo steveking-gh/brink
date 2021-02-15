@@ -21,6 +21,9 @@ pub enum LexToken {
     #[token("section")] Section,
     #[token("assert")] Assert,
     #[token("sizeof")] Sizeof,
+    #[token("abs")] Abs,
+    #[token("img")] Img,
+    #[token("sec")] Sec,
     #[token("wrs")] Wrs,
     #[token("wr")] Wr,
     #[token("output")] Output,
@@ -169,8 +172,13 @@ impl<'toks> Ast<'toks> {
     }
 
     /// Return an iterator over the children of the specified AST node
-    pub fn children(&'toks self, nid: NodeId) -> indextree::Children<usize>{
-        return nid.children(&self.arena)
+    pub fn children(&self, nid: NodeId) -> indextree::Children<usize>{
+        nid.children(&self.arena)
+    }
+
+    /// Returns true if the specified node has child nodes
+    pub fn has_children(&self, nid: NodeId) -> bool {
+        nid.children(&self.arena).next().is_some()
     }
 
     /// Returns the lexical value of the specified child of the specified
@@ -314,6 +322,21 @@ impl<'toks> Ast<'toks> {
         }
 
         false
+    }
+
+    /// Expect the specified token or not.  If found, add it to the parent and advance.
+    /// If not found, do nothing and return success
+    fn optional_token(&mut self, tok: LexToken, diags: &mut Diags, parent : NodeId) -> bool {
+
+        if let Some(tinfo) = self.peek() {
+            if tok == tinfo.tok {
+                self.add_to_parent_and_advance(parent);
+            }
+        } else {
+            self.err_no_input(diags);
+        }
+
+        true
     }
 
     /// Expect the specified token and advance without adding to the parent.
@@ -498,6 +521,27 @@ impl<'toks> Ast<'toks> {
                 self.tok_num += 1;
                 lhs
             }
+            LexToken::Abs |
+            LexToken::Img |
+            LexToken::Sec => {
+                // We expect 2 or 3 tokens: '(' 'optional identifier' ')', but don't bother to record
+                // the surrounding parens to simplify later linearization
+                let assert_nid = self.arena.new_node(self.tok_num);
+                self.tok_num += 1;
+                if !self.expect_token_no_add(LexToken::OpenParen, diags) {
+                    return self.dbg_exit_pratt("parse_pratt", None);
+                }
+                if !self.optional_token(LexToken::Identifier, diags, assert_nid) {
+                    return self.dbg_exit_pratt("parse_pratt", None);
+                }
+                if !self.expect_token_no_add(LexToken::CloseParen, diags) {
+                    return self.dbg_exit_pratt("parse_pratt", None);
+                }
+
+                let lhs = Some(assert_nid);
+                lhs
+            }
+
             LexToken::Sizeof => {
                 // We expect 3 tokens: '(' 'identifier' ')', but don't bother to record
                 // the surrounding parens to simplify later linearization
@@ -802,8 +846,8 @@ impl<'toks> AstDb<'toks> {
         let mut children = parent_nid.children(&ast.arena);
 
         // First, advance to the specified child number
-        let mut child_num = 0;
-        while child_num < child_num {
+        let mut num = 0;
+        while num < child_num {
             let sec_name_nid_opt = children.next();
             if sec_name_nid_opt.is_none() {
                 // error, not enough children to reach section name
@@ -812,7 +856,7 @@ impl<'toks> AstDb<'toks> {
                 diags.err1("AST_23", &m, section_tinfo.span());
                 return false;
             }
-            child_num += 1;
+            num += 1;
         }
         let sec_name_nid_opt = children.next();
         if sec_name_nid_opt.is_none() {
@@ -906,6 +950,22 @@ impl<'toks> AstDb<'toks> {
                 let children = parent_nid.children(&ast.arena);
                 for nid in children {
                     result &= AstDb::record_r(rdepth + 1, nid, diags, ast, sections, nested_sections);
+                }
+                result
+            }
+            // Sizeof statement must specify a valid section name enclosed in ()
+            LexToken::Abs |
+            LexToken::Img |
+            LexToken::Sec => {
+                // child 0 is the *optional* identifier since we didn't record surround '()'
+                if ast.has_children(parent_nid) {
+                    if !Self::validate_section_name(0, parent_nid, &ast, &sections, diags) {
+                        return false;
+                    }
+                    let children = parent_nid.children(&ast.arena);
+                    for nid in children {
+                        result &= AstDb::record_r(rdepth + 1, nid, diags, ast, sections, nested_sections);
+                    }
                 }
                 result
             }

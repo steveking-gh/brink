@@ -7,10 +7,11 @@ use log::{error, warn, info, debug, trace};
 
 use ast::{Ast, AstDb, LexToken, TokenInfo};
 use ir_base::{IRKind,OperandKind,DataType};
-use std::ops::Range;
+use std::{ops::Range};
 
 pub struct LinOperand {
-    pub nid: NodeId,
+    /// linear ID of source operation if this operand is an output.
+    pub src_lid: Option<usize>,
     pub src_loc: Range<usize>,
     pub val: String,
     pub kind: OperandKind,
@@ -29,11 +30,11 @@ fn lex_to_data_type(lxt: LexToken) -> DataType {
 }
 
 impl<'toks> LinOperand {
-    pub fn new(nid: NodeId, ast: &'toks Ast, kind: OperandKind,
+    pub fn new(src_lid: Option<usize>, nid: NodeId, ast: &'toks Ast, kind: OperandKind,
                data_type: DataType) -> LinOperand {
         let tinfo = ast.get_tinfo(nid);
         let src_loc = tinfo.loc.clone();
-        LinOperand { nid, src_loc, val: tinfo.val.to_string(), kind, data_type }
+        LinOperand { src_lid, src_loc, val: tinfo.val.to_string(), kind, data_type }
     }    
 }
 
@@ -74,6 +75,10 @@ fn tok_to_irkind(tok: LexToken) -> IRKind {
         LexToken::DoubleAmpersand => { IRKind::LogicalAnd }
         LexToken::Pipe => { IRKind::BitOr }
         LexToken::DoublePipe => { IRKind::LogicalOr }
+        LexToken::Sizeof => { IRKind::Sizeof }
+        LexToken::Abs => { IRKind::Abs }
+        LexToken::Img => { IRKind::Img }
+        LexToken::Sec => { IRKind::Sec }
         bug => {
             assert!( false, "Failed to convert LexToken to IRKind for {:?}", bug);
             IRKind::Assert // keep compiler happy
@@ -153,7 +158,9 @@ impl<'toks> LinearDb {
         true
     }
 
-    fn process_operands(&mut self, result: &mut bool, expected: usize, lops: &mut Vec<usize>, ir_lid: usize,
+    // Process the expected number of operands.
+    fn process_operands(&mut self, result: &mut bool, expected: usize,
+                        lops: &mut Vec<usize>, ir_lid: usize,
                         diags: &mut Diags, tinfo: &TokenInfo) {
 
         // If we found the expected number of operands, then add them to the new IR
@@ -166,6 +173,19 @@ impl<'toks> LinearDb {
         } else {
             *result = false;
         }
+    }
+
+    // Process the expected number of *optional* operands.  Either the number
+    // number of operands must be zero or the expected number.
+    fn process_optional_operands(&mut self, result: &mut bool, expected: usize,
+                                  lops: &mut Vec<usize>, ir_lid: usize,
+                                  diags: &mut Diags, tinfo: &TokenInfo) {
+
+        if lops.is_empty() {
+            return;
+        }
+
+        self.process_operands(result, expected, lops, ir_lid, diags, tinfo);
     }
 
     /// Recursively record information about the children of an AST object.
@@ -226,12 +246,32 @@ impl<'toks> LinearDb {
                 self.process_operands(result, 1, &mut lops, ir_lid, diags, tinfo);
 
                 // Add a destination operand to the operation to hold the result
-                let idx = self.add_operand_to_ir(ir_lid, LinOperand::new(parent_nid, ast,
-                                                  OperandKind::Variable, DataType::Int));
+                let idx = self.add_operand_to_ir(ir_lid, LinOperand::new(
+                        Some(ir_lid), parent_nid, ast, OperandKind::Variable, DataType::Int));
                 // Also add the destination operand to the local operands
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);
+            }
+            LexToken::Abs |
+            LexToken::Img |
+            LexToken::Sec => {
+                // A vector to track the operands of this expression.
+                let mut lops = Vec::new();
+                // Create the new IR
+                let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tinfo.tok));
+                // There is *optional* identifier child.
+                // If the child exists, we will get the address of the associated identifier
+                // otherwise, we get the current address
+                self.record_children_r(result, rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
+                // 1 operand expected
+                self.process_optional_operands(result, 1, &mut lops, ir_lid, diags, tinfo);
 
+                // Add a destination operand to the operation to hold the result
+                let idx = self.add_operand_to_ir(ir_lid, LinOperand::new(
+                        Some(ir_lid), parent_nid, ast, OperandKind::Variable, DataType::Int));
+                // Also add the destination operand to the local operands
+                // The destination operand is presumably an input operand in the parent.
+                returned_operands.push(idx);
             }
             LexToken::Identifier |
             LexToken::U64 |
@@ -240,7 +280,7 @@ impl<'toks> LinearDb {
                 // and return them as local operands.
                 // This case terminates recursion.
                 let idx = self.operand_vec.len();
-                self.operand_vec.push(LinOperand::new(parent_nid,ast,OperandKind::Constant,
+                self.operand_vec.push(LinOperand::new(None, parent_nid,ast,OperandKind::Constant,
                                         lex_to_data_type(tinfo.tok)));
                 returned_operands.push(idx);
             }
@@ -274,8 +314,8 @@ impl<'toks> LinearDb {
                 self.process_operands(result, 2, &mut lops, ir_lid, diags, tinfo);
 
                 // Add a destination operand to the operation to hold the result
-                let idx = self.add_operand_to_ir(ir_lid, LinOperand::new(parent_nid, ast,
-                                                  OperandKind::Variable,DataType::Int));
+                let idx = self.add_operand_to_ir(ir_lid, LinOperand::new(
+                    Some(ir_lid), parent_nid, ast, OperandKind::Variable,DataType::Int));
                 // Also add the destination operand to the local operands
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);

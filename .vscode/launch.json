@@ -20,7 +20,11 @@
                 }
             },
             "args": ["-o empty_section_1.bin",
-                     "${workspaceFolder}/tests/subtract_1.brink"],
+                     "-v",
+                     "-v",
+                     "-v",
+                     "-v",
+                     "${workspaceFolder}/tests/address_1.brink"],
         },
         {
             "type": "lldb",

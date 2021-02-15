@@ -34,12 +34,18 @@ pub enum IRKind {
     RightShift,
     SectionStart,
     SectionEnd,
+    Abs,
+    Img,
+    Sec,
     Sizeof,
     Wrs,
 }
 
 #[derive(Debug)]
 pub struct IROperand {
+    /// Some(linear ID) of source operation if this operand is an output.
+    /// None for constants.
+    pub src_lid: Option<usize>,
     pub kind: OperandKind,
     pub data_type: DataType,
     pub src_loc: Range<usize>,

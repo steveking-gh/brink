@@ -64,6 +64,10 @@ impl IRDb {
         opnd.to_identifier()
     }
 
+    pub fn get_operand_src_lid(&self, opnd_num: usize) -> Option<usize> {
+        self.parms.get(opnd_num).unwrap().src_lid
+    }
+
     fn process_lin_operands(&mut self, lin_db: &LinearDb, diags: &mut Diags) -> bool {
         for lop in lin_db.operand_vec.iter() {
             let val = self.make_box_val(lop, diags);
@@ -74,7 +78,8 @@ impl IRDb {
             let kind = lop.kind;
             let data_type = lop.data_type;
             let src_loc = lop.src_loc.clone();
-            self.parms.push(IROperand{ kind, data_type, src_loc, val });
+            let src_lid = lop.src_lid;
+            self.parms.push(IROperand{ src_lid, kind, data_type, src_loc, val });
         }
 
         true
@@ -133,10 +138,13 @@ impl IRDb {
             IRKind::LogicalOr |
             IRKind::Subtract |
             IRKind::Add => { self.validate_arithmetic_operands(ir, diags) }
-            IRKind::U64 => { true }
-            IRKind::SectionStart => { true }
-            IRKind::SectionEnd => { true }
-            IRKind::Sizeof => { true }
+            IRKind::U64 |
+            IRKind::SectionStart |
+            IRKind::SectionEnd |
+            IRKind::Sizeof |
+            IRKind::Abs |
+            IRKind::Img |
+            IRKind::Sec |
             IRKind::Wrs => { true }
         };
         result

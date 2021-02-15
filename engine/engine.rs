@@ -1,5 +1,5 @@
-use std::convert::TryFrom;
-use ir_base::{IR, IRKind, DataType};
+use std::{convert::TryFrom};
+use ir_base::{DataType, IR, IRKind};
 use irdb::IRDb;
 use diags::Diags;
 use std::{any::Any, convert::TryInto, io::Write};
@@ -16,7 +16,6 @@ pub struct Location {
     abs: usize,
     sec: usize,
 }
-
 pub struct Parameter {
     data_type: DataType,
     val: Box<dyn Any>,
@@ -26,28 +25,28 @@ impl Parameter {
     fn to_bool(&self) -> bool {
         match self.data_type {
             DataType::Int => { *self.val.downcast_ref::<u64>().unwrap() != 0 },
-            _ => { assert!(false); false },
+            _ => panic!("Bad downcast conversion to bool!"),
         }
     }
 
     fn to_u64(&self) -> u64 {
         match self.data_type {
             DataType::Int => { *self.val.downcast_ref::<u64>().unwrap() },
-            _ => { assert!(false); 0 },
+            _ => panic!("Bad downcast conversion to u64!"),
         }
     }
 
     fn to_str(&self) -> &str {
         match self.data_type {
             DataType::QuotedString => { self.val.downcast_ref::<String>().unwrap() },
-            _ => { assert!(false); "" },
+            _ => panic!("Bad downcast conversion to &str!"),
         }
     }
 
     fn to_identifier(&self) -> &str {
         match self.data_type {
             DataType::Identifier => { self.val.downcast_ref::<String>().unwrap() },
-            _ => { assert!(false); "" },
+            _ => panic!("Bad downcast conversion to identifier!"),
         }
     }
 }
@@ -55,14 +54,33 @@ impl Parameter {
 pub struct Engine {
     parms: Vec<RefCell<Parameter>>,
     ir_locs: Vec<Location>,
+
+    /// Stack of section offsets.  Each time processing enters
+    /// a new section, we push the old section offset onto the stack
+    /// and pop when return back to the parent section.
+    sec_offsets: Vec<usize>,
+
+    /// Stack of sections for debug use
+    sec_names: Vec<String>,
 }
 
 impl Engine {
 
+    /// Debug trace that produces an indented output with section name to make
+    /// section nesting more readable.
+    fn trace(&self, msg: &str) {
+        let mut sec_name = "";
+        let sec_depth = self.sec_names.len();
+        if sec_depth != 0 {
+            sec_name = self.sec_names.last().unwrap();
+        }
+        trace!("{}{}: {}", "    ".repeat(sec_depth), sec_name, msg);
+    }
+
     fn iterate_wrs(&mut self, ir: &IR, _irdb: &IRDb, _diags: &mut Diags,
                     current: &mut Location) -> bool {
-        trace!("Engine::iterate_wrs: ENTER, abs {}, img {}, sec {}",
-            current.abs, current.img, current.sec);
+        self.trace(format!("Engine::iterate_wrs: abs {}, img {}, sec {}",
+            current.abs, current.img, current.sec).as_str());
         // wrs takes one input parameter
         assert!(ir.operands.len() == 1);
         let in_parm_num0 = ir.operands[0];
@@ -72,7 +90,7 @@ impl Engine {
         current.img += sz;
         current.abs += sz;
         current.sec += sz;
-        trace!("Engine::iterate_wrs: EXIT");
+        
         true
     }
 
@@ -154,8 +172,8 @@ impl Engine {
 
     fn iterate_arithmetic(&mut self, ir: &IR, _irdb: &IRDb, operation: IRKind,
                     current: &Location, diags: &mut Diags) -> bool {
-        trace!("Engine::iterate_arithmetic: ENTER, abs {}, img {}, sec {}",
-            current.abs, current.img, current.sec);
+        self.trace(format!("Engine::iterate_arithmetic: abs {}, img {}, sec {}",
+            current.abs, current.img, current.sec).as_str());
         // All operations here take two inputs and produces one output parameter
         assert!(ir.operands.len() == 3);
         let in_parm_num0 = ir.operands[0];
@@ -189,14 +207,14 @@ impl Engine {
             }
         };
     
-        trace!("Engine::iterate_arithmetic: EXIT");
+        
         result
     }
 
     fn iterate_sizeof(&mut self, ir: &IR, irdb: &IRDb, diags: &mut Diags,
                     current: &Location) -> bool {
-        trace!("Engine::iterate_sizeof: ENTER, abs {}, img {}, sec {}",
-            current.abs, current.img, current.sec);
+        self.trace(format!("Engine::iterate_sizeof: abs {}, img {}, sec {}",
+            current.abs, current.img, current.sec).as_str());
         // sizeof takes one input and produces one output
         // we've already discarded surrounding () on the operand
         assert!(ir.operands.len() == 2);
@@ -223,12 +241,127 @@ impl Engine {
         let start_loc = &self.ir_locs[ir_rng.start];
         let end_loc = &self.ir_locs[ir_rng.end];
         let sz = end_loc.abs - start_loc.abs;
-        debug!("Sizeof {} is currently {}", sec_name, sz);
+        self.trace(format!("Sizeof {} is currently {}", sec_name, sz).as_str());
         // We'll at least panic at runtime if conversion from
         // usize to u64 fails instead of bad output binary.
         *out = sz.try_into().unwrap();
     
-        trace!("Engine::iterate_sizeof: EXIT");
+        
+        true
+    }
+
+    /// Compute the transient current address.  This case is called when
+    /// Abs/Img/Sec is called without an identifier.
+    fn iterate_current_address(&mut self, ir: &IR, current: &Location) -> bool {
+        self.trace(format!("Engine::iterate_current_address: abs {}, img {}, sec {}",
+            current.abs, current.img, current.sec).as_str());
+        assert!(ir.operands.len() == 1);
+        let out_parm_num = ir.operands[0];
+        let mut out_parm = self.parms[out_parm_num].borrow_mut();
+        let out = out_parm.val.downcast_mut::<u64>().unwrap();
+
+        // We'll at least panic at runtime if conversion from
+        // usize to u64 fails instead of bad output binary.
+        match ir.kind {
+            // Will panic if usize does not fit in a u64
+            IRKind::Abs => { *out = current.abs.try_into().unwrap(); }
+            IRKind::Img => { *out = current.img.try_into().unwrap(); }
+            IRKind::Sec => { *out = current.sec.try_into().unwrap(); }
+            bad => {
+                panic!("Called iterate_current_address with bogus IR {:?}", bad);
+            }
+        }
+    
+        
+        true
+    }
+
+    /// Compute the transient address of the identifier.  This case is called when
+    /// Abs/Img/Sec is called with an identifier.
+    fn iterate_identifier_address(&mut self, ir: &IR, irdb: &IRDb, diags: &mut Diags,
+                    current: &Location) -> bool {
+        self.trace(format!("Engine::iterate_identifier_address: abs {}, img {}, sec {}",
+            current.abs, current.img, current.sec).as_str());
+        // Abs/Img/SEc take one optional input and produce one output.
+        // We've already discarded surrounding () on the operand.
+        assert!(ir.operands.len() == 2);
+        let in_parm_num0 = ir.operands[0]; // identifier
+        let out_parm_num = ir.operands[1];
+        let in_parm0 = self.parms[in_parm_num0].borrow();
+        let mut out_parm = self.parms[out_parm_num].borrow_mut();
+
+        let sec_name = in_parm0.to_identifier();
+        let out = out_parm.val.downcast_mut::<u64>().unwrap();
+
+        // We've already verified that the section identifier exists,
+        // but unless the section actually got used in the output,
+        // then we won't find location info for it.
+        let ir_rng = irdb.id_locs.get(sec_name);
+        if ir_rng.is_none() {
+            let msg = format!("Can't take address of section '{}' not used in output.",
+                    sec_name);
+            diags.err1("EXEC_11", &msg, ir.src_loc.clone());
+            return false;
+        }
+        let ir_rng = ir_rng.unwrap();
+        assert!(ir_rng.start <= ir_rng.end);
+        let start_loc = &self.ir_locs[ir_rng.start];
+        match ir.kind {
+            // Will panic if usize does not fit in a u64
+            IRKind::Abs => { *out = start_loc.abs.try_into().unwrap(); }
+            IRKind::Img => { *out = start_loc.img.try_into().unwrap(); }
+            IRKind::Sec => { *out = start_loc.sec.try_into().unwrap(); }
+            bad => {
+                panic!("Called iterate_current_address with bogus IR {:?}", bad);
+            }
+        }
+        
+        true
+    }
+
+    fn iterate_address(&mut self, ir: &IR, irdb: &IRDb, diags: &mut Diags,
+                    current: &Location) -> bool {
+        self.trace(format!("Engine::iterate_address: abs {}, img {}, sec {}",
+            current.abs, current.img, current.sec).as_str());
+        // Abs/Img/SEc take one optional input and produce one output.
+        // We've already discarded surrounding () on the operand.
+        let num_operands = ir.operands.len();
+        let result = match num_operands {
+            1 => self.iterate_current_address(ir, current),
+            2 => self.iterate_identifier_address(ir, irdb, diags, current),
+            bad => panic!("Wrong number of IR operands = {}!", bad),
+        };
+    
+        
+        result
+    }
+
+    /// At the start of a section, push the old section offset
+    /// and reset the current section offset to zero.
+    fn iterate_section_start(&mut self, ir: &IR, irdb: &IRDb, _diags: &mut Diags,
+                             current: &mut Location) -> bool {
+        let sec_name = irdb.get_opnd_as_identifier(&ir, 0).to_string();
+        // For debugging, push our current section on the name stack
+        self.sec_names.push(sec_name);
+        self.trace(format!("Engine::iterate_section_start: abs {}, img {}, sec {}",
+                    current.abs, current.img, current.sec).as_str());
+        self.sec_offsets.push(current.sec);
+        current.sec = 0;
+        
+        true
+    }
+
+    /// At the end of a section, pop the last section offset and add
+    /// its value to the current section offset
+    fn iterate_section_end(&mut self, ir: &IR, irdb: &IRDb, _diags: &mut Diags,
+                            current: &mut Location) -> bool {
+        let sec_name = irdb.get_opnd_as_identifier(&ir, 0).to_string();
+        self.trace(format!("Engine::iterate_section_end: '{}', abs {}, img {}, sec {}",
+                sec_name, current.abs, current.img, current.sec).as_str());
+        current.sec += self.sec_offsets.pop().unwrap();
+        // For debugging, pop our current section from the name stack
+        self.sec_names.pop();
+        
         true
     }
 
@@ -237,13 +370,13 @@ impl Engine {
         // may access any IR location.
         let ir_locs = vec![Location {img: 0, abs: 0, sec: 0}; irdb.ir_vec.len()];
 
-        let mut engine = Engine { parms: Vec::new(), ir_locs };
-        debug!("Engine::new: ENTER");
+        let mut engine = Engine { parms: Vec::new(), ir_locs, sec_offsets: Vec::new(),
+                                        sec_names: Vec::new() };
+        engine.trace("Engine::new:");
         // Initialize parameters from the IR operands.
         engine.parms.reserve(irdb.parms.len());
         for opnd in &irdb.parms {
-            let parm = Parameter { data_type: opnd.data_type,
-                    val: opnd.clone_val_box() };
+            let parm = Parameter { data_type: opnd.data_type, val: opnd.clone_val_box() };
             engine.parms.push(RefCell::new(parm));
         }
 
@@ -253,7 +386,7 @@ impl Engine {
             return None;
         }
 
-        debug!("Engine::new: EXIT");
+        engine.trace("Engine::new: EXIT");
         Some(engine)
     }
 
@@ -264,15 +397,19 @@ impl Engine {
     }
 
     pub fn iterate(&mut self, irdb: &IRDb, diags: &mut Diags, abs_start: usize) -> bool {
-        trace!("Engine::iterate: abs_start = {}", abs_start);
+        self.trace(format!("Engine::iterate: abs_start = {}", abs_start).as_str());
         let mut result = true;
         let mut old_locations = Vec::new();
         let mut stable = false;
         let mut iter_count = 0;
         while result && !stable {
-            trace!("Engine::iterate: Iteration count {}", iter_count);
+            self.trace(format!("Engine::iterate: Iteration count {}", iter_count).as_str());
             iter_count += 1;
             let mut current = Location{ img: 0, abs: abs_start, sec: 0 };
+
+            // make sure we exited as many sections as we entered on each iteration
+            assert!(self.sec_offsets.len() == 0);
+
             for (lid,ir) in irdb.ir_vec.iter().enumerate() {
                 // record our location after each IR
                 self.ir_locs[lid] = current.clone();
@@ -297,10 +434,16 @@ impl Engine {
 
                     IRKind::Sizeof => { self.iterate_sizeof(&ir, irdb, diags, &mut current) }
                     IRKind::Wrs => { self.iterate_wrs(&ir, irdb, diags, &mut current) }
-                    IRKind::Assert | /* evaluate assert only at execute time */
-                    IRKind::U64 |
-                    IRKind::SectionStart |
-                    IRKind::SectionEnd => { true }
+                    IRKind::Abs |
+                    IRKind::Img |
+                    IRKind::Sec => { self.iterate_address(ir, irdb, diags, &current) }
+                    IRKind::SectionStart => { self.iterate_section_start(ir, irdb, diags, &mut current) }
+                    IRKind::SectionEnd => { self.iterate_section_end(ir, irdb, diags, &mut current) }
+
+                    // The following IR types are evaluated only at execute time.
+                    // Nothing to do during iteration.
+                    IRKind::Assert |
+                    IRKind::U64 => { true }
                 }
             }
             if self.ir_locs == old_locations {
@@ -314,23 +457,68 @@ impl Engine {
         result
     }
 
-    fn execute_assert(&self, ir: &IR, _irdb: &IRDb, diags: &mut Diags, _file: &File)
+    /// If the operand is a variable, show its value.
+    /// Constant operands are presumed self-evident.
+    fn assert_info_operand(&self, opnd_num: usize, irdb: &IRDb, diags: &mut Diags) {
+        let opnd = self.parms[opnd_num].borrow();
+        let ir_opnd = &irdb.parms[opnd_num];
+        match opnd.data_type {
+            DataType::Int => {
+                let val = opnd.to_u64();
+                let msg = format!("Operand has value {}", val);
+                let primary_code_ref = ir_opnd.src_loc.clone();
+                diags.note1("EXEC_8", &msg, primary_code_ref);
+            }
+            _ => {}
+        }
+    }
+
+    /// Display addition diagnostic if the assertion occurred for an
+    /// operand that is an output of another operation.
+    fn assert_info(&self, src_lid: Option<usize>, irdb: &IRDb, diags: &mut Diags) {
+        if src_lid.is_none() {
+            // No extra info available.  Source was presumably a constant.
+            return;
+        }
+        let src_lid = src_lid.unwrap();
+        // get the operation at the source lid
+        let operation = irdb.ir_vec.get(src_lid).unwrap();
+        let num_operands = operation.operands.len();
+        // This is an assert, so the last operation is a boolean that we
+        // presume to be false, necessitating this diagnostic.
+        for (idx, opnd) in operation.operands.iter().enumerate() {
+            if idx < num_operands - 1 {
+                self.assert_info_operand(*opnd, irdb, diags);
+            }
+        }
+    }
+
+    fn execute_assert(&self, ir: &IR, irdb: &IRDb, diags: &mut Diags, _file: &File)
                       -> Result<()> {
-        trace!("Engine::execute_assert: ENTER");
+        self.trace("Engine::execute_assert:");
         let mut result = Ok(());
-        debug!("engine::execute_assert: checking operand {}", ir.operands[0]);
-        if self.parms[ir.operands[0]].borrow().to_bool() == false {
+        let opnd_num = ir.operands[0];
+        self.trace(format!("engine::execute_assert: checking operand {}", opnd_num).as_str());
+        let parm = self.parms[opnd_num].borrow();
+        if parm.to_bool() == false {
+            // assert failed
             let msg = format!("Assert expression failed");
             diags.err1("EXEC_2", &msg, ir.src_loc.clone());
+
+            // If the boolean the assertion failed on is an output of an operation,
+            // then backtrack to print information about that operation.  To backtrack
+            // we get the Option<src_lid> for the assert.
+            let src_lid = irdb.get_operand_src_lid(opnd_num);
+            self.assert_info(src_lid, irdb, diags);
             result = Err(anyhow!("Assert failed"));
         }
-        trace!("Engine::execute_assert: EXIT");
+        
         result
     }
 
     fn execute_wrs(&self, ir: &IR, _irdb: &IRDb, diags: &mut Diags, file: &mut File)
                    -> Result<()> {
-        trace!("Engine::execute_wrs: ENTER");
+        self.trace("Engine::execute_wrs:");
         let buf = self.parms[ir.operands[0]].borrow();
         let bufs = buf.to_str().as_bytes();
         // the map_error lambda just converts io::error to a std::error
@@ -340,13 +528,13 @@ impl Engine {
             let msg = format!("Writing string failed");
             diags.err1("EXEC_3", &msg, ir.src_loc.clone());
         }
-        trace!("Engine::execute_wrs: EXIT");
+        
         result
     }
 
     pub fn execute(&self, irdb: &IRDb, diags: &mut Diags, file: &mut File)
                    -> Result<()> {
-        trace!("Engine::execute: ENTER");
+        self.trace("Engine::execute:");
         let mut result;
         let mut error_count = 0;
         for ir in &irdb.ir_vec {
@@ -354,6 +542,9 @@ impl Engine {
                 IRKind::Assert => { self.execute_assert(ir, irdb, diags, file) }
                 IRKind::Wrs => { self.execute_wrs(ir, irdb, diags, file) }
                 // the rest of these operations are computed during iteration
+                IRKind::Abs |
+                IRKind::Img |
+                IRKind::Sec |
                 IRKind::Sizeof |
                 IRKind::NEq |
                 IRKind::GEq |
@@ -381,7 +572,7 @@ impl Engine {
                 }
             }
         }
-        trace!("Engine::execute: EXIT");
+        
         if error_count > 0 {
             return Err(anyhow!("Error detected"));
         }

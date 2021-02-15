@@ -4,7 +4,7 @@ use assert_cmd::{Command};
 use std::fs;
 use serial_test::serial;
 
-// Many tests just use the default output file "ouput.bin".
+// Many tests just use the default output file "output.bin".
 // This creates a race condition since each test deletes this
 // file when done.
 // Use #[serial] on tests the produce output.bin to fix this race condition.
@@ -794,6 +794,18 @@ fn logical_or_1() {
     let _cmd = Command::cargo_bin("brink")
                 .unwrap()
                 .arg("tests/logical_or_1.brink")
+                .assert()
+                .success();
+
+    fs::remove_file("output.bin").unwrap();
+}
+
+#[test]
+#[serial]
+fn address_1() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/address_1.brink")
                 .assert()
                 .success();
 
