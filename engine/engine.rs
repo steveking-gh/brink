@@ -13,7 +13,6 @@ use log::{error, warn, info, debug, trace};
 #[derive(Clone,Debug,PartialEq)]
 pub struct Location {
     img: u64,
-    abs: u64,
     sec: u64,
 }
 pub struct Parameter {
@@ -62,6 +61,9 @@ pub struct Engine {
 
     /// Stack of sections for debug use
     sec_names: Vec<String>,
+
+    /// Starting absolute address, just copied from irdb for convenience
+    start_addr: u64,
 }
 
 impl Engine {
@@ -79,8 +81,8 @@ impl Engine {
 
     fn iterate_wrs(&mut self, ir: &IR, _irdb: &IRDb, _diags: &mut Diags,
                     current: &mut Location) -> bool {
-        self.trace(format!("Engine::iterate_wrs: abs {}, img {}, sec {}",
-            current.abs, current.img, current.sec).as_str());
+        self.trace(format!("Engine::iterate_wrs: img {}, sec {}",
+                   current.img, current.sec).as_str());
         // wrs takes one input parameter
         assert!(ir.operands.len() == 1);
         let in_parm_num0 = ir.operands[0];
@@ -89,7 +91,6 @@ impl Engine {
         // Will panic if usize does not fit in u64
         let sz = in_parm0.to_str().len() as u64;
         current.img += sz;
-        current.abs += sz;
         current.sec += sz;
         
         true
@@ -162,7 +163,8 @@ impl Engine {
         let mut result = true;
         let shift_amount = u32::try_from(in1);
         if shift_amount.is_err() {
-            let msg = format!("Shift amount {} is too large in Right Shift expression '{} >> {}'", in1, in0, in1);
+            let msg = format!("Shift amount {} is too large in Right Shift expression '{} >> {}'",
+                            in1, in0, in1);
             diags.err1("EXEC_10", &msg, ir.src_loc.clone());
             result = false;
         } else {
@@ -173,8 +175,8 @@ impl Engine {
 
     fn iterate_arithmetic(&mut self, ir: &IR, _irdb: &IRDb, operation: IRKind,
                     current: &Location, diags: &mut Diags) -> bool {
-        self.trace(format!("Engine::iterate_arithmetic: abs {}, img {}, sec {}",
-            current.abs, current.img, current.sec).as_str());
+        self.trace(format!("Engine::iterate_arithmetic: img {}, sec {}",
+                               current.img, current.sec).as_str());
         // All operations here take two inputs and produces one output parameter
         assert!(ir.operands.len() == 3);
         let in_parm_num0 = ir.operands[0];
@@ -214,8 +216,8 @@ impl Engine {
 
     fn iterate_sizeof(&mut self, ir: &IR, irdb: &IRDb, diags: &mut Diags,
                     current: &Location) -> bool {
-        self.trace(format!("Engine::iterate_sizeof: abs {}, img {}, sec {}",
-            current.abs, current.img, current.sec).as_str());
+        self.trace(format!("Engine::iterate_sizeof: img {}, sec {}",
+                            current.img, current.sec).as_str());
         // sizeof takes one input and produces one output
         // we've already discarded surrounding () on the operand
         assert!(ir.operands.len() == 2);
@@ -241,7 +243,7 @@ impl Engine {
         assert!(ir_rng.start <= ir_rng.end);
         let start_loc = &self.ir_locs[ir_rng.start];
         let end_loc = &self.ir_locs[ir_rng.end];
-        let sz = end_loc.abs - start_loc.abs;
+        let sz = end_loc.img - start_loc.img;
         self.trace(format!("Sizeof {} is currently {}", sec_name, sz).as_str());
         // We'll at least panic at runtime if conversion from
         // usize to u64 fails instead of bad output binary.
@@ -254,8 +256,8 @@ impl Engine {
     /// Compute the transient current address.  This case is called when
     /// Abs/Img/Sec is called without an identifier.
     fn iterate_current_address(&mut self, ir: &IR, current: &Location) -> bool {
-        self.trace(format!("Engine::iterate_current_address: abs {}, img {}, sec {}",
-            current.abs, current.img, current.sec).as_str());
+        self.trace(format!("Engine::iterate_current_address: img {}, sec {}",
+                            current.img, current.sec).as_str());
         assert!(ir.operands.len() == 1);
         let out_parm_num = ir.operands[0];
         let mut out_parm = self.parms[out_parm_num].borrow_mut();
@@ -264,8 +266,11 @@ impl Engine {
         // We'll at least panic at runtime if conversion from
         // usize to u64 fails instead of bad output binary.
         match ir.kind {
-            // Will panic if usize does not fit in a u64
-            IRKind::Abs => { *out = current.abs.try_into().unwrap(); }
+            IRKind::Abs => { 
+                // Will panic if usize does not fit in a u64
+                let img: u64 = current.img.try_into().unwrap();
+                *out = img + self.start_addr;
+            }
             IRKind::Img => { *out = current.img.try_into().unwrap(); }
             IRKind::Sec => { *out = current.sec.try_into().unwrap(); }
             bad => {
@@ -281,8 +286,8 @@ impl Engine {
     /// Abs/Img/Sec is called with an identifier.
     fn iterate_identifier_address(&mut self, ir: &IR, irdb: &IRDb, diags: &mut Diags,
                     current: &Location) -> bool {
-        self.trace(format!("Engine::iterate_identifier_address: abs {}, img {}, sec {}",
-            current.abs, current.img, current.sec).as_str());
+        self.trace(format!("Engine::iterate_identifier_address: img {}, sec {}",
+                            current.img, current.sec).as_str());
         // Abs/Img/Sec take one optional input and produce one output.
         // We've already discarded surrounding () on the operand.
         assert!(ir.operands.len() == 2);
@@ -309,7 +314,10 @@ impl Engine {
         let start_loc = &self.ir_locs[ir_rng.start];
         match ir.kind {
             // Will panic if usize does not fit in a u64
-            IRKind::Abs => { *out = start_loc.abs.try_into().unwrap(); }
+            IRKind::Abs => {
+                let img: u64 = start_loc.img.try_into().unwrap();
+                *out = img + self.start_addr;
+            }
             IRKind::Img => { *out = start_loc.img.try_into().unwrap(); }
             IRKind::Sec => { *out = start_loc.sec.try_into().unwrap(); }
             bad => {
@@ -322,8 +330,8 @@ impl Engine {
 
     fn iterate_address(&mut self, ir: &IR, irdb: &IRDb, diags: &mut Diags,
                     current: &Location) -> bool {
-        self.trace(format!("Engine::iterate_address: abs {}, img {}, sec {}",
-            current.abs, current.img, current.sec).as_str());
+        self.trace(format!("Engine::iterate_address: img {}, sec {}",
+                            current.img, current.sec).as_str());
         // Abs/Img/SEc take one optional input and produce one output.
         // We've already discarded surrounding () on the operand.
         let num_operands = ir.operands.len();
@@ -344,8 +352,8 @@ impl Engine {
         let sec_name = irdb.get_opnd_as_identifier(&ir, 0).to_string();
         // For debugging, push our current section on the name stack
         self.sec_names.push(sec_name);
-        self.trace(format!("Engine::iterate_section_start: abs {}, img {}, sec {}",
-                    current.abs, current.img, current.sec).as_str());
+        self.trace(format!("Engine::iterate_section_start: img {}, sec {}",
+                            current.img, current.sec).as_str());
         self.sec_offsets.push(current.sec);
         current.sec = 0;
         
@@ -357,8 +365,8 @@ impl Engine {
     fn iterate_section_end(&mut self, ir: &IR, irdb: &IRDb, _diags: &mut Diags,
                             current: &mut Location) -> bool {
         let sec_name = irdb.get_opnd_as_identifier(&ir, 0).to_string();
-        self.trace(format!("Engine::iterate_section_end: '{}', abs {}, img {}, sec {}",
-                sec_name, current.abs, current.img, current.sec).as_str());
+        self.trace(format!("Engine::iterate_section_end: '{}', img {}, sec {}",
+                sec_name, current.img, current.sec).as_str());
         current.sec += self.sec_offsets.pop().unwrap();
         // For debugging, pop our current section from the name stack
         self.sec_names.pop();
@@ -369,11 +377,12 @@ impl Engine {
     pub fn new(irdb: &IRDb, diags: &mut Diags, abs_start: usize) -> Option<Engine> {
         // Initialize all ir_locs locations to zero.  The first iterate loop
         // may access any IR location.
-        let ir_locs = vec![Location {img: 0, abs: 0, sec: 0}; irdb.ir_vec.len()];
+        let ir_locs = vec![Location {img: 0, sec: 0}; irdb.ir_vec.len()];
 
         let mut engine = Engine { parms: Vec::new(), ir_locs, sec_offsets: Vec::new(),
-                                        sec_names: Vec::new() };
+                                         sec_names: Vec::new(), start_addr: irdb.start_addr };
         engine.trace("Engine::new:");
+
         // Initialize parameters from the IR operands.
         engine.parms.reserve(irdb.parms.len());
         for opnd in &irdb.parms {
@@ -406,7 +415,7 @@ impl Engine {
         while result && !stable {
             self.trace(format!("Engine::iterate: Iteration count {}", iter_count).as_str());
             iter_count += 1;
-            let mut current = Location{ img: 0, abs: irdb.start_addr, sec: 0 };
+            let mut current = Location{ img: 0, sec: 0 };
 
             // make sure we exited as many sections as we entered on each iteration
             assert!(self.sec_offsets.len() == 0);
