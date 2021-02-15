@@ -283,7 +283,7 @@ impl Engine {
                     current: &Location) -> bool {
         self.trace(format!("Engine::iterate_identifier_address: abs {}, img {}, sec {}",
             current.abs, current.img, current.sec).as_str());
-        // Abs/Img/SEc take one optional input and produce one output.
+        // Abs/Img/Sec take one optional input and produce one output.
         // We've already discarded surrounding () on the operand.
         assert!(ir.operands.len() == 2);
         let in_parm_num0 = ir.operands[0]; // identifier

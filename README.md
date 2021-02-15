@@ -159,10 +159,12 @@ As shown in the table, Brink will check some operations for arithmetic under/ove
 
 ## Address and Offset
 
-Bring allows programs to query three kinds of location information:
-* abs() returns current absolute address
-* img() returns the current offset relative to the start of the output
-* sec() returns the current offset relative to the start of a section
+The following built-in functions allows programs to query and use three kinds of location information:
+* `abs( [optional identifier] )` returns an absolute address
+* `img( [optional identifier] )` returns an offset relative to the start of the output
+* `sec( [optional identifier] )` returns an offset relative to the start of a section
+
+When called with an identifier, the address or offset pertains to the location of that identifier.  When called without an identifier, the functions return the current address or offset.
 
 For example:
 

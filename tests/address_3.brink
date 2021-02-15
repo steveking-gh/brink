@@ -1,0 +1,60 @@
+section fiz {
+    assert abs() == 0x1006;
+    assert img() == 0x6;
+    assert sec() == 0x0;
+    wrs "fiz";
+    assert abs() == 0x1009;
+    assert img() == 0x9;
+    assert sec() == 0x3;
+}
+
+
+section bar {
+    assert abs() == 0x1003;
+    assert img() == 0x3;
+    assert sec() == 0x0;
+    wrs "bar";
+    assert abs() == 0x1006;
+    assert img() == 0x6;
+    assert sec() == 0x3;
+    wr fiz;
+    assert abs() == 0x1009;
+    assert img() == 0x9;
+    assert sec() == 0x6;
+}
+
+// top level section
+section foo {
+    assert abs() == 0x1000;
+    assert img() == 0x0;
+    assert sec() == 0x0;
+    wrs "foo";
+    assert abs() == 0x1003;
+    assert img() == 0x3;
+    assert sec() == 0x3;
+    wr bar;
+    assert abs() == 0x1009;
+    assert img() == 0x9;
+    assert sec() == 0x9;
+    wr boo;
+    assert abs() == 0x100C;
+    assert img() == 0xC;
+    assert sec() == 0xC;
+}
+
+// section after reference
+section boo {
+    assert abs() == 0x1009;
+    assert img() == 0x9;
+    assert sec() == 0x0;
+
+    assert abs(fiz) == 0x1006;
+    assert img(fiz) == 0x6;
+
+    wrs "boo";
+    assert abs() == 0x100C;
+    assert img() == 0xC;
+    assert sec() == 0x3;
+}
+
+output foo 0x1000;
