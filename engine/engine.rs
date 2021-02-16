@@ -232,7 +232,7 @@ impl Engine {
         // We've already verified that the section identifier exists,
         // but unless the section actually got used in the output,
         // then we won't find location info for it.
-        let ir_rng = irdb.id_locs.get(sec_name);
+        let ir_rng = irdb.sized_locs.get(sec_name);
         if ir_rng.is_none() {
             let msg = format!("Can't take sizeof() section '{}' not used in output.",
                     sec_name);
@@ -296,22 +296,21 @@ impl Engine {
         let in_parm0 = self.parms[in_parm_num0].borrow();
         let mut out_parm = self.parms[out_parm_num].borrow_mut();
 
-        let sec_name = in_parm0.to_identifier();
+        let name = in_parm0.to_identifier();
         let out = out_parm.val.downcast_mut::<u64>().unwrap();
 
         // We've already verified that the section identifier exists,
         // but unless the section actually got used in the output,
         // then we won't find location info for it.
-        let ir_rng = irdb.id_locs.get(sec_name);
-        if ir_rng.is_none() {
-            let msg = format!("Can't take address of section '{}' not used in output.",
-                    sec_name);
+        let ir_num = irdb.addressed_locs.get(name);
+        if ir_num.is_none() {
+            let msg = format!("Address of section or label '{}' not reachable in output.",
+                    name);
             diags.err1("EXEC_11", &msg, ir.src_loc.clone());
             return false;
         }
-        let ir_rng = ir_rng.unwrap();
-        assert!(ir_rng.start <= ir_rng.end);
-        let start_loc = &self.ir_locs[ir_rng.start];
+        let ir_num = ir_num.unwrap();
+        let start_loc = &self.ir_locs[*ir_num];
         match ir.kind {
             // Will panic if usize does not fit in a u64
             IRKind::Abs => {

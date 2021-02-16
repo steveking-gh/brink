@@ -17,9 +17,13 @@ pub struct IRDb {
     /// in the output statement.  Zero by default.
     pub start_addr: u64,
 
-    /// Maps an identifier to the (start,stop) indices in
-    /// the ir_vec.
-    pub id_locs: HashMap<String,Range<usize>>,
+    /// Maps an identifier to the (start,stop) indices in the ir_vec.
+    /// Used for items with a size (potentially zero) such as sections.
+    pub sized_locs: HashMap<String,Range<usize>>,
+
+    /// Maps an identifier to the start indices in the ir_vec.
+    /// Used for items that are addressable, including sections and labels
+    pub addressed_locs: HashMap<String,usize>,
 }
 
 impl IRDb {
@@ -166,16 +170,22 @@ impl IRDb {
             let ir_num = self.ir_vec.len();
             if self.validate_operands(&ir, diags) {
                 match kind {
+                    IRKind::Label => {
+                        // create the addressable entry and set the IR number
+                        let name = self.get_opnd_as_identifier(&ir, 0).to_string();
+                        self.addressed_locs.insert(name, ir_num);
+                    }
                     IRKind::SectionStart => {
                         // create the section entry and set the starting IR number
                         let sec_name = self.get_opnd_as_identifier(&ir, 0).to_string();
                         let rng = Range {start: ir_num, end: 0};
-                        self.id_locs.insert(sec_name, rng);
+                        self.sized_locs.insert(sec_name.clone(), rng);
+                        self.addressed_locs.insert(sec_name, ir_num);
                     }
                     IRKind::SectionEnd => {
                         // Update the end of the range for this section
                         let sec_name = self.get_opnd_as_identifier(&ir, 0).to_string();
-                        let rng = self.id_locs.get_mut(&sec_name).unwrap();
+                        let rng = self.sized_locs.get_mut(&sec_name).unwrap();
                         rng.end = ir_num;
                     }
                     _ => {}
@@ -206,7 +216,7 @@ impl IRDb {
         }
 
         let mut ir_db = IRDb { ir_vec: Vec::new(), parms: Vec::new(),
-            id_locs: HashMap::new(), start_addr };
+            sized_locs: HashMap::new(), addressed_locs: HashMap::new(), start_addr };
 
         if !ir_db.process_lin_operands(lin_db, diags) {
             return None;

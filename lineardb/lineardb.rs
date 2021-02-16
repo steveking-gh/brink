@@ -35,7 +35,7 @@ impl<'toks> LinOperand {
         let tinfo = ast.get_tinfo(nid);
         let src_loc = tinfo.loc.clone();
         LinOperand { src_lid, src_loc, val: tinfo.val.to_string(), kind, data_type }
-    }    
+    }
 }
 
 pub struct LinIR {
@@ -339,9 +339,18 @@ impl<'toks> LinearDb {
                 }
             }
             LexToken::Label => {
-                // A label to identify a particular location in the output.
-                // Labels have no operands and are their own identifier.
-                self.new_ir(parent_nid, ast, IRKind::Label);
+                // A label marking an addressable location in the output.
+                // Labels have no children in the AST since they are their own identifier.
+                // In the IR, the identifier becomes the only operand of the label operation.
+                let ir_lid = self.new_ir(parent_nid, ast, IRKind::Label);
+
+                // Trim the trailing colon on the label.
+                let name_without_colon = tinfo.val[..tinfo.val.len() - 1].to_string();
+
+                // Add an identifier name operand
+                let operand = LinOperand { src_lid: Some(ir_lid), src_loc: tinfo.loc.clone(),
+                                val: name_without_colon, kind: OperandKind::Constant, data_type: DataType::Identifier};
+                self.add_operand_to_ir(ir_lid, operand);
             }
 
             LexToken::Semicolon |

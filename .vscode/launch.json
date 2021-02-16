@@ -19,12 +19,11 @@
                     "kind": "bin"
                 }
             },
-            "args": ["-o empty_section_1.bin",
+            "args": ["-v",
                      "-v",
                      "-v",
                      "-v",
-                     "-v",
-                     "${workspaceFolder}/tests/address_1.brink"],
+                     "${workspaceFolder}/tests/label_1.brink"],
         },
         {
             "type": "lldb",

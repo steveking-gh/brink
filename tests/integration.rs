@@ -835,5 +835,17 @@ fn address_3() {
 
     fs::remove_file("output.bin").unwrap();
 }
+#[test]
+#[serial]
+fn label_1() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/label_1.brink")
+                .assert()
+                .success();
+
+    fs::remove_file("output.bin").unwrap();
+}
+
 } // mod tests
 

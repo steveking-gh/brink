@@ -1,0 +1,16 @@
+section foo {
+    lab1: wrs "Wow!";
+    lab2:
+    assert abs(lab1) == 0x1000;
+    assert img(lab1) == 0;
+    assert sec(lab1) == 0;
+    assert abs(lab2) == 0x1004;
+    assert img(lab2) == 4;
+    assert sec(lab2) == 4;
+    assert abs(lab3) == 0x1004;
+    assert img(lab3) == 4;
+    assert sec(lab3) == 4;
+    lab3:
+}
+
+output foo 0x1000;
