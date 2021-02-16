@@ -63,6 +63,17 @@ impl<'a, 'msg> Diags<'a> {
 
     /// Writes the diagnostic to the terminal with primary
     /// code location.
+    pub fn note0(&self, code: &str, msg: &'msg str) {
+        if self.verbosity == 0 { return; }
+        let diag = Diagnostic::note()
+                .with_code(code)
+                .with_message(msg);
+        let _ = term::emit(&mut self.writer.lock(), &self.config,
+                           &self.source_map, &diag);
+    }
+
+    /// Writes the diagnostic to the terminal with primary
+    /// code location.
     pub fn note1(&self, code: &str, msg: &'msg str,
                   primary_code_ref: Range<usize>) {
         if self.verbosity == 0 { return; }
@@ -74,7 +85,6 @@ impl<'a, 'msg> Diags<'a> {
         let _ = term::emit(&mut self.writer.lock(), &self.config,
                            &self.source_map, &diag);
     }
-    
 
     /// Writes the diagnostic to the terminal with primary
     /// and secondary code locations.

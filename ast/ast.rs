@@ -45,6 +45,7 @@ pub enum LexToken {
     #[token("(")] OpenParen,
     #[token(")")] CloseParen,
     #[token(";")] Semicolon,
+    #[regex("[_a-zA-Z][0-9a-zA-Z_]*:")] Label,
     #[regex("[_a-zA-Z][0-9a-zA-Z_]*")] Identifier,
 
     // Support the forms accepted by the nice parse_int crate:
@@ -400,6 +401,7 @@ impl<'toks> Ast<'toks> {
             // Stay in the section even after errors to give the user
             // more than one error at a time
             let parse_ok = match tinfo.tok {
+                LexToken::Label => self.parse_label(parent, diags),
                 LexToken::Wr => self.parse_wr(parent, diags),
                 LexToken::Wrs => self.parse_wrs(parent, diags),
                 LexToken::Assert => self.parse_assert(parent, diags),
@@ -639,9 +641,6 @@ impl<'toks> Ast<'toks> {
     }
 
     /// Parser for an assert statement
-    /// We do not yet have full mathematical expression evaluation.
-    /// The assert must be a 3 part expression with the middle lexical element
-    /// either a == or !=.
     fn parse_assert(&mut self, parent: NodeId, diags: &mut Diags) -> bool {
 
         self.dbg_enter("parse_assert");
@@ -657,6 +656,14 @@ impl<'toks> Ast<'toks> {
         }
 
         self.dbg_exit("parse_assert", result)
+    }
+
+    fn parse_label(&mut self, parent: NodeId, _diags: &mut Diags) -> bool {
+        // Not much to do since labels just mark a place but
+        // cause no actions.
+        self.dbg_enter("parse_label");
+        self.add_to_parent_and_advance(parent);
+        self.dbg_exit("parse_assert", true)
     }
 
     fn parse_output(&mut self, parent : NodeId, diags: &mut Diags) -> bool {
@@ -813,6 +820,7 @@ impl<'toks> Output<'toks> {
  *****************************************************************************/
 pub struct AstDb<'toks> {
     pub sections: HashMap<&'toks str, Section<'toks>>,
+    pub labels: HashMap<&'toks str, Vec<NodeId>>,
     pub output: Output<'toks>,
     //pub properties: HashMap<NodeId, NodeProperty>
 }
@@ -823,6 +831,7 @@ impl<'toks> AstDb<'toks> {
     const MAX_RECURSION_DEPTH:usize = 100;
 
     /// Processes a section in the AST
+    /// All section names are also label names
     fn record_section(diags: &mut Diags, sec_nid: NodeId, ast: &'toks Ast,
                       sections: &mut HashMap<&'toks str, Section<'toks>> ) -> bool {
         debug!("AstDb::record_section: NodeId {}", sec_nid);
@@ -841,13 +850,14 @@ impl<'toks> AstDb<'toks> {
             return false;
         }
         sections.insert(sec_str, Section::new(&ast, sec_nid));
+
         true
     }
 
     /// Returns true if the first child of the specified node is a section
     /// name that exists.  Otherwise, prints a diagnostic and returns false.
-    fn validate_section_name(child_num: usize, parent_nid: NodeId, ast: &'toks Ast,
-                    sections: &HashMap<&'toks str, Section<'toks>>, diags: &mut Diags) -> bool {
+    fn validate_section_name(&self, child_num: usize, parent_nid: NodeId, ast: &'toks Ast,
+                    diags: &mut Diags) -> bool {
         debug!("AstDb::validate_section_name: NodeId {} for child {}", parent_nid, child_num);
 
         let mut children = parent_nid.children(&ast.arena);
@@ -876,7 +886,7 @@ impl<'toks> AstDb<'toks> {
         let sec_name_nid = sec_name_nid_opt.unwrap();
         let sec_tinfo = ast.get_tinfo(sec_name_nid);
         let sec_str = sec_tinfo.val;
-        if !sections.contains_key(sec_str) {
+        if !self.sections.contains_key(sec_str) {
             // error, specified section does not exist
             let m = format!("Unknown section name '{}'", sec_str);
             diags.err1("AST_16", &m, sec_tinfo.span());
@@ -902,12 +912,10 @@ impl<'toks> AstDb<'toks> {
     /// Recursively record information about the children of an AST object.
     /// nested sections tracks the current hierarchy of section writes so we
     /// catch cycles.
-    fn record_r(rdepth: usize, parent_nid: NodeId, diags: &mut Diags,
-        ast: &'toks Ast, sections: &HashMap<&'toks str, Section<'toks>>,
-        nested_sections: &mut HashSet<&'toks str> ) -> bool {
+    fn record_r(&mut self, rdepth: usize, parent_nid: NodeId, ast: &'toks Ast,
+                 nested_sections: &mut HashSet<&'toks str>, diags: &mut Diags ) -> bool {
 
-        debug!("AstDb::record_r: >>>> ENTER at depth {} for parent nid: {}",
-                rdepth, parent_nid);
+        debug!("AstDb::record_r: >>>> ENTER at depth {} for parent nid: {}", rdepth, parent_nid);
 
         if rdepth > AstDb::MAX_RECURSION_DEPTH {
             let tinfo = ast.get_tinfo(parent_nid);
@@ -922,7 +930,7 @@ impl<'toks> AstDb<'toks> {
         result &= match tinfo.tok {
             // Wr statement must specify a valid section name
             LexToken::Wr => {
-                if !Self::validate_section_name(0, parent_nid, &ast, &sections, diags) {
+                if !self.validate_section_name(0, parent_nid, &ast, diags) {
                     return false;
                 }
                 let mut children = parent_nid.children(&ast.arena);
@@ -940,10 +948,10 @@ impl<'toks> AstDb<'toks> {
                 } else {
                     // add this section to our nested sections tracker
                     nested_sections.insert(sec_str);
-                    let section = sections.get(sec_str).unwrap();
+                    let section = self.sections.get(sec_str).unwrap();
                     let children = section.nid.children(&ast.arena);
                     for nid in children {
-                        result &= AstDb::record_r(rdepth + 1, nid, diags, ast, sections, nested_sections);
+                        result &= self.record_r(rdepth + 1, nid, ast, nested_sections, diags);
                     }
                     result
                 }
@@ -951,12 +959,12 @@ impl<'toks> AstDb<'toks> {
             // Sizeof statement must specify a valid section name enclosed in ()
             LexToken::Sizeof => {
                 // child 0 is the identifier since we didn't record surround '()'
-                if !Self::validate_section_name(0, parent_nid, &ast, &sections, diags) {
+                if !self.validate_section_name(0, parent_nid, &ast, diags) {
                     return false;
                 }
                 let children = parent_nid.children(&ast.arena);
                 for nid in children {
-                    result &= AstDb::record_r(rdepth + 1, nid, diags, ast, sections, nested_sections);
+                    result &= self.record_r(rdepth + 1, nid,ast, nested_sections, diags);
                 }
                 result
             }
@@ -966,12 +974,12 @@ impl<'toks> AstDb<'toks> {
             LexToken::Sec => {
                 // child 0 is the *optional* identifier since we didn't record surround '()'
                 if ast.has_children(parent_nid) {
-                    if !Self::validate_section_name(0, parent_nid, &ast, &sections, diags) {
+                    if !self.validate_section_name(0, parent_nid, &ast, diags) {
                         return false;
                     }
                     let children = parent_nid.children(&ast.arena);
                     for nid in children {
-                        result &= AstDb::record_r(rdepth + 1, nid, diags, ast, sections, nested_sections);
+                        result &= self.record_r(rdepth + 1, nid, ast, nested_sections, diags);
                     }
                 }
                 result
@@ -980,7 +988,7 @@ impl<'toks> AstDb<'toks> {
                 // When no children exist, this case terminates recursion.
                 let children = parent_nid.children(&ast.arena);
                 for nid in children {
-                    result &= AstDb::record_r(rdepth + 1, nid, diags, ast, sections, nested_sections);
+                    result &= self.record_r(rdepth + 1, nid, ast, nested_sections, diags);
                 }
                 result
             }
@@ -1007,7 +1015,12 @@ impl<'toks> AstDb<'toks> {
             result = result && match tinfo.tok {
                 LexToken::Section => Self::record_section(diags, nid, &ast, &mut sections),
                 LexToken::Output => Self::record_output(diags, nid, &ast, &mut output),
-                _ => true, // other statements are of no consequence here
+                _ => {
+                    let msg = format!("Invalid top-level expression {}", tinfo.val);
+                    diags.err1("AST_24", &msg, tinfo.span().clone());
+                    diags.note0("AST_25", "At top-level, allowed expressions are 'section' and 'output'");
+                    false
+                }
             };
         }
 
@@ -1021,12 +1034,10 @@ impl<'toks> AstDb<'toks> {
             bail!("AST construction failed");
         }
 
-        //let mut nested_sections : HashSet<&'toks str> = HashSet::new();
-        let mut nested_sections = HashSet::new();
-
         let output_nid = output.as_ref().unwrap().nid;
+        let mut ast_db = AstDb { sections, labels: HashMap::new(), output: output.unwrap() };
 
-        if !Self::validate_section_name(0, output_nid, &ast, &sections, diags) {
+        if !ast_db.validate_section_name(0, output_nid, &ast, diags) {
             bail!("AST construction failed");
         }
 
@@ -1038,17 +1049,18 @@ impl<'toks> AstDb<'toks> {
         let sec_str = sec_tinfo.val;
 
         // add the output section to our nested sections tracker
+        let mut nested_sections = HashSet::new();
         nested_sections.insert(sec_str);
-        let section = sections.get(sec_str).unwrap();
+        let section = ast_db.sections.get(sec_str).unwrap();
         let children = section.nid.children(&ast.arena);
         for nid in children {
-            result &= AstDb::record_r(1, nid, diags, ast, &sections, &mut nested_sections);
+            result &= ast_db.record_r(1, nid, ast, &mut nested_sections, diags);
         }
 
         if !result {
             bail!("AST construction failed");
         }
 
-        Ok(AstDb { sections, output: output.unwrap()})
+        Ok(ast_db)
     }
 }

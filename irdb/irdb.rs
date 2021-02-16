@@ -146,6 +146,7 @@ impl IRDb {
             IRKind::SectionStart |
             IRKind::SectionEnd |
             IRKind::Sizeof |
+            IRKind::Label |
             IRKind::Abs |
             IRKind::Img |
             IRKind::Sec |

@@ -340,7 +340,6 @@ impl Engine {
             2 => self.iterate_identifier_address(ir, irdb, diags, current),
             bad => panic!("Wrong number of IR operands = {}!", bad),
         };
-    
         
         result
     }
@@ -375,8 +374,8 @@ impl Engine {
     }
 
     pub fn new(irdb: &IRDb, diags: &mut Diags, abs_start: usize) -> Option<Engine> {
-        // Initialize all ir_locs locations to zero.  The first iterate loop
-        // may access any IR location.
+        // The first iterate loop may access any IR location, so initialize all
+        // ir_locs locations to zero.  
         let ir_locs = vec![Location {img: 0, sec: 0}; irdb.ir_vec.len()];
 
         let mut engine = Engine { parms: Vec::new(), ir_locs, sec_offsets: Vec::new(),
@@ -452,6 +451,7 @@ impl Engine {
 
                     // The following IR types are evaluated only at execute time.
                     // Nothing to do during iteration.
+                    IRKind::Label |
                     IRKind::Assert |
                     IRKind::U64 => { true }
                 }
@@ -555,6 +555,7 @@ impl Engine {
                 IRKind::Abs |
                 IRKind::Img |
                 IRKind::Sec |
+                IRKind::Label |
                 IRKind::Sizeof |
                 IRKind::NEq |
                 IRKind::GEq |

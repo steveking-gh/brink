@@ -338,6 +338,12 @@ impl<'toks> LinearDb {
                     *result = false;
                 }
             }
+            LexToken::Label => {
+                // A label to identify a particular location in the output.
+                // Labels have no operands and are their own identifier.
+                self.new_ir(parent_nid, ast, IRKind::Label);
+            }
+
             LexToken::Semicolon |
             LexToken::OpenParen |
             LexToken::CloseParen |
