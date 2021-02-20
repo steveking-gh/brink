@@ -482,7 +482,7 @@ fn fuzz_found_14() {
     .arg("tests/fuzz_found_14.brink")
     .assert()
     .failure()
-    .stderr(predicates::str::contains("[EXEC_5]"));
+    .stderr(predicates::str::contains("[LINEAR_6]"));
 }
 
 #[test]
@@ -539,6 +539,21 @@ fn nested_section_1() {
     assert_eq!("foo!\nBye\nbar!\nboo!\n", fs::read_to_string("nested_section_1.bin").unwrap());
     fs::remove_file("nested_section_1.bin").unwrap();
 }
+
+#[test]
+fn nested_section_2() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/nested_section_2.brink")
+                .arg("-o nested_section_2.bin")
+                .assert()
+                .success();
+
+    // Verify output file is correct.  If so, then clean up.
+    assert_eq!("bar!\nbar!\n", fs::read_to_string("nested_section_2.bin").unwrap());
+    fs::remove_file("nested_section_2.bin").unwrap();
+}
+
 
 #[test]
 fn sizeof_1() {
@@ -835,6 +850,18 @@ fn address_3() {
 
     fs::remove_file("output.bin").unwrap();
 }
+
+#[test]
+fn address_5() {
+    let _cmd = Command::cargo_bin("brink")
+    .unwrap()
+    .arg("tests/address_5.brink")
+    .assert()
+    .failure()
+    .stderr(predicates::str::contains("[LINEAR_7]"));
+}
+
+
 #[test]
 #[serial]
 fn label_1() {

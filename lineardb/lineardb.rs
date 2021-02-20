@@ -7,7 +7,7 @@ use log::{error, warn, info, debug, trace};
 
 use ast::{Ast, AstDb, LexToken, TokenInfo};
 use ir_base::{IRKind,OperandKind,DataType};
-use std::{ops::Range};
+use std::{collections::{HashMap}, ops::Range};
 
 pub struct LinOperand {
     /// linear ID of source operation if this operand is an output.
@@ -428,6 +428,10 @@ impl<'toks> LinearDb {
             return None;
         }
 
+        if !LinearCheck::check(&linear_db, diags) {
+            return None;
+        }
+
         debug!("LinearDb::new: <<<< EXIT for nid: {}", output_nid);
         Some(linear_db)
     }
@@ -456,4 +460,155 @@ impl<'toks> LinearDb {
             debug!("LinearDb: {}", op);
         }
     }
+}
+
+struct LinearCheck {
+    label_idents: HashMap<String,Range<usize>>,
+    section_count: HashMap<String,usize>,
+}
+
+impl LinearCheck {
+    pub fn new() -> LinearCheck {
+        LinearCheck { label_idents: HashMap::new(),
+                      section_count: HashMap::new()
+        }
+    }
+
+    pub fn check(lindb: &LinearDb, diags: &mut Diags) -> bool {
+        let mut lc = LinearCheck::new();
+        if !lc.inventory_identifiers(lindb, diags)  { return false; }
+        if !lc.verify_global_identifier_refs(lindb, diags) { return false; }
+
+        // TODO: Check for scoped name for sec()
+        true
+    }
+
+    /// Adds a label identifier that is an operand to the inventory.
+    /// This inventory contains only declarations of identifiers, not references
+    fn inventory_label_ident(&mut self, op_num: usize, lir: &LinIR, lindb: &LinearDb,
+                                     diags: &mut Diags) -> bool {
+        let mut result = true;
+        let name_operand_num = lir.operand_vec[op_num];
+        let name_operand = lindb.operand_vec.get(name_operand_num).unwrap();
+        assert!(name_operand.kind == OperandKind::Constant);
+        assert!(name_operand.data_type == DataType::Identifier);
+        let name = &name_operand.val;
+        if self.label_idents.contains_key(name) {
+            let orig_loc = self.label_idents.get(name).unwrap();
+            let msg = format!("Duplicate label name {}", name);
+            diags.err2("LINEAR_2", &msg, name_operand.src_loc.clone(), orig_loc.clone());
+            // keep processing after error to report other problems
+            result = false;
+        } else {
+            self.label_idents.insert(name.clone(), name_operand.src_loc.clone());
+        }
+        result
+    }
+
+    /// Increment the number of occurrences of this section
+    fn inventory_section_ident(&mut self, lir: &LinIR, lindb: &LinearDb) {
+        let name_operand_num = lir.operand_vec[0];
+        let name_operand = lindb.operand_vec.get(name_operand_num).unwrap();
+        assert!(name_operand.kind == OperandKind::Constant);
+        assert!(name_operand.data_type == DataType::Identifier);
+        let name = &name_operand.val;
+
+        if let Some(count) = self.section_count.get_mut(name) {
+            *count += 1;
+        } else {
+            self.section_count.insert(name.to_string(), 1);
+        }
+    }
+
+    /// Build a hash of all valid identifier names: labels, sections, etc
+    /// Reports an error and returns false if duplicate labels exist.
+    fn inventory_identifiers(&mut self, lindb: &LinearDb, diags: &mut Diags ) -> bool {
+        let mut result = true;
+        for lir in &lindb.ir_vec {
+            result &= match lir.op {
+                IRKind::Label => self.inventory_label_ident(0, lir, lindb, diags),
+                IRKind::SectionStart => {
+                    self.inventory_section_ident(lir, lindb);
+                    true
+                }
+                _ => { true }
+                }
+            }
+
+        debug!("LinearCheck::inventory_identifiers:");
+        for (name, _) in &self.label_idents {
+            debug!("    {}", name);
+        }
+
+        result
+    }
+
+    /// Verifies that every identifier reference exists in the inventory
+    /// Must not be called before inventory_identifiers
+    fn verify_global_identifier_refs(&mut self, lindb: &LinearDb, diags: &mut Diags) -> bool {
+        let mut result = true;
+        for lir in &lindb.ir_vec {
+            result &= match lir.op {
+                IRKind::Abs |
+                IRKind::Img |
+                IRKind::Sizeof => {
+                    self.verify_global_identifer_operand_refs(lir, lindb, diags)
+                }
+                _ => { true }
+            }
+        }
+
+        result
+    }
+
+    /// Return true if the identifier refers to a section with only a
+    /// single instance.  Returns false if this is an ambiguous section ref
+    /// or not a section ref.
+    fn is_valid_section_ref(&mut self, lop: &LinOperand, diags: &mut Diags) -> bool {
+        if let Some(count) = self.section_count.get(&lop.val) {
+            if *count == 1 {
+                return true;
+            }
+            let msg = format!("Reference to section '{}' is ambiguous. This \
+                                        section occurs {} times in the output", lop.val, *count);
+            diags.err1("LINEAR_7", &msg, lop.src_loc.clone());
+            // keep processing after error to report other problems
+        }
+        false
+    }
+
+    /// Return true if the identifier refers to label.
+    /// Returns false otherwise.
+    fn is_valid_label_ref(&mut self, lop: &LinOperand, diags: &mut Diags) -> bool {
+        if self.label_idents.contains_key(&lop.val) {
+            return true;
+        }
+        false
+    }
+
+    /// For the specified linear IR, verify any operands that are identifier
+    /// references are valid as global identifiers
+    fn verify_global_identifer_operand_refs(&mut self, lir: &LinIR, lindb: &LinearDb,
+                                            diags: &mut Diags) -> bool {
+        let mut result = true;
+        for &lop_num in &lir.operand_vec {
+            let lop= &lindb.operand_vec[lop_num];
+            if lop.data_type == DataType::Identifier {
+                debug!("LinearCheck::verify_identifier_refs: Verifying reference to '{}'", lop.val);
+                if self.is_valid_section_ref(lop, diags) {
+                    continue;
+                }
+                if self.is_valid_label_ref(lop, diags) {
+                    continue;
+                }
+
+                let msg = format!("Unknown or unreachable identifier {}", lop.val);
+                diags.err1("LINEAR_6", &msg, lop.src_loc.clone());
+                // keep processing after error to report other problems
+                result = false;
+            }
+        }
+        result
+    }
+
 }

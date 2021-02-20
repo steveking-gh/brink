@@ -1,0 +1,14 @@
+section bar {
+    wrs "bar";
+}
+
+// top level section
+section foo {
+    wr bar;
+    wr bar;
+
+    // Ambiguous reference, should fail
+    assert img(bar) == 3;
+}
+
+output foo 0x1000;

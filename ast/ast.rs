@@ -864,42 +864,6 @@ impl<'toks> AstDb<'toks> {
         true
     }
 
-    /// Processes a label in the AST.
-    /// The label might not be reachable from the output section, so
-    /// we do a subsequent pruning pass
-    /// All section names are also label names
-    fn record_label(&mut self, label_nid: NodeId, ast: &'toks Ast, diags: &mut Diags ) -> bool {
-        debug!("AstDb::record_label: NodeId {}", label_nid);
-
-        let label_tinfo = ast.get_tinfo(label_nid);
-        
-        // get the label name without the trailing ':'
-        let label_str = &label_tinfo.val[..label_tinfo.val.len() - 1];
-
-        if self.labels.contains_key(label_str) {
-            // error, duplicate label names
-            // We know the label exists, so unwrap is fine.
-            let orig_label = self.labels.get(label_str).unwrap();
-            let orig_tinfo = ast.get_tinfo(orig_label.nid);
-            let m = format!("Label name '{}' conflicts with another label of the same name", label_str);
-            diags.err2("AST_31", &m, label_tinfo.span(), orig_tinfo.span());
-            return false;
-        }
-
-        if self.sections.contains_key(label_str) {
-            // error, label conflicts with a section name
-            // We know the section exists, so unwrap is fine.
-            let orig_section = self.sections.get(label_str).unwrap();
-            let orig_tinfo = orig_section.tinfo;
-            let m = format!("Label name '{}' conflicts with section of the same name", label_str);
-            diags.err2("AST_29", &m, label_tinfo.span(), orig_tinfo.span());
-            return false;
-        }
-
-        self.labels.insert(label_str, Label { nid: label_nid, loc: label_tinfo.loc.clone() });
-        true
-    }
-
     /// Returns true if the specified child of the specified node is a section
     /// name that exists.  Otherwise, prints a diagnostic and returns false.
     fn validate_section_name(&self, child_num: usize, parent_nid: NodeId, ast: &'toks Ast,
@@ -941,47 +905,6 @@ impl<'toks> AstDb<'toks> {
         true
     }
 
-    /// Returns true if the specified child of the specified node is a section or label
-    /// name that exists.  Otherwise, prints a diagnostic and returns false.
-    fn validate_addressable_name(&self, child_num: usize, parent_nid: NodeId, ast: &'toks Ast,
-                    diags: &mut Diags) -> bool {
-        debug!("AstDb::validate_section_name: NodeId {} for child {}", parent_nid, child_num);
-
-        let mut children = parent_nid.children(&ast.arena);
-
-        // First, advance to the specified child number
-        let mut num = 0;
-        while num < child_num {
-            let name_nid_opt = children.next();
-            if name_nid_opt.is_none() {
-                // error, not enough children to reach name
-                let m = format!("Missing section or label name");
-                let name_tinfo = ast.get_tinfo(parent_nid);
-                diags.err1("AST_32", &m, name_tinfo.span());
-                return false;
-            }
-            num += 1;
-        }
-        let name_nid_opt = children.next();
-        if name_nid_opt.is_none() {
-            // error, specified section does not exist
-            let m = format!("Missing section or label name");
-            let section_tinfo = ast.get_tinfo(parent_nid);
-            diags.err1("AST_33", &m, section_tinfo.span());
-            return false;
-        }
-        let name_nid = name_nid_opt.unwrap();
-        let tinfo = ast.get_tinfo(name_nid);
-        let name_str = tinfo.val;
-        if !self.sections.contains_key(name_str) && self.labels.contains_key(name_str) {
-            // error, specified section does not exist
-            let m = format!("Unknown or unreachable section or label name '{}'", name_str);
-            diags.err1("AST_34", &m, tinfo.span());
-            return false;
-        }
-        true
-    }
-
     pub fn record_output(diags: &mut Diags, nid: NodeId, ast: &'toks Ast,
                          output: &mut Option<Output<'toks>>) -> bool {
         let tinfo = ast.get_tinfo(nid);
@@ -994,76 +917,6 @@ impl<'toks> AstDb<'toks> {
 
         *output = Some(Output::new(&ast,nid));
         true // succeed
-    }
-
-    /// Recursively validate references to sections and labels
-    /// Must run after validate_nesting_r and record_labels_r
-    // TODO - This approach is silly
-    // TODO - Create an AST iterator that walks all the nodes for us
-    fn validate_refs_r(&mut self, parent_nid: NodeId, ast: &'toks Ast, diags: &mut Diags ) -> bool {
-
-        debug!("AstDb::validate_refs_r: ENTER for parent nid: {}", parent_nid);
-
-        let mut result = true;
-        let tinfo = ast.get_tinfo(parent_nid);
-        result &= match tinfo.tok {
-            // Wr statement must specify a valid section name
-            LexToken::Wr => {
-                let mut children = parent_nid.children(&ast.arena);
-                // the section name is the first child of the output
-                // AST processing guarantees this exists.
-                let sec_nid = children.next().unwrap();
-                let sec_tinfo = ast.get_tinfo(sec_nid);
-                let sec_str = sec_tinfo.val;
-
-                let section = self.sections.get(sec_str).unwrap();
-                let children = section.nid.children(&ast.arena);
-                for nid in children {
-                    result &= self.validate_refs_r(nid, ast, diags);
-                }
-                result
-            }
-            // Sizeof statement must specify a valid section name enclosed in ()
-            LexToken::Sizeof => {
-                // child 0 is the identifier since we didn't record surround '()'
-                if !self.validate_section_name(0, parent_nid, &ast, diags) {
-                    return false;
-                }
-                let children = parent_nid.children(&ast.arena);
-                for nid in children {
-                    result &= self.validate_refs_r(nid,ast, diags);
-                }
-                result
-            }
-            // Sizeof statement must specify a valid section name enclosed in ()
-            LexToken::Abs |
-            LexToken::Img |
-            LexToken::Sec => {
-                // child 0 is the *optional* identifier since we didn't record surround '()'
-                // can be a label or section name, i.e. any name with an associated address
-                if ast.has_children(parent_nid) {
-                    if !self.validate_addressable_name(0, parent_nid, &ast, diags) {
-                        return false;
-                    }
-                    let children = parent_nid.children(&ast.arena);
-                    for nid in children {
-                        result &= self.validate_refs_r(nid, ast, diags);
-                    }
-                }
-                result
-            }
-            _ => {
-                // When no children exist, this case terminates recursion.
-                let children = parent_nid.children(&ast.arena);
-                for nid in children {
-                    result &= self.validate_refs_r(nid, ast, diags);
-                }
-                result
-            }
-        };
-
-        debug!("AstDb::validate_refs_r: EXIT({}) for nid: {}", result, parent_nid);
-        result
     }
 
     /// Recursively validate the basic hierarchy of the AST object.
@@ -1112,6 +965,8 @@ impl<'toks> AstDb<'toks> {
                         result &= self.validate_nesting_r(rdepth + 1, nid,
                                                           ast, nested_sections, diags);
                     }
+                    // We're done with the section, so remove it from the nesting hash.
+                    nested_sections.remove(sec_str);
                     result
                 }
             }
@@ -1128,52 +983,6 @@ impl<'toks> AstDb<'toks> {
 
         debug!("AstDb::validate_nesting_r: EXIT({}) at depth {} for nid: {}",
                 result, rdepth, parent_nid);
-        result
-    }
-
-    /// Recursively record label information in an AST object.
-    /// Must ran after validate_nesting_r.
-    // TODO - This approach is silly
-    // TODO - Create an AST iterator that walks all the nodes for us
-    fn record_labels_r(&mut self, parent_nid: NodeId, ast: &'toks Ast, diags: &mut Diags ) -> bool {
-
-        debug!("AstDb::record_labels_r: ENTER for parent nid: {}", parent_nid);
-
-        let mut result = true;
-        let tinfo = ast.get_tinfo(parent_nid);
-        result &= match tinfo.tok {
-            // Wr statement specifies a valid section name
-            // record_sections_r has already validated the section name.
-            LexToken::Wr => {
-                let mut children = parent_nid.children(&ast.arena);
-                // the section name is the first child of the output
-                // AST processing guarantees this exists.
-                let sec_nid = children.next().unwrap();
-                let sec_tinfo = ast.get_tinfo(sec_nid);
-                let sec_str = sec_tinfo.val;
-
-                    // add this section to our nested sections tracker
-                let section = self.sections.get(sec_str).unwrap();
-                let children = section.nid.children(&ast.arena);
-                for nid in children {
-                    result &= self.record_labels_r(nid, ast, diags);
-                }
-                result
-            }
-            LexToken::Label => {
-                self.record_label(parent_nid, ast, diags)
-            }
-            _ => {
-                // When no children exist, this case terminates recursion.
-                let children = parent_nid.children(&ast.arena);
-                for nid in children {
-                    result &= self.record_labels_r(nid, ast, diags);
-                }
-                result
-            }
-        };
-
-        debug!("AstDb::record_labels_r: EXIT({}) for nid: {}", result, parent_nid);
         result
     }
 
@@ -1232,24 +1041,10 @@ impl<'toks> AstDb<'toks> {
         let section = ast_db.sections.get(sec_str).unwrap();
 
         // We're going to need this iterator more than once
-        let children1 = section.nid.children(&ast.arena);
-        let children2 = children.clone();
-        let children3 = children.clone();
+        let children = section.nid.children(&ast.arena);
 
-        for nid in children1 {
+        for nid in children {
             result &= ast_db.validate_nesting_r(1, nid, ast, &mut nested_sections, diags);
-        }
-
-        if result {
-            for nid in children2 {
-                result &= ast_db.record_labels_r(nid, ast, diags);
-            }
-        }
-
-        if result {
-            for nid in children3 {
-                result &= ast_db.validate_refs_r(nid, ast, diags);
-            }
         }
 
         if !result {

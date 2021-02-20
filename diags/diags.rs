@@ -50,13 +50,13 @@ impl<'a, 'msg> Diags<'a> {
     /// Writes the diagnostic to the terminal with primary
     /// code location.
     pub fn err1(&self, code: &str, msg: &'msg str,
-                     primary_code_ref: Range<usize>) {
+                     loc: Range<usize>) {
         if self.verbosity == 0 { return; }
 
         let diag = Diagnostic::error()
                 .with_code(code)
                 .with_message(msg)
-                .with_labels(vec![Label::primary((), primary_code_ref)]);
+                .with_labels(vec![Label::primary((), loc)]);
         let _ = term::emit(&mut self.writer.lock(), &self.config,
                            &self.source_map, &diag);
     }
@@ -75,13 +75,13 @@ impl<'a, 'msg> Diags<'a> {
     /// Writes the diagnostic to the terminal with primary
     /// code location.
     pub fn note1(&self, code: &str, msg: &'msg str,
-                  primary_code_ref: Range<usize>) {
+                  loc: Range<usize>) {
         if self.verbosity == 0 { return; }
 
         let diag = Diagnostic::note()
                 .with_code(code)
                 .with_message(msg)
-                .with_labels(vec![Label::primary((), primary_code_ref)]);
+                .with_labels(vec![Label::primary((), loc)]);
         let _ = term::emit(&mut self.writer.lock(), &self.config,
                            &self.source_map, &diag);
     }
@@ -89,15 +89,15 @@ impl<'a, 'msg> Diags<'a> {
     /// Writes the diagnostic to the terminal with primary
     /// and secondary code locations.
     pub fn err2(&self, code: &str, msg: &'msg str,
-                     primary_code_ref: Range<usize>,
-                     secondary_code_ref: Range<usize>) {
+                     loc1: Range<usize>,
+                     loc2: Range<usize>) {
         if self.verbosity == 0 { return; }
 
         let diag = Diagnostic::error()
                 .with_code(code)
                 .with_message(msg)
-                .with_labels(vec![Label::primary((), primary_code_ref),
-                                  Label::secondary((), secondary_code_ref)]);
+                .with_labels(vec![Label::primary((), loc1),
+                                  Label::secondary((), loc2)]);
 
         let _ = term::emit(&mut self.writer.lock(), &self.config,
                            &self.source_map, &diag);
