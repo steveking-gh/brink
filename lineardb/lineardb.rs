@@ -474,17 +474,16 @@ impl LinearCheck {
         }
     }
 
+
     pub fn check(lindb: &LinearDb, diags: &mut Diags) -> bool {
         let mut lc = LinearCheck::new();
         if !lc.inventory_identifiers(lindb, diags)  { return false; }
         if !lc.verify_global_identifier_refs(lindb, diags) { return false; }
-
-        // TODO: Check for scoped name for sec()
         true
     }
 
     /// Adds a label identifier that is an operand to the inventory.
-    /// This inventory contains only declarations of identifiers, not references
+    /// This inventory contains only declarations of identifiers, not references.
     fn inventory_label_ident(&mut self, op_num: usize, lir: &LinIR, lindb: &LinearDb,
                                      diags: &mut Diags) -> bool {
         let mut result = true;
@@ -579,7 +578,7 @@ impl LinearCheck {
 
     /// Return true if the identifier refers to label.
     /// Returns false otherwise.
-    fn is_valid_label_ref(&mut self, lop: &LinOperand, diags: &mut Diags) -> bool {
+    fn is_valid_label_ref(&mut self, lop: &LinOperand) -> bool {
         if self.label_idents.contains_key(&lop.val) {
             return true;
         }
@@ -598,7 +597,7 @@ impl LinearCheck {
                 if self.is_valid_section_ref(lop, diags) {
                     continue;
                 }
-                if self.is_valid_label_ref(lop, diags) {
+                if self.is_valid_label_ref(lop) {
                     continue;
                 }
 
