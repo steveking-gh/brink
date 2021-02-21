@@ -1,0 +1,11 @@
+section foo {
+    wrs "Wow1\n";
+    wrs "\nWow2";
+    wrs "\tWow3\n";
+    wrs "\"Wow4\"\n";
+    wrs "\"Wow5\"";
+    wrs "Wo\"w6";
+    wrs "\"";
+}
+
+output foo;

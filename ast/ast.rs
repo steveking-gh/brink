@@ -717,7 +717,10 @@ impl<'toks> Ast<'toks> {
             LexToken::Identifier => (tinfo.val, Ast::DOT_DEFAULT_FILL),
             LexToken::QuotedString => {
                 if tinfo.val.len() <= 8 {
-                    (tinfo.val.trim_matches('\"'), Ast::DOT_DEFAULT_FILL)
+                    (tinfo.val.strip_prefix('\"')
+                              .unwrap()
+                              .strip_suffix('\"')
+                              .unwrap(), Ast::DOT_DEFAULT_FILL)
                 } else {
                     ("<string>", Ast::DOT_DEFAULT_FILL)
                 }

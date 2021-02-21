@@ -31,10 +31,11 @@ impl IRDb {
     fn make_box_val(&mut self, lop: &LinOperand, diags: &mut Diags) -> Option<Box<dyn Any>> {
         match lop.data_type {
             DataType::QuotedString => {
-                // Trim surround quotes and convert escape characters
+                // Trim quotes and convert escape characters
                 return Some(Box::new(lop.val
-                        .trim_matches('\"')
-                        .to_string()
+                        .strip_prefix('\"').unwrap()
+                        .strip_suffix('\"').unwrap()
+                        .replace("\\\"", "\"")
                         .replace("\\n", "\n")
                         .replace("\\t", "\t")));
             }

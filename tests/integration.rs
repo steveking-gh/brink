@@ -874,5 +874,20 @@ fn label_1() {
     fs::remove_file("output.bin").unwrap();
 }
 
+#[test]
+fn quoted_escapes_1() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/quoted_escapes_1.brink")
+                .arg("-o quoted_escapes_1.bin")
+                .assert()
+                .success();
+
+    // Verify output file is correct.  If so, then clean up.
+    //assert_eq!("Wow1\n\nWow2\tWos3\n\"Wow4\"\n\"Wow5\"Wo\"w6\"", fs::read_to_string("quoted_escapes_1.bin").unwrap());
+    assert_eq!("Wow1\n\nWow2\tWow3\n\"Wow4\"\n\"Wow5\"Wo\"w6\"", fs::read_to_string("quoted_escapes_1.bin").unwrap());
+    fs::remove_file("quoted_escapes_1.bin").unwrap();
+}
+
 } // mod tests
 
