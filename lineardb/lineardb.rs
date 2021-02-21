@@ -12,10 +12,10 @@ use std::{collections::{HashMap}, ops::Range};
 pub struct LinOperand {
     /// linear ID of source operation if this operand is an output.
     pub src_lid: Option<usize>,
-    pub src_loc: Range<usize>,
-    pub val: String,
     pub kind: OperandKind,
+    pub src_loc: Range<usize>,
     pub data_type: DataType,
+    pub val: String,
 }
 
 fn lex_to_data_type(lxt: LexToken) -> DataType {
