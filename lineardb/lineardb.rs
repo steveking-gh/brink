@@ -9,6 +9,10 @@ use ast::{Ast, AstDb, LexToken, TokenInfo};
 use ir::{IRKind,OperandKind,DataType};
 use std::{collections::{HashMap}, ops::Range};
 
+/// The operand type for linear IRs.  This operand type is very similar to the
+/// IROperand type, with the critical distinction that LinOperand creation
+/// cannot fail.  This is a valuable simplification during the AST to Linear
+/// conversion process.
 pub struct LinOperand {
     /// linear ID of source operation if this operand is an output.
     pub src_lid: Option<usize>,
@@ -38,6 +42,9 @@ impl<'toks> LinOperand {
     }
 }
 
+/// The type for linear IRs.  This type is similar to the IR type, with the
+/// critical distinction that LinIR creation cannot fail.  This is a valuable
+/// simplification during the AST to Linear conversion process.
 pub struct LinIR {
     pub nid: NodeId,
     pub src_loc: Range<usize>,
