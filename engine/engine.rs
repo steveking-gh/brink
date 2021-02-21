@@ -1,5 +1,5 @@
 use std::{convert::TryFrom};
-use ir_base::{DataType, IR, IRKind};
+use ir::{DataType, IR, IRKind};
 use irdb::IRDb;
 use diags::Diags;
 use std::{any::Any, convert::TryInto, io::Write};

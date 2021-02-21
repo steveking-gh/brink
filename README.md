@@ -135,7 +135,7 @@ Numbers are 64-bit unsigned (u64) by default.
 
 ### Quoted Strings
 
-Brink allows utf-8 quoted strings with escape characters tab (\t) and newline (\n).  Newlines are Linux style, so "A\n" is a two byte string on all platforms.
+Brink allows utf-8 quoted strings with escape characters quote (\\\") tab (\t) and newline (\n).  Newlines are Linux style, so "A\n" is a two byte string on all platforms.
 
 ## Arithmetic Operators
 

@@ -1,12 +1,12 @@
 pub type Span = std::ops::Range<usize>;
 use diags::Diags;
-use lineardb::{LinOperand, LinearDb};
+use lineardb::LinearDb;
 
 #[allow(unused_imports)]
 use log::{error, warn, info, debug, trace};
 
-use ir_base::{DataType, IR, IRKind, IROperand, OperandKind};
-use std::{any::Any, collections::HashMap, ops::Range};
+use ir::{DataType, IR, IRKind, IROperand, OperandKind};
+use std::{collections::HashMap, ops::Range};
 use parse_int::parse;
 
 pub struct IRDb {
@@ -28,42 +28,6 @@ pub struct IRDb {
 
 impl IRDb {
 
-    fn make_box_val(&mut self, lop: &LinOperand, diags: &mut Diags) -> Option<Box<dyn Any>> {
-        match lop.data_type {
-            DataType::QuotedString => {
-                // Trim quotes and convert escape characters
-                return Some(Box::new(lop.val
-                        .strip_prefix('\"').unwrap()
-                        .strip_suffix('\"').unwrap()
-                        .replace("\\\"", "\"")
-                        .replace("\\n", "\n")
-                        .replace("\\t", "\t")));
-            }
-            DataType::Int => {
-                if lop.kind == OperandKind::Constant {
-                    let res = parse::<u64>(&lop.val);
-                    if let Ok(v) = res {
-                        return Some(Box::new(v));
-                    } else {
-                        let m = format!("Malformed integer operand {}", lop.val);
-                        diags.err1("IR_1", &m, lop.src_loc.clone());
-                        return None;
-                    }
-                } else {
-                    return Some(Box::new(0u64));
-                }
-            }
-            DataType::Identifier => {
-                return Some(Box::new(lop.val.clone()));
-            }
-            DataType::Unknown => {
-                let m = format!("IR conversion failed for {}", lop.val);
-                diags.err1("IR_2", &m, lop.src_loc.clone());
-                return None;
-            }
-        };
-    }
-
     /// Returns the value of the specified operand for the specified IR.
     /// The operand number is for the *IR*, not the absolute operand
     /// index in the central operands vector.
@@ -78,20 +42,18 @@ impl IRDb {
     }
 
     fn process_lin_operands(&mut self, lin_db: &LinearDb, diags: &mut Diags) -> bool {
+        let mut result = true;
         for lop in lin_db.operand_vec.iter() {
-            let val = self.make_box_val(lop, diags);
-            if val.is_none() {
-                return false;
+            let opnd = IROperand::new( lop.src_lid, &lop.sval, &lop.src_loc, lop.kind, lop.data_type, diags);
+            if let Some(opnd) = opnd {
+                self.parms.push(opnd);
+            } else {
+                // keep processing to return more type conversion errors, if any
+                result = false;
             }
-            let val = val.unwrap();
-            let kind = lop.kind;
-            let data_type = lop.data_type;
-            let src_loc = lop.src_loc.clone();
-            let src_lid = lop.src_lid;
-            self.parms.push(IROperand{ src_lid, kind, data_type, src_loc, val });
         }
 
-        true
+        result
     }
 
     // Expect 1 operand which is int or bool
@@ -99,13 +61,13 @@ impl IRDb {
         let len = ir.operands.len();
         if len != 1 {
             let m = format!("'{:?}' expressions must evaluate to one boolean operand, but found {} operands.", ir.kind, len);
-            diags.err1("IR_4", &m, ir.src_loc.clone());
+            diags.err1("IRDB_4", &m, ir.src_loc.clone());
             return false;
         }
         let opnd = &self.parms[ir.operands[0]];
         if opnd.data_type != DataType::Int {
             let m = format!("'{:?}' expressions require an integer or boolean operand, found '{:?}'.", ir.kind, opnd.data_type);
-            diags.err2("IR_5", &m, ir.src_loc.clone(), opnd.src_loc.clone());
+            diags.err2("IRDB_5", &m, ir.src_loc.clone(), opnd.src_loc.clone());
             return false;
         }
         true
@@ -116,14 +78,14 @@ impl IRDb {
         let len = ir.operands.len();
         if len != 3 {
             let m = format!("'{:?}' expressions must evaluate to 2 input and one output operands, but found {} total operands.", ir.kind, len);
-            diags.err1("IR_6", &m, ir.src_loc.clone());
+            diags.err1("IRDB_6", &m, ir.src_loc.clone());
             return false;
         }
         for op_num in 0..2 {
             let opnd = &self.parms[ir.operands[op_num]];
             if opnd.data_type != DataType::Int {
                 let m = format!("'{:?}' expressions require an integer, found '{:?}'.", ir.kind, opnd.data_type);
-                diags.err2("IR_7", &m, ir.src_loc.clone(), opnd.src_loc.clone());
+                diags.err2("IRDB_7", &m, ir.src_loc.clone(), opnd.src_loc.clone());
                 return false;
             }
         }
@@ -211,7 +173,7 @@ impl IRDb {
             } else {
                 let m = format!("Malformed integer operand {}", addr_str);
                 let primary_code_ref = lin_db.output_addr_loc.as_ref().unwrap();
-                diags.err1("IR_3", &m, primary_code_ref.clone());
+                diags.err1("IRDB_3", &m, primary_code_ref.clone());
                 return None;                
             }
         }

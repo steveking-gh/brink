@@ -18,5 +18,5 @@ parse_int = "0.5.0"
 # local dependencies
 diags = { path = "../diags" }
 ast = { path = "../ast" }
-ir_base = { path = "../ir_base" }
+ir = { path = "../ir" }
 lineardb = { path = "../lineardb" }

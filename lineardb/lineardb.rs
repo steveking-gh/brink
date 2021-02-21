@@ -6,7 +6,7 @@ use diags::Diags;
 use log::{error, warn, info, debug, trace};
 
 use ast::{Ast, AstDb, LexToken, TokenInfo};
-use ir_base::{IRKind,OperandKind,DataType};
+use ir::{IRKind,OperandKind,DataType};
 use std::{collections::{HashMap}, ops::Range};
 
 pub struct LinOperand {
@@ -15,7 +15,7 @@ pub struct LinOperand {
     pub kind: OperandKind,
     pub src_loc: Range<usize>,
     pub data_type: DataType,
-    pub val: String,
+    pub sval: String,
 }
 
 fn lex_to_data_type(lxt: LexToken) -> DataType {
@@ -34,7 +34,7 @@ impl<'toks> LinOperand {
                data_type: DataType) -> LinOperand {
         let tinfo = ast.get_tinfo(nid);
         let src_loc = tinfo.loc.clone();
-        LinOperand { src_lid, src_loc, val: tinfo.val.to_string(), kind, data_type }
+        LinOperand { src_lid, src_loc, sval: tinfo.val.to_string(), kind, data_type }
     }
 }
 
@@ -349,7 +349,7 @@ impl<'toks> LinearDb {
 
                 // Add an identifier name operand
                 let operand = LinOperand { src_lid: Some(ir_lid), src_loc: tinfo.loc.clone(),
-                                val: name_without_colon, kind: OperandKind::Constant, data_type: DataType::Identifier};
+                                sval: name_without_colon, kind: OperandKind::Constant, data_type: DataType::Identifier};
                 self.add_operand_to_ir(ir_lid, operand);
             }
 
@@ -449,7 +449,7 @@ impl<'toks> LinearDb {
                     first = false;
                 }
                 if operand.kind == OperandKind::Constant {
-                    op.push_str(&format!(" {}", operand.val));
+                    op.push_str(&format!(" {}", operand.sval));
                 } else if operand.kind == OperandKind::Variable {
                     op.push_str(&format!(" tmp{}", *child));
                 } else {
@@ -491,7 +491,7 @@ impl LinearCheck {
         let name_operand = lindb.operand_vec.get(name_operand_num).unwrap();
         assert!(name_operand.kind == OperandKind::Constant);
         assert!(name_operand.data_type == DataType::Identifier);
-        let name = &name_operand.val;
+        let name = &name_operand.sval;
         if self.label_idents.contains_key(name) {
             let orig_loc = self.label_idents.get(name).unwrap();
             let msg = format!("Duplicate label name {}", name);
@@ -510,7 +510,7 @@ impl LinearCheck {
         let name_operand = lindb.operand_vec.get(name_operand_num).unwrap();
         assert!(name_operand.kind == OperandKind::Constant);
         assert!(name_operand.data_type == DataType::Identifier);
-        let name = &name_operand.val;
+        let name = &name_operand.sval;
 
         if let Some(count) = self.section_count.get_mut(name) {
             *count += 1;
@@ -564,12 +564,12 @@ impl LinearCheck {
     /// single instance.  Returns false if this is an ambiguous section ref
     /// or not a section ref.
     fn is_valid_section_ref(&mut self, lop: &LinOperand, diags: &mut Diags) -> bool {
-        if let Some(count) = self.section_count.get(&lop.val) {
+        if let Some(count) = self.section_count.get(&lop.sval) {
             if *count == 1 {
                 return true;
             }
             let msg = format!("Reference to section '{}' is ambiguous. This \
-                                        section occurs {} times in the output", lop.val, *count);
+                                        section occurs {} times in the output", lop.sval, *count);
             diags.err1("LINEAR_7", &msg, lop.src_loc.clone());
             // keep processing after error to report other problems
         }
@@ -579,7 +579,7 @@ impl LinearCheck {
     /// Return true if the identifier refers to label.
     /// Returns false otherwise.
     fn is_valid_label_ref(&mut self, lop: &LinOperand) -> bool {
-        if self.label_idents.contains_key(&lop.val) {
+        if self.label_idents.contains_key(&lop.sval) {
             return true;
         }
         false
@@ -593,7 +593,7 @@ impl LinearCheck {
         for &lop_num in &lir.operand_vec {
             let lop= &lindb.operand_vec[lop_num];
             if lop.data_type == DataType::Identifier {
-                debug!("LinearCheck::verify_identifier_refs: Verifying reference to '{}'", lop.val);
+                debug!("LinearCheck::verify_identifier_refs: Verifying reference to '{}'", lop.sval);
                 if self.is_valid_section_ref(lop, diags) {
                     continue;
                 }
@@ -601,7 +601,7 @@ impl LinearCheck {
                     continue;
                 }
 
-                let msg = format!("Unknown or unreachable identifier {}", lop.val);
+                let msg = format!("Unknown or unreachable identifier {}", lop.sval);
                 diags.err1("LINEAR_6", &msg, lop.src_loc.clone());
                 // keep processing after error to report other problems
                 result = false;

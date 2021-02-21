@@ -1,7 +1,7 @@
 [workspace]
 members = [
     "ast",
-    "ir_base",
+    "ir",
     "lineardb",
     "engine",
     "process",

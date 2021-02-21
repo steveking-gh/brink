@@ -19,4 +19,3 @@ diags = { path = "../diags" }
 lineardb = { path = "../lineardb" }
 irdb = { path = "../irdb" }
 engine = { path = "../engine" }
-ir_base = { path = "../ir_base" }
