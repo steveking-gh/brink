@@ -4,6 +4,7 @@ section foo {
     wrs "\tWow3\n";
     wrs "\"Wow4\"\n";
     wrs "\"Wow5\"";
+    wrs "";
     wrs "Wo\"w6";
     wrs "\"";
 }
