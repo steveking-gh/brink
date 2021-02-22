@@ -1,0 +1,18 @@
+section bar {
+    wrs "bar";
+}
+
+// top level section
+section foo {
+    wr bar;
+    wr boo;
+}
+
+// section after reference
+section boo {
+    wrs "boo";
+    // should fail since bar isn't in this section
+    assert sec(bar) == 0;
+}
+
+output foo 0x1000;

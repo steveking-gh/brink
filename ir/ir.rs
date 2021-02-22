@@ -99,7 +99,7 @@ impl IROperand {
                 return Some(Box::new(sval.to_string()));
             }
             DataType::Unknown => {
-                let m = format!("Conversion failed for unknown typoe {}.", sval);
+                let m = format!("Conversion failed for unknown type {}.", sval);
                 diags.err1("IR_2", &m, src_loc.clone());
             }
         };

@@ -203,7 +203,7 @@ impl<'toks> LinearDb {
                 returned_operands: &mut Vec<usize>,
                 diags: &mut Diags, ast: &'toks Ast, ast_db: &AstDb) {
 
-        debug!("LinearDb::record_r: >>>> ENTER at depth {} for parent nid: {}",
+        debug!("LinearDb::record_r: ENTER at depth {} for parent nid: {}",
                 rdepth, parent_nid);
 
         if !self.depth_sanity(rdepth, parent_nid, diags, ast) {
@@ -379,7 +379,7 @@ impl<'toks> LinearDb {
             }
         }
 
-        debug!("LinearDb::record_r: <<<< EXIT({}) at depth {} for nid: {}",
+        debug!("LinearDb::record_r: EXIT({}) at depth {} for nid: {}",
                 result, rdepth, parent_nid);
     }
 
@@ -388,7 +388,7 @@ impl<'toks> LinearDb {
     /// records only elements with size > 0.
     pub fn new(diags: &mut Diags, ast: &'toks Ast,
                ast_db: &'toks AstDb) -> Option<LinearDb> {
-        debug!("LinearDb::new: >>>> ENTER");
+        debug!("LinearDb::new: ENTER");
 
         // AstDb already validated output exists
         let output_nid = ast_db.output.nid;
@@ -435,11 +435,18 @@ impl<'toks> LinearDb {
             return None;
         }
 
-        if !LinearCheck::check(&linear_db, diags) {
+        // debug
+        linear_db.dump();
+
+        if !IdentDb::check_globals(&linear_db, diags) {
             return None;
         }
 
-        debug!("LinearDb::new: <<<< EXIT for nid: {}", output_nid);
+        if !IdentDb::check_locals(&linear_db, diags) {
+            return None;
+        }
+
+        debug!("LinearDb::new: EXIT for nid: {}", output_nid);
         Some(linear_db)
     }
 
@@ -469,25 +476,99 @@ impl<'toks> LinearDb {
     }
 }
 
-struct LinearCheck {
+struct IdentDb {
     label_idents: HashMap<String,Range<usize>>,
     section_count: HashMap<String,usize>,
 }
 
-impl LinearCheck {
-    pub fn new() -> LinearCheck {
-        LinearCheck { label_idents: HashMap::new(),
-                      section_count: HashMap::new()
+impl IdentDb {
+    pub fn new() -> IdentDb {
+        IdentDb { label_idents: HashMap::new(),
+                  section_count: HashMap::new()
         }
     }
 
-
-    pub fn check(lindb: &LinearDb, diags: &mut Diags) -> bool {
-        let mut lc = LinearCheck::new();
-        if !lc.inventory_identifiers(lindb, diags)  { return false; }
-        if !lc.verify_global_identifier_refs(lindb, diags) { return false; }
+    /// Verify all global identifier references
+    pub fn check_globals(lindb: &LinearDb, diags: &mut Diags) -> bool {
+        let mut idb = IdentDb::new();
+        if !idb.inventory_global_idents(lindb, diags)  { return false; }
+        if !idb.verify_global_refs(lindb, diags) { return false; }
         true
     }
+
+    /// Recursively verify all local (within a section) reference
+    pub fn check_locals(lindb: &LinearDb, diags: &mut Diags) -> bool {
+        debug!("IdentDb::check_locals: ENTER");
+
+        let mut result = true;
+        let mut lid = 0;
+        let len = lindb.ir_vec.len();
+
+        // Search for the outermost section_start
+        while lid < len && lindb.ir_vec[lid].op != IRKind::SectionStart {
+            lid += 1;
+        }
+
+        // We found a section start.  Recurse
+        lid += 1;
+        result &= IdentDb::check_locals_r(&mut lid, lindb, diags);
+
+        debug!("IdentDb::check_locals: EXIT({})", result );
+        result
+    }
+
+    fn check_locals_r(lid: &mut usize, lindb: &LinearDb, diags: &mut Diags) -> bool {
+        debug!("IdentDb::check_locals_r: ENTER at lid {}", *lid);
+        let mut result = true;
+        let mut idb = IdentDb::new();
+        // remember the starting lid of this section
+        let start_lid = *lid;
+        loop {
+            let lir = &lindb.ir_vec[*lid];
+            *lid += 1;
+            match lir.op {
+                IRKind::SectionStart => {
+                    // We found a section start.  Add the section name identifier
+                    // to the local database and recurse.
+                    idb.inventory_section_ident(lir, lindb);                    
+                    result &= IdentDb::check_locals_r(lid, lindb, diags);
+                }
+                IRKind::Label => { idb.inventory_label_ident(0, lir, lindb, diags); },
+
+                IRKind::SectionEnd => break, // Done with local section inventory
+                _ => {}
+            }
+        }
+
+        if result {
+            result &= idb.verify_local_refs(start_lid, lindb, diags)
+        }
+
+        // Update the caller's lid to the end of this local section
+        debug!("IdentDb::check_locals_r: EXIT at lid {}", *lid);
+        result
+    }
+
+    /// Verifies that every identifier reference exists in the inventory
+    /// Must not be called before inventory_identifiers
+    fn verify_local_refs(&self, start_lid: usize, lindb: &LinearDb, diags: &mut Diags) -> bool {
+        let mut result = true;
+        // start local verification from the starting lid
+        for lir in &lindb.ir_vec[start_lid..] {
+            match lir.op {
+                IRKind::Sec => {
+                    result &= self.verify_operand_refs(lir, lindb, diags);
+                }
+                IRKind::SectionEnd => { break },
+                _ => {}
+            }
+        }
+
+        result
+    }
+
+    // TODO Add test that fails with bad local ref
+
 
     /// Adds a label identifier that is an operand to the inventory.
     /// This inventory contains only declarations of identifiers, not references.
@@ -513,22 +594,25 @@ impl LinearCheck {
 
     /// Increment the number of occurrences of this section
     fn inventory_section_ident(&mut self, lir: &LinIR, lindb: &LinearDb) {
+        trace!("IdentDb::inventory_section_ident: ENTER");
         let name_operand_num = lir.operand_vec[0];
         let name_operand = lindb.operand_vec.get(name_operand_num).unwrap();
         assert!(name_operand.kind == OperandKind::Constant);
         assert!(name_operand.data_type == DataType::Identifier);
         let name = &name_operand.sval;
+        debug!("IdentDb::inventory_section_ident: Adding section name {} to inventory.", name);
 
         if let Some(count) = self.section_count.get_mut(name) {
             *count += 1;
         } else {
             self.section_count.insert(name.to_string(), 1);
         }
+        trace!("IdentDb::inventory_section_ident: EXIT");
     }
 
     /// Build a hash of all valid identifier names: labels, sections, etc
     /// Reports an error and returns false if duplicate labels exist.
-    fn inventory_identifiers(&mut self, lindb: &LinearDb, diags: &mut Diags ) -> bool {
+    fn inventory_global_idents(&mut self, lindb: &LinearDb, diags: &mut Diags ) -> bool {
         let mut result = true;
         for lir in &lindb.ir_vec {
             result &= match lir.op {
@@ -541,7 +625,7 @@ impl LinearCheck {
                 }
             }
 
-        debug!("LinearCheck::inventory_identifiers:");
+        debug!("IdentDb::inventory_identifiers:");
         for (name, _) in &self.label_idents {
             debug!("    {}", name);
         }
@@ -551,14 +635,14 @@ impl LinearCheck {
 
     /// Verifies that every identifier reference exists in the inventory
     /// Must not be called before inventory_identifiers
-    fn verify_global_identifier_refs(&mut self, lindb: &LinearDb, diags: &mut Diags) -> bool {
+    fn verify_global_refs(&self, lindb: &LinearDb, diags: &mut Diags) -> bool {
         let mut result = true;
         for lir in &lindb.ir_vec {
             result &= match lir.op {
                 IRKind::Abs |
                 IRKind::Img |
                 IRKind::Sizeof => {
-                    self.verify_global_identifer_operand_refs(lir, lindb, diags)
+                    self.verify_operand_refs(lir, lindb, diags)
                 }
                 _ => { true }
             }
@@ -570,7 +654,7 @@ impl LinearCheck {
     /// Return true if the identifier refers to a section with only a
     /// single instance.  Returns false if this is an ambiguous section ref
     /// or not a section ref.
-    fn is_valid_section_ref(&mut self, lop: &LinOperand, diags: &mut Diags) -> bool {
+    fn is_valid_section_ref(&self, lop: &LinOperand, diags: &mut Diags) -> bool {
         if let Some(count) = self.section_count.get(&lop.sval) {
             if *count == 1 {
                 return true;
@@ -585,7 +669,7 @@ impl LinearCheck {
 
     /// Return true if the identifier refers to label.
     /// Returns false otherwise.
-    fn is_valid_label_ref(&mut self, lop: &LinOperand) -> bool {
+    fn is_valid_label_ref(&self, lop: &LinOperand) -> bool {
         if self.label_idents.contains_key(&lop.sval) {
             return true;
         }
@@ -593,14 +677,16 @@ impl LinearCheck {
     }
 
     /// For the specified linear IR, verify any operands that are identifier
-    /// references are valid as global identifiers
-    fn verify_global_identifer_operand_refs(&mut self, lir: &LinIR, lindb: &LinearDb,
-                                            diags: &mut Diags) -> bool {
+    /// references are valid as global identifiers.  Note that some
+    /// operations have no operands, e.g. img() and fall through this
+    /// function harmlessly.
+    fn verify_operand_refs(&self, lir: &LinIR, lindb: &LinearDb,
+                           diags: &mut Diags) -> bool {
         let mut result = true;
         for &lop_num in &lir.operand_vec {
             let lop= &lindb.operand_vec[lop_num];
             if lop.data_type == DataType::Identifier {
-                debug!("LinearCheck::verify_identifier_refs: Verifying reference to '{}'", lop.sval);
+                debug!("IdentDb::verify_identifier_refs: Verifying reference to '{}'", lop.sval);
                 if self.is_valid_section_ref(lop, diags) {
                     continue;
                 }

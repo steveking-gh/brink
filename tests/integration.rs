@@ -852,6 +852,17 @@ fn address_3() {
 }
 
 #[test]
+fn address_4() {
+    let _cmd = Command::cargo_bin("brink")
+    .unwrap()
+    .arg("tests/address_4.brink")
+    .assert()
+    .failure()
+    .stderr(predicates::str::contains("[LINEAR_6]"));
+}
+
+
+#[test]
 fn address_5() {
     let _cmd = Command::cargo_bin("brink")
     .unwrap()
