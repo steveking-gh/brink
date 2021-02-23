@@ -872,6 +872,25 @@ fn address_5() {
     .stderr(predicates::str::contains("[LINEAR_7]"));
 }
 
+#[test]
+fn address_6() {
+    let _cmd = Command::cargo_bin("brink")
+    .unwrap()
+    .arg("tests/address_6.brink")
+    .assert()
+    .failure()
+    .stderr(predicates::str::contains("[LINEAR_6]"));
+}
+
+#[test]
+fn address_7() {
+    let _cmd = Command::cargo_bin("brink")
+    .unwrap()
+    .arg("tests/address_7.brink")
+    .assert()
+    .failure()
+    .stderr(predicates::str::contains("[LINEAR_6]"));
+}
 
 #[test]
 #[serial]

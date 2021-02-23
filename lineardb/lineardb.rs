@@ -549,26 +549,49 @@ impl IdentDb {
         result
     }
 
+    /// Recursively skip over nested sections and return to the parent section
+    /// Call with the start_lid one past the nested section_start operation
+    /// Returns the new final lid, which will be one past the section_end of
+    /// the outermost nested section.
+    fn skip_nested_sections_r(&self, start_lid: usize, lindb: &LinearDb) -> usize {
+        let mut lid = start_lid;
+        loop {
+            let lir = &lindb.ir_vec[lid];
+            lid += 1;
+            match lir.op {
+                IRKind::SectionStart => {
+                    lid = self.skip_nested_sections_r(lid, lindb);
+                }
+                IRKind::SectionEnd => break,
+                _ => {}
+            }
+        }
+        lid
+    }
+
     /// Verifies that every identifier reference exists in the inventory
     /// Must not be called before inventory_identifiers
     fn verify_local_refs(&self, start_lid: usize, lindb: &LinearDb, diags: &mut Diags) -> bool {
         let mut result = true;
-        // start local verification from the starting lid
-        for lir in &lindb.ir_vec[start_lid..] {
+        let mut lid = start_lid;
+
+        loop {
+            let lir = &lindb.ir_vec[lid];
+            lid += 1;
             match lir.op {
                 IRKind::Sec => {
                     result &= self.verify_operand_refs(lir, lindb, diags);
                 }
-                IRKind::SectionEnd => { break },
+                IRKind::SectionStart => {
+                    lid = self.skip_nested_sections_r(lid, lindb);
+                }
+                IRKind::SectionEnd => break,
                 _ => {}
             }
         }
 
         result
     }
-
-    // TODO Add test that fails with bad local ref
-
 
     /// Adds a label identifier that is an operand to the inventory.
     /// This inventory contains only declarations of identifiers, not references.

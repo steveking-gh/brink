@@ -23,7 +23,7 @@
                      "-v",
                      "-v",
                      "-v",
-                     "${workspaceFolder}/tests/address_1.brink"],
+                     "${workspaceFolder}/tests/address_6.brink"],
         },
         {
             "type": "lldb",
