@@ -154,57 +154,136 @@ Brink supports the following arithmetic operators with same relative precedence 
 |            | <=       | n/a                   | less-than-or-equalLTE (same precedence as ==) |
 |            | &&       | n/a                   | Logical-AND                                   |
 | Lowest     | \|\|     | n/a                   | Logical-OR                                    |
+---
 
 As shown in the table, Brink will check some operations for arithmetic under/overflow.
 
-## Address and Offset
+## `abs( [identifier] ) -> u64`
 
-The following built-in functions allows programs to query and use three kinds of location information:
-* `abs( [optional identifier] )` returns an absolute address
-* `img( [optional identifier] )` returns an offset relative to the start of the output
-* `sec( [optional identifier] )` returns an offset relative to the start of a section
+When called with an identifier, returns the absolute byte address of the identifier as a u64.  When called without an identifier, returns the current absolute address.  The absolute byte address is the image offset + the starting address specified in the `output` statement.
 
-When called with an identifier, the address or offset pertains to the location of that identifier.  When called without an identifier, the functions return the current address or offset.
-
-For example:
+### Example
 
     section fiz {
-        assert abs() == 6;
-        assert img() == 6;
-        assert sec() == 0;
+        assert abs() == 0x1006;
         wrs "fiz";
-        assert abs() == 9;
-        assert img() == 9;
-        assert sec() == 3;
+        assert abs() == 0x1009;
+        assert abs(foo) == 0x1000;
     }
     
     section bar {
-        assert abs() == 3;
-        assert img() == 3;
-        assert sec() == 0;
+        assert abs() == 0x1003;
         wrs "bar";
-        assert abs() == 6;
-        assert img() == 6;
-        assert sec() == 3;
+        assert abs() == 0x1006;
         wr fiz;
-        assert abs() == 9;
-        assert img() == 9;
-        assert sec() == 6;
+        assert abs() == 0x1009;
     }
     
     // top level section
     section foo {
-        assert abs() == 0;
+        assert abs() == 0x1000;
+        wrs "foo";
+        assert abs() == 0x1003;
+        assert abs(fiz) == 0x1006;
+        wr bar;
+        assert abs() == 0x1009;
+        assert abs(bar) == 0x1003;
+    }
+    
+    output foo 0x1000;  // starting absolute address is 0x1000
+
+## `img( [identifier] ) -> u64`
+
+When called with an identifier, returns the byte offset as a u64 of the identifier from the start of the output image.  When called without an identifier, returns the current image offset.
+
+### Example
+
+    section fiz {
+        assert img() == 6;
+        wrs "fiz";
+        assert img() == 9;
+        assert img(foo) == 0;
+    }
+    
+    section bar {
+        assert img() == 3;
+        wrs "bar";
+        assert img() == 6;
+        wr fiz;
+        assert img() == 9;
+    }
+    
+    // top level section
+    section foo {
         assert img() == 0;
+        wrs "foo";
+        assert img() == 3;
+        assert img(fiz) == 6;
+        wr bar;
+        assert img() == 9;
+        assert img(bar) == 3;
+    }
+    
+    output foo 0x1000;  // starting absolute address is 0x1000
+
+## `sec( [identifier] ) -> u64`
+
+When called with an identifier, returns the byte offset as a u64 of the identifier from the start of the current section.  When called without an identifier, returns the current section offset.
+
+### Example
+
+    section fiz {
+        assert sec() == 0;
+        wrs "fiz";
+        assert sec() == 3;
+    }
+    
+    section bar {
+        assert sec() == 0;
+        wrs "bar";
+        assert sec() == 3;
+        wr fiz;
+        assert sec() == 6;
+        assert sec(fiz) == 3;
+    }
+    
+    // top level section
+    section foo {
         assert sec() == 0;
         wrs "foo";
-        assert abs() == 3;
-        assert img() == 3;
         assert sec() == 3;
         wr bar;
-        assert abs() == 9;
-        assert img() == 9;
         assert sec() == 9;
     }
     
-    output foo;
+    output foo 0x1000;  // starting absolute address is 0x1000
+
+When a section offset specifies an identifier, the identifier must be in the scope of the current section.  For example:
+
+    section fiz {
+        wrs "fiz";
+    }
+
+    section bar {
+        wr fiz;
+        assert sec(fiz) == 0; // OK fiz in scope in section bar
+    }
+
+    section foo {
+        wr bar;
+        assert sec(bar) == 0; // OK, bar is local in this section
+        assert sec(fiz) == 0; // ERROR, fiz is out of scope in section foo
+    }
+
+## `output <section identifier> [absolute starting address]`
+
+Specifies the section to output and an optional absolute starting address.  Without a starting address, `output` defaults to a starting address of 0.
+
+## `wrs "quoted string"`
+
+Writes the specified quoted string to the output.  Brink supports utf-8 quoted strings with escape characters
+* quote (\\\")
+* tab (\t)
+* newline (\n).
+
+Newlines are Linux style, so "A\n" is a two byte string on all platforms.
