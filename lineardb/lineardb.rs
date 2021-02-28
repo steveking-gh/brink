@@ -24,7 +24,8 @@ pub struct LinOperand {
 
 fn lex_to_data_type(lxt: LexToken) -> DataType {
     match lxt {
-        LexToken::U64 => DataType::Int,
+        LexToken::U64 => DataType::U64,
+        LexToken::I64 => DataType::I64,
         LexToken::QuotedString => DataType::QuotedString,
         LexToken::Identifier => DataType::Identifier,
         // In some cases, like the result of operations, we don't
@@ -257,7 +258,7 @@ impl<'toks> LinearDb {
 
                 // Add a destination operand to the operation to hold the result
                 let idx = self.add_operand_to_ir(ir_lid, LinOperand::new(
-                        Some(ir_lid), parent_nid, ast, OperandKind::Variable, DataType::Int));
+                        Some(ir_lid), parent_nid, ast, OperandKind::Variable, DataType::U64));
                 // Also add the destination operand to the local operands
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);
@@ -278,13 +279,14 @@ impl<'toks> LinearDb {
 
                 // Add a destination operand to the operation to hold the result
                 let idx = self.add_operand_to_ir(ir_lid, LinOperand::new(
-                        Some(ir_lid), parent_nid, ast, OperandKind::Variable, DataType::Int));
+                        Some(ir_lid), parent_nid, ast, OperandKind::Variable, DataType::U64));
                 // Also add the destination operand to the local operands
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);
             }
             LexToken::Identifier |
             LexToken::U64 |
+            LexToken::I64 |
             LexToken::QuotedString => {
                 // These are immediate operands.  Add them to the main operand vector
                 // and return them as local operands.
@@ -325,7 +327,7 @@ impl<'toks> LinearDb {
 
                 // Add a destination operand to the operation to hold the result
                 let idx = self.add_operand_to_ir(ir_lid, LinOperand::new(
-                    Some(ir_lid), parent_nid, ast, OperandKind::Variable,DataType::Int));
+                    Some(ir_lid), parent_nid, ast, OperandKind::Variable,DataType::U64));
                 // Also add the destination operand to the local operands
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);

@@ -8,14 +8,15 @@ pub enum OperandKind {
     Variable,
     Constant,
 }
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DataType {
-    Int,
+    U64,
+    I64,
     QuotedString,
     Identifier,
     Unknown,
 }
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IRKind {
     Abs,
     Add,
@@ -40,6 +41,7 @@ pub enum IRKind {
     Sizeof,
     Subtract,
     U64,
+    I64,
     Wrs,
 }
 
@@ -81,7 +83,7 @@ impl IROperand {
                         .replace("\\n", "\n")
                         .replace("\\t", "\t")));
             }
-            DataType::Int => {
+            DataType::U64 => {
                 if kind == OperandKind::Constant {
                     let res = parse::<u64>(sval);
                     if let Ok(v) = res {
@@ -95,6 +97,22 @@ impl IROperand {
                     return Some(Box::new(0u64));
                 }
             }
+
+            DataType::I64 => {
+                if kind == OperandKind::Constant {
+                    let res = parse::<i64>(sval);
+                    if let Ok(v) = res {
+                        return Some(Box::new(v));
+                    } else {
+                        let m = format!("Malformed integer operand {}", sval);
+                        diags.err1("IR_3", &m, src_loc.clone());
+                    }
+                } else {
+                    // We don't know variable value, so initialize to zero
+                    return Some(Box::new(0u64));
+                }
+            }
+
             DataType::Identifier => {
                 return Some(Box::new(sval.to_string()));
             }
@@ -109,7 +127,8 @@ impl IROperand {
 
     pub fn clone_val_box(&self) -> Box<dyn Any> {
         match self.data_type {
-            DataType::Int => { Box::new(self.val.downcast_ref::<u64>().unwrap().clone()) },
+            DataType::U64 => { Box::new(self.val.downcast_ref::<u64>().unwrap().clone()) },
+            DataType::I64 => { Box::new(self.val.downcast_ref::<i64>().unwrap().clone()) },
             DataType::QuotedString |
             DataType::Identifier => {Box::new(self.val.downcast_ref::<String>().unwrap().clone())},
             DataType::Unknown => {Box::new(self.val.downcast_ref::<String>().unwrap().clone())},
@@ -118,15 +137,22 @@ impl IROperand {
 
     pub fn to_bool(&self) -> bool {
         match self.data_type {
-            DataType::Int => { *self.val.downcast_ref::<u64>().unwrap() != 0 },
+            DataType::U64 => { *self.val.downcast_ref::<u64>().unwrap() != 0 },
             _ => { panic!("Internal error: Invalid type conversion to bool"); },
         }
     }
 
     pub fn to_u64(&self) -> u64 {
         match self.data_type {
-            DataType::Int => { *self.val.downcast_ref::<u64>().unwrap() },
+            DataType::U64 => { *self.val.downcast_ref::<u64>().unwrap() },
             _ => { panic!("Internal error: Invalid type conversion to u64"); },
+        }
+    }
+
+    pub fn to_i64(&self) -> i64 {
+        match self.data_type {
+            DataType::I64 => { *self.val.downcast_ref::<i64>().unwrap() },
+            _ => { panic!("Internal error: Invalid type conversion to i64"); },
         }
     }
 

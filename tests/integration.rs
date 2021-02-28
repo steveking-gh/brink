@@ -611,6 +611,18 @@ fn integers_1() {
 
 #[test]
 #[serial]
+fn integers_2() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/integers_2.brink")
+                .assert()
+                .success();
+
+    fs::remove_file("output.bin").unwrap();
+}
+
+#[test]
+#[serial]
 fn neq_1() {
     let _cmd = Command::cargo_bin("brink")
                 .unwrap()

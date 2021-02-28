@@ -23,15 +23,22 @@ pub struct Parameter {
 impl Parameter {
     fn to_bool(&self) -> bool {
         match self.data_type {
-            DataType::Int => { *self.val.downcast_ref::<u64>().unwrap() != 0 },
+            DataType::U64 => { *self.val.downcast_ref::<u64>().unwrap() != 0 },
             _ => panic!("Bad downcast conversion to bool!"),
         }
     }
 
     fn to_u64(&self) -> u64 {
         match self.data_type {
-            DataType::Int => { *self.val.downcast_ref::<u64>().unwrap() },
+            DataType::U64 => { *self.val.downcast_ref::<u64>().unwrap() },
             _ => panic!("Bad downcast conversion to u64!"),
+        }
+    }
+
+    fn to_i64(&self) -> i64 {
+        match self.data_type {
+            DataType::I64 => { *self.val.downcast_ref::<i64>().unwrap() },
+            _ => panic!("Bad downcast conversion to i64!"),
         }
     }
 
@@ -172,6 +179,22 @@ impl Engine {
         }
         result
     }
+
+    /*
+    fn get_arithmetic_type(lhs: DataType, rhs: DataType, op: IRKind) -> DataType {
+        let result = DataType::Unknown;
+        match lhs {
+            DataType::U64 => {
+                match rhs {
+                    DataType::U64 => return DataType::U64,
+                    DataType::I64 => return DataType::U64,
+                }
+
+            }
+        }
+        result
+    }
+    */
 
     fn iterate_arithmetic(&mut self, ir: &IR, _irdb: &IRDb, operation: IRKind,
                     current: &Location, diags: &mut Diags) -> bool {
@@ -452,6 +475,7 @@ impl Engine {
                     // Nothing to do during iteration.
                     IRKind::Label |
                     IRKind::Assert |
+                    IRKind::I64 |
                     IRKind::U64 => { true }
                 }
             }
@@ -472,7 +496,7 @@ impl Engine {
         let opnd = self.parms[opnd_num].borrow();
         let ir_opnd = &irdb.parms[opnd_num];
         match opnd.data_type {
-            DataType::Int => {
+            DataType::U64 => {
                 let val = opnd.to_u64();
                 let msg = format!("Operand has value {}", val);
                 let primary_code_ref = ir_opnd.src_loc.clone();
@@ -560,6 +584,7 @@ impl Engine {
                 IRKind::GEq |
                 IRKind::LEq |
                 IRKind::DoubleEq |
+                IRKind::I64 |
                 IRKind::U64 |
                 IRKind::BitAnd |
                 IRKind::LogicalAnd |

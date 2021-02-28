@@ -65,7 +65,7 @@ impl IRDb {
             return false;
         }
         let opnd = &self.parms[ir.operands[0]];
-        if opnd.data_type != DataType::Int {
+        if (opnd.data_type != DataType::U64) && (opnd.data_type != DataType::I64) {
             let m = format!("'{:?}' expressions require an integer or boolean operand, found '{:?}'.", ir.kind, opnd.data_type);
             diags.err2("IRDB_5", &m, ir.src_loc.clone(), opnd.src_loc.clone());
             return false;
@@ -83,7 +83,7 @@ impl IRDb {
         }
         for op_num in 0..2 {
             let opnd = &self.parms[ir.operands[op_num]];
-            if opnd.data_type != DataType::Int {
+            if (opnd.data_type != DataType::U64) && (opnd.data_type != DataType::I64) {
                 let m = format!("'{:?}' expressions require an integer, found '{:?}'.", ir.kind, opnd.data_type);
                 diags.err2("IRDB_7", &m, ir.src_loc.clone(), opnd.src_loc.clone());
                 return false;
@@ -110,6 +110,7 @@ impl IRDb {
             IRKind::Subtract |
             IRKind::Add => { self.validate_arithmetic_operands(ir, diags) }
             IRKind::U64 |
+            IRKind::I64 |
             IRKind::SectionStart |
             IRKind::SectionEnd |
             IRKind::Sizeof |
@@ -207,8 +208,14 @@ impl IRDb {
                 }
                 if operand.kind == OperandKind::Constant {
                     match operand.data_type {
-                        DataType::Int => {
+                        DataType::U64 => {
+                            // Always display U64 as hex
                             let v = operand.val.downcast_ref::<u64>().unwrap();
+                            op.push_str(&format!(" ({:?} {:?}){:#X}", operand.kind, operand.data_type, v));
+                        }
+                        DataType::I64 => {
+                            // Always display I64 as signed decimal, which is the format default
+                            let v = operand.val.downcast_ref::<i64>().unwrap();
                             op.push_str(&format!(" ({:?} {:?}){}", operand.kind, operand.data_type, v));
                         }
                         // order matters, must be last
