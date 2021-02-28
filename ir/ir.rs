@@ -26,6 +26,7 @@ pub enum IRKind {
     Divide,
     DoubleEq,
     GEq,
+    I64,
     Img,
     Label,
     LeftShift,
@@ -40,8 +41,9 @@ pub enum IRKind {
     SectionStart,
     Sizeof,
     Subtract,
+    ToI64,
+    ToU64,
     U64,
-    I64,
     Wrs,
 }
 

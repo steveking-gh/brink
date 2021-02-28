@@ -57,7 +57,7 @@ impl IRDb {
     }
 
     // Expect 1 operand which is int or bool
-    fn validate_bool_operands(&self, ir: &IR, diags: &mut Diags) -> bool {
+    fn validate_bool_operand(&self, ir: &IR, diags: &mut Diags) -> bool {
         let len = ir.operands.len();
         if len != 1 {
             let m = format!("'{:?}' expressions must evaluate to one boolean operand, but found {} operands.", ir.kind, len);
@@ -73,7 +73,7 @@ impl IRDb {
         true
     }
 
-    // Expect 1 operand which is int or bool
+    // Expect 2 operand which are int or bool
     fn validate_arithmetic_operands(&self, ir: &IR, diags: &mut Diags) -> bool {
         let len = ir.operands.len();
         if len != 3 {
@@ -94,7 +94,7 @@ impl IRDb {
 
     fn validate_operands(&self, ir: &IR, diags: &mut Diags) -> bool {
         let result = match ir.kind {
-            IRKind::Assert => { self.validate_bool_operands(ir, diags) }
+            IRKind::Assert => { self.validate_bool_operand(ir, diags) }
             IRKind::NEq |
             IRKind::LEq |
             IRKind::GEq |
@@ -109,6 +109,8 @@ impl IRDb {
             IRKind::LogicalOr |
             IRKind::Subtract |
             IRKind::Add => { self.validate_arithmetic_operands(ir, diags) }
+            IRKind::ToI64 |
+            IRKind::ToU64 |
             IRKind::U64 |
             IRKind::I64 |
             IRKind::SectionStart |
@@ -123,6 +125,8 @@ impl IRDb {
         result
     }
 
+    /// Convert the linear IR to real IR.  Conversion from Linear IR to real IR can fail,
+    /// which is a hassle we don't want to deal with during linearization of the AST.
     fn process_linear_ir(&mut self, lin_db: &LinearDb, diags: &mut Diags) -> bool {
         let mut result = true;
         for lir in &lin_db.ir_vec {

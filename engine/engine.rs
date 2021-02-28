@@ -24,35 +24,35 @@ impl Parameter {
     fn to_bool(&self) -> bool {
         match self.data_type {
             DataType::U64 => { *self.val.downcast_ref::<u64>().unwrap() != 0 },
-            _ => panic!("Bad downcast conversion to bool!"),
+            bad => panic!("Bad downcast conversion of {:?} to bool!", bad),
         }
     }
 
     fn to_u64(&self) -> u64 {
         match self.data_type {
             DataType::U64 => { *self.val.downcast_ref::<u64>().unwrap() },
-            _ => panic!("Bad downcast conversion to u64!"),
+            bad => panic!("Bad downcast conversion of {:?} to u64!", bad),
         }
     }
 
     fn to_i64(&self) -> i64 {
         match self.data_type {
             DataType::I64 => { *self.val.downcast_ref::<i64>().unwrap() },
-            _ => panic!("Bad downcast conversion to i64!"),
+            bad => panic!("Bad downcast conversion of {:?} to i64!", bad),
         }
     }
 
     fn to_str(&self) -> &str {
         match self.data_type {
             DataType::QuotedString => { self.val.downcast_ref::<String>().unwrap() },
-            _ => panic!("Bad downcast conversion to &str!"),
+            bad => panic!("Bad downcast conversion of {:?} to &str!", bad),
         }
     }
 
     fn to_identifier(&self) -> &str {
         match self.data_type {
             DataType::Identifier => { self.val.downcast_ref::<String>().unwrap() },
-            _ => panic!("Bad downcast conversion to identifier!"),
+            bad => panic!("Bad downcast conversion of {:?} to identifier!", bad),
         }
     }
 }
@@ -180,23 +180,71 @@ impl Engine {
         result
     }
 
-    /*
-    fn get_arithmetic_type(lhs: DataType, rhs: DataType, op: IRKind) -> DataType {
-        let result = DataType::Unknown;
-        match lhs {
-            DataType::U64 => {
-                match rhs {
-                    DataType::U64 => return DataType::U64,
-                    DataType::I64 => return DataType::U64,
+    fn iterate_type_conversion(&mut self, ir: &IR, irdb: &IRDb, operation: IRKind,
+                    current: &Location, diags: &mut Diags) -> bool {
+        self.trace(format!("Engine::iterate_type_conversion: img {}, sec {}",
+                               current.img, current.sec).as_str());
+        // All operations here take one input and produce one output parameter
+        let mut result = true;
+        assert!(ir.operands.len() == 2);
+        let in_parm_num0 = ir.operands[0];
+        let out_parm_num = ir.operands[2];
+        let in_parm0 = self.parms[in_parm_num0].borrow();
+        let mut out_parm = self.parms[out_parm_num].borrow_mut();
+        match operation {
+            IRKind::ToU64 => {
+                match in_parm0.data_type {
+                    DataType::U64 => {
+                        // Trivial U64 to U64
+                        let in0 = in_parm0.to_u64();
+                        let out = out_parm.val.downcast_mut::<u64>().unwrap();
+                        *out = in0;
+                    }
+                    DataType::I64 => {
+                        // I64 to U64
+                        let in0 = in_parm0.to_i64();
+                        let out = out_parm.val.downcast_mut::<u64>().unwrap();
+                        *out = in0 as u64;
+                    }
+                    bad => {
+                        let src_loc = irdb.parms[in_parm_num0].src_loc.clone();
+                        let msg = format!("Can't convert from {:?} to U64", bad);
+                        diags.err1("EXEC_12", &msg, src_loc);
+                        result = false;
+                    }
                 }
+            }
+            IRKind::ToI64 => {
+                match in_parm0.data_type {
+                    DataType::I64 => {
+                        // Trivial I64 to I64
+                        let in0 = in_parm0.to_i64();
+                        let out = out_parm.val.downcast_mut::<i64>().unwrap();
+                        *out = in0;
+                    }
+                    DataType::U64 => {
+                        // U64 to I64
+                        let in0 = in_parm0.to_u64();
+                        let out = out_parm.val.downcast_mut::<i64>().unwrap();
+                        *out = in0 as i64;
+                    }
+                    bad => {
+                        let src_loc = irdb.parms[in_parm_num0].src_loc.clone();
+                        let msg = format!("Can't convert from {:?} to U64", bad);
+                        diags.err1("EXEC_12", &msg, src_loc);
+                        result = false;
+                    }
+                }
+            }
 
+            bad => {
+                panic!("Called iterate_type_conversion with bad IRKind operation {:?}", bad);
             }
         }
         result
     }
-    */
 
-    fn iterate_arithmetic(&mut self, ir: &IR, _irdb: &IRDb, operation: IRKind,
+    fn iterate_arithmetic(&mut self, ir: &IR, irdb: &IRDb, operation: IRKind,
                     current: &Location, diags: &mut Diags) -> bool {
         self.trace(format!("Engine::iterate_arithmetic: img {}, sec {}",
                                current.img, current.sec).as_str());
@@ -209,6 +257,14 @@ impl Engine {
         let in_parm1 = self.parms[in_parm_num1].borrow();
         let mut out_parm = self.parms[out_parm_num].borrow_mut();
 
+        if in_parm0.data_type != in_parm1.data_type {
+            let loc0 = irdb.parms[in_parm_num0].src_loc.clone();
+            let loc1 = irdb.parms[in_parm_num1].src_loc.clone();
+            let msg = format!("Input operand types do not match.  Left is '{:?}', right is '{:?}'",
+                        in_parm0.data_type, in_parm1.data_type);
+            diags.err2("EXEC_13", &msg, loc0, loc1 );
+            return false;
+        }
         let in0 = in_parm0.to_u64();
         let in1 = in_parm1.to_u64();
         let out = out_parm.val.downcast_mut::<u64>().unwrap();
@@ -232,8 +288,7 @@ impl Engine {
                 panic!("Called iterate_arithmetic with bad IRKind operation {:?}", bad);
             }
         };
-    
-        
+
         result
     }
 
@@ -300,7 +355,6 @@ impl Engine {
                 panic!("Called iterate_current_address with bogus IR {:?}", bad);
             }
         }
-    
         
         true
     }
@@ -462,7 +516,8 @@ impl Engine {
                     IRKind::GEq |
                     IRKind::LEq |
                     IRKind::NEq => { self.iterate_arithmetic(&ir, irdb, operation, &current, diags) }
-
+                    IRKind::ToI64 |
+                    IRKind::ToU64 => { self.iterate_type_conversion(&ir, irdb, operation, &current, diags) }
                     IRKind::Sizeof => { self.iterate_sizeof(&ir, irdb, diags, &mut current) }
                     IRKind::Wrs => { self.iterate_wrs(&ir, irdb, diags, &mut current) }
                     IRKind::Abs |
@@ -580,6 +635,8 @@ impl Engine {
                 IRKind::Sec |
                 IRKind::Label |
                 IRKind::Sizeof |
+                IRKind::ToI64 |
+                IRKind::ToU64 |
                 IRKind::NEq |
                 IRKind::GEq |
                 IRKind::LEq |

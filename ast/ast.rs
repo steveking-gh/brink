@@ -20,6 +20,8 @@ pub enum LexToken {
     #[token("section")] Section,
     #[token("assert")] Assert,
     #[token("sizeof")] Sizeof,
+    #[token("to_u64")] ToU64,
+    #[token("to_i64")] ToI64,
     #[token("abs")] Abs,
     #[token("img")] Img,
     #[token("sec")] Sec,
@@ -546,6 +548,30 @@ impl<'toks> Ast<'toks> {
                 }
 
                 let lhs = Some(assert_nid);
+                lhs
+            }
+
+            LexToken::ToI64 |
+            LexToken::ToU64 => {
+                // We expect '(' <expr> ')', which is the same
+                // as a normal parenthesized expression.
+                let tox64_nid = self.arena.new_node(self.tok_num);
+                self.tok_num += 1;
+
+                if !self.expect_token_no_add(LexToken::OpenParen, diags) {
+                    return self.dbg_exit_pratt("parse_pratt", None);
+                }
+                // We're inside parens, so reset minimum binding precedence to 0.
+                let expression_nid = self.parse_pratt(0, result, diags);
+                // If result is success, then keep processing
+                if let Some(expression_nid) = expression_nid {
+                    tox64_nid.append(expression_nid, &mut self.arena);
+                }
+                if !self.expect_token_no_add(LexToken::CloseParen, diags) {
+                    return self.dbg_exit_pratt("parse_pratt", None);
+                }
+
+                let lhs = Some(tox64_nid);
                 lhs
             }
 

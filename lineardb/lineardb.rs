@@ -25,7 +25,9 @@ pub struct LinOperand {
 fn lex_to_data_type(lxt: LexToken) -> DataType {
     match lxt {
         LexToken::U64 => DataType::U64,
+        LexToken::ToU64 => DataType::U64,
         LexToken::I64 => DataType::I64,
+        LexToken::ToI64 => DataType::I64,
         LexToken::QuotedString => DataType::QuotedString,
         LexToken::Identifier => DataType::Identifier,
         // In some cases, like the result of operations, we don't
@@ -84,6 +86,8 @@ fn tok_to_irkind(tok: LexToken) -> IRKind {
         LexToken::Pipe => { IRKind::BitOr }
         LexToken::DoublePipe => { IRKind::LogicalOr }
         LexToken::Sizeof => { IRKind::Sizeof }
+        LexToken::ToU64 => { IRKind::ToU64 }
+        LexToken::ToI64 => { IRKind::ToI64 }
         LexToken::Abs => { IRKind::Abs }
         LexToken::Img => { IRKind::Img }
         LexToken::Sec => { IRKind::Sec }
@@ -213,7 +217,6 @@ impl<'toks> LinearDb {
         }
 
         let tinfo = ast.get_tinfo(parent_nid);
-        
         match tinfo.tok {
             LexToken::Wr => {
                 // A vector to track the operands of this expression.
@@ -304,6 +307,21 @@ impl<'toks> LinearDb {
                 // 1 operand expected
                 self.process_operands(result, 1, &mut lops, ir_lid, diags, tinfo);
             }
+            LexToken::ToI64 |
+            LexToken::ToU64 => {
+                // A vector to track the operands of this expression.
+                let mut lops = Vec::new();
+                self.record_children_r(result, rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
+                let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tinfo.tok));
+                // 1 operand expected
+                self.process_operands(result, 1, &mut lops, ir_lid, diags, tinfo);
+                // Add a destination operand to the operation to hold the result
+                let idx = self.add_operand_to_ir(ir_lid, LinOperand::new(
+                    Some(ir_lid), parent_nid, ast, OperandKind::Variable, lex_to_data_type(tinfo.tok)));
+                // Also add the destination operand to the local operands
+                // The destination operand is presumably an input operand in the parent.
+                returned_operands.push(idx);
+            }
             LexToken::NEq |
             LexToken::LEq |
             LexToken::GEq |
@@ -327,7 +345,7 @@ impl<'toks> LinearDb {
 
                 // Add a destination operand to the operation to hold the result
                 let idx = self.add_operand_to_ir(ir_lid, LinOperand::new(
-                    Some(ir_lid), parent_nid, ast, OperandKind::Variable,DataType::U64));
+                    Some(ir_lid), parent_nid, ast, OperandKind::Variable, DataType::U64));
                 // Also add the destination operand to the local operands
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);

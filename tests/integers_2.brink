@@ -1,0 +1,8 @@
+section foo {
+    // decimal and hex equivalence
+    assert -42 == -42;
+    assert 0xFFFF_FFFF_FFFF_FFFF == to_u64(-1);
+    assert 0xFFFF_FFFF_FFFF_FFFE == to_u64(-2);
+}
+
+output foo;
