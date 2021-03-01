@@ -6,7 +6,7 @@ use diags::Diags;
 use log::{error, warn, info, debug, trace};
 
 use ast::{Ast, AstDb, LexToken, TokenInfo};
-use ir::{IRKind,OperandKind,DataType};
+use ir::{IRKind};
 use std::{collections::{HashMap}, ops::Range};
 
 /// The operand type for linear IRs.  This operand type is very similar to the
@@ -15,33 +15,25 @@ use std::{collections::{HashMap}, ops::Range};
 /// conversion process.
 pub struct LinOperand {
     /// linear ID of source operation if this operand is an output.
-    pub src_lid: Option<usize>,
-    pub kind: OperandKind,
+    pub ir_lid: Option<usize>,
     pub src_loc: Range<usize>,
-    pub data_type: DataType,
+    pub tok: LexToken,
     pub sval: String,
 }
 
-fn lex_to_data_type(lxt: LexToken) -> DataType {
-    match lxt {
-        LexToken::U64 => DataType::U64,
-        LexToken::ToU64 => DataType::U64,
-        LexToken::I64 => DataType::I64,
-        LexToken::ToI64 => DataType::I64,
-        LexToken::QuotedString => DataType::QuotedString,
-        LexToken::Identifier => DataType::Identifier,
-        // In some cases, like the result of operations, we don't
-        // know the type of the operand during linearization.
-        _ => DataType::Unknown
-    }
-}
-
 impl<'toks> LinOperand {
-    pub fn new(src_lid: Option<usize>, nid: NodeId, ast: &'toks Ast, kind: OperandKind,
-               data_type: DataType) -> LinOperand {
+
+    /// Create a new linear operand.  If the ir_lid exists, then this
+    /// operand is the output of the specified lid.
+    pub fn new(ir_lid: Option<usize>, nid: NodeId, ast: &'toks Ast,
+                tok: LexToken) -> LinOperand {
         let tinfo = ast.get_tinfo(nid);
         let src_loc = tinfo.loc.clone();
-        LinOperand { src_lid, src_loc, sval: tinfo.val.to_string(), kind, data_type }
+        LinOperand { ir_lid, src_loc, sval: tinfo.val.to_string(), tok }
+    }
+
+    pub fn is_output_of(&self) -> Option<usize> {
+        return self.ir_lid;
     }
 }
 
@@ -217,6 +209,7 @@ impl<'toks> LinearDb {
         }
 
         let tinfo = ast.get_tinfo(parent_nid);
+        let tok = tinfo.tok;
         match tinfo.tok {
             LexToken::Wr => {
                 // A vector to track the operands of this expression.
@@ -261,7 +254,7 @@ impl<'toks> LinearDb {
 
                 // Add a destination operand to the operation to hold the result
                 let idx = self.add_operand_to_ir(ir_lid, LinOperand::new(
-                        Some(ir_lid), parent_nid, ast, OperandKind::Variable, DataType::U64));
+                        Some(ir_lid), parent_nid, ast, tok));
                 // Also add the destination operand to the local operands
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);
@@ -282,7 +275,7 @@ impl<'toks> LinearDb {
 
                 // Add a destination operand to the operation to hold the result
                 let idx = self.add_operand_to_ir(ir_lid, LinOperand::new(
-                        Some(ir_lid), parent_nid, ast, OperandKind::Variable, DataType::U64));
+                        Some(ir_lid), parent_nid, ast, tok));
                 // Also add the destination operand to the local operands
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);
@@ -295,8 +288,7 @@ impl<'toks> LinearDb {
                 // and return them as local operands.
                 // This case terminates recursion.
                 let idx = self.operand_vec.len();
-                self.operand_vec.push(LinOperand::new(None, parent_nid,ast,OperandKind::Constant,
-                                        lex_to_data_type(tinfo.tok)));
+                self.operand_vec.push(LinOperand::new(None, parent_nid,ast,tok));
                 returned_operands.push(idx);
             }
             LexToken::Assert => {
@@ -317,7 +309,7 @@ impl<'toks> LinearDb {
                 self.process_operands(result, 1, &mut lops, ir_lid, diags, tinfo);
                 // Add a destination operand to the operation to hold the result
                 let idx = self.add_operand_to_ir(ir_lid, LinOperand::new(
-                    Some(ir_lid), parent_nid, ast, OperandKind::Variable, lex_to_data_type(tinfo.tok)));
+                    Some(ir_lid), parent_nid, ast, tok));
                 // Also add the destination operand to the local operands
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);
@@ -345,7 +337,7 @@ impl<'toks> LinearDb {
 
                 // Add a destination operand to the operation to hold the result
                 let idx = self.add_operand_to_ir(ir_lid, LinOperand::new(
-                    Some(ir_lid), parent_nid, ast, OperandKind::Variable, DataType::U64));
+                    Some(ir_lid), parent_nid, ast, tok));
                 // Also add the destination operand to the local operands
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);
@@ -375,8 +367,8 @@ impl<'toks> LinearDb {
                 let name_without_colon = tinfo.val[..tinfo.val.len() - 1].to_string();
 
                 // Add an identifier name operand
-                let operand = LinOperand { src_lid: Some(ir_lid), src_loc: tinfo.loc.clone(),
-                                sval: name_without_colon, kind: OperandKind::Constant, data_type: DataType::Identifier};
+                let operand = LinOperand { ir_lid: Some(ir_lid), src_loc: tinfo.loc.clone(),
+                                sval: name_without_colon, tok};
                 self.add_operand_to_ir(ir_lid, operand);
             }
 
@@ -482,12 +474,10 @@ impl<'toks> LinearDb {
                 } else {
                     first = false;
                 }
-                if operand.kind == OperandKind::Constant {
-                    op.push_str(&format!(" {}", operand.sval));
-                } else if operand.kind == OperandKind::Variable {
-                    op.push_str(&format!(" tmp{}", *child));
+                if let Some(ir_lid) = operand.is_output_of() {
+                    op.push_str(&format!(" tmp{}, output of lid {}", *child, ir_lid));
                 } else {
-                    assert!(false);
+                    op.push_str(&format!(" {}", operand.sval));
                 }
                 //op.push_str(&format!(" temp_{}", operand.val));
             }
@@ -620,8 +610,6 @@ impl IdentDb {
         let mut result = true;
         let name_operand_num = lir.operand_vec[op_num];
         let name_operand = lindb.operand_vec.get(name_operand_num).unwrap();
-        assert!(name_operand.kind == OperandKind::Constant);
-        assert!(name_operand.data_type == DataType::Identifier);
         let name = &name_operand.sval;
         if self.label_idents.contains_key(name) {
             let orig_loc = self.label_idents.get(name).unwrap();
@@ -640,8 +628,6 @@ impl IdentDb {
         trace!("IdentDb::inventory_section_ident: ENTER");
         let name_operand_num = lir.operand_vec[0];
         let name_operand = lindb.operand_vec.get(name_operand_num).unwrap();
-        assert!(name_operand.kind == OperandKind::Constant);
-        assert!(name_operand.data_type == DataType::Identifier);
         let name = &name_operand.sval;
         debug!("IdentDb::inventory_section_ident: Adding section name {} to inventory.", name);
 
@@ -728,7 +714,7 @@ impl IdentDb {
         let mut result = true;
         for &lop_num in &lir.operand_vec {
             let lop= &lindb.operand_vec[lop_num];
-            if lop.data_type == DataType::Identifier {
+            if lop.tok == LexToken::Identifier {
                 debug!("IdentDb::verify_identifier_refs: Verifying reference to '{}'", lop.sval);
                 if self.is_valid_section_ref(lop, diags) {
                     continue;
@@ -745,5 +731,4 @@ impl IdentDb {
         }
         result
     }
-
 }

@@ -152,10 +152,10 @@ impl<'toks> Ast<'toks> {
     // Boilerplate entry for recursive descent parsing functions.
     fn dbg_enter(&self, func_name: &str) {
         if let Some(tinfo) = self.peek() {
-            debug!("Ast::{} ENTER, {}:{} is {:?}", func_name, self.tok_num,
+            trace!("Ast::{} ENTER, {}:{} is {:?}", func_name, self.tok_num,
                    tinfo.val, tinfo.tok);
         } else {
-            debug!("Ast::{} ENTER, {}:{} is {}", func_name, self.tok_num,
+            trace!("Ast::{} ENTER, {}:{} is {}", func_name, self.tok_num,
                    "<end of input>", "<end of input>");
         }
     }
@@ -164,7 +164,7 @@ impl<'toks> Ast<'toks> {
     /// This function returns the result and should be the last statement
     /// in each function
     fn dbg_exit(&self, func_name: &str, result: bool) -> bool {
-        debug!("Ast::{} EXIT {:?}", func_name, result);
+        trace!("Ast::{} EXIT {:?}", func_name, result);
         result
     }
 
@@ -172,7 +172,7 @@ impl<'toks> Ast<'toks> {
     /// This function returns the result and should be the last statement
     /// in each function
     fn dbg_exit_pratt(&self, func_name: &str, result: Option<NodeId>) -> Option<NodeId> {
-        debug!("Ast::{} EXIT {:?}", func_name, result);
+        trace!("Ast::{} EXIT {:?}", func_name, result);
         result
     }
 

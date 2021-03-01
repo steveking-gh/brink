@@ -3,11 +3,6 @@ use std::ops::Range;
 use diags::Diags;
 use parse_int::parse;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum OperandKind {
-    Variable,
-    Constant,
-}
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DataType {
     U64,
@@ -51,28 +46,33 @@ pub enum IRKind {
 pub struct IROperand {
     /// Some(linear ID) of source operation if this operand is an output.
     /// None for constants.
-    pub src_lid: Option<usize>,
-    pub kind: OperandKind,
-    pub data_type: DataType,
+    pub ir_lid: Option<usize>,
     pub src_loc: Range<usize>,
+    pub is_constant: bool,
+    pub data_type: DataType,
     pub val: Box<dyn Any>,
 }
 
 impl IROperand {
 
-    pub fn new(src_lid: Option<usize>, sval: &str, src_loc: &Range<usize>, kind: OperandKind,
-               data_type: DataType, diags: &mut Diags) -> Option<IROperand> {
+    pub fn new(ir_lid: Option<usize>, sval: &str, src_loc: &Range<usize>,
+               data_type: DataType, is_constant: bool, diags: &mut Diags) -> Option<IROperand> {
 
-        if let Some(val) = IROperand::convert_type(sval, data_type, kind, src_loc, diags) {
-            return Some(IROperand { src_lid, src_loc: src_loc.clone(),
-                        kind, data_type, val });
+        if let Some(val) = IROperand::convert_type(sval, data_type, src_loc,
+                                                            is_constant, diags) {
+            return Some(IROperand { ir_lid, src_loc: src_loc.clone(), is_constant,
+                        data_type, val });
         }
 
         None
     }
     
-    fn convert_type(sval: &str, data_type: DataType, kind: OperandKind,
-                    src_loc: &Range<usize>, diags: &mut Diags) -> Option<Box<dyn Any>> {
+    pub fn is_output_of(&self) -> Option<usize> {
+        return self.ir_lid;
+    }
+
+    fn convert_type(sval: &str, data_type: DataType, src_loc: &Range<usize>,
+                    is_constant: bool, diags: &mut Diags) -> Option<Box<dyn Any>> {
         match data_type {
             DataType::QuotedString => {
                 // Trim quotes and convert escape characters
@@ -86,7 +86,7 @@ impl IROperand {
                         .replace("\\t", "\t")));
             }
             DataType::U64 => {
-                if kind == OperandKind::Constant {
+                if is_constant {
                     let res = parse::<u64>(sval);
                     if let Ok(v) = res {
                         return Some(Box::new(v));
@@ -101,7 +101,7 @@ impl IROperand {
             }
 
             DataType::I64 => {
-                if kind == OperandKind::Constant {
+                if is_constant {
                     let res = parse::<i64>(sval);
                     if let Ok(v) = res {
                         return Some(Box::new(v));

@@ -596,7 +596,7 @@ impl Engine {
             // If the boolean the assertion failed on is an output of an operation,
             // then backtrack to print information about that operation.  To backtrack
             // we get the Option<src_lid> for the assert.
-            let src_lid = irdb.get_operand_src_lid(opnd_num);
+            let src_lid = irdb.get_operand_ir_lid(opnd_num);
             self.assert_info(src_lid, irdb, diags);
             result = Err(anyhow!("Assert failed"));
         }

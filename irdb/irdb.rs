@@ -1,11 +1,11 @@
 pub type Span = std::ops::Range<usize>;
 use diags::Diags;
-use lineardb::LinearDb;
+use lineardb::{LinearDb};
 
 #[allow(unused_imports)]
 use log::{error, warn, info, debug, trace};
 
-use ir::{DataType, IR, IRKind, IROperand, OperandKind};
+use ir::{DataType, IR, IRKind, IROperand};
 use std::{collections::HashMap, ops::Range};
 use parse_int::parse;
 
@@ -37,14 +37,116 @@ impl IRDb {
         opnd.to_identifier()
     }
 
-    pub fn get_operand_src_lid(&self, opnd_num: usize) -> Option<usize> {
-        self.parms.get(opnd_num).unwrap().src_lid
+    pub fn get_operand_ir_lid(&self, opnd_num: usize) -> Option<usize> {
+        self.parms.get(opnd_num).unwrap().ir_lid
     }
 
+
+    /// Get the datatype of the referenced operand.
+    /// Returns None on error
+    fn get_operand_data_type_r(&mut self, depth: usize, lop_num: usize, lin_db: &LinearDb,
+                                diags: &mut Diags) -> Option<DataType> {
+        trace!("IRDb::get_operand_data_type_r: Enter at depth {} for lop number {}", depth, lop_num);
+        let lop = &lin_db.operand_vec[lop_num];
+        let data_type = match lop.tok {
+            ast::LexToken::DoubleEq |
+            ast::LexToken::NEq |
+            ast::LexToken::GEq |
+            ast::LexToken::LEq |
+            ast::LexToken::Abs |
+            ast::LexToken::Img |
+            ast::LexToken::Sec |
+            ast::LexToken::Pipe |
+            ast::LexToken::DoublePipe |
+            ast::LexToken::Ampersand |
+            ast::LexToken::DoubleAmpersand |
+            ast::LexToken::Sizeof |
+            ast::LexToken::DoubleLess |
+            ast::LexToken::DoubleGreater |
+            ast::LexToken::ToU64 |
+            ast::LexToken::U64 => { Some(DataType::U64) }
+            ast::LexToken::ToI64 |
+            ast::LexToken::I64 => { Some(DataType::I64) }
+            ast::LexToken::QuotedString => { Some(DataType::QuotedString) }
+            ast::LexToken::Label => { Some(DataType::Identifier) }
+            ast::LexToken::Identifier => { Some(DataType::Identifier) }
+            ast::LexToken::Plus |
+            ast::LexToken::Minus |
+            ast::LexToken::Asterisk |
+            ast::LexToken::FSlash => {
+                // These operations have the same data type as their two inputs
+                if lop.ir_lid.is_none() {
+                    panic!("Output operand '{:?}' does not have a source lid", lop.tok);
+                }
+
+                let lin_ir_lid = lop.ir_lid.unwrap();
+                let lin_ir = &lin_db.ir_vec[lin_ir_lid];
+                // We expect 2 input and 1 output operand.
+                assert!(lin_ir.operand_vec.len() == 3);
+                // The lop this this function was called with *is* the output operand
+                assert!(lin_ir.operand_vec[2] == lop_num);
+                let lhs_num = lin_ir.operand_vec[0];
+                let rhs_num = lin_ir.operand_vec[1];
+                
+                let lhs_opt = self.get_operand_data_type_r(depth + 1, lhs_num, lin_db, diags);
+                if let Some(lhs_dt) = lhs_opt {
+                    let rhs_opt = self.get_operand_data_type_r(depth + 1, rhs_num, lin_db, diags);
+                    if let Some(rhs_dt) = rhs_opt {
+                        if lhs_dt == rhs_dt {
+                            Some(lhs_dt)
+                        } else {
+                            let msg = format!("Error, data type mismatch in input operands.  Left is {:?}, right is {:?}.",
+                                    lhs_dt, rhs_dt);
+                            diags.err1("IRDB_1", &msg, lin_ir.src_loc.clone());
+                            None
+                        }
+                    } else {
+                        None // data type for right was None
+                    }
+                } else {
+                    None // data type for left was None
+                }
+            }
+            ast::LexToken::Assert |
+            ast::LexToken::Section |
+            ast::LexToken::OpenBrace |
+            ast::LexToken::CloseBrace |
+            ast::LexToken::OpenParen |
+            ast::LexToken::CloseParen |
+            ast::LexToken::Semicolon |
+            ast::LexToken::Wrs |
+            ast::LexToken::Wr |
+            ast::LexToken::Output |
+            ast::LexToken::Unknown => { panic!("Token '{:?}' has no associated data type.", lop.tok); }
+        };
+
+        trace!("IRDb::get_operand_data_type_r: Exit from depth {}, lop {} is {:?}", depth, lop_num, data_type);
+        data_type
+    }
+
+    /// Process untyped linear operands into real IR operands
     fn process_lin_operands(&mut self, lin_db: &LinearDb, diags: &mut Diags) -> bool {
+        trace!("IRDb::process_lin_operands: Enter");
+
         let mut result = true;
-        for lop in lin_db.operand_vec.iter() {
-            let opnd = IROperand::new( lop.src_lid, &lop.sval, &lop.src_loc, lop.kind, lop.data_type, diags);
+        let len = lin_db.operand_vec.len();
+        for lop_num in 0..len {
+            let dt_opt = self.get_operand_data_type_r(0, lop_num, lin_db, diags);
+            if dt_opt.is_none() {
+                return false; // error case, just give up
+            }
+
+            let data_type = dt_opt.unwrap();
+            let lop = &lin_db.operand_vec[lop_num];
+
+            // Determine if this operand is a constant value.  If so, operand construction
+            // will convert the string representation to its native value.
+            let is_constant = lop.ir_lid.is_none();
+
+            // During construction of the IROperand, the string in the linear operand is converted
+            // to an actual typed value, which can fail, e.g. integer out of range
+            let opnd = IROperand::new( lop.ir_lid, &lop.sval, &lop.src_loc, data_type,
+                                                    is_constant, diags);
             if let Some(opnd) = opnd {
                 self.parms.push(opnd);
             } else {
@@ -53,6 +155,7 @@ impl IRDb {
             }
         }
 
+        trace!("IRDb::process_lin_operands: Exit({})", result);
         result
     }
 
@@ -210,28 +313,26 @@ impl IRDb {
                 } else {
                     first = false;
                 }
-                if operand.kind == OperandKind::Constant {
+                if let Some(ir_lid) = operand.is_output_of() {
+                    op.push_str(&format!(" ({:?})tmp{}, output of lid {}", operand.data_type, *child, ir_lid));
+                } else {
                     match operand.data_type {
                         DataType::U64 => {
                             // Always display U64 as hex
                             let v = operand.val.downcast_ref::<u64>().unwrap();
-                            op.push_str(&format!(" ({:?} {:?}){:#X}", operand.kind, operand.data_type, v));
+                            op.push_str(&format!(" ({:?}){:#X}", operand.data_type, v));
                         }
                         DataType::I64 => {
                             // Always display I64 as signed decimal, which is the format default
                             let v = operand.val.downcast_ref::<i64>().unwrap();
-                            op.push_str(&format!(" ({:?} {:?}){}", operand.kind, operand.data_type, v));
+                            op.push_str(&format!(" ({:?}){}", operand.data_type, v));
                         }
                         // order matters, must be last
                         _ => {
                             let v = operand.val.downcast_ref::<String>().unwrap();
-                            op.push_str(&format!(" ({:?} {:?}){}", operand.kind, operand.data_type, v));
+                            op.push_str(&format!(" ({:?}){}", operand.data_type, v));
                         },
                     }
-                } else if operand.kind == OperandKind::Variable {
-                    op.push_str(&format!(" ({:?} {:?})var{}", operand.kind, operand.data_type, *child));
-                } else {
-                    assert!(false);
                 }
             }
             debug!("IRDb: {}", op);
