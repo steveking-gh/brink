@@ -111,7 +111,7 @@ impl IROperand {
                     }
                 } else {
                     // We don't know variable value, so initialize to zero
-                    return Some(Box::new(0u64));
+                    return Some(Box::new(0i64));
                 }
             }
 

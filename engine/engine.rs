@@ -103,7 +103,7 @@ impl Engine {
         true
     }
 
-    fn do_add(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
+    fn do_u64_add(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
         let check = in0.checked_add(in1);
         if check.is_none() {
             let msg = format!("Add expression '{} + {}' will overflow", in0, in1);
@@ -115,7 +115,19 @@ impl Engine {
         }
     }
 
-    fn do_sub(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
+    fn do_i64_add(&self, ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
+        let check = in0.checked_add(in1);
+        if check.is_none() {
+            let msg = format!("Add expression '{} + {}' will overflow", in0, in1);
+            diags.err1("EXEC_21", &msg, ir.src_loc.clone());
+            false
+        } else {
+            *out = check.unwrap();
+            true
+        }
+    }
+
+    fn do_u64_sub(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
         let check = in0.checked_sub(in1);
         if check.is_none() {
             let msg = format!("Subtract expression '{} - {}' will underflow", in0, in1);
@@ -127,7 +139,19 @@ impl Engine {
         }
     }
 
-    fn do_mul(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
+    fn do_i64_sub(&self, ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
+        let check = in0.checked_sub(in1);
+        if check.is_none() {
+            let msg = format!("Subtract expression '{} - {}' will underflow", in0, in1);
+            diags.err1("EXEC_24", &msg, ir.src_loc.clone());
+            false
+        } else {
+            *out = check.unwrap();
+            true
+        }
+    }
+
+    fn do_u64_mul(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
         let check = in0.checked_mul(in1);
         if check.is_none() {
             let msg = format!("Multiply expression '{} * {}' will overflow", in0, in1);
@@ -139,7 +163,19 @@ impl Engine {
         }
     }
 
-    fn do_div(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
+    fn do_i64_mul(&self, ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
+        let check = in0.checked_mul(in1);
+        if check.is_none() {
+            let msg = format!("Multiply expression '{} * {}' will overflow", in0, in1);
+            diags.err1("EXEC_26", &msg, ir.src_loc.clone());
+            false
+        } else {
+            *out = check.unwrap();
+            true
+        }
+    }
+
+    fn do_u64_div(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
         let check = in0.checked_div(in1);
         if check.is_none() {
             let msg = format!("Exception in divide expression '{} / {}'", in0, in1);
@@ -151,8 +187,19 @@ impl Engine {
         }
     }
 
-    fn do_shl(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
+    fn do_i64_div(&self, ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
+        let check = in0.checked_div(in1);
+        if check.is_none() {
+            let msg = format!("Exception in divide expression '{} / {}'", in0, in1);
+            diags.err1("EXEC_27", &msg, ir.src_loc.clone());
+            false
+        } else {
+            *out = check.unwrap();
+            true
+        }
+    }
 
+    fn do_u64_shl(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
         let mut result = true;
         let shift_amount = u32::try_from(in1);
         if shift_amount.is_err() {
@@ -165,14 +212,40 @@ impl Engine {
         result
     }
 
-    fn do_shr(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
+    fn do_i64_shl(&self, ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
+        let mut result = true;
+        let shift_amount = u32::try_from(in1);
+        if shift_amount.is_err() {
+            let msg = format!("Shift amount {} is too large in Left Shift expression '{} << {}'", in1, in0, in1);
+            diags.err1("EXEC_29", &msg, ir.src_loc.clone());
+            result = false;
+        } else {
+            *out = in0 << in1;
+        }
+        result
+    }
 
+    fn do_u64_shr(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
         let mut result = true;
         let shift_amount = u32::try_from(in1);
         if shift_amount.is_err() {
             let msg = format!("Shift amount {} is too large in Right Shift expression '{} >> {}'",
                             in1, in0, in1);
             diags.err1("EXEC_10", &msg, ir.src_loc.clone());
+            result = false;
+        } else {
+            *out = in0 >> in1;
+        }
+        result
+    }
+
+    fn do_i64_shr(&self, ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
+        let mut result = true;
+        let shift_amount = u32::try_from(in1);
+        if shift_amount.is_err() {
+            let msg = format!("Shift amount {} is too large in Right Shift expression '{} >> {}'",
+                            in1, in0, in1);
+            diags.err1("EXEC_20", &msg, ir.src_loc.clone());
             result = false;
         } else {
             *out = in0 >> in1;
@@ -188,7 +261,7 @@ impl Engine {
         let mut result = true;
         assert!(ir.operands.len() == 2);
         let in_parm_num0 = ir.operands[0];
-        let out_parm_num = ir.operands[2];
+        let out_parm_num = ir.operands[1];
         let in_parm0 = self.parms[in_parm_num0].borrow();
         let mut out_parm = self.parms[out_parm_num].borrow_mut();
         match operation {
@@ -250,12 +323,13 @@ impl Engine {
                                current.img, current.sec).as_str());
         // All operations here take two inputs and produces one output parameter
         assert!(ir.operands.len() == 3);
+
+        // Borrow the parameters from the main array
         let in_parm_num0 = ir.operands[0];
         let in_parm_num1 = ir.operands[1];
         let out_parm_num = ir.operands[2];
         let in_parm0 = self.parms[in_parm_num0].borrow();
         let in_parm1 = self.parms[in_parm_num1].borrow();
-        let mut out_parm = self.parms[out_parm_num].borrow_mut();
 
         if in_parm0.data_type != in_parm1.data_type {
             let loc0 = irdb.parms[in_parm_num0].src_loc.clone();
@@ -265,30 +339,66 @@ impl Engine {
             diags.err2("EXEC_13", &msg, loc0, loc1 );
             return false;
         }
-        let in0 = in_parm0.to_u64();
-        let in1 = in_parm1.to_u64();
-        let out = out_parm.val.downcast_mut::<u64>().unwrap();
 
-        let result = match operation {
-            IRKind::DoubleEq => { *out = (in0 == in1) as u64; true }
-            IRKind::NEq => { *out = (in0 != in1) as u64; true }
-            IRKind::GEq => { *out = (in0 >= in1) as u64; true }
-            IRKind::LEq => { *out = (in0 <= in1) as u64; true }
-            IRKind::BitAnd => { *out = in0 & in1; true }
-            IRKind::LogicalAnd => { *out = ((in0 != 0) && (in1 != 0)) as u64; true }
-            IRKind::BitOr => { *out = in0 | in1; true }
-            IRKind::LogicalOr => { *out = ((in0 != 0) || (in1 != 0)) as u64; true }
-            IRKind::Add => { self.do_add(ir, in0, in1, out, diags) }
-            IRKind::Subtract => { self.do_sub(ir, in0, in1, out, diags) }
-            IRKind::Multiply => { self.do_mul(ir, in0, in1, out, diags) }
-            IRKind::Divide => { self.do_div(ir, in0, in1, out, diags) }
-            IRKind::LeftShift => { self.do_shl(ir, in0, in1, out, diags) }
-            IRKind::RightShift => { self.do_shr(ir, in0, in1, out, diags) }
-            bad => {
-                panic!("Called iterate_arithmetic with bad IRKind operation {:?}", bad);
+        let mut result = true;
+        // output of compare is u64 regardless of inputs
+        if in_parm0.data_type == DataType::U64 {
+            let in0 = in_parm0.to_u64();
+            let in1 = in_parm1.to_u64();
+            let mut out_parm = self.parms[out_parm_num].borrow_mut();
+            let out = out_parm.val.downcast_mut::<u64>().unwrap();
+
+            match operation {
+                IRKind::DoubleEq   => *out = (in0 == in1) as u64,
+                IRKind::NEq        => *out = (in0 != in1) as u64,
+                IRKind::GEq        => *out = (in0 >= in1) as u64,
+                IRKind::LEq        => *out = (in0 <= in1) as u64,
+                IRKind::BitAnd     => *out = in0 & in1,
+                IRKind::LogicalAnd => *out = ((in0 != 0) && (in1 != 0)) as u64,
+                IRKind::BitOr      => *out = in0 | in1,
+                IRKind::LogicalOr  => *out = ((in0 != 0) || (in1 != 0)) as u64,
+                IRKind::Add        => { result &= self.do_u64_add(ir, in0, in1, out, diags); }
+                IRKind::Subtract   => { result &= self.do_u64_sub(ir, in0, in1, out, diags); }
+                IRKind::Multiply   => { result &= self.do_u64_mul(ir, in0, in1, out, diags); }
+                IRKind::Divide     => { result &= self.do_u64_div(ir, in0, in1, out, diags); }
+                IRKind::LeftShift  => { result &= self.do_u64_shl(ir, in0, in1, out, diags); }
+                IRKind::RightShift => { result &= self.do_u64_shr(ir, in0, in1, out, diags); }            
+                bad => panic!("Forgot to handle u64 {:?}", bad),
+            };
+        } else if in_parm0.data_type == DataType::I64 {
+            let in0 = in_parm0.to_i64();
+            let in1 = in_parm1.to_i64();
+            let mut out_parm = self.parms[out_parm_num].borrow_mut();
+
+            match operation {
+                // output of compare is u64 regardless of inputs
+                IRKind::LogicalAnd => { let out = out_parm.val.downcast_mut::<u64>().unwrap(); *out = ((in0 != 0) && (in1 != 0)) as u64 }
+                IRKind::LogicalOr  => { let out = out_parm.val.downcast_mut::<u64>().unwrap(); *out = ((in0 != 0) || (in1 != 0)) as u64 }
+                IRKind::LEq        => { let out = out_parm.val.downcast_mut::<u64>().unwrap(); *out = (in0 <= in1) as u64 }
+                IRKind::GEq        => { let out = out_parm.val.downcast_mut::<u64>().unwrap(); *out = (in0 >= in1) as u64 }
+                IRKind::NEq        => { let out = out_parm.val.downcast_mut::<u64>().unwrap(); *out = (in0 != in1) as u64 }
+                IRKind::DoubleEq   => { let out = out_parm.val.downcast_mut::<u64>().unwrap(); *out = (in0 == in1) as u64 }
+                
+                IRKind::BitOr      => { let out = out_parm.val.downcast_mut::<i64>().unwrap(); *out = in0 | in1 }
+                IRKind::BitAnd     => { let out = out_parm.val.downcast_mut::<i64>().unwrap(); *out = in0 & in1 }
+                IRKind::Add        => { let out = out_parm.val.downcast_mut::<i64>().unwrap(); result &= self.do_i64_add(ir, in0, in1, out, diags); }
+                IRKind::Subtract   => { let out = out_parm.val.downcast_mut::<i64>().unwrap(); result &= self.do_i64_sub(ir, in0, in1, out, diags); }
+                IRKind::Multiply   => { let out = out_parm.val.downcast_mut::<i64>().unwrap(); result &= self.do_i64_mul(ir, in0, in1, out, diags); }
+                IRKind::Divide     => { let out = out_parm.val.downcast_mut::<i64>().unwrap(); result &= self.do_i64_div(ir, in0, in1, out, diags); }
+                IRKind::LeftShift  => { let out = out_parm.val.downcast_mut::<i64>().unwrap(); result &= self.do_i64_shl(ir, in0, in1, out, diags); }
+                IRKind::RightShift => { let out = out_parm.val.downcast_mut::<i64>().unwrap(); result &= self.do_i64_shr(ir, in0, in1, out, diags); }
+
+                bad => panic!("Forgot to handle i64 {:?}", bad),
             }
-        };
-
+        } else {
+            let loc0 = irdb.parms[in_parm_num0].src_loc.clone();
+            let loc1 = irdb.parms[in_parm_num1].src_loc.clone();
+            // check above ensures the types are the same, whatever they are
+            let msg = format!("Unexpected input operand types '{:?}'  Expected I64 or U64.",
+                                    in_parm0.data_type);
+            diags.err2("EXEC_19", &msg, loc0, loc1 );
+            return false;
+        }
         result
     }
 

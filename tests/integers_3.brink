@@ -1,0 +1,8 @@
+section foo {
+    assert -42 != to_i64(42);
+    assert -42 == to_i64(0) - to_i64(42);
+    assert -42 == to_i64( to_i64(0) - to_i64(42) );
+    assert to_u64(-42) == to_u64( to_i64(0) - to_i64(42) );
+}
+
+output foo;
