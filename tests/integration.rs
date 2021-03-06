@@ -711,6 +711,18 @@ fn subtract_3() {
 
 #[test]
 #[serial]
+fn subtract_4() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/subtract_4.brink")
+                .assert()
+                .success();
+
+    fs::remove_file("output.bin").unwrap();
+}
+
+#[test]
+#[serial]
 fn multiply_1() {
     let _cmd = Command::cargo_bin("brink")
                 .unwrap()
