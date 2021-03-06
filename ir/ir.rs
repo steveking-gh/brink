@@ -7,6 +7,7 @@ use parse_int::parse;
 pub enum DataType {
     U64,
     I64,
+    Integer, // ambiguously U64 or I64
     QuotedString,
     Identifier,
     Unknown,
@@ -71,6 +72,7 @@ impl IROperand {
         return self.ir_lid;
     }
 
+    /// Converts the specified string into the specified type
     fn convert_type(sval: &str, data_type: DataType, src_loc: &Range<usize>,
                     is_constant: bool, diags: &mut Diags) -> Option<Box<dyn Any>> {
         match data_type {
@@ -87,7 +89,9 @@ impl IROperand {
             }
             DataType::U64 => {
                 if is_constant {
-                    let res = parse::<u64>(sval);
+                    // Strip the trailing 'u' if any
+                    let sval_no_u = sval.strip_suffix('u').unwrap_or(sval);
+                    let res = parse::<u64>(&sval_no_u);
                     if let Ok(v) = res {
                         return Some(Box::new(v));
                     } else {
@@ -102,6 +106,25 @@ impl IROperand {
 
             DataType::I64 => {
                 if is_constant {
+                    // Strip the trailing 's' if any
+                    let sval_no_i = sval.strip_suffix('i').unwrap_or(sval);
+                    let res = parse::<i64>(sval_no_i);
+                    if let Ok(v) = res {
+                        return Some(Box::new(v));
+                    } else {
+                        let m = format!("Malformed integer operand {}", sval);
+                        diags.err1("IR_3", &m, src_loc.clone());
+                    }
+                } else {
+                    // We don't know variable value, so initialize to zero
+                    return Some(Box::new(0i64));
+                }
+            }
+
+            DataType::Integer => {
+                if is_constant {
+                    // We have to store Integer as a real Rust type.  Storing as i64
+                    // is least surprising since expectations like 1 - 2 == -1 hold.
                     let res = parse::<i64>(sval);
                     if let Ok(v) = res {
                         return Some(Box::new(v));
@@ -130,6 +153,7 @@ impl IROperand {
     pub fn clone_val_box(&self) -> Box<dyn Any> {
         match self.data_type {
             DataType::U64 => { Box::new(self.val.downcast_ref::<u64>().unwrap().clone()) },
+            DataType::Integer | // Integer stored as i64
             DataType::I64 => { Box::new(self.val.downcast_ref::<i64>().unwrap().clone()) },
             DataType::QuotedString |
             DataType::Identifier => {Box::new(self.val.downcast_ref::<String>().unwrap().clone())},
@@ -139,6 +163,8 @@ impl IROperand {
 
     pub fn to_bool(&self) -> bool {
         match self.data_type {
+            DataType::Integer | // Integer stored as i64
+            DataType::I64 => { (*self.val.downcast_ref::<i64>().unwrap() as u64) != 0 },
             DataType::U64 => { *self.val.downcast_ref::<u64>().unwrap() != 0 },
             _ => { panic!("Internal error: Invalid type conversion to bool"); },
         }
@@ -146,6 +172,7 @@ impl IROperand {
 
     pub fn to_u64(&self) -> u64 {
         match self.data_type {
+            DataType::Integer => { *self.val.downcast_ref::<i64>().unwrap() as u64 },
             DataType::U64 => { *self.val.downcast_ref::<u64>().unwrap() },
             _ => { panic!("Internal error: Invalid type conversion to u64"); },
         }
@@ -153,6 +180,7 @@ impl IROperand {
 
     pub fn to_i64(&self) -> i64 {
         match self.data_type {
+            DataType::Integer |
             DataType::I64 => { *self.val.downcast_ref::<i64>().unwrap() },
             _ => { panic!("Internal error: Invalid type conversion to i64"); },
         }

@@ -1,6 +1,6 @@
 section foo {
     // Should cause u64 underflow
-    assert 1 - 2 == 0;
+    assert 1u - 2u == 0;
 }
 
 output foo;

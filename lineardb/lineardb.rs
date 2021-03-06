@@ -283,6 +283,7 @@ impl<'toks> LinearDb {
             LexToken::Identifier |
             LexToken::U64 |
             LexToken::I64 |
+            LexToken::Integer |
             LexToken::QuotedString => {
                 // These are immediate operands.  Add them to the main operand vector
                 // and return them as local operands.
@@ -415,7 +416,7 @@ impl<'toks> LinearDb {
 
         if output_addr_nid.is_some() {
             let output_addr_tinfo = ast.get_tinfo(ast_db.output.addr_nid.unwrap());
-            if output_addr_tinfo.tok == LexToken::U64 {
+            if [LexToken::U64, LexToken::Integer].contains(&output_addr_tinfo.tok) {
                 output_addr_str = Some(output_addr_tinfo.val.to_string());
                 output_addr_loc = Some(output_addr_tinfo.loc.clone());
                 debug!("LinearDb::new: Output address is {}", output_addr_str.as_ref().unwrap());

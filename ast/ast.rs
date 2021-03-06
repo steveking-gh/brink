@@ -50,13 +50,16 @@ pub enum LexToken {
     #[regex("[_a-zA-Z][0-9a-zA-Z_]*:")] Label,
     #[regex("[_a-zA-Z][0-9a-zA-Z_]*")] Identifier,
 
-    // Support the forms accepted by the nice parse_int crate:
-    // 0b, 0o, 0x and regular decimal
-    #[regex("0[bB][01][_01]*|0[xX][0-9a-fA-F][_0-9a-fA-F]*|[1-9][_0-9]*|0")] U64,
+    // Plain vanilla numbers that are ambiguously signed or unsigned
+    #[regex("[1-9][_0-9]*|0")] Integer,
 
-    // Numbers that start with a minus sign
-    #[regex("-[1-9][_0-9]*")] I64,
+    // Unsigned literals are suffixed with 'u'
+    // binary and hex numbers are unsigned by default and don't require u suffix
+    #[regex("0[bB][01][_01]*u?|0[xX][0-9a-fA-F][_0-9a-fA-F]*u?|[1-9][_0-9]*u|0u")] U64,
 
+    // Signed literals are suffixed with 'i' and/or start with a minus sign
+    #[regex("0[bB][01][_01]*i|0[xX][0-9a-fA-F][_0-9a-fA-F]*i|[1-9][_0-9]*i|-[1-9][_0-9]*i?|0i")] I64,
+    
     // Not only is \ special in strings and must be escaped, but also special in
     // regex.  We use raw string here to avoid having the escape the \ for the
     // string itself. The \\ in this raw string are escape \ for the regex
@@ -331,12 +334,14 @@ impl<'toks> Ast<'toks> {
         false
     }
 
-    /// Expect the specified token or not.  If found, add it to the parent and advance.
+    /// Expect zero or one instance of specified tokens.
+    /// If we find an allowed found, add it to the parent and advance.
     /// If not found, do nothing and return success
-    fn optional_token(&mut self, tok: LexToken, diags: &mut Diags, parent : NodeId) -> bool {
+    fn optional_token(&mut self, tokvec: &[LexToken], diags: &mut Diags,
+                        parent : NodeId) -> bool {
 
         if let Some(tinfo) = self.peek() {
-            if tok == tinfo.tok {
+            if tokvec.contains(&tinfo.tok) {
                 self.add_to_parent_and_advance(parent);
             }
         } else {
@@ -467,6 +472,8 @@ impl<'toks> Ast<'toks> {
     /// Higher numbers are stronger binding.
     fn get_binding_power(tok: LexToken) -> (u8,u8) {
         match tok {
+            LexToken::Integer |
+            LexToken::I64 |
             LexToken::U64 => (15,16),
             LexToken::FSlash |
             LexToken::Asterisk => (13,14),
@@ -524,6 +531,7 @@ impl<'toks> Ast<'toks> {
                 }
                 lhs
             }
+            LexToken::Integer |
             LexToken::I64 |
             LexToken::U64 => {
                 let lhs = Some(self.arena.new_node(self.tok_num));
@@ -540,7 +548,7 @@ impl<'toks> Ast<'toks> {
                 if !self.expect_token_no_add(LexToken::OpenParen, diags) {
                     return self.dbg_exit_pratt("parse_pratt", None);
                 }
-                if !self.optional_token(LexToken::Identifier, diags, assert_nid) {
+                if !self.optional_token(&[LexToken::Identifier], diags, assert_nid) {
                     return self.dbg_exit_pratt("parse_pratt", None);
                 }
                 if !self.expect_token_no_add(LexToken::CloseParen, diags) {
@@ -708,7 +716,7 @@ impl<'toks> Ast<'toks> {
                     "Expected a section name after output") {
 
             // After the section identifier, an optional absolute starting address
-            result = self.optional_token(LexToken::U64, diags, output_nid);
+            result = self.optional_token(&[LexToken::U64, LexToken::Integer], diags, output_nid);
                         
             // finally a semicolon
             result &= self.expect_semi(diags, output_nid);

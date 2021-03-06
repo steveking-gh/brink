@@ -1,6 +1,6 @@
 section foo {
     // Should cause u64 overflow
-    assert 18446744073709551615 * 2 == 3689348814741910323; // deleted trailing 0 to fit in u64
+    assert 18446744073709551615u * 2 == 3689348814741910323u; // deleted trailing 0 to fit in u64
 }
 
 output foo;

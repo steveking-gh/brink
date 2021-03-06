@@ -442,7 +442,7 @@ fn fuzz_found_10() {
     .arg("tests/fuzz_found_10.brink")
     .assert()
     .failure()
-    .stderr(predicates::str::contains("[IR_1]"));
+    .stderr(predicates::str::contains("[IR_3]"));
 }
 
 #[test]
@@ -472,7 +472,7 @@ fn fuzz_found_13() {
     .arg("tests/fuzz_found_13.brink")
     .assert()
     .failure()
-    .stderr(predicates::str::contains("[EXEC_6]"));
+    .stderr(predicates::str::contains("[EXEC_26]"));
 }
 
 #[test]

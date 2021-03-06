@@ -4,9 +4,9 @@ section foo {
     assert 8 == 1 << 3;
     assert 0xF << 4 == 0xF0;
     assert 0xFFFFFFFF << 4 == 0xFFFFFFFF0;
-    assert 0xFFFFFFFFFFFFFFFF << 0 == 0xFFFFFFFFFFFFFFFF;
-    assert 0xFFFFFFFFFFFFFFFF << 1 == 0xFFFFFFFFFFFFFFFE;
-    assert 0xFFFFFFFFFFFFFFFF << 32 == 0xFFFF_FFFF_0000_0000;
+    assert 0xFFFF_FFFF_FFFF_FFFF << 0 == 0xFFFFFFFFFFFFFFFF;
+    assert 0xFFFF_FFFF_FFFF_FFFF << 1 == 0xFFFFFFFFFFFFFFFE;
+    assert 0xFFFF_FFFF_FFFF_FFFF << 32 == 0xFFFF_FFFF_0000_0000;
 }
 
 output foo;

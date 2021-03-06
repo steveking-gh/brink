@@ -23,6 +23,8 @@ pub struct Parameter {
 impl Parameter {
     fn to_bool(&self) -> bool {
         match self.data_type {
+            // TODO make bools natively i64
+            DataType::Integer => { (*self.val.downcast_ref::<i64>().unwrap() as u64) != 0 },
             DataType::U64 => { *self.val.downcast_ref::<u64>().unwrap() != 0 },
             bad => panic!("Bad downcast conversion of {:?} to bool!", bad),
         }
@@ -30,6 +32,8 @@ impl Parameter {
 
     fn to_u64(&self) -> u64 {
         match self.data_type {
+            // Integers stored as i64
+            DataType::Integer => { *self.val.downcast_ref::<i64>().unwrap() as u64 },
             DataType::U64 => { *self.val.downcast_ref::<u64>().unwrap() },
             bad => panic!("Bad downcast conversion of {:?} to u64!", bad),
         }
@@ -37,6 +41,7 @@ impl Parameter {
 
     fn to_i64(&self) -> i64 {
         match self.data_type {
+            DataType::Integer |
             DataType::I64 => { *self.val.downcast_ref::<i64>().unwrap() },
             bad => panic!("Bad downcast conversion of {:?} to i64!", bad),
         }
@@ -166,7 +171,7 @@ impl Engine {
     fn do_i64_mul(&self, ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
         let check = in0.checked_mul(in1);
         if check.is_none() {
-            let msg = format!("Multiply expression '{} * {}' will overflow", in0, in1);
+            let msg = format!("Multiply expression '{} * {}' will overflow data type I64", in0, in1);
             diags.err1("EXEC_26", &msg, ir.src_loc.clone());
             false
         } else {
@@ -266,17 +271,17 @@ impl Engine {
         let mut out_parm = self.parms[out_parm_num].borrow_mut();
         match operation {
             IRKind::ToU64 => {
+                let out = out_parm.val.downcast_mut::<u64>().unwrap();
                 match in_parm0.data_type {
                     DataType::U64 => {
-                        // Trivial U64 to U64
+                        // Trivial Integer or U64 to U64
                         let in0 = in_parm0.to_u64();
-                        let out = out_parm.val.downcast_mut::<u64>().unwrap();
                         *out = in0;
                     }
+                    DataType::Integer |
                     DataType::I64 => {
                         // I64 to U64
                         let in0 = in_parm0.to_i64();
-                        let out = out_parm.val.downcast_mut::<u64>().unwrap();
                         *out = in0 as u64;
                     }
                     bad => {
@@ -288,18 +293,18 @@ impl Engine {
                 }
             }
             IRKind::ToI64 => {
+                let out = out_parm.val.downcast_mut::<i64>().unwrap();
                 match in_parm0.data_type {
-                    DataType::I64 => {
-                        // Trivial I64 to I64
-                        let in0 = in_parm0.to_i64();
-                        let out = out_parm.val.downcast_mut::<i64>().unwrap();
-                        *out = in0;
-                    }
                     DataType::U64 => {
                         // U64 to I64
                         let in0 = in_parm0.to_u64();
-                        let out = out_parm.val.downcast_mut::<i64>().unwrap();
                         *out = in0 as i64;
+                    }
+                    DataType::Integer |
+                    DataType::I64 => {
+                        // Trivial Integer or I64 to I64
+                        let in0 = in_parm0.to_i64();
+                        *out = in0;
                     }
                     bad => {
                         let src_loc = irdb.parms[in_parm_num0].src_loc.clone();
@@ -325,27 +330,47 @@ impl Engine {
         assert!(ir.operands.len() == 3);
 
         // Borrow the parameters from the main array
-        let in_parm_num0 = ir.operands[0];
-        let in_parm_num1 = ir.operands[1];
-        let out_parm_num = ir.operands[2];
-        let in_parm0 = self.parms[in_parm_num0].borrow();
-        let in_parm1 = self.parms[in_parm_num1].borrow();
+        let lhs_num = ir.operands[0];
+        let rhs_num = ir.operands[1];
+        let out_num = ir.operands[2];
+        let lhs = self.parms[lhs_num].borrow();
+        let rhs = self.parms[rhs_num].borrow();
 
-        if in_parm0.data_type != in_parm1.data_type {
-            let loc0 = irdb.parms[in_parm_num0].src_loc.clone();
-            let loc1 = irdb.parms[in_parm_num1].src_loc.clone();
-            let msg = format!("Input operand types do not match.  Left is '{:?}', right is '{:?}'",
-                        in_parm0.data_type, in_parm1.data_type);
-            diags.err2("EXEC_13", &msg, loc0, loc1 );
-            return false;
+        let lhs_dt = lhs.data_type;
+        let rhs_dt = rhs.data_type;
+
+        if lhs_dt != rhs_dt {
+            let mut dt_ok = false;
+            // Right and left side data types are not equal.
+            // Determine if we can proceed.
+            if rhs_dt == DataType::Integer {
+                if [DataType::I64, DataType::U64, DataType::Integer].contains(&lhs_dt) {
+                    dt_ok = true; // Integers work with s/u types
+                }
+            } else if lhs_dt == DataType::Integer {
+                if [DataType::I64, DataType::U64].contains(&rhs_dt) {
+                    dt_ok = true; // Integers work with s/u types
+                }
+            }
+
+            if !dt_ok {
+                let loc0 = irdb.parms[lhs_num].src_loc.clone();
+                let loc1 = irdb.parms[rhs_num].src_loc.clone();
+                let msg = format!("Input operand types do not match.  Left is '{:?}', right is '{:?}'",
+                                        lhs_dt, rhs_dt);
+                diags.err2("EXEC_13", &msg, loc0, loc1 );
+                return false;
+            }
         }
 
         let mut result = true;
         // output of compare is u64 regardless of inputs
-        if in_parm0.data_type == DataType::U64 {
-            let in0 = in_parm0.to_u64();
-            let in1 = in_parm1.to_u64();
-            let mut out_parm = self.parms[out_parm_num].borrow_mut();
+        // check both parms since one might be an ambiguous integer
+        // If either side is unsigned, the whole thing is unsigned
+        if (lhs_dt == DataType::U64) || (rhs_dt == DataType::U64) {
+            let in0 = lhs.to_u64();
+            let in1 = rhs.to_u64();
+            let mut out_parm = self.parms[out_num].borrow_mut();
             let out = out_parm.val.downcast_mut::<u64>().unwrap();
 
             match operation {
@@ -365,10 +390,13 @@ impl Engine {
                 IRKind::RightShift => { result &= self.do_u64_shr(ir, in0, in1, out, diags); }            
                 bad => panic!("Forgot to handle u64 {:?}", bad),
             };
-        } else if in_parm0.data_type == DataType::I64 {
-            let in0 = in_parm0.to_i64();
-            let in1 = in_parm1.to_i64();
-            let mut out_parm = self.parms[out_parm_num].borrow_mut();
+        } else if (lhs_dt == DataType::I64) || (rhs_dt == DataType::I64) ||
+                  ((lhs_dt == DataType::Integer) && (rhs_dt == DataType::Integer)) {
+            // If either side is signed, treat the whole expression as signed
+            // If both sides are ambiguous integers then treat the whole expression as signed
+            let in0 = lhs.to_i64();
+            let in1 = rhs.to_i64();
+            let mut out_parm = self.parms[out_num].borrow_mut();
 
             match operation {
                 // output of compare is u64 regardless of inputs
@@ -391,11 +419,10 @@ impl Engine {
                 bad => panic!("Forgot to handle i64 {:?}", bad),
             }
         } else {
-            let loc0 = irdb.parms[in_parm_num0].src_loc.clone();
-            let loc1 = irdb.parms[in_parm_num1].src_loc.clone();
+            let loc0 = irdb.parms[lhs_num].src_loc.clone();
+            let loc1 = irdb.parms[rhs_num].src_loc.clone();
             // check above ensures the types are the same, whatever they are
-            let msg = format!("Unexpected input operand types '{:?}'  Expected I64 or U64.",
-                                    in_parm0.data_type);
+            let msg = format!("Unexpected input operand types '{:?}'  Expected I64 or U64.", lhs_dt);
             diags.err2("EXEC_19", &msg, loc0, loc1 );
             return false;
         }
@@ -606,6 +633,7 @@ impl Engine {
             assert!(self.sec_offsets.len() == 0);
 
             for (lid,ir) in irdb.ir_vec.iter().enumerate() {
+                debug!("Engine::iterate on lid {}", lid);
                 // record our location after each IR
                 self.ir_locs[lid] = current.clone();
                 let operation = ir.kind;
@@ -671,7 +699,7 @@ impl Engine {
         }
     }
 
-    /// Display addition diagnostic if the assertion occurred for an
+    /// Display additional diagnostic if the assertion occurred for an
     /// operand that is an output of another operation.
     fn assert_info(&self, src_lid: Option<usize>, irdb: &IRDb, diags: &mut Diags) {
         if src_lid.is_none() {
