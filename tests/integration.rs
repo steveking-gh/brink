@@ -634,6 +634,16 @@ fn integers_3() {
 }
 
 #[test]
+fn integers_4() {
+    let _cmd = Command::cargo_bin("brink")
+    .unwrap()
+    .arg("tests/integers_4.brink")
+    .assert()
+    .failure()
+    .stderr(predicates::str::contains("[AST_19]"));
+}
+
+#[test]
 #[serial]
 fn neq_1() {
     let _cmd = Command::cargo_bin("brink")

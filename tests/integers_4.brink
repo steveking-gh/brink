@@ -1,0 +1,5 @@
+section foo {
+    assert -0 == 0;
+}
+
+output foo;
