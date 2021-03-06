@@ -111,7 +111,7 @@ impl Engine {
     fn do_u64_add(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
         let check = in0.checked_add(in1);
         if check.is_none() {
-            let msg = format!("Add expression '{} + {}' will overflow", in0, in1);
+            let msg = format!("Add expression '{} + {}' will overflow type U64", in0, in1);
             diags.err1("EXEC_1", &msg, ir.src_loc.clone());
             false
         } else {
@@ -123,7 +123,7 @@ impl Engine {
     fn do_i64_add(&self, ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
         let check = in0.checked_add(in1);
         if check.is_none() {
-            let msg = format!("Add expression '{} + {}' will overflow", in0, in1);
+            let msg = format!("Add expression '{} + {}' will overflow type I64", in0, in1);
             diags.err1("EXEC_21", &msg, ir.src_loc.clone());
             false
         } else {
@@ -135,7 +135,7 @@ impl Engine {
     fn do_u64_sub(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
         let check = in0.checked_sub(in1);
         if check.is_none() {
-            let msg = format!("Subtract expression '{} - {}' will underflow", in0, in1);
+            let msg = format!("Subtract expression '{} - {}' will underflow type U64", in0, in1);
             diags.err1("EXEC_4", &msg, ir.src_loc.clone());
             false
         } else {
@@ -147,7 +147,7 @@ impl Engine {
     fn do_i64_sub(&self, ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
         let check = in0.checked_sub(in1);
         if check.is_none() {
-            let msg = format!("Subtract expression '{} - {}' will underflow", in0, in1);
+            let msg = format!("Subtract expression '{} - {}' will underflow type I64", in0, in1);
             diags.err1("EXEC_24", &msg, ir.src_loc.clone());
             false
         } else {
@@ -159,7 +159,7 @@ impl Engine {
     fn do_u64_mul(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
         let check = in0.checked_mul(in1);
         if check.is_none() {
-            let msg = format!("Multiply expression '{} * {}' will overflow", in0, in1);
+            let msg = format!("Multiply expression '{} * {}' will overflow type U64", in0, in1);
             diags.err1("EXEC_6", &msg, ir.src_loc.clone());
             false
         } else {
