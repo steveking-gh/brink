@@ -113,13 +113,25 @@ Produces `output.bin`:
 ## Brink Language Reference
 ---
 
+
+## Types
+
+Brink supports the following data types:
+
+* `U64` - 64-bit unsigned values
+* `I64` - 64-bit signed values
+* `Integer` - 64-bit with flexible sign treatment
+* `QuotedString` - A UTF-8 string in double quotes
+* `Identifier` - Identifier names
+
 ## Literals
 
-### Numbers
+### Number Literals
 
 Brink supports number literals in decimal, hex (0x) and binary (0b) forms.  After the first digit, you can use '_' within number literals to help with readability.  Brink uses the [parse_int](https://crates.io/crates/parse_int) library for conversion from string to value.
 
     assert 42 == 42;
+    assert -42 == -42;
     assert 0x42 == 0x42;
     assert 0x42 == 66;
     assert 0x4_2 == 66;
@@ -131,7 +143,34 @@ Brink supports number literals in decimal, hex (0x) and binary (0b) forms.  Afte
     assert 0b101000010 == 0x142;
     assert 0b0000000001000010 == 0x42;
 
-Numbers are 64-bit unsigned (u64) by default.
+The following table summarizes how Brink determines the type of number literals.
+
+| Example | Type      | Description                                                        |
+|---------|-----------|--------------------------------------------------------------------|
+| `4`     | `Integer` | Simple decimal numbers are `Integer` type with flexible signedness |
+| `4u`    | `U64`     | Explicitly `U64`                                                   |
+| `4i`    | `I64`     | Explicitly `I64`                                                   |
+| `-4`    | `I64`     | Negative numbers are `I64`                                         |
+| `0x4`   | `U64`     | Hex numbers are `U64` by default                                   |
+| `0x4i`  | `I64`     | Explicitly `I64` hex number                                        |
+| `0b100` | `U64`     | Binary numbers are `U64` by default                                |
+
+For convenience, the compiler casts the flexible `Integer` type to `U64` or `I64` as needed.
+
+    assert 42u == 42;  // U64 operates with Integer
+    assert 42i == 42;  // I64 operates with Integer
+
+Otherwise the types used in an expression must match.  For example:
+
+    assert 42u == 42i; // mix unsigned and signed
+
+Produces and error message:
+
+    error[EXEC_13]: Input operand types do not match.  Left is 'U64', right is 'I64'
+      ┌─ tests/integers_5.brink:2:12
+      │
+    2 │     assert 42u == 42i; // mix unsigned and signed
+      │            ^^^    ---
 
 ### Quoted Strings
 

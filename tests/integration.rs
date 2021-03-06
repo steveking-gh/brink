@@ -633,7 +633,9 @@ fn integers_3() {
     fs::remove_file("output.bin").unwrap();
 }
 
+
 #[test]
+#[serial]
 fn integers_4() {
     let _cmd = Command::cargo_bin("brink")
     .unwrap()
@@ -641,6 +643,17 @@ fn integers_4() {
     .assert()
     .failure()
     .stderr(predicates::str::contains("[AST_19]"));
+}
+
+#[test]
+#[serial]
+fn integers_5() {
+    let _cmd = Command::cargo_bin("brink")
+    .unwrap()
+    .arg("tests/integers_5.brink")
+    .assert()
+    .failure()
+    .stderr(predicates::str::contains("[EXEC_13]"));
 }
 
 #[test]

@@ -1,0 +1,5 @@
+section foo {
+    assert 42u == 42i; // Fails, type mismatch
+}
+
+output foo;
