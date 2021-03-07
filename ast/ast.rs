@@ -41,6 +41,7 @@ pub enum LexToken {
     #[token("-")] Minus,
     #[token("*")] Asterisk,
     #[token("/")] FSlash,
+    #[token(",")] Comma,
     #[token("<<")] DoubleLess,
     #[token(">>")] DoubleGreater,
     #[token("{")] OpenBrace,
@@ -623,8 +624,11 @@ impl<'toks> Ast<'toks> {
                 break;
             }
 
+            // Screen out disallowed operations
             let op_tinfo = op_tinfo.unwrap();
             match op_tinfo.tok {
+                // Command and semi terminate an expression
+                LexToken::Comma |
                 LexToken::Semicolon => { break; }
                 LexToken::NEq |
                 LexToken::DoubleEq |
@@ -706,11 +710,26 @@ impl<'toks> Ast<'toks> {
         let mut result = true;
         // Add the print keyword as a child of the parent
         let print_nid = self.add_to_parent_and_advance(parent);
-        let expression_nid = self.parse_pratt(0, &mut result, diags);
-        if result {
-            if let Some(expression_nid) = expression_nid {
-                print_nid.append(expression_nid, &mut self.arena);
-                result &= self.expect_semi(diags, print_nid);
+
+        loop {
+            let expression_nid = self.parse_pratt(0, &mut result, diags);
+            if result {
+                if let Some(expression_nid) = expression_nid {
+                    print_nid.append(expression_nid, &mut self.arena);
+
+                    // Arguments to print are comma separated, but don't
+                    // clutter up the AST with the comma.  Just omit.
+                    if let Some(tinfo) = self.peek() {
+                        if tinfo.tok == LexToken::Comma {
+                            self.tok_num += 1;
+                            continue
+                        }
+                    }
+
+                    // If not a comma, then we expect semi.
+                    result &= self.expect_semi(diags, print_nid);
+                    break;
+                }
             }
         }
 

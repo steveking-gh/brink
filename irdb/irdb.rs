@@ -130,6 +130,7 @@ impl IRDb {
             ast::LexToken::Section |
             ast::LexToken::OpenBrace |
             ast::LexToken::CloseBrace |
+            ast::LexToken::Comma |
             ast::LexToken::OpenParen |
             ast::LexToken::CloseParen |
             ast::LexToken::Semicolon |

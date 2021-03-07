@@ -23,7 +23,7 @@ pub struct Parameter {
 impl Parameter {
     fn to_bool(&self) -> bool {
         match self.data_type {
-            // TODO make bools natively i64
+            // TODO make boolean natively i64
             DataType::Integer => { (*self.val.downcast_ref::<i64>().unwrap() as u64) != 0 },
             DataType::U64 => { *self.val.downcast_ref::<u64>().unwrap() != 0 },
             bad => panic!("Bad downcast conversion of {:?} to bool!", bad),

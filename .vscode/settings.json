@@ -28,6 +28,7 @@
         "parms",
         "pretok",
         "rdepth",
+        "signedness",
         "strout",
         "structs",
         "sval",
@@ -36,6 +37,7 @@
         "tnum",
         "toknum",
         "toks",
+        "tokvec",
         "wrsa"
     ]
 }

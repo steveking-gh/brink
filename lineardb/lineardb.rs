@@ -304,8 +304,11 @@ impl<'toks> LinearDb {
                 let mut lops = Vec::new();
                 self.record_children_r(result, rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
                 let ir_lid = self.new_ir(parent_nid, ast, IRKind::Print);
-                // 1 operand expected
-                self.process_operands(result, 1, &mut lops, ir_lid, diags, tinfo);
+
+                // Unlimited number of operands
+                for idx in lops {
+                    self.add_operand_idx_to_ir(ir_lid, idx);
+                }
             }
             LexToken::ToI64 |
             LexToken::ToU64 => {
@@ -381,6 +384,7 @@ impl<'toks> LinearDb {
             }
 
             LexToken::Semicolon |
+            LexToken::Comma |
             LexToken::OpenParen |
             LexToken::CloseParen |
             LexToken::OpenBrace |

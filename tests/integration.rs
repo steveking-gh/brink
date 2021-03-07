@@ -1014,5 +1014,18 @@ fn print_1() {
     fs::remove_file("output.bin").unwrap();
 }
 
+#[test]
+#[serial]
+fn print_2() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/print_2.brink")
+                .assert()
+                .success()
+                .stdout(predicates::str::contains("Wow! 3 2\n"));
+
+    fs::remove_file("output.bin").unwrap();
+}
+
 } // mod tests
 
