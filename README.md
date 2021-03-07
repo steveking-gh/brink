@@ -9,7 +9,7 @@ __^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^__
 Brink is a domain specific language for linking and compositing of
 an output file.  Brink simplifies construction of complex files by managing sizes,
 offsets and ordering in a readable declarative style.  Brink was created with
-flash and other NVM images in mind, but tries to be generally useful.
+FLASH or other NVM images in mind, especially for use in embedded systems.
 
 ## Examples
 
@@ -113,7 +113,6 @@ Produces `output.bin`:
 ## Brink Language Reference
 ---
 
-
 ## Types
 
 Brink supports the following data types:
@@ -172,6 +171,19 @@ Produces and error message:
     2 │     assert 42u == 42i; // mix unsigned and signed
       │            ^^^    ---
 
+Users can explicitly cast a number literal or expression to the required signedness using the built-in `to_u64` to `to_i64` functions.  For example:
+
+    assert -42 != to_i64(42);  // comparing signed to unsigned
+
+The `to_u64` and `to_i64` functions **DO NOT** report an error if the runtime value under/overflows the destination type.
+
+    assert 0xFFFF_FFFF_FFFF_FFFF == to_u64(-1); // OK
+    assert to_i64(0xFFFF_FFFF_FFFF_FFFF) == -1; // OK
+
+### True and False
+
+Brink considers a zero value false and all non-zero values true.
+
 ### Quoted Strings
 
 Brink allows utf-8 quoted strings with escape characters quote (\\\") tab (\t) and newline (\n).  Newlines are Linux style, so "A\n" is a two byte string on all platforms.
@@ -197,11 +209,13 @@ Brink supports the following arithmetic operators with same relative precedence 
 
 As shown in the table, Brink will check some operations for arithmetic under/overflow.
 
+---
+
 ## `abs( [identifier] ) -> u64`
 
 When called with an identifier, returns the absolute byte address of the identifier as a u64.  When called without an identifier, returns the current absolute address.  The absolute byte address is the image offset + the starting address specified in the `output` statement.
 
-### Example
+### `abs` Example
 
     section fiz {
         assert abs() == 0x1006;
@@ -231,11 +245,29 @@ When called with an identifier, returns the absolute byte address of the identif
     
     output foo 0x1000;  // starting absolute address is 0x1000
 
+---
+
+## `assert <expression>;`
+
+Reports an error if the specified expression does not evaluate to a true (non-zero) value.  Assert expressions provide a means of error checking and do not affect the output file.
+
+### `assert` Example
+
+    section foo {
+        assert 1;   // OK, non-zero is true
+        assert -1;  // OK, non-zero is true
+        assert 1 + 1 == 2;
+    }
+
+    output foo;
+
+---
+
 ## `img( [identifier] ) -> u64`
 
 When called with an identifier, returns the byte offset as a u64 of the identifier from the start of the output image.  When called without an identifier, returns the current image offset.
 
-### Example
+### `img` Example
 
     section fiz {
         assert img() == 6;
@@ -265,11 +297,13 @@ When called with an identifier, returns the byte offset as a u64 of the identifi
     
     output foo 0x1000;  // starting absolute address is 0x1000
 
+---
+
 ## `sec( [identifier] ) -> u64`
 
 When called with an identifier, returns the byte offset as a u64 of the identifier from the start of the current section.  When called without an identifier, returns the current section offset.
 
-### Example
+### `sec` Example
 
     section fiz {
         assert sec() == 0;
@@ -314,9 +348,30 @@ When a section offset specifies an identifier, the identifier must be in the sco
         assert sec(fiz) == 0; // ERROR, fiz is out of scope in section foo
     }
 
+    output foo 0x1000;
+
 ## `output <section identifier> [absolute starting address]`
 
 Specifies the section to output and an optional absolute starting address.  Without a starting address, `output` defaults to a starting address of 0.
+
+---
+
+## `to_i64( <expression> )`
+
+Converts the specified expression to the I64 type without regard to under/overflow.
+
+### `to_i64` Example
+
+    section foo {
+        assert to_i64(0xFFFF_FFFF_FFFF_FFFF) == -1;
+        assert to_i64(42u) == 42;
+        assert to_i64(42u) == 42i;
+        assert to_i64(42) == 42i;
+    }
+
+    output foo;
+
+---
 
 ## `wrs "quoted string"`
 

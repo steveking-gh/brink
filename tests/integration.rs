@@ -633,7 +633,6 @@ fn integers_3() {
     fs::remove_file("output.bin").unwrap();
 }
 
-
 #[test]
 #[serial]
 fn integers_4() {
@@ -976,6 +975,30 @@ fn quoted_escapes_1() {
     //assert_eq!("Wow1\n\nWow2\tWos3\n\"Wow4\"\n\"Wow5\"Wo\"w6\"", fs::read_to_string("quoted_escapes_1.bin").unwrap());
     assert_eq!("Wow1\n\nWow2\tWow3\n\"Wow4\"\n\"Wow5\"Wo\"w6\"", fs::read_to_string("quoted_escapes_1.bin").unwrap());
     fs::remove_file("quoted_escapes_1.bin").unwrap();
+}
+
+#[test]
+#[serial]
+fn to_u64_1() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/to_u64_1.brink")
+                .assert()
+                .success();
+
+    fs::remove_file("output.bin").unwrap();
+}
+
+#[test]
+#[serial]
+fn to_i64_1() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/to_i64_1.brink")
+                .assert()
+                .success();
+
+    fs::remove_file("output.bin").unwrap();
 }
 
 } // mod tests
