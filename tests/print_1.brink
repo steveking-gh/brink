@@ -1,5 +1,7 @@
 section foo {
-    print "Wow!";
+    wrs "123";
+    print "Wow!\n";
+    print sizeof(foo);
 }
 
 output foo;

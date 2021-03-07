@@ -3,7 +3,6 @@ section foo {
     assert to_u64(42i) == 42;
     assert to_u64(42i) == 42u;
     assert to_u64(42) == 42u;
-
 }
 
 output foo;

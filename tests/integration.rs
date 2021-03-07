@@ -1008,7 +1008,8 @@ fn print_1() {
                 .unwrap()
                 .arg("tests/print_1.brink")
                 .assert()
-                .success();
+                .success()
+                .stdout(predicates::str::contains("Wow!\n3"));
 
     fs::remove_file("output.bin").unwrap();
 }

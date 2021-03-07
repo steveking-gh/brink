@@ -743,11 +743,29 @@ impl Engine {
         result
     }
 
-    fn execute_print(&self, _ir: &IR, _irdb: &IRDb, _diags: &mut Diags, _file: &File)
+    fn execute_print(&self, ir: &IR, irdb: &IRDb, diags: &mut Diags, _file: &File)
                       -> Result<()> {
         self.trace("Engine::execute_print:");
-        print!("Print placeholder!\n");
+        let num_ops = ir.operands.len();
         let mut result = Ok(());
+        for local_op_num in 0..num_ops {
+            let op_num = ir.operands[local_op_num];
+            let op = self.parms[op_num].borrow();
+            debug!("Processing print operand {} with data type {:?}", local_op_num, op.data_type);
+            match op.data_type {
+                DataType::QuotedString => { print!("{}", op.to_str()); }
+                DataType::U64 => { print!("{}", op.to_u64()); }
+                DataType::Integer |
+                DataType::I64 => { print!("{}", op.to_i64()); }
+                bad => {
+                    let msg = format!("Cannot print type '{:?}'", bad );
+                    let src_loc = irdb.parms[op_num].src_loc.clone();
+                    diags.err1("EXEC_14", &msg, src_loc);
+                    result = Err(anyhow!("Print failed"));
+                }
+            }
+        }
+
         result
     }
 
