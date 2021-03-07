@@ -84,8 +84,7 @@ fn tok_to_irkind(tok: LexToken) -> IRKind {
         LexToken::Img => { IRKind::Img }
         LexToken::Sec => { IRKind::Sec }
         bug => {
-            assert!( false, "Failed to convert LexToken to IRKind for {:?}", bug);
-            IRKind::Assert // keep compiler happy
+            panic!("Failed to convert LexToken to IRKind for {:?}", bug);
         }
     }
 }
@@ -297,6 +296,14 @@ impl<'toks> LinearDb {
                 let mut lops = Vec::new();
                 self.record_children_r(result, rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
                 let ir_lid = self.new_ir(parent_nid, ast, IRKind::Assert);
+                // 1 operand expected
+                self.process_operands(result, 1, &mut lops, ir_lid, diags, tinfo);
+            }
+            LexToken::Print => {
+                // A vector to track the operands of this expression.
+                let mut lops = Vec::new();
+                self.record_children_r(result, rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
+                let ir_lid = self.new_ir(parent_nid, ast, IRKind::Print);
                 // 1 operand expected
                 self.process_operands(result, 1, &mut lops, ir_lid, diags, tinfo);
             }

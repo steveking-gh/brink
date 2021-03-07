@@ -668,6 +668,7 @@ impl Engine {
                     // Nothing to do during iteration.
                     IRKind::Label |
                     IRKind::Assert |
+                    IRKind::Print |
                     IRKind::I64 |
                     IRKind::U64 => { true }
                 }
@@ -742,6 +743,14 @@ impl Engine {
         result
     }
 
+    fn execute_print(&self, _ir: &IR, _irdb: &IRDb, _diags: &mut Diags, _file: &File)
+                      -> Result<()> {
+        self.trace("Engine::execute_print:");
+        print!("Print placeholder!\n");
+        let mut result = Ok(());
+        result
+    }
+
     fn execute_wrs(&self, ir: &IR, _irdb: &IRDb, diags: &mut Diags, file: &mut File)
                    -> Result<()> {
         self.trace("Engine::execute_wrs:");
@@ -766,6 +775,7 @@ impl Engine {
         for ir in &irdb.ir_vec {
             result = match ir.kind {
                 IRKind::Assert => { self.execute_assert(ir, irdb, diags, file) }
+                IRKind::Print => { self.execute_print(ir, irdb, diags, file) }
                 IRKind::Wrs => { self.execute_wrs(ir, irdb, diags, file) }
                 // the rest of these operations are computed during iteration
                 IRKind::Abs |

@@ -126,6 +126,7 @@ impl IRDb {
                 }
             }
             ast::LexToken::Assert |
+            ast::LexToken::Print |
             ast::LexToken::Section |
             ast::LexToken::OpenBrace |
             ast::LexToken::CloseBrace |
@@ -177,6 +178,11 @@ impl IRDb {
         result
     }
 
+    // Print accepts most expressions without side effects
+    fn validate_print_operands(&self, _ir: &IR, _diags: &mut Diags) -> bool {
+        true
+    }
+
     // Expect 1 operand which is an integer of some sort or bool
     fn validate_bool_operand(&self, ir: &IR, diags: &mut Diags) -> bool {
         let len = ir.operands.len();
@@ -216,6 +222,7 @@ impl IRDb {
     fn validate_operands(&self, ir: &IR, diags: &mut Diags) -> bool {
         let result = match ir.kind {
             IRKind::Assert => { self.validate_bool_operand(ir, diags) }
+            IRKind::Print => { self.validate_print_operands(ir, diags) }
             IRKind::NEq |
             IRKind::LEq |
             IRKind::GEq |

@@ -52,14 +52,14 @@ cause crashes and hangs.  At the time of writing (Rust 1.49.0), fuzz testing
 
 To run fuzz tests:
 
-    cd process
-    cargo +nightly fuzz run fuzz_target_1
+    $ cd process
+    $ cargo +nightly fuzz run fuzz_target_1
 
-    cd lineardb
-    cargo +nightly fuzz run fuzz_target_1
+    $ cd lineardb
+    $ cargo +nightly fuzz run fuzz_target_1
 
-    cd ast
-    cargo +nightly fuzz run fuzz_target_1
+    $ cd ast
+    $ cargo +nightly fuzz run fuzz_target_1
 
 Fuzz tests run until stopped with Ctrl-C.  In my experience, fuzz tests will catch a problem in 60 seconds or not at all.
 
@@ -144,15 +144,15 @@ Brink supports number literals in decimal, hex (0x) and binary (0b) forms.  Afte
 
 The following table summarizes how Brink determines the type of number literals.
 
-| Example | Type      | Description                                                        |
-|---------|-----------|--------------------------------------------------------------------|
-| `4`     | `Integer` | Simple decimal numbers are `Integer` type with flexible signedness |
-| `4u`    | `U64`     | Explicitly `U64`                                                   |
-| `4i`    | `I64`     | Explicitly `I64`                                                   |
-| `-4`    | `I64`     | Negative numbers are `I64`                                         |
-| `0x4`   | `U64`     | Hex numbers are `U64` by default                                   |
-| `0x4i`  | `I64`     | Explicitly `I64` hex number                                        |
-| `0b100` | `U64`     | Binary numbers are `U64` by default                                |
+| Example | Type    | Description                                                        |
+|---------|---------|--------------------------------------------------------------------|
+| 4       | Integer | Simple decimal numbers are `Integer` type with flexible signedness |
+| 4u      | U64     | Explicitly `U64`                                                   |
+| 4i      | I64     | Explicitly `I64`                                                   |
+| -4      | I64     | Negative numbers are `I64`                                         |
+| 0x4     | U64     | Hex numbers are `U64` by default                                   |
+| 0x4i    | I64     | Explicitly `I64` hex number                                        |
+| 0b100   | U64     | Binary numbers are `U64` by default                                |
 
 For convenience, the compiler casts the flexible `Integer` type to `U64` or `I64` as needed.
 
@@ -299,6 +299,14 @@ Example:
 
 ---
 
+## `output <section identifier> [absolute starting address]`
+
+Specifies the section to output and an optional absolute starting address.  Without a starting address, `output` defaults to a starting address of 0.
+
+**A Brink program must have exactly one output statement.**
+
+---
+
 ## `sec( [identifier] ) -> U64`
 
 When called with an identifier, returns the byte offset as a U64 of the identifier from the start of the current section.  When called without an identifier, returns the current section offset.
@@ -349,14 +357,6 @@ When a section offset specifies an identifier, the identifier must be in the sco
     }
 
     output foo 0x1000;
-
-## `output <section identifier> [absolute starting address]`
-
-Specifies the section to output and an optional absolute starting address.  Without a starting address, `output` defaults to a starting address of 0.
-
-**A Brink program must have exactly one output statement.**
-
----
 
 ## `sizeof( <identifier> ) -> U64`
 

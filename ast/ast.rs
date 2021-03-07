@@ -20,6 +20,7 @@ pub enum LexToken {
     #[token("section")] Section,
     #[token("assert")] Assert,
     #[token("sizeof")] Sizeof,
+    #[token("print")] Print,
     #[token("to_u64")] ToU64,
     #[token("to_i64")] ToI64,
     #[token("abs")] Abs,
@@ -415,6 +416,7 @@ impl<'toks> Ast<'toks> {
                 LexToken::Wr => self.parse_wr(parent, diags),
                 LexToken::Wrs => self.parse_wrs(parent, diags),
                 LexToken::Assert => self.parse_assert(parent, diags),
+                LexToken::Print => self.parse_print(parent, diags),
                 _ => {
                     self.err_invalid_expression(diags, "AST_3");
                     false
@@ -531,6 +533,7 @@ impl<'toks> Ast<'toks> {
                 }
                 lhs
             }
+            LexToken::QuotedString |
             LexToken::Integer |
             LexToken::I64 |
             LexToken::U64 => {
@@ -694,6 +697,24 @@ impl<'toks> Ast<'toks> {
         }
 
         self.dbg_exit("parse_assert", result)
+    }
+
+    /// Parser for a print statement
+    fn parse_print(&mut self, parent: NodeId, diags: &mut Diags) -> bool {
+
+        self.dbg_enter("parse_print");
+        let mut result = true;
+        // Add the print keyword as a child of the parent
+        let print_nid = self.add_to_parent_and_advance(parent);
+        let expression_nid = self.parse_pratt(0, &mut result, diags);
+        if result {
+            if let Some(expression_nid) = expression_nid {
+                print_nid.append(expression_nid, &mut self.arena);
+                result &= self.expect_semi(diags, print_nid);
+            }
+        }
+
+        self.dbg_exit("parse_print", result)
     }
 
     fn parse_label(&mut self, parent: NodeId, _diags: &mut Diags) -> bool {

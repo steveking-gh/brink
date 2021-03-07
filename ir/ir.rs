@@ -31,6 +31,7 @@ pub enum IRKind {
     LogicalOr,
     Multiply,
     NEq,
+    Print,
     RightShift,
     Sec,
     SectionEnd,
