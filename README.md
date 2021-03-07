@@ -163,7 +163,7 @@ Otherwise the types used in an expression must match.  For example:
 
     assert 42u == 42i; // mix unsigned and signed
 
-Produces and error message:
+Produces an error message:
 
     error[EXEC_13]: Input operand types do not match.  Left is 'U64', right is 'I64'
       ┌─ tests/integers_5.brink:2:12
@@ -211,9 +211,9 @@ As shown in the table, Brink will check some operations for arithmetic under/ove
 
 ---
 
-## `abs( [identifier] ) -> u64`
+## `abs( [identifier] ) -> U64`
 
-When called with an identifier, returns the absolute byte address of the identifier as a u64.  When called without an identifier, returns the current absolute address.  The absolute byte address is the image offset + the starting address specified in the `output` statement.
+When called with an identifier, returns the absolute byte address of the identifier as a U64.  When called without an identifier, returns the current absolute address.  The absolute byte address is the image offset + the starting address specified in the `output` statement.
 
 Example:
 
@@ -263,9 +263,9 @@ Example:
 
 ---
 
-## `img( [identifier] ) -> u64`
+## `img( [identifier] ) -> U64`
 
-When called with an identifier, returns the byte offset as a u64 of the identifier from the start of the output image.  When called without an identifier, returns the current image offset.
+When called with an identifier, returns the byte offset as a U64 of the identifier from the start of the output image.  When called without an identifier, returns the current image offset.
 
 Example:
 
@@ -299,9 +299,9 @@ Example:
 
 ---
 
-## `sec( [identifier] ) -> u64`
+## `sec( [identifier] ) -> U64`
 
-When called with an identifier, returns the byte offset as a u64 of the identifier from the start of the current section.  When called without an identifier, returns the current section offset.
+When called with an identifier, returns the byte offset as a U64 of the identifier from the start of the current section.  When called without an identifier, returns the current section offset.
 
 Example:
 
@@ -354,9 +354,28 @@ When a section offset specifies an identifier, the identifier must be in the sco
 
 Specifies the section to output and an optional absolute starting address.  Without a starting address, `output` defaults to a starting address of 0.
 
+**A Brink program must have exactly one output statement.**
+
 ---
 
-## `to_i64( <expression> )`
+## `sizeof( <identifier> ) -> U64`
+
+Returns the size in bytes of the specified identifier.
+
+Example:
+
+    section empty_one {}
+    section foo {
+        wrs "Wow!";
+        wr empty_one;
+        assert sizeof(empty_one) == 0;
+        assert sizeof(foo) == 4;
+    }
+    
+    output foo;
+---
+
+## `to_i64( <expression> ) -> I64`
 
 Converts the specified expression to the I64 type without regard to under/overflow.
 
@@ -373,7 +392,7 @@ Example:
 
 ---
 
-## `to_u64( <expression> )`
+## `to_u64( <expression> ) -> U64`
 
 Converts the specified expression to the U64 type without regard to under/overflow.
 
