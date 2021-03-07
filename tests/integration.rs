@@ -1003,13 +1003,25 @@ fn to_i64_1() {
 
 #[test]
 #[serial]
+fn to_i64_2() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/to_i64_2.brink")
+                .assert()
+                .success();
+
+    fs::remove_file("output.bin").unwrap();
+}
+
+#[test]
+#[serial]
 fn print_1() {
     let _cmd = Command::cargo_bin("brink")
                 .unwrap()
                 .arg("tests/print_1.brink")
                 .assert()
                 .success()
-                .stdout(predicates::str::contains("Wow!\n3"));
+                .stdout(predicates::str::contains("Wow!\n0x3"));
 
     fs::remove_file("output.bin").unwrap();
 }
@@ -1022,7 +1034,7 @@ fn print_2() {
                 .arg("tests/print_2.brink")
                 .assert()
                 .success()
-                .stdout(predicates::str::contains("Wow! 3 2\n"));
+                .stdout(predicates::str::contains("Wow! 0x3 2\n"));
 
     fs::remove_file("output.bin").unwrap();
 }

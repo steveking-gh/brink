@@ -19,7 +19,7 @@ For a source file called my_file.brink:
      * A section defines part of an output.
      */
     section foo {
-        // wrs writes a quoted string to the output
+        // Write a quoted string to the output
         wrs "Hello World!\n";
     }
 
@@ -37,6 +37,18 @@ Brink supports assert expressions for error checking.  This example verifies tha
     }
     output bar;
 
+You can of course print to console during generation of your output image.
+
+    section bar {
+        print "Output size is ", sizeof(bar), " bytes\n";
+        wrs "Hello World!\n";
+        assert sizeof(bar) == 13;
+    }
+    output bar;
+
+Will print the message:
+
+    Output size is 13 bytes
 ## Unit Testing
 
 Brink supports unit tests.
@@ -249,7 +261,7 @@ Example:
 
 ## `assert <expression>;`
 
-Reports an error if the specified expression does not evaluate to a true (non-zero) value.  Assert expressions provide a means of error checking and do not affect the output file.
+The assert statement reports an error if the specified expression does not evaluate to a true (non-zero) value.  Assert expressions provide a means of error checking and do not affect the output file.
 
 Example:
 
@@ -299,11 +311,16 @@ Example:
 
 ---
 
-## `output <section identifier> [absolute starting address]`
+## `output <section identifier> [absolute starting address];`
 
-Specifies the section to output and an optional absolute starting address.  Without a starting address, `output` defaults to a starting address of 0.
+An output statement specifies the section to write to the output file and an optional absolute starting address.  Without a starting address, `output` defaults to a starting address of 0.
 
 **A Brink program must have exactly one output statement.**
+
+---
+## `print <expression> [, <expression>, ...];`
+
+The print statement evaluates the comma separated list of expressions and prints them to the console.
 
 ---
 

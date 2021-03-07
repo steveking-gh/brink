@@ -754,7 +754,7 @@ impl Engine {
             debug!("Processing print operand {} with data type {:?}", local_op_num, op.data_type);
             match op.data_type {
                 DataType::QuotedString => { print!("{}", op.to_str()); }
-                DataType::U64 => { print!("{}", op.to_u64()); }
+                DataType::U64 => { print!("{:#X}", op.to_u64()); }
                 DataType::Integer |
                 DataType::I64 => { print!("{}", op.to_i64()); }
                 bad => {

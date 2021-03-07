@@ -1,5 +1,5 @@
 use logos::{Logos};
-use indextree::{Arena,NodeId};
+use indextree::{Arena, NodeId};
 pub type Span = std::ops::Range<usize>;
 use std::{collections::{HashMap,HashSet}, ops::Range};
 use diags::Diags;
@@ -176,8 +176,9 @@ impl<'toks> Ast<'toks> {
     /// Boilerplate exit for recursive descent parsing functions.
     /// This function returns the result and should be the last statement
     /// in each function
-    fn dbg_exit_pratt(&self, func_name: &str, result: Option<NodeId>) -> Option<NodeId> {
-        trace!("Ast::{} EXIT {:?}", func_name, result);
+    fn dbg_exit_pratt(&self, func_name: &str, top: &Option<NodeId>, result: bool) -> bool {
+        trace!("Ast::{} EXIT {} with node id {:?}", func_name,
+                if result {"OK"} else {"!! FAIL !!"}, top);
         result
     }
 
@@ -238,7 +239,7 @@ impl<'toks> Ast<'toks> {
     fn err_expected_after(&self, diags: &mut Diags, code: &str, msg: &str) {
         let m = format!("{}, but found '{}'", msg, self.tv[self.tok_num].val);
         diags.err2(code, &m, self.tv[self.tok_num].span(), 
-   self.tv[self.tok_num-1].span());
+                self.tv[self.tok_num-1].span());
     }
 
     fn err_invalid_expression(&self, diags: &mut Diags, code: &str) {
@@ -255,15 +256,23 @@ impl<'toks> Ast<'toks> {
         diags.err1("AST_14", &m, self.tv[brace_tok_num].span());
     }
 
-    /// Attempts to advance the token number past the next semicolon.
-    /// The final token number may be invalid.  This function is
-    /// used to try to recover from syntax errors.
+    /// Attempts to advance the token number past the next semicolon. The final
+    /// token number may be invalid.  This function is used to try to recover
+    /// from syntax errors.
+    ///
+    /// If the current token is already one past a semicolon, then do nothing.
+    /// This case occurs when the semicolon itself was unexpected, e.g. missing
+    /// close paren like assert(1;
     fn advance_past_semicolon(&mut self) {
+        assert!(self.tok_num > 0);
         self.dbg_enter("advance_past_semicolon");
-        assert!(self.tok_num != 0);
-        while let Some(tinfo) = self.take() {
-            if tinfo.tok == LexToken::Semicolon {
-                break;
+        if let Some(prev_tinfo) = self.tv.get(self.tok_num - 1) {
+            if prev_tinfo.tok != LexToken::Semicolon {
+                while let Some(tinfo) = self.take() {
+                    if tinfo.tok == LexToken::Semicolon {
+                        break;
+                    }
+                }
             }
         }
         debug!("Ast::advance_past_semicolon: Stopped on token {}", self.tok_num);
@@ -336,6 +345,24 @@ impl<'toks> Ast<'toks> {
         false
     }
 
+    /// Expect an expression which cannot be None.
+    fn expect_expr(&mut self, parent : NodeId, diags: &mut Diags) -> bool {
+
+        let mut expr_opt = None;
+        if !self.parse_pratt(0, &mut expr_opt, diags) {
+            return false;
+        }
+        if expr_opt.is_none() {
+            let tinfo = self.get_tinfo(parent);
+            let msg = format!("Expected valid expression inside parentheses after {:?}", tinfo.tok);
+            diags.err1("AST_12", &msg, tinfo.span());
+            return false;
+        }
+        // Success, add the expression a child of the input parent node.
+        parent.append(expr_opt.unwrap(), &mut self.arena);
+        true
+    }
+
     /// Expect zero or one instance of specified tokens.
     /// If we find an allowed found, add it to the parent and advance.
     /// If not found, do nothing and return success
@@ -354,6 +381,7 @@ impl<'toks> Ast<'toks> {
     }
 
     /// Expect the specified token and advance without adding to the parent.
+    // TODO reorder parameters so diags is last
     fn expect_token_no_add(&mut self, tok: LexToken, diags: &mut Diags) -> bool {
 
         if let Some(tinfo) = self.peek() {
@@ -362,7 +390,7 @@ impl<'toks> Ast<'toks> {
                 return true;
             } else {
                 let msg = format!("Expected {:?}", tok);
-                self.err_expected_after(diags, "AST_22", &msg);
+                self.err_expected_after(diags, "AST_20", &msg);
             }
         } else {
             self.err_no_input(diags);
@@ -401,9 +429,22 @@ impl<'toks> Ast<'toks> {
         self.dbg_enter("parse_section_contents");
         let mut result = true; // todo fixme
 
+        let mut tok_num_old = 0;
         while let Some(tinfo) = self.peek() {
             debug!("Ast::parse_section_contents: token {}:{}", self.tok_num, tinfo.val);
-            // todo rewrite as match statement
+            if tok_num_old == self.tok_num {
+                // In some error cases, such as a missing closing brace, parsing
+                // can get stuck without advancing the token pointer.  For
+                // example, this problem occurs because an error occurs at the
+                // very start of a new expression.  The advance_past_semicolon
+                // function won't move us forward since we're already past a
+                // semicolon and at the start of a new statement. As a simple
+                // solution, detect that we're not making forward progress and
+                // force the token number forward.
+                self.tok_num += 1;
+                continue;
+            }
+            tok_num_old = self.tok_num;
             // When we find a close brace, we're done with section content
             if tinfo.tok == LexToken::CloseBrace {
                 self.parse_leaf(parent);
@@ -425,7 +466,6 @@ impl<'toks> Ast<'toks> {
             };
 
             if !parse_ok {
-                self.take();
                 debug!("Ast::parse_section_contents: skipping to next ; starting from {}", self.tok_num);
                 // Consume the bad token and skip forward    
                 self.advance_past_semicolon();
@@ -492,144 +532,150 @@ impl<'toks> Ast<'toks> {
             LexToken::GEq => (5,6),
             LexToken::DoubleAmpersand => (3,4),
             LexToken::DoublePipe => (1,2),
+            // comma is one of the fall through cases with 0 precedence
             _ => (0,0),
         }
     }
 
     /// Parse an expression with correct precedence up to the next semicolon.
-    /// This is a Pratt parser that returns the NodeID at the top of the local AST.
+    /// This is a Pratt parser aka precedence climbing parser that returns the NodeID
+    /// at the top of the local AST, or None if the expression is complete.
     /// See https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
     /// for a nice explanation of Pratt parsers with Rust.
-    /// On return, the terminal semicolon will be the next unprocessed token.
-    fn parse_pratt(&mut self, min_bp: u8, result: &mut bool, diags: &mut Diags) -> Option<NodeId> {
+    /// On successful return, the terminal semicolon will be the next unprocessed token.
+    fn parse_pratt(&mut self, min_bp: u8, top: &mut Option<NodeId>, diags: &mut Diags) -> bool {
 
         self.dbg_enter("parse_pratt");
         debug!("Ast::parse_pratt: Min BP = {}", min_bp);
         let lhs_tinfo = self.peek();
         if lhs_tinfo.is_none() {
-            *result = false;
             self.err_no_input(diags);
-            return self.dbg_exit_pratt("parse_pratt", None);
+            return self.dbg_exit_pratt("parse_pratt", &None, false);
         }
 
         let lhs_tinfo = lhs_tinfo.unwrap();
 
-        let mut lhs_nid = match lhs_tinfo.tok {
-            LexToken::CloseParen |          // Finding a closing paren means we're done
-            LexToken::Semicolon => { None } // Finding a semicolon means we're done.
-            LexToken::OpenParen => {
-                self.tok_num += 1;
-                let mut lhs = self.parse_pratt(0, result, diags);
-                if lhs.is_some() {
-                    if let Some(paren_tinfo) = self.peek() {
-                        if paren_tinfo.tok == LexToken::CloseParen {
-                            self.tok_num += 1;
-                        } else {
-                            let msg = format!("Expected a closing ')' but found {}", paren_tinfo.val);
-                            diags.err1("AST_20", &msg, paren_tinfo.span());
-                            *result = false;
-                            lhs = None;
-                        }
-                    }
-                }
-                lhs
+        *top = None; // Initialize 
+
+        match lhs_tinfo.tok {
+
+            // Finding a close paren or a semi-colon terminates an expression.
+            LexToken::CloseParen |
+            LexToken::Semicolon => {
+                 /* top will be None */
+                 *top = None;
             }
+
+            // This open paren is precedence control in an expression, e.g. (1+2)*3.
+            // This is not an open paren associated with a built-in function.
+            LexToken::OpenParen => {
+                // move past the open paren without storing in the AST.
+                self.tok_num += 1;
+                // lhs is everything inside parentheses.
+                if !self.parse_pratt(0, top, diags) {
+                    return self.dbg_exit_pratt("parse_pratt", &None, false);
+                }
+                // Open paren must have a matching close paren.
+                if !self.expect_token_no_add(LexToken::CloseParen, diags) {
+                    return self.dbg_exit_pratt("parse_pratt", &None, false);
+                }
+            }
+
+            // These simple atoms end up as leaf nodes in the AST
             LexToken::QuotedString |
             LexToken::Integer |
             LexToken::I64 |
             LexToken::U64 => {
-                let lhs = Some(self.arena.new_node(self.tok_num));
+                *top = Some(self.arena.new_node(self.tok_num));
                 self.tok_num += 1;
-                lhs
             }
+
+            // Built-in functions with an optional identifier inside parens
+            // ( [optional identifier] )
             LexToken::Abs |
             LexToken::Img |
             LexToken::Sec => {
-                // We expect 2 or 3 tokens: '(' 'optional identifier' ')', but don't bother to record
-                // the surrounding parens to simplify later linearization
-                let assert_nid = self.arena.new_node(self.tok_num);
+                // Create the node for the function and move past
+                *top = Some(self.arena.new_node(self.tok_num));
                 self.tok_num += 1;
+
                 if !self.expect_token_no_add(LexToken::OpenParen, diags) {
-                    return self.dbg_exit_pratt("parse_pratt", None);
+                    return self.dbg_exit_pratt("parse_pratt", &None, false);
                 }
-                if !self.optional_token(&[LexToken::Identifier], diags, assert_nid) {
-                    return self.dbg_exit_pratt("parse_pratt", None);
+                if !self.optional_token(&[LexToken::Identifier], diags, top.unwrap()) {
+                    return self.dbg_exit_pratt("parse_pratt", &None, false);
                 }
                 if !self.expect_token_no_add(LexToken::CloseParen, diags) {
-                    return self.dbg_exit_pratt("parse_pratt", None);
+                    return self.dbg_exit_pratt("parse_pratt", &None, false);
                 }
-
-                let lhs = Some(assert_nid);
-                lhs
             }
 
+            // Build-in functions with a mandatory identifier inside parens
+            // ( <identifier> )
+            LexToken::Sizeof => {
+                *top = Some(self.arena.new_node(self.tok_num));
+                self.tok_num += 1;
+
+                if !self.expect_token_no_add(LexToken::OpenParen, diags) {
+                    return self.dbg_exit_pratt("parse_pratt", &None, false);
+                }
+                if !self.expect_token(LexToken::Identifier, diags, top.unwrap()) {
+                    return self.dbg_exit_pratt("parse_pratt", &None, false);
+                }
+                if !self.expect_token_no_add(LexToken::CloseParen, diags) {
+                    return self.dbg_exit_pratt("parse_pratt", &None, false);
+                }
+            }
+
+
+            // Built-in functions with a non-optional expression inside parens
+            // ( <expr> )
             LexToken::ToI64 |
             LexToken::ToU64 => {
-                // We expect '(' <expr> ')', which is the same
-                // as a normal parenthesized expression.
-                let tox64_nid = self.arena.new_node(self.tok_num);
+                *top = Some(self.arena.new_node(self.tok_num));
                 self.tok_num += 1;
 
                 if !self.expect_token_no_add(LexToken::OpenParen, diags) {
-                    return self.dbg_exit_pratt("parse_pratt", None);
+                    return self.dbg_exit_pratt("parse_pratt", &None, false);
                 }
-                // We're inside parens, so reset minimum binding precedence to 0.
-                let expression_nid = self.parse_pratt(0, result, diags);
-                // If result is success, then keep processing
-                if let Some(expression_nid) = expression_nid {
-                    tox64_nid.append(expression_nid, &mut self.arena);
+                if !self.expect_expr(top.unwrap(), diags) {
+                    return self.dbg_exit_pratt("parse_pratt", &None, false);
                 }
                 if !self.expect_token_no_add(LexToken::CloseParen, diags) {
-                    return self.dbg_exit_pratt("parse_pratt", None);
+                    return self.dbg_exit_pratt("parse_pratt", &None, false);
                 }
-
-                let lhs = Some(tox64_nid);
-                lhs
             }
 
-            LexToken::Sizeof => {
-                // We expect 3 tokens: '(' 'identifier' ')', but don't bother to record
-                // the surrounding parens to simplify later linearization
-                let assert_nid = self.arena.new_node(self.tok_num);
-                self.tok_num += 1;
-                if !self.expect_token_no_add(LexToken::OpenParen, diags) {
-                    return self.dbg_exit_pratt("parse_pratt", None);
-                }
-                if !self.expect_token(LexToken::Identifier, diags, assert_nid) {
-                    return self.dbg_exit_pratt("parse_pratt", None);
-                }
-                if !self.expect_token_no_add(LexToken::CloseParen, diags) {
-                    return self.dbg_exit_pratt("parse_pratt", None);
-                }
-
-                let lhs = Some(assert_nid);
-                lhs
-            }
             _ => {
                 let msg = format!("Invalid expression operand '{}'", lhs_tinfo.val);
                 diags.err1("AST_19", &msg, lhs_tinfo.span());
-                None
+                return self.dbg_exit_pratt("parse_pratt", &None, false);
             }
         };
 
-        if lhs_nid.is_none() {
-            return self.dbg_exit_pratt("parse_pratt", None);
+        // Clean exit if this expression had no more tokens
+        if (*top).is_none() {
+            return self.dbg_exit_pratt("parse_pratt", &None, true);
         }
 
+        // Keep processing for the remaining right hand side of the expression.
         loop {
-
-            // We expect an operation such as add, a semicolon, or EOF.
+            // We expect an operation such as add, a semicolon, etc. or the end of input.
             let op_tinfo = self.peek();
             if op_tinfo.is_none() {
-                break;
+                break; // end of input.
             }
 
             // Screen out disallowed operations
             let op_tinfo = op_tinfo.unwrap();
             match op_tinfo.tok {
-                // Command and semi terminate an expression
+                // Comma, close paren and semi are terminating conditions
+                // because some upper layer is specifically looking for them.
                 LexToken::Comma |
+                LexToken::CloseParen |
                 LexToken::Semicolon => { break; }
+                LexToken::ToI64 |
+                LexToken::ToU64 |
                 LexToken::NEq |
                 LexToken::DoubleEq |
                 LexToken::DoubleGreater |
@@ -646,8 +692,8 @@ impl<'toks> Ast<'toks> {
                 LexToken::FSlash => {}
                 _ => {
                     let msg = format!("Invalid operation '{}'", op_tinfo.val);
-                    diags.err1("AST_18", &msg, op_tinfo.span());
-                    break;
+                    diags.err1("AST_9", &msg, op_tinfo.span());
+                    return self.dbg_exit_pratt("parse_pratt", &None, false);
                 }
             }
 
@@ -664,16 +710,20 @@ impl<'toks> Ast<'toks> {
             let op_nid = self.arena.new_node(self.tok_num);
             self.tok_num += 1;
 
-            // attach the left hand size as a child of the operation
-            op_nid.append(lhs_nid.unwrap(), &mut self.arena);
+            // Attach the old top as a child of the operation,
+            // then update the new top node
+            op_nid.append(top.unwrap(), &mut self.arena);
 
             // The operation is the new left-hand-side from our caller's point of view
-            lhs_nid = Some(op_nid);
+            *top = Some(op_nid);
 
             // Recurse into the right hand side of the operation, if any
-            let rhs_nid = self.parse_pratt(rbp, result, diags);
+            let mut rhs_opt = None;
+            if !self.parse_pratt(rbp, &mut rhs_opt, diags) {
+                return self.dbg_exit_pratt("parse_pratt", &None, false);
+            }
 
-            if let Some(rhs_nid) = rhs_nid {
+            if let Some(rhs_nid) = rhs_opt {
                 op_nid.append(rhs_nid, &mut self.arena);
             } else {
                 // RHS is none
@@ -681,29 +731,27 @@ impl<'toks> Ast<'toks> {
             }
         }
 
-    
-        self.dbg_exit_pratt("parse_pratt", lhs_nid)
+        self.dbg_exit_pratt("parse_pratt", top, true)
     }
 
     /// Parser for an assert statement
+    /// assert <expr> ;
     fn parse_assert(&mut self, parent: NodeId, diags: &mut Diags) -> bool {
 
         self.dbg_enter("parse_assert");
-        let mut result = true;
         // Add the assert keyword as a child of the parent
         let assert_nid = self.add_to_parent_and_advance(parent);
-        let expression_nid = self.parse_pratt(0, &mut result, diags);
+        let mut result = self.expect_expr(assert_nid, diags);
         if result {
-            if let Some(expression_nid) = expression_nid {
-                assert_nid.append(expression_nid, &mut self.arena);
-                result &= self.expect_semi(diags, assert_nid);
-            }
+            // Expression was OK
+            result &= self.expect_semi(diags, assert_nid);
         }
 
         self.dbg_exit("parse_assert", result)
     }
 
-    /// Parser for a print statement
+    /// Parser for a print statement with one or more expressions
+    /// print <expr> [, <expr>] ;
     fn parse_print(&mut self, parent: NodeId, diags: &mut Diags) -> bool {
 
         self.dbg_enter("parse_print");
@@ -711,25 +759,29 @@ impl<'toks> Ast<'toks> {
         // Add the print keyword as a child of the parent
         let print_nid = self.add_to_parent_and_advance(parent);
 
+        let mut expr_opt = None;
+
+        // Loop until we run out of comma separated expressions.
+        // After each return from parse_pratt, we should be pointing at a comma.
         loop {
-            let expression_nid = self.parse_pratt(0, &mut result, diags);
-            if result {
-                if let Some(expression_nid) = expression_nid {
-                    print_nid.append(expression_nid, &mut self.arena);
+            result &= self.parse_pratt(0, &mut expr_opt, diags);
+            if !result {
+                break; // error occurred
+            }
+            if let Some(expr_nid) = expr_opt {
+                print_nid.append(expr_nid, &mut self.arena);
 
-                    // Arguments to print are comma separated, but don't
-                    // clutter up the AST with the comma.  Just omit.
-                    if let Some(tinfo) = self.peek() {
-                        if tinfo.tok == LexToken::Comma {
-                            self.tok_num += 1;
-                            continue
-                        }
+                // Omit the comma from the AST to reduce clutter.
+                if let Some(tinfo) = self.peek() {
+                    if tinfo.tok == LexToken::Comma {
+                        self.tok_num += 1;
+                        continue
                     }
-
-                    // If not a comma, then we expect semi.
-                    result &= self.expect_semi(diags, print_nid);
-                    break;
                 }
+
+                // If not a comma, then we expect semi.
+                result &= self.expect_semi(diags, print_nid);
+                break;
             }
         }
 
