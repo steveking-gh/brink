@@ -318,9 +318,38 @@ An output statement specifies the section to write to the output file and an opt
 **A Brink program must have exactly one output statement.**
 
 ---
+
 ## `print <expression> [, <expression>, ...];`
 
-The print statement evaluates the comma separated list of expressions and prints them to the console.
+The print statement evaluates the comma separated list of expressions and prints them to the console.  For expressions, print displays unsigned values in hex and signed values in decimal.  If needed, the `to_u64` and to `to_i64` functions can control the output style.
+
+Brink executes a given print statement for each instance found in the output file.  In other words, a print statement in a section written multiple times will execute multiple times in the order found.
+
+Example:
+
+    section bar {
+        print "Section 'bar' starts at ", abs(), "\n";
+        wrs "bar";
+    }
+    
+    // top level section
+    section foo {
+        print "Output spans address range ", abs(foo), "-", abs(foo) + sizeof(foo),
+              " (", to_i64(sizeof(foo)), " bytes)\n";
+        wrs "foo";
+        wr bar;
+        wr bar;
+        wr bar;
+    }
+    
+    output foo 0x1000;  // starting absolute address is 0x1000
+
+Will result in the following console output:
+
+    Output spans address range 0x1000-0x100C (12 bytes)
+    Section 'bar' starts at 0x1003
+    Section 'bar' starts at 0x1006
+    Section 'bar' starts at 0x1009
 
 ---
 
