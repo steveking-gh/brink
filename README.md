@@ -215,7 +215,7 @@ As shown in the table, Brink will check some operations for arithmetic under/ove
 
 When called with an identifier, returns the absolute byte address of the identifier as a u64.  When called without an identifier, returns the current absolute address.  The absolute byte address is the image offset + the starting address specified in the `output` statement.
 
-### `abs` Example
+Example:
 
     section fiz {
         assert abs() == 0x1006;
@@ -251,7 +251,7 @@ When called with an identifier, returns the absolute byte address of the identif
 
 Reports an error if the specified expression does not evaluate to a true (non-zero) value.  Assert expressions provide a means of error checking and do not affect the output file.
 
-### `assert` Example
+Example:
 
     section foo {
         assert 1;   // OK, non-zero is true
@@ -267,7 +267,7 @@ Reports an error if the specified expression does not evaluate to a true (non-ze
 
 When called with an identifier, returns the byte offset as a u64 of the identifier from the start of the output image.  When called without an identifier, returns the current image offset.
 
-### `img` Example
+Example:
 
     section fiz {
         assert img() == 6;
@@ -303,7 +303,7 @@ When called with an identifier, returns the byte offset as a u64 of the identifi
 
 When called with an identifier, returns the byte offset as a u64 of the identifier from the start of the current section.  When called without an identifier, returns the current section offset.
 
-### `sec` Example
+Example:
 
     section fiz {
         assert sec() == 0;
@@ -360,7 +360,7 @@ Specifies the section to output and an optional absolute starting address.  With
 
 Converts the specified expression to the I64 type without regard to under/overflow.
 
-### `to_i64` Example
+Example:
 
     section foo {
         assert to_i64(0xFFFF_FFFF_FFFF_FFFF) == -1;
@@ -369,6 +369,23 @@ Converts the specified expression to the I64 type without regard to under/overfl
         assert to_i64(42) == 42i;
     }
 
+    output foo;
+
+---
+
+## `to_u64( <expression> )`
+
+Converts the specified expression to the U64 type without regard to under/overflow.
+
+Example:
+
+    section foo {
+        assert 0xFFFF_FFFF_FFFF_FFFF == to_u64(-1);
+        assert to_u64(42i) == 42;
+        assert to_u64(42i) == 42u;
+        assert to_u64(42) == 42u;
+    }
+    
     output foo;
 
 ---
