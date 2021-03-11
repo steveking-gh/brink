@@ -10,7 +10,7 @@ fuzz_target!(|data: &[u8]| {
     if let Ok(str_in) = std::str::from_utf8(data) {
         // Set the verbosity to 0 to avoid console error
         // messages during the test.
-        let mut diags = Diags::new("fuzz_target_1",str_in, 0);
+        let mut diags = Diags::new("fuzz_target_1",str_in, 0, false);
         if let Some(ast) = Ast::new(str_in, &mut diags) {
             if let Ok(ast_db) = AstDb::new(&mut diags, &ast) {
                 let _ = LinearDb::new(&mut diags, &ast, &ast_db, 0);

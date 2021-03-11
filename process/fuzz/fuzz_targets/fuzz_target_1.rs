@@ -8,6 +8,6 @@ fuzz_target!(|data: &[u8]| {
         // Get matches from a fake arg string, since we don't
         // want to process the fuzz testers actually command line!
         let args = App::new("brink").get_matches_from( vec![""]);
-        let _result = process("!! FUZZ TEST !!", str_in, &args, 0);
+        let _result = process("!! FUZZ TEST !!", str_in, &args, 0, false);
     }
 });
