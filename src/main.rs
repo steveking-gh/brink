@@ -64,6 +64,11 @@ fn main() -> Result<()> {
                 .value_name("output_file")
                 .takes_value(true)
                 .help("Specifies output file name.  Default is output.bin."))
+            .arg(Arg::with_name("noprint")
+                .long("noprint")
+                .value_name("noprint")
+                .takes_value(false)
+                .help("Suppresses console print statements in source code.  Default is false."))
             .arg(Arg::with_name("quiet")
                 .short("q")
                 .long("quiet")
@@ -94,5 +99,6 @@ fn main() -> Result<()> {
                 in_file_name, env::current_dir().unwrap().display()))?
         .replace("\r\n","\n");
 
-    process(&in_file_name, &str_in, &args, verbosity)
+    process(&in_file_name, &str_in, &args, verbosity,
+             args.is_present("noprint"))
 }

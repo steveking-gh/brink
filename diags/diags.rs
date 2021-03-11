@@ -10,15 +10,17 @@ pub struct Diags<'a> {
     source_map: SimpleFile<&'a str, &'a str>,
     config: codespan_reporting::term::Config,
     verbosity: u64,
+    pub noprint: bool,
 }
 
 impl<'a, 'msg> Diags<'a> {
-    pub fn new(name: &'a str, fstr: &'a str, verbosity: u64) -> Self {
+    pub fn new(name: &'a str, fstr: &'a str, verbosity: u64, noprint: bool) -> Self {
         Self {
             writer: StandardStream::stderr(ColorChoice::Always),
             source_map: SimpleFile::new(name,fstr),
             config: codespan_reporting::term::Config::default(),
-            verbosity
+            verbosity,
+            noprint,
         }
     }
 

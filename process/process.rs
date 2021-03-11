@@ -15,12 +15,13 @@ use log::{error, warn, info, debug, trace};
 /// Entry point for all processing on the input source file
 /// name: The name of the file
 /// fstr: A string containing the file
-pub fn process(name: &str, fstr: &str, args: &clap::ArgMatches, verbosity: u64)
+pub fn process(name: &str, fstr: &str, args: &clap::ArgMatches, verbosity: u64,
+                noprint: bool)
                -> Result<()> {
     info!("Processing {}", name);
     debug!("File contains: {}", fstr);
 
-    let mut diags = Diags::new(name,fstr,verbosity);
+    let mut diags = Diags::new(name,fstr,verbosity,noprint);
 
     let ast = Ast::new(fstr, &mut diags);
     if ast.is_none() {

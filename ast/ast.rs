@@ -442,6 +442,7 @@ impl<'toks> Ast<'toks> {
                 // solution, detect that we're not making forward progress and
                 // force the token number forward.
                 self.tok_num += 1;
+                debug!("parse_section_contents: Forcing forward progress.");
                 continue;
             }
             tok_num_old = self.tok_num;

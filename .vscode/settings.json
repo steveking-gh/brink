@@ -23,6 +23,7 @@
         "lindb",
         "lineardb",
         "nidvec",
+        "noprint",
         "opnd",
         "outp",
         "parms",

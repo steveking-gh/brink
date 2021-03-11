@@ -743,9 +743,15 @@ impl Engine {
         result
     }
 
+    /// Execute the print statement.
+    /// If the diags noprint option is true, suppress printing.
     fn execute_print(&self, ir: &IR, irdb: &IRDb, diags: &mut Diags, _file: &File)
                       -> Result<()> {
         self.trace("Engine::execute_print:");
+        if diags.noprint {
+            debug!("Suppressing print statements.");
+            return Ok(());
+        }
         let num_ops = ir.operands.len();
         let mut result = Ok(());
         for local_op_num in 0..num_ops {
