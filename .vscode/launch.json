@@ -23,7 +23,7 @@
                      "-v",
                      "-v",
                      "-v",
-                     "${workspaceFolder}/tests/missing_brace_1.brink"],
+                     "${workspaceFolder}/tests/fuzz_found_15.brink"],
         },
         {
             "type": "lldb",

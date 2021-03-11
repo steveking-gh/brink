@@ -783,6 +783,14 @@ impl<'toks> Ast<'toks> {
                 // If not a comma, then we expect semi.
                 result &= self.expect_semi(diags, print_nid);
                 break;
+            } else {
+                // the print statement ended in some unusual way, e.g. trailing comma.
+                // fuzz test found this with print 1,;
+                let msg = "Print statement ended unexpectedly";
+                let tinfo = self.get_tinfo(print_nid);
+                diags.err1("AST_21", &msg, tinfo.span());
+                result = false;
+                break;
             }
         }
 
