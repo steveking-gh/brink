@@ -496,6 +496,18 @@ fn fuzz_found_15() {
 }
 
 #[test]
+#[serial]
+fn fuzz_found_16() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/fuzz_found_16.brink")
+                .assert()
+                .success();
+
+    fs::remove_file("output.bin").unwrap();
+}
+
+#[test]
 fn missing_brace_1() {
     let _cmd = Command::cargo_bin("brink")
     .unwrap()
