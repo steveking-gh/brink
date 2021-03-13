@@ -213,7 +213,7 @@ impl Engine {
             diags.err1("EXEC_9", &msg, ir.src_loc.clone());
             result = false;
         } else {
-            *out = in0 << in1;
+            *out = in0.checked_shl(shift_amount.unwrap()).unwrap_or(0);
         }
         result
     }
@@ -226,7 +226,7 @@ impl Engine {
             diags.err1("EXEC_29", &msg, ir.src_loc.clone());
             result = false;
         } else {
-            *out = in0 << in1;
+            *out = in0.checked_shl(shift_amount.unwrap()).unwrap_or(0);
         }
         result
     }
@@ -240,7 +240,7 @@ impl Engine {
             diags.err1("EXEC_10", &msg, ir.src_loc.clone());
             result = false;
         } else {
-            *out = in0 >> in1;
+            *out = in0.checked_shr(shift_amount.unwrap()).unwrap_or(0);
         }
         result
     }
@@ -254,7 +254,7 @@ impl Engine {
             diags.err1("EXEC_20", &msg, ir.src_loc.clone());
             result = false;
         } else {
-            *out = in0 >> in1;
+            *out = in0.checked_shr(shift_amount.unwrap()).unwrap_or(0);
         }
         result
     }

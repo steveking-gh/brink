@@ -1,0 +1,5 @@
+section foo {// 3;
+    assert 0 >> 1490u == 42i; // = 0
+}
+
+output foo;
