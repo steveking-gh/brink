@@ -319,9 +319,17 @@ An output statement specifies the section to write to the output file and an opt
 
 ---
 
+<a id="print-statement"></a>
 ## `print <expression> [, <expression>, ...];`
-
 The print statement evaluates the comma separated list of expressions and prints them to the console.  For expressions, print displays unsigned values in hex and signed values in decimal.  If needed, the `to_u64` and to `to_i64` functions can control the output style.
+
+Writes the specified quoted string to the output.  Brink supports utf-8 quoted strings with escape characters
+
+* quote (\\\")
+* tab (\t)
+* newline (\n).
+
+Newlines are Linux style, so "A\n" is a two byte string on all platforms.
 
 Brink executes a given print statement for each instance found in the output file.  In other words, a print statement in a section written multiple times will execute multiple times in the order found.
 
@@ -455,11 +463,7 @@ Example:
 
 ---
 
-## `wrs "quoted string"`
+## `wrs <expression> [, <expression>, ...];`
 
-Writes the specified quoted string to the output.  Brink supports utf-8 quoted strings with escape characters
-* quote (\\\")
-* tab (\t)
-* newline (\n).
+The wrs statement evaluates the comma separated list of expressions and writes the resulting string to the output file.  Wrs accepts the same expressions and operates similarly to the print statement.  For more information, see [print](#print-statement).
 
-Newlines are Linux style, so "A\n" is a two byte string on all platforms.
