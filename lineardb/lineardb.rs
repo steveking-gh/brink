@@ -83,6 +83,7 @@ fn tok_to_irkind(tok: LexToken) -> IRKind {
         LexToken::Abs => { IRKind::Abs }
         LexToken::Img => { IRKind::Img }
         LexToken::Sec => { IRKind::Sec }
+        LexToken::Print => { IRKind::Print }
         bug => {
             panic!("Failed to convert LexToken to IRKind for {:?}", bug);
         }
@@ -232,15 +233,6 @@ impl<'toks> LinearDb {
                 // linear ID for the 'wr' and expect no operands.
                 *result &= self.operand_count_is_valid(0, &lops, diags, tinfo);
             }
-            LexToken::Wrs => {
-                // A vector to track the operands of this expression.
-                let mut lops = Vec::new();
-                // Write a fixed string. The string is the operand.
-                let ir_lid = self.new_ir(parent_nid, ast, IRKind::Wrs);
-                self.record_children_r(result, rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
-                // 1 operand expected
-                self.process_operands(result, 1, &mut lops, ir_lid, diags, tinfo);
-            }
             LexToken::Sizeof => {
                 // A vector to track the operands of this expression.
                 let mut lops = Vec::new();
@@ -299,11 +291,12 @@ impl<'toks> LinearDb {
                 // 1 operand expected
                 self.process_operands(result, 1, &mut lops, ir_lid, diags, tinfo);
             }
+            LexToken::Wrs |
             LexToken::Print => {
                 // A vector to track the operands of this expression.
                 let mut lops = Vec::new();
                 self.record_children_r(result, rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
-                let ir_lid = self.new_ir(parent_nid, ast, IRKind::Print);
+                let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tinfo.tok));
 
                 // Unlimited number of operands
                 for idx in lops {

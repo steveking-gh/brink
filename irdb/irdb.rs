@@ -188,7 +188,7 @@ impl IRDb {
     }
 
     // Print accepts most expressions without side effects
-    fn validate_print_operands(&self, _ir: &IR, _diags: &mut Diags) -> bool {
+    fn validate_string_expr_operands(&self, _ir: &IR, _diags: &mut Diags) -> bool {
         true
     }
 
@@ -231,7 +231,8 @@ impl IRDb {
     fn validate_operands(&self, ir: &IR, diags: &mut Diags) -> bool {
         let result = match ir.kind {
             IRKind::Assert => { self.validate_bool_operand(ir, diags) }
-            IRKind::Print => { self.validate_print_operands(ir, diags) }
+            IRKind::Wrs |
+            IRKind::Print => { self.validate_string_expr_operands(ir, diags) }
             IRKind::NEq |
             IRKind::LEq |
             IRKind::GEq |
@@ -256,8 +257,7 @@ impl IRDb {
             IRKind::Label |
             IRKind::Abs |
             IRKind::Img |
-            IRKind::Sec |
-            IRKind::Wrs => { true }
+            IRKind::Sec => { true }
         };
         result
     }

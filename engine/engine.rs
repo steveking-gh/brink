@@ -92,22 +92,60 @@ impl Engine {
         trace!("{}{}: {}", "    ".repeat(sec_depth), sec_name, msg);
     }
 
-    fn iterate_wrs(&mut self, ir: &IR, _irdb: &IRDb, _diags: &mut Diags,
+    fn iterate_wrs(&mut self, ir: &IR, irdb: &IRDb, diags: &mut Diags,
                     current: &mut Location) -> bool {
         self.trace(format!("Engine::iterate_wrs: img {}, sec {}",
                    current.img, current.sec).as_str());
-        // wrs takes one input parameter
-        assert!(ir.operands.len() == 1);
-        let in_parm_num0 = ir.operands[0];
-        let in_parm0 = self.parms[in_parm_num0].borrow();
+
+        let xstr_opt = self.evaluate_string_expr(ir, irdb, diags);
+        if xstr_opt.is_none() {
+            return false;
+        }
+
+        let xstr = xstr_opt.unwrap();
 
         // Will panic if usize does not fit in u64
-        let sz = in_parm0.to_str().len() as u64;
+        let sz = xstr.len() as u64;
         current.img += sz;
         current.sec += sz;
         
         true
     }
+
+    /// Compute the string representation of the expression.
+    /// Returns the resulting string in xstr.
+    /// If the diags noprint option is true, suppress printing.
+    /// Returns None of failure
+    fn evaluate_string_expr(&self, ir: &IR, irdb: &IRDb, diags: &mut Diags) -> Option<String> {
+        let num_ops = ir.operands.len();
+        let mut result = true;
+        let mut xstr = String::new();
+        for local_op_num in 0..num_ops {
+            let op_num = ir.operands[local_op_num];
+            let op = self.parms[op_num].borrow();
+            debug!("Processing string expr operand {} with data type {:?}", local_op_num, op.data_type);
+            match op.data_type {
+                DataType::QuotedString => { xstr.push_str(op.to_str()); }
+                DataType::U64 => { xstr.push_str(format!("{:#X}", op.to_u64()).as_str()); }
+                DataType::Integer |
+                DataType::I64 => { xstr.push_str(format!("{}", op.to_i64()).as_str()); }
+                bad => {
+                    let msg = format!("Cannot stringify type '{:?}'", bad );
+                    let src_loc = irdb.parms[op_num].src_loc.clone();
+                    diags.err1("EXEC_14", &msg, src_loc);
+                    result = false;
+                }
+            }
+        }
+
+        // If stringifying succeeded, return the String
+        if result {
+            Some(xstr)
+        } else {
+            None
+        }
+    }
+
 
     fn do_u64_add(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
         let check = in0.checked_add(in1);
@@ -288,7 +326,7 @@ impl Engine {
                     bad => {
                         let src_loc = irdb.parms[in_parm_num0].src_loc.clone();
                         let msg = format!("Can't convert from {:?} to U64", bad);
-                        diags.err1("EXEC_12", &msg, src_loc);
+                        diags.err1("EXEC_17", &msg, src_loc);
                         result = false;
                     }
                 }
@@ -658,6 +696,9 @@ impl Engine {
                     IRKind::ToI64 |
                     IRKind::ToU64 => { self.iterate_type_conversion(&ir, irdb, operation, &current, diags) }
                     IRKind::Sizeof => { self.iterate_sizeof(&ir, irdb, diags, &mut current) }
+
+                    // Unlike print, we have to iterate on the string write operation since
+                    // the size of the string affects the size of the output image.
                     IRKind::Wrs => { self.iterate_wrs(&ir, irdb, diags, &mut current) }
                     IRKind::Abs |
                     IRKind::Img |
@@ -753,34 +794,31 @@ impl Engine {
             debug!("Suppressing print statements.");
             return Ok(());
         }
-        let num_ops = ir.operands.len();
-        let mut result = Ok(());
-        for local_op_num in 0..num_ops {
-            let op_num = ir.operands[local_op_num];
-            let op = self.parms[op_num].borrow();
-            debug!("Processing print operand {} with data type {:?}", local_op_num, op.data_type);
-            match op.data_type {
-                DataType::QuotedString => { print!("{}", op.to_str()); }
-                DataType::U64 => { print!("{:#X}", op.to_u64()); }
-                DataType::Integer |
-                DataType::I64 => { print!("{}", op.to_i64()); }
-                bad => {
-                    let msg = format!("Cannot print type '{:?}'", bad );
-                    let src_loc = irdb.parms[op_num].src_loc.clone();
-                    diags.err1("EXEC_14", &msg, src_loc);
-                    result = Err(anyhow!("Print failed"));
-                }
-            }
+
+        let xstr_opt = self.evaluate_string_expr(ir, irdb, diags);
+        if xstr_opt.is_none() {
+            let msg = format!("Evaluating string expression failed.");
+            diags.err1("EXEC_16", &msg, ir.src_loc.clone());
+            return Err(anyhow!("Wrs failed"));
         }
 
-        result
+        let xstr = xstr_opt.unwrap();
+        print!("{}", xstr);
+        Ok(())
     }
 
-    fn execute_wrs(&self, ir: &IR, _irdb: &IRDb, diags: &mut Diags, file: &mut File)
+    fn execute_wrs(&self, ir: &IR, irdb: &IRDb, diags: &mut Diags, file: &mut File)
                    -> Result<()> {
         self.trace("Engine::execute_wrs:");
-        let buf = self.parms[ir.operands[0]].borrow();
-        let bufs = buf.to_str().as_bytes();
+        let xstr_opt = self.evaluate_string_expr(ir, irdb, diags);
+        if xstr_opt.is_none() {
+            let msg = format!("Evaluating string expression failed.");
+            diags.err1("EXEC_15", &msg, ir.src_loc.clone());
+            return Err(anyhow!("Wrs failed"));
+        }
+
+        let xstr = xstr_opt.unwrap();
+        let bufs = xstr.as_bytes();
         // the map_error lambda just converts io::error to a std::error
         let result = file.write_all(bufs)
                                      .map_err(|err|err.into());

@@ -1014,7 +1014,6 @@ fn quoted_escapes_1() {
                 .success();
 
     // Verify output file is correct.  If so, then clean up.
-    //assert_eq!("Wow1\n\nWow2\tWos3\n\"Wow4\"\n\"Wow5\"Wo\"w6\"", fs::read_to_string("quoted_escapes_1.bin").unwrap());
     assert_eq!("Wow1\n\nWow2\tWow3\n\"Wow4\"\n\"Wow5\"Wo\"w6\"", fs::read_to_string("quoted_escapes_1.bin").unwrap());
     fs::remove_file("quoted_escapes_1.bin").unwrap();
 }
@@ -1080,6 +1079,21 @@ fn print_2() {
 
     fs::remove_file("output.bin").unwrap();
 }
+
+#[test]
+fn wrs_1() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/wrs_1.brink")
+                .arg("-o wrs_1.bin")
+                .assert()
+                .success();
+
+    // Verify output file is correct.  If so, then clean up.
+    assert_eq!("123 Wow! 14 2\n", fs::read_to_string("wrs_1.bin").unwrap());
+    fs::remove_file("wrs_1.bin").unwrap();
+}
+
 
 } // mod tests
 

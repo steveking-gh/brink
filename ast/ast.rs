@@ -457,9 +457,9 @@ impl<'toks> Ast<'toks> {
             let parse_ok = match tinfo.tok {
                 LexToken::Label => self.parse_label(parent, diags),
                 LexToken::Wr => self.parse_wr(parent, diags),
-                LexToken::Wrs => self.parse_wrs(parent, diags),
                 LexToken::Assert => self.parse_assert(parent, diags),
-                LexToken::Print => self.parse_print(parent, diags),
+                LexToken::Wrs |
+                LexToken::Print => self.parse_string_expr(parent, diags),
                 _ => {
                     self.err_invalid_expression(diags, "AST_3");
                     false
@@ -494,22 +494,6 @@ impl<'toks> Ast<'toks> {
             result = self.expect_semi(diags, wr_nid);
         }
         self.dbg_exit("parse_wr", result)
-    }
-
-    /// Parser for writing a string
-    fn parse_wrs(&mut self, parent_nid : NodeId, diags: &mut Diags) -> bool {
-
-        self.dbg_enter("parse_wrs");
-        let mut result = false;
-        // Add the wrs keyword as a child of the parent and advance
-        let wrs_nid = self.add_to_parent_and_advance(parent_nid);
-
-        // Next, a quoted string is expected
-        if self.expect_leaf(diags, wrs_nid, LexToken::QuotedString, "AST_4",
-                    "Expected a quoted string after 'wrs'") {
-            result = self.expect_semi(diags, wrs_nid);
-        }
-        self.dbg_exit("parse_wrs", result)
     }
 
     /// Returns the (lhs,rhs) binding power for any token
@@ -753,9 +737,9 @@ impl<'toks> Ast<'toks> {
 
     /// Parser for a print statement with one or more expressions
     /// print <expr> [, <expr>] ;
-    fn parse_print(&mut self, parent: NodeId, diags: &mut Diags) -> bool {
+    fn parse_string_expr(&mut self, parent: NodeId, diags: &mut Diags) -> bool {
 
-        self.dbg_enter("parse_print");
+        self.dbg_enter("parse_string_expr");
         let mut result = true;
         // Add the print keyword as a child of the parent
         let print_nid = self.add_to_parent_and_advance(parent);
@@ -794,7 +778,7 @@ impl<'toks> Ast<'toks> {
             }
         }
 
-        self.dbg_exit("parse_print", result)
+        self.dbg_exit("parse_string_expr", result)
     }
 
     fn parse_label(&mut self, parent: NodeId, _diags: &mut Diags) -> bool {
