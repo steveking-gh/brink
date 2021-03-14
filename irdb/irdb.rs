@@ -81,6 +81,7 @@ impl IRDb {
             ast::LexToken::Asterisk |
             ast::LexToken::FSlash => {
                 // These operations have the same data type as their two inputs
+                // The data type must be numeric.
                 if lop.ir_lid.is_none() {
                     panic!("Output operand '{:?}' does not have a source lid", lop.tok);
                 }
@@ -100,7 +101,14 @@ impl IRDb {
                     if let Some(rhs_dt) = rhs_opt {
                         // We now have both lhs and rhs data types
                         if lhs_dt == rhs_dt {
-                            data_type = Some(lhs_dt);
+                            let allowed = [DataType::I64, DataType::U64, DataType::Integer];
+                            if !allowed.contains(&lhs_dt) {
+                                let msg = format!("Error, found data type '{:?}', but operation '{:?}' requires one of {:?}.",
+                                                lhs_dt, lop.tok, allowed);
+                                diags.err1("IRDB_2", &msg, lin_ir.src_loc.clone());
+                            } else {
+                                data_type = Some(lhs_dt);
+                            }
                         } else {
                             let mut dt_ok = false;
                             // Attempt to reconcile the data types

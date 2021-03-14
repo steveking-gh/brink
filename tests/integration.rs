@@ -518,6 +518,16 @@ fn fuzz_found_17() {
 }
 
 #[test]
+fn fuzz_found_18() {
+    let _cmd = Command::cargo_bin("brink")
+    .unwrap()
+    .arg("tests/fuzz_found_18.brink")
+    .assert()
+    .failure()
+    .stderr(predicates::str::contains("[IRDB_2]"));
+}
+
+#[test]
 fn missing_brace_1() {
     let _cmd = Command::cargo_bin("brink")
     .unwrap()

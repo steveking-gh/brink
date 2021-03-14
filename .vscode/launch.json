@@ -23,7 +23,7 @@
                      "-v",
                      "-v",
                      "-v",
-                     "${workspaceFolder}/tests/fuzz_found_17.brink"],
+                     "${workspaceFolder}/tests/fuzz_found_18.brink"],
         },
         {
             "type": "lldb",
