@@ -318,8 +318,6 @@ An output statement specifies the section to write to the output file and an opt
 **A Brink program must have exactly one output statement.**
 
 ---
-
-<a id="print-statement"></a>
 ## `print <expression> [, <expression>, ...];`
 The print statement evaluates the comma separated list of expressions and prints them to the console.  For expressions, print displays unsigned values in hex and signed values in decimal.  If needed, the `to_u64` and to `to_i64` functions can control the output style.
 
@@ -465,5 +463,5 @@ Example:
 
 ## `wrs <expression> [, <expression>, ...];`
 
-The wrs statement evaluates the comma separated list of expressions and writes the resulting string to the output file.  Wrs accepts the same expressions and operates similarly to the print statement.  For more information, see [print](#print-statement).
+The wrs statement evaluates the comma separated list of expressions and writes the resulting string to the output file.  Wrs accepts the same expressions and operates similarly to the print statement.  For more information, see [print](#print-expression--expression-).
 
