@@ -460,8 +460,36 @@ Example:
     output foo;
 
 ---
+## `wr8 <expression>;`
+## `wr16 <expression>;`
+## `wr24 <expression>;`
+## `wr32 <expression>;`
+## `wr40 <expression>;`
+## `wr48 <expression>;`
+## `wr56 <expression>;`
+## `wr64 <expression>;`
+Writes an expression as a little-endian binary value to the output file.  The expression is silently truncated to the specified bit length.
+
+Example:
+
+    // Test expressions in wrx
+    section foo {
+        wr8  (1 + 2) + img() + abs(foo) + sizeof(foo); // 3 + 0 + 10 + 36  = 49
+        wr16 (1 + 2) + img() + abs(foo) + sizeof(foo); // 3 + 1 + 10 + 36  = 50 00
+        wr24 (1 + 2) + img() + abs(foo) + sizeof(foo); // 3 + 3 + 10 + 36  = 52 00 00
+        wr32 (1 + 2) + img() + abs(foo) + sizeof(foo); // 3 + 6 + 10 + 36  = 55 00 00 00
+        wr40 (1 + 2) + img() + abs(foo) + sizeof(foo); // 3 + 10 + 10 + 36 = 59 00 00 00 00
+        wr48 (1 + 2) + img() + abs(foo) + sizeof(foo); // 3 + 15 + 10 + 36 = 64 00 00 00 00 00
+        wr56 (1 + 2) + img() + abs(foo) + sizeof(foo); // 3 + 21 + 10 + 36 = 70 00 00 00 00 00 00
+        wr64 (1 + 2) + img() + abs(foo) + sizeof(foo); // 3 + 28 + 10 + 36 = 77 00 00 00 00 00 00 00
+        assert sizeof(foo) == 36;
+    }
+    
+    output foo 10;
+
+---
 
 ## `wrs <expression> [, <expression>, ...];`
 
-The wrs statement evaluates the comma separated list of expressions and writes the resulting string to the output file.  Wrs accepts the same expressions and operates similarly to the print statement.  For more information, see [print](#print-expression--expression-).
+Evaluates the comma separated list of expressions and writes the resulting string to the output file.  Wrs accepts the same expressions and operates similarly to the print statement.  For more information, see [print](#print-expression--expression-).
 
