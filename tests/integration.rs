@@ -1107,6 +1107,7 @@ fn wrx_1() {
     assert_eq!("1\n12\n123\n1234\n12345\n123456\n1234567\n12345678\n", fs::read_to_string("wrx_1.bin").unwrap());
     fs::remove_file("wrx_1.bin").unwrap();
 }
+
 #[test]
 #[serial]
 fn wrx_2() {
@@ -1129,6 +1130,66 @@ fn wrx_3() {
                 .success();
 
     fs::remove_file("output.bin").unwrap();
+}
+
+#[test]
+fn wrx_4() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/wrx_4.brink")
+                .arg("-o wrx_4.bin")
+                .assert()
+                .success();
+
+    // Verify output file is correct.  If so, then clean up.
+    let bytevec = fs::read("wrx_4.bin").unwrap();
+    assert!(bytevec.len() == 36);
+    // wr8
+    assert_eq!(bytevec[0], 49);
+    // wr16
+    assert_eq!(bytevec[1], 50);
+    assert_eq!(bytevec[2], 00);
+    // wr24
+    assert_eq!(bytevec[3], 52);
+    assert_eq!(bytevec[4], 00);
+    assert_eq!(bytevec[5], 00);
+    // wr32
+    assert_eq!(bytevec[6], 55);
+    assert_eq!(bytevec[7], 00);
+    assert_eq!(bytevec[8], 00);
+    assert_eq!(bytevec[9], 00);
+    // wr40
+    assert_eq!(bytevec[10], 59);
+    assert_eq!(bytevec[11], 00);
+    assert_eq!(bytevec[12], 00);
+    assert_eq!(bytevec[13], 00);
+    assert_eq!(bytevec[14], 00);
+    // wr48
+    assert_eq!(bytevec[15], 64);
+    assert_eq!(bytevec[16], 00);
+    assert_eq!(bytevec[17], 00);
+    assert_eq!(bytevec[18], 00);
+    assert_eq!(bytevec[19], 00);
+    assert_eq!(bytevec[20], 00);
+    // wr56
+    assert_eq!(bytevec[21], 70);
+    assert_eq!(bytevec[22], 00);
+    assert_eq!(bytevec[23], 00);
+    assert_eq!(bytevec[24], 00);
+    assert_eq!(bytevec[25], 00);
+    assert_eq!(bytevec[26], 00);
+    assert_eq!(bytevec[27], 00);
+    // wr64
+    assert_eq!(bytevec[28], 77);
+    assert_eq!(bytevec[29], 00);
+    assert_eq!(bytevec[30], 00);
+    assert_eq!(bytevec[31], 00);
+    assert_eq!(bytevec[32], 00);
+    assert_eq!(bytevec[33], 00);
+    assert_eq!(bytevec[34], 00);
+    assert_eq!(bytevec[35], 00);
+
+    fs::remove_file("wrx_4.bin").unwrap();
 }
 
 
