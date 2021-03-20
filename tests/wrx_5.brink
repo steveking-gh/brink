@@ -1,0 +1,15 @@
+
+// Test expressions in wrx
+section foo {
+    wr8  0x42EF_CDAB_7856_3412; // 12
+    wr16 0x42EF_CDAB_7856_3412; // 12 34
+    wr24 0x42EF_CDAB_7856_3412; // 12 34 56 
+    wr32 0x42EF_CDAB_7856_3412; // 12 34 56 78
+    wr40 0x42EF_CDAB_7856_3412; // 12 34 56 78 AB
+    wr48 0x42EF_CDAB_7856_3412; // 12 34 56 78 AB CD
+    wr56 0x42EF_CDAB_7856_3412; // 12 34 56 78 AB CD EF
+    wr64 0x42EF_CDAB_7856_3412; // 12 34 56 78 AB CD EF 42
+    assert sizeof(foo) == 36;
+}
+
+output foo 10;

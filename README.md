@@ -468,7 +468,8 @@ Example:
 ## `wr48 <expression>;`
 ## `wr56 <expression>;`
 ## `wr64 <expression>;`
-Writes an expression as a little-endian binary value to the output file.  The expression is silently truncated to the specified bit length.
+
+Evaluates the expression and writes the result as a little-endian binary value to the output file.  Upper bits of the result value are silently truncated to the specified bit length.
 
 Example:
 

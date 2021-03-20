@@ -1192,6 +1192,66 @@ fn wrx_4() {
     fs::remove_file("wrx_4.bin").unwrap();
 }
 
+#[test]
+fn wrx_5() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/wrx_5.brink")
+                .arg("-o wrx_5.bin")
+                .assert()
+                .success();
+
+    // Verify output file is correct.  If so, then clean up.
+    let bytevec = fs::read("wrx_5.bin").unwrap();
+    assert!(bytevec.len() == 36);
+    // wr8
+    assert_eq!(bytevec[0], 0x12);
+    // wr16
+    assert_eq!(bytevec[1], 0x12);
+    assert_eq!(bytevec[2], 0x34);
+    // wr24
+    assert_eq!(bytevec[3], 0x12);
+    assert_eq!(bytevec[4], 0x34);
+    assert_eq!(bytevec[5], 0x56);
+    // wr32
+    assert_eq!(bytevec[6], 0x12);
+    assert_eq!(bytevec[7], 0x34);
+    assert_eq!(bytevec[8], 0x56);
+    assert_eq!(bytevec[9], 0x78);
+    // wr40
+    assert_eq!(bytevec[10], 0x12);
+    assert_eq!(bytevec[11], 0x34);
+    assert_eq!(bytevec[12], 0x56);
+    assert_eq!(bytevec[13], 0x78);
+    assert_eq!(bytevec[14], 0xAB);
+    // wr48
+    assert_eq!(bytevec[15], 0x12);
+    assert_eq!(bytevec[16], 0x34);
+    assert_eq!(bytevec[17], 0x56);
+    assert_eq!(bytevec[18], 0x78);
+    assert_eq!(bytevec[19], 0xAB);
+    assert_eq!(bytevec[20], 0xCD);
+    // wr56
+    assert_eq!(bytevec[21], 0x12);
+    assert_eq!(bytevec[22], 0x34);
+    assert_eq!(bytevec[23], 0x56);
+    assert_eq!(bytevec[24], 0x78);
+    assert_eq!(bytevec[25], 0xAB);
+    assert_eq!(bytevec[26], 0xCD);
+    assert_eq!(bytevec[27], 0xEF);
+    // wr64
+    assert_eq!(bytevec[28], 0x12);
+    assert_eq!(bytevec[29], 0x34);
+    assert_eq!(bytevec[30], 0x56);
+    assert_eq!(bytevec[31], 0x78);
+    assert_eq!(bytevec[32], 0xAB);
+    assert_eq!(bytevec[33], 0xCD);
+    assert_eq!(bytevec[34], 0xEF);
+    assert_eq!(bytevec[35], 0x42);
+
+    fs::remove_file("wrx_5.bin").unwrap();
+}
+
 
 } // mod tests
 
