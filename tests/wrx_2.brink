@@ -1,0 +1,47 @@
+section foo1 {
+    assert img(foo1) == 0;
+    assert img(foo2) == 1;
+    assert sizeof(foo1) == 1;
+    assert sizeof(foo2) == 2;
+    assert sizeof(bar) == 3;
+    wr8 0x01;
+    assert img(foo1) == 0;
+    assert img(foo2) == 1;
+    assert sizeof(foo1) == 1;
+    assert sizeof(foo2) == 2;
+    assert sizeof(bar) == 3;
+}
+section foo2 {
+    assert img(foo1) == 0;
+    assert img(foo2) == 1;
+    assert sizeof(foo1) == 1;
+    assert sizeof(foo2) == 2;
+    assert sizeof(bar) == 3;
+    wr16 0x02;
+    assert img(foo1) == 0;
+    assert img(foo2) == 1;
+    assert sizeof(foo1) == 1;
+    assert sizeof(foo2) == 2;
+    assert sizeof(bar) == 3;
+}
+section bar {
+    assert img(foo1) == 0;
+    assert img(foo2) == 1;
+    assert sizeof(foo1) == 1;
+    assert sizeof(foo2) == 2;
+    assert sizeof(bar) == 3;
+    wr foo1;
+    assert img(foo1) == 0;
+    assert img(foo2) == 1;
+    assert sizeof(foo1) == 1;
+    assert sizeof(foo2) == 2;
+    assert sizeof(bar) == 3;
+    wr foo2;
+    assert img(foo1) == 0;
+    assert img(foo2) == 1;
+    assert sizeof(foo1) == 1;
+    assert sizeof(foo2) == 2;
+    assert sizeof(bar) == 3;
+}
+
+output bar;

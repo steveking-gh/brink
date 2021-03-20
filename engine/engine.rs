@@ -497,12 +497,25 @@ impl Engine {
         assert!(ir_rng.start <= ir_rng.end);
         let start_loc = &self.ir_locs[ir_rng.start];
         let end_loc = &self.ir_locs[ir_rng.end];
-        let sz = end_loc.img - start_loc.img;
-        self.trace(format!("Sizeof {} is currently {}", sec_name, sz).as_str());
-        // We'll at least panic at runtime if conversion from
-        // usize to u64 fails instead of bad output binary.
-        *out = sz.try_into().unwrap();
-    
+
+        if start_loc.img > end_loc.img {
+            // When the start has a larger image offset than the end, it means
+            // something before this section grew significant during the current
+            // iteration.  The starting offset has already been updated during
+            // this iteration, but not yet th end.  In this case, report a zero
+            // size and wait for the next iteration where the ending offset will
+            // be more accurate.
+            self.trace(format!("Starting img offset {} > ending img offset {} in {}",
+                       start_loc.img, end_loc.img, sec_name).as_str());
+            *out = 0;
+
+        } else {
+            let sz = end_loc.img - start_loc.img;
+            self.trace(format!("Sizeof {} is currently {}", sec_name, sz).as_str());
+            // We'll at least panic at runtime if conversion from
+            // usize to u64 fails instead of bad output binary.
+            *out = sz.try_into().unwrap();
+        }
         
         true
     }
@@ -672,7 +685,7 @@ impl Engine {
             assert!(self.sec_offsets.len() == 0);
 
             for (lid,ir) in irdb.ir_vec.iter().enumerate() {
-                debug!("Engine::iterate on lid {}", lid);
+                debug!("Engine::iterate on lid {} at img offset {}", lid, current.img);
                 // record our location after each IR
                 self.ir_locs[lid] = current.clone();
                 let operation = ir.kind;
@@ -706,17 +719,17 @@ impl Engine {
                     IRKind::SectionStart => { self.iterate_section_start(ir, irdb, diags, &mut current) }
                     IRKind::SectionEnd => { self.iterate_section_end(ir, irdb, diags, &mut current) }
 
+                    IRKind::Wr8  => { current.sec += 1; current.img += 1; true }
+                    IRKind::Wr16 => { current.sec += 2; current.img += 2; true }
+                    IRKind::Wr24 => { current.sec += 3; current.img += 3; true }
+                    IRKind::Wr32 => { current.sec += 4; current.img += 4; true }
+                    IRKind::Wr40 => { current.sec += 5; current.img += 5; true }
+                    IRKind::Wr48 => { current.sec += 6; current.img += 6; true }
+                    IRKind::Wr56 => { current.sec += 7; current.img += 7; true }
+                    IRKind::Wr64 => { current.sec += 8; current.img += 8; true }
                     // The following IR types are evaluated only at execute time.
                     // Nothing to do during iteration.
                     IRKind::Label |
-                    IRKind::Wr8  |
-                    IRKind::Wr16 |
-                    IRKind::Wr24 |
-                    IRKind::Wr32 |
-                    IRKind::Wr40 |
-                    IRKind::Wr48 |
-                    IRKind::Wr56 |
-                    IRKind::Wr64 |
                     IRKind::Assert |
                     IRKind::Print |
                     IRKind::I64 |

@@ -1,0 +1,54 @@
+section foo1 {
+    wr8 0x01;
+    assert sizeof(foo1) == 0x01;
+    assert sizeof(bar) == 36;
+}
+section foo2 {
+    wr16 0x02;
+    assert sizeof(foo2) == 0x02;
+    assert sizeof(bar) == 36;
+}
+section foo3 {
+    wr24 0x03;
+    assert sizeof(foo3) == 0x03;
+    assert sizeof(bar) == 36;
+}
+section foo4 {
+    wr32 0x04;
+    assert sizeof(foo4) == 0x04;
+    assert sizeof(bar) == 36;
+}
+section foo5 {
+    wr40 0x05;
+    assert sizeof(foo5) == 0x05;
+    assert sizeof(bar) == 36;
+}
+section foo6 {
+    wr48 0x06;
+    assert sizeof(foo6) == 0x06;
+    assert sizeof(bar) == 36;
+}
+section foo7 {
+    wr56 0x07;
+    assert sizeof(foo7) == 0x07;
+    assert sizeof(bar) == 36;
+}
+section foo8 {
+    wr64 0x08;
+    assert sizeof(foo8) == 0x08;
+    assert sizeof(bar) == 36;
+}
+
+section bar {
+    assert sizeof(bar) == 36;
+    wr foo1;
+    wr foo2;
+    wr foo3;
+    wr foo4;
+    wr foo5;
+    wr foo6;
+    wr foo7;
+    wr foo8;
+}
+
+output bar;

@@ -1107,6 +1107,29 @@ fn wrx_1() {
     assert_eq!("1\n12\n123\n1234\n12345\n123456\n1234567\n12345678\n", fs::read_to_string("wrx_1.bin").unwrap());
     fs::remove_file("wrx_1.bin").unwrap();
 }
+#[test]
+#[serial]
+fn wrx_2() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/wrx_2.brink")
+                .assert()
+                .success();
+
+    fs::remove_file("output.bin").unwrap();
+}
+
+#[test]
+#[serial]
+fn wrx_3() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/wrx_3.brink")
+                .assert()
+                .success();
+
+    fs::remove_file("output.bin").unwrap();
+}
 
 
 } // mod tests
