@@ -62,6 +62,15 @@ impl<'toks> LinIR {
 
 fn tok_to_irkind(tok: LexToken) -> IRKind {
     match tok {
+        LexToken::Wr8 =>  { IRKind::Wr8 }
+        LexToken::Wr16 => { IRKind::Wr16 }
+        LexToken::Wr24 => { IRKind::Wr24 }
+        LexToken::Wr32 => { IRKind::Wr32 }
+        LexToken::Wr40 => { IRKind::Wr40 }
+        LexToken::Wr48 => { IRKind::Wr48 }
+        LexToken::Wr56 => { IRKind::Wr56 }
+        LexToken::Wr64 => { IRKind::Wr64 }
+        LexToken::Assert => { IRKind::Assert }
         LexToken::Wrs => { IRKind::Wrs }
         LexToken::NEq => { IRKind::NEq }
         LexToken::DoubleEq => { IRKind::DoubleEq }
@@ -283,11 +292,19 @@ impl<'toks> LinearDb {
                 self.operand_vec.push(LinOperand::new(None, parent_nid,ast,tok));
                 returned_operands.push(idx);
             }
+            LexToken::Wr8  |
+            LexToken::Wr16 |
+            LexToken::Wr24 |
+            LexToken::Wr32 |
+            LexToken::Wr40 |
+            LexToken::Wr48 |
+            LexToken::Wr56 |
+            LexToken::Wr64 |
             LexToken::Assert => {
                 // A vector to track the operands of this expression.
                 let mut lops = Vec::new();
                 self.record_children_r(result, rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
-                let ir_lid = self.new_ir(parent_nid, ast, IRKind::Assert);
+                let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tinfo.tok));
                 // 1 operand expected
                 self.process_operands(result, 1, &mut lops, ir_lid, diags, tinfo);
             }

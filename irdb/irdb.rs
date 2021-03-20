@@ -133,6 +133,14 @@ impl IRDb {
                     }
                 }
             }
+            ast::LexToken::Wr8  |
+            ast::LexToken::Wr16 |
+            ast::LexToken::Wr24 |
+            ast::LexToken::Wr32 |
+            ast::LexToken::Wr40 |
+            ast::LexToken::Wr48 |
+            ast::LexToken::Wr56 |
+            ast::LexToken::Wr64 |
             ast::LexToken::Assert |
             ast::LexToken::Print |
             ast::LexToken::Section |
@@ -193,16 +201,16 @@ impl IRDb {
     }
 
     // Expect 1 operand which is an integer of some sort or bool
-    fn validate_bool_operand(&self, ir: &IR, diags: &mut Diags) -> bool {
+    fn validate_numeric_operand(&self, ir: &IR, diags: &mut Diags) -> bool {
         let len = ir.operands.len();
         if len != 1 {
-            let m = format!("'{:?}' expressions must evaluate to one boolean operand, but found {} operands.", ir.kind, len);
+            let m = format!("'{:?}' expressions must evaluate to one operand, but found {}.", ir.kind, len);
             diags.err1("IRDB_4", &m, ir.src_loc.clone());
             return false;
         }
         let opnd = &self.parms[ir.operands[0]];
         if ![DataType::Integer, DataType::I64, DataType::U64].contains(&opnd.data_type) {
-            let m = format!("'{:?}' expressions require an integer or boolean operand, found '{:?}'.", ir.kind, opnd.data_type);
+            let m = format!("'{:?}' expression requires an integer or boolean operand, found '{:?}'.", ir.kind, opnd.data_type);
             diags.err2("IRDB_5", &m, ir.src_loc.clone(), opnd.src_loc.clone());
             return false;
         }
@@ -210,17 +218,17 @@ impl IRDb {
     }
 
     // Expect 2 operand which are int or bool
-    fn validate_arithmetic_operands(&self, ir: &IR, diags: &mut Diags) -> bool {
+    fn validate_numeric_operands2(&self, ir: &IR, diags: &mut Diags) -> bool {
         let len = ir.operands.len();
         if len != 3 {
-            let m = format!("'{:?}' expressions must evaluate to 2 input and one output operands, but found {} total operands.", ir.kind, len);
+            let m = format!("'{:?}' expression requires 2 input and one output operands, but found {} total operands.", ir.kind, len);
             diags.err1("IRDB_6", &m, ir.src_loc.clone());
             return false;
         }
         for op_num in 0..2 {
             let opnd = &self.parms[ir.operands[op_num]];
             if ![DataType::Integer, DataType::I64, DataType::U64].contains(&opnd.data_type) {
-                let m = format!("'{:?}' expressions require an integer, found '{:?}'.", ir.kind, opnd.data_type);
+                let m = format!("'{:?}' expression requires an integer, found '{:?}'.", ir.kind, opnd.data_type);
                 diags.err2("IRDB_7", &m, ir.src_loc.clone(), opnd.src_loc.clone());
                 return false;
             }
@@ -230,7 +238,15 @@ impl IRDb {
 
     fn validate_operands(&self, ir: &IR, diags: &mut Diags) -> bool {
         let result = match ir.kind {
-            IRKind::Assert => { self.validate_bool_operand(ir, diags) }
+            IRKind::Wr8 |
+            IRKind::Wr16 |
+            IRKind::Wr24 |
+            IRKind::Wr32 |
+            IRKind::Wr40 |
+            IRKind::Wr48 |
+            IRKind::Wr56 |
+            IRKind::Wr64 |
+            IRKind::Assert => { self.validate_numeric_operand(ir, diags) }
             IRKind::Wrs |
             IRKind::Print => { self.validate_string_expr_operands(ir, diags) }
             IRKind::NEq |
@@ -246,7 +262,7 @@ impl IRDb {
             IRKind::BitOr |
             IRKind::LogicalOr |
             IRKind::Subtract |
-            IRKind::Add => { self.validate_arithmetic_operands(ir, diags) }
+            IRKind::Add => { self.validate_numeric_operands2(ir, diags) }
             IRKind::ToI64 |
             IRKind::ToU64 |
             IRKind::U64 |

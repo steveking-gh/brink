@@ -42,6 +42,14 @@ pub enum IRKind {
     ToU64,
     U64,
     Wrs,
+    Wr8,
+    Wr16,
+    Wr24,
+    Wr32,
+    Wr40,
+    Wr48,
+    Wr56,
+    Wr64,
 }
 
 #[derive(Debug)]

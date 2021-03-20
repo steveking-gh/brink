@@ -709,6 +709,14 @@ impl Engine {
                     // The following IR types are evaluated only at execute time.
                     // Nothing to do during iteration.
                     IRKind::Label |
+                    IRKind::Wr8  |
+                    IRKind::Wr16 |
+                    IRKind::Wr24 |
+                    IRKind::Wr32 |
+                    IRKind::Wr40 |
+                    IRKind::Wr48 |
+                    IRKind::Wr56 |
+                    IRKind::Wr64 |
                     IRKind::Assert |
                     IRKind::Print |
                     IRKind::I64 |
@@ -830,6 +838,53 @@ impl Engine {
         result
     }
 
+    fn execute_wrx(&self, ir: &IR, _irdb: &IRDb, diags: &mut Diags, file: &mut File)
+                   -> Result<()> {
+        self.trace(format!("Engine::execute_wrx: {:?}", ir.kind ).as_str());
+        let wrx_byte_width = match ir.kind {
+            IRKind::Wr8  => 1,
+            IRKind::Wr16 => 2,
+            IRKind::Wr24 => 3,
+            IRKind::Wr32 => 4,
+            IRKind::Wr40 => 5,
+            IRKind::Wr48 => 6,
+            IRKind::Wr56 => 7,
+            IRKind::Wr64 => 8,
+            bad => { panic!("Called execute_wrs with {:?}", bad); }
+        };
+
+        let opnd_num = ir.operands[0];
+        self.trace(format!("engine::execute_wrx: checking operand {}", opnd_num).as_str());
+        let parm = self.parms[opnd_num].borrow();
+
+        // Extract bytes as little-endian.  One a big-endian machine, the LSB will
+        // bit the highest address location, which is wrong since we're writing
+        // from the lowest address.
+        let buf = match parm.data_type {
+            DataType::Integer |
+            DataType::I64 => {
+                let val = parm.to_i64();
+                val.to_le_bytes()
+            }
+            DataType::U64 => {
+                let val = parm.to_u64();
+                val.to_le_bytes()
+            }
+            bad => { panic!("Unexpected parameter type {:?} in execute_wrx", bad); }
+        };
+
+        // The map_error lambda just converts io::error to a std::error
+        // Write only the number of bytes required for the width of the wrx
+        let result = file.write_all(&buf[0..wrx_byte_width])
+                                    .map_err(|err|err.into());
+        if result.is_err() {
+            let msg = format!("{:?} failed", ir.kind);
+            diags.err1("EXEC_18", &msg, ir.src_loc.clone());
+        }
+
+        result
+    }
+
     pub fn execute(&self, irdb: &IRDb, diags: &mut Diags, file: &mut File)
                    -> Result<()> {
         self.trace("Engine::execute:");
@@ -837,6 +892,14 @@ impl Engine {
         let mut error_count = 0;
         for ir in &irdb.ir_vec {
             result = match ir.kind {
+                IRKind::Wr8  |
+                IRKind::Wr16 |
+                IRKind::Wr24 |
+                IRKind::Wr32 |
+                IRKind::Wr40 |
+                IRKind::Wr48 |
+                IRKind::Wr56 |
+                IRKind::Wr64 => { self.execute_wrx(ir, irdb, diags, file) }
                 IRKind::Assert => { self.execute_assert(ir, irdb, diags, file) }
                 IRKind::Print => { self.execute_print(ir, irdb, diags, file) }
                 IRKind::Wrs => { self.execute_wrs(ir, irdb, diags, file) }

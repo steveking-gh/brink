@@ -27,6 +27,14 @@ pub enum LexToken {
     #[token("img")] Img,
     #[token("sec")] Sec,
     #[token("wrs")] Wrs,
+    #[token("wr8")] Wr8,
+    #[token("wr16")] Wr16,
+    #[token("wr24")] Wr24,
+    #[token("wr32")] Wr32,
+    #[token("wr40")] Wr40,
+    #[token("wr48")] Wr48,
+    #[token("wr56")] Wr56,
+    #[token("wr64")] Wr64,
     #[token("wr")] Wr,
     #[token("output")] Output,
     #[token("==")] DoubleEq,
@@ -457,7 +465,15 @@ impl<'toks> Ast<'toks> {
             let parse_ok = match tinfo.tok {
                 LexToken::Label => self.parse_label(parent, diags),
                 LexToken::Wr => self.parse_wr(parent, diags),
-                LexToken::Assert => self.parse_assert(parent, diags),
+                LexToken::Wr8 |
+                LexToken::Wr16 |
+                LexToken::Wr24 |
+                LexToken::Wr32 |
+                LexToken::Wr40 |
+                LexToken::Wr48 |
+                LexToken::Wr56 |
+                LexToken::Wr64 |
+                LexToken::Assert => self.parse_numeric_expr(parent, diags),
                 LexToken::Wrs |
                 LexToken::Print => self.parse_string_expr(parent, diags),
                 _ => {
@@ -721,18 +737,18 @@ impl<'toks> Ast<'toks> {
 
     /// Parser for an assert statement
     /// assert <expr> ;
-    fn parse_assert(&mut self, parent: NodeId, diags: &mut Diags) -> bool {
+    fn parse_numeric_expr(&mut self, parent: NodeId, diags: &mut Diags) -> bool {
 
-        self.dbg_enter("parse_assert");
+        self.dbg_enter("parse_numeric_expr");
         // Add the assert keyword as a child of the parent
-        let assert_nid = self.add_to_parent_and_advance(parent);
-        let mut result = self.expect_expr(assert_nid, diags);
+        let nid = self.add_to_parent_and_advance(parent);
+        let mut result = self.expect_expr(nid, diags);
         if result {
             // Expression was OK
-            result &= self.expect_semi(diags, assert_nid);
+            result &= self.expect_semi(diags, nid);
         }
 
-        self.dbg_exit("parse_assert", result)
+        self.dbg_exit("parse_numeric_expr", result)
     }
 
     /// Parser for a print statement with one or more expressions

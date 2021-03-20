@@ -1094,6 +1094,20 @@ fn wrs_1() {
     fs::remove_file("wrs_1.bin").unwrap();
 }
 
+#[test]
+fn wrx_1() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/wrx_1.brink")
+                .arg("-o wrx_1.bin")
+                .assert()
+                .success();
+
+    // Verify output file is correct.  If so, then clean up.
+    assert_eq!("1\n12\n123\n1234\n12345\n123456\n1234567\n12345678\n", fs::read_to_string("wrx_1.bin").unwrap());
+    fs::remove_file("wrx_1.bin").unwrap();
+}
+
 
 } // mod tests
 

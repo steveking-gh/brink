@@ -1,0 +1,20 @@
+section foo {
+    wr8 0x31;      // ASCII 1
+    wr8 0x0A;      // ASCII \n
+    wr16 0x3231;   // ASCII 12
+    wr8 0x0A;      // ASCII \n
+    wr24 0x333231; // ASCII 123
+    wr8 0x0A;      // ASCII \n
+    wr32 0x34333231; // ASCII 1234
+    wr8 0x0A;      // ASCII \n
+    wr40 0x3534333231; // ASCII 12345
+    wr8 0x0A;      // ASCII \n
+    wr48 0x363534333231; // ASCII 123456
+    wr8 0x0A;      // ASCII \n
+    wr56 0x37363534333231; // ASCII 1234567
+    wr8 0x0A;      // ASCII \n
+    wr64 0x3837363534333231; // ASCII 12345678
+    wr8 0x0A;      // ASCII \n
+}
+
+output foo;
