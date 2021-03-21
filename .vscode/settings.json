@@ -8,6 +8,7 @@
         "ainfo",
         "basevec",
         "bufs",
+        "bytevec",
         "childvec",
         "codespan",
         "ctxt",
@@ -40,6 +41,7 @@
         "toknum",
         "toks",
         "tokvec",
-        "wrsa"
+        "wrsa",
+        "xstr"
     ]
 }

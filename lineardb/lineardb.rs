@@ -153,15 +153,17 @@ impl<'toks> LinearDb {
         true
     }
 
-    fn record_children_r(&mut self, result: &mut bool, rdepth: usize, parent_nid: NodeId,
+    fn record_children_r(&mut self, rdepth: usize, parent_nid: NodeId,
                         lops: &mut Vec<usize>,
-                        diags: &mut Diags, ast: &'toks Ast, ast_db: &AstDb) {
+                        diags: &mut Diags, ast: &'toks Ast, ast_db: &AstDb) -> bool {
         // Easy linearizing without dereferencing through a name.
         // When no children exist, this case terminates recursion.
         let children = ast.children(parent_nid);
+        let mut result = true;
         for nid in children {
-            *result &= self.record_r(rdepth, nid, lops, diags, ast, ast_db);
+            result &= self.record_r(rdepth, nid, lops, diags, ast, ast_db);
         }
+        result
     }
 
     fn operand_count_is_valid(&self, expected: usize, lops: &Vec<usize>, diags: &mut Diags, tinfo: &TokenInfo) -> bool {
@@ -176,9 +178,8 @@ impl<'toks> LinearDb {
     }
 
     // Process the expected number of operands.
-    fn process_operands(&mut self, result: &mut bool, expected: usize,
-                        lops: &mut Vec<usize>, ir_lid: usize,
-                        diags: &mut Diags, tinfo: &TokenInfo) {
+    fn process_operands(&mut self, expected: usize, lops: &mut Vec<usize>, ir_lid: usize,
+                        diags: &mut Diags, tinfo: &TokenInfo) -> bool {
 
         // If we found the expected number of operands, then add them to the new IR
         // Otherwise, do nothing but indicate the error.
@@ -188,21 +189,21 @@ impl<'toks> LinearDb {
                 self.add_operand_idx_to_ir(ir_lid, *idx);
             }
         } else {
-            *result = false;
+            return false;
         }
+        true
     }
 
     // Process the expected number of *optional* operands.  Either the number
     // number of operands must be zero or the expected number.
-    fn process_optional_operands(&mut self, result: &mut bool, expected: usize,
-                                  lops: &mut Vec<usize>, ir_lid: usize,
-                                  diags: &mut Diags, tinfo: &TokenInfo) {
+    fn process_optional_operands(&mut self, expected: usize, lops: &mut Vec<usize>, ir_lid: usize,
+                                  diags: &mut Diags, tinfo: &TokenInfo) -> bool {
 
         if lops.is_empty() {
-            return;
+            return true;
         }
 
-        self.process_operands(result, expected, lops, ir_lid, diags, tinfo);
+        self.process_operands(expected, lops, ir_lid, diags, tinfo)
     }
 
     /// Recursively record information about the children of an AST object. The
@@ -254,10 +255,10 @@ impl<'toks> LinearDb {
                 // Get the size of the section.  Section name is an identifier operand.
                 let ir_lid = self.new_ir(parent_nid, ast, IRKind::Sizeof);
                 // There is child, which is the identifier
-                self.record_children_r(&mut result, rdepth + 1, parent_nid,
+                result &= self.record_children_r(rdepth + 1, parent_nid,
                                         &mut lops, diags, ast, ast_db);
                 // 1 operand expected
-                self.process_operands(&mut result, 1, &mut lops, ir_lid, diags, tinfo);
+                result &= self.process_operands(1, &mut lops, ir_lid, diags, tinfo);
 
                 // Add a destination operand to the operation to hold the result
                 let idx = self.add_operand_to_ir(ir_lid, LinOperand::new(
@@ -276,9 +277,10 @@ impl<'toks> LinearDb {
                 // There is *optional* identifier child.
                 // If the child exists, we will get the address of the associated identifier
                 // otherwise, we get the current address
-                self.record_children_r(&mut result, rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
+                result &= self.record_children_r(rdepth + 1, parent_nid, &mut lops, diags,
+                                                ast, ast_db);
                 // 1 operand expected
-                self.process_optional_operands(&mut result, 1, &mut lops, ir_lid, diags, tinfo);
+                result &= self.process_optional_operands(1, &mut lops, ir_lid, diags, tinfo);
 
                 // Add a destination operand to the operation to hold the result
                 let idx = self.add_operand_to_ir(ir_lid, LinOperand::new(
@@ -310,16 +312,16 @@ impl<'toks> LinearDb {
             LexToken::Assert => {
                 // A vector to track the operands of this expression.
                 let mut lops = Vec::new();
-                self.record_children_r(&mut result, rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
+                result &= self.record_children_r(rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
                 let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tinfo.tok));
                 // 1 operand expected
-                self.process_operands(&mut result, 1, &mut lops, ir_lid, diags, tinfo);
+                result &= self.process_operands(1, &mut lops, ir_lid, diags, tinfo);
             }
             LexToken::Wrs |
             LexToken::Print => {
                 // A vector to track the operands of this expression.
                 let mut lops = Vec::new();
-                self.record_children_r(&mut result, rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
+                result &= self.record_children_r(rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
                 let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tinfo.tok));
 
                 // Unlimited number of operands
@@ -331,10 +333,10 @@ impl<'toks> LinearDb {
             LexToken::ToU64 => {
                 // A vector to track the operands of this expression.
                 let mut lops = Vec::new();
-                self.record_children_r(&mut result, rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
+                result &= self.record_children_r(rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
                 let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tinfo.tok));
                 // 1 operand expected
-                self.process_operands(&mut result, 1, &mut lops, ir_lid, diags, tinfo);
+                result &= self.process_operands(1, &mut lops, ir_lid, diags, tinfo);
                 // Add a destination operand to the operation to hold the result
                 let idx = self.add_operand_to_ir(ir_lid, LinOperand::new(
                     Some(ir_lid), parent_nid, ast, tok));
@@ -359,11 +361,11 @@ impl<'toks> LinearDb {
             LexToken::Plus => {
                 // A vector to track the operands of this expression.
                 let mut lops = Vec::new();
-                self.record_children_r(&mut result, rdepth + 1, parent_nid,
+                result &= self.record_children_r(rdepth + 1, parent_nid,
                                         &mut lops, diags, ast, ast_db);
                 let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tinfo.tok));
                 // 2 operands expected
-                self.process_operands(&mut result, 2, &mut lops, ir_lid, diags, tinfo);
+                result &= self.process_operands(2, &mut lops, ir_lid, diags, tinfo);
 
                 // Add a destination operand to the operation to hold the result
                 let idx = self.add_operand_to_ir(ir_lid, LinOperand::new(
@@ -376,7 +378,7 @@ impl<'toks> LinearDb {
                 // Record the linear start of this section.
                 let mut lops = Vec::new();
                 let start_lid = self.new_ir(parent_nid, ast, IRKind::SectionStart);
-                self.record_children_r(&mut result, rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
+                result &= self.record_children_r(rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
                 let end_lid = self.new_ir(parent_nid, ast, IRKind::SectionEnd);
                 // 1 operand expected, which is the name of the section.
                 if self.operand_count_is_valid(1, &lops, diags, tinfo) {
