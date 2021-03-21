@@ -82,6 +82,7 @@ fn tok_to_irkind(tok: LexToken) -> IRKind {
         LexToken::Minus => { IRKind::Subtract }
         LexToken::Asterisk => { IRKind::Multiply }
         LexToken::FSlash => { IRKind::Divide }
+        LexToken::Percent => { IRKind::Modulo }
         LexToken::Ampersand => { IRKind::BitAnd }
         LexToken::DoubleAmpersand => { IRKind::LogicalAnd }
         LexToken::Pipe => { IRKind::BitOr }
@@ -347,6 +348,7 @@ impl<'toks> LinearDb {
             LexToken::Pipe |
             LexToken::DoublePipe |
             LexToken::FSlash |
+            LexToken::Percent |
             LexToken::Minus |
             LexToken::Plus => {
                 // A vector to track the operands of this expression.

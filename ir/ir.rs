@@ -29,6 +29,7 @@ pub enum IRKind {
     LEq,
     LogicalAnd,
     LogicalOr,
+    Modulo,
     Multiply,
     NEq,
     Print,

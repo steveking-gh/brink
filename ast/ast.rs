@@ -49,6 +49,7 @@ pub enum LexToken {
     #[token("-")] Minus,
     #[token("*")] Asterisk,
     #[token("/")] FSlash,
+    #[token("%")] Percent,
     #[token(",")] Comma,
     #[token("<<")] DoubleLess,
     #[token(">>")] DoubleGreater,
@@ -519,6 +520,7 @@ impl<'toks> Ast<'toks> {
             LexToken::Integer |
             LexToken::I64 |
             LexToken::U64 => (15,16),
+            LexToken::Percent |
             LexToken::FSlash |
             LexToken::Asterisk => (13,14),
             LexToken::Minus |
@@ -690,6 +692,7 @@ impl<'toks> Ast<'toks> {
                 LexToken::Plus |
                 LexToken::Minus |
                 LexToken::Asterisk |
+                LexToken::Percent |
                 LexToken::FSlash => {}
                 _ => {
                     let msg = format!("Invalid operation '{}'", op_tinfo.val);

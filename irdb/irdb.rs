@@ -79,6 +79,7 @@ impl IRDb {
             ast::LexToken::Plus |
             ast::LexToken::Minus |
             ast::LexToken::Asterisk |
+            ast::LexToken::Percent |
             ast::LexToken::FSlash => {
                 // These operations have the same data type as their two inputs
                 // The data type must be numeric.
@@ -257,6 +258,7 @@ impl IRDb {
             IRKind::RightShift |
             IRKind::Multiply |
             IRKind::Divide |
+            IRKind::Modulo |
             IRKind::BitAnd |
             IRKind::LogicalAnd |
             IRKind::BitOr |
