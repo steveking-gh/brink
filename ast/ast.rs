@@ -475,8 +475,8 @@ impl<'toks> Ast<'toks> {
                 LexToken::Wr56 |
                 LexToken::Wr64 |
                 LexToken::Wrs |
-                LexToken::Print => self.parse_multi_expr(parent, diags),
-                LexToken::Assert => self.parse_single_expr(parent, diags),
+                LexToken::Assert |
+                LexToken::Print => self.parse_expr(parent, diags),
                 _ => {
                     self.err_invalid_expression(diags, "AST_3");
                     false
@@ -738,25 +738,9 @@ impl<'toks> Ast<'toks> {
         self.dbg_exit_pratt("parse_pratt", top, true)
     }
 
-    /// Parser for a single expression statement, no commas.
-    /// For example: assert <expr> ;
-    fn parse_single_expr(&mut self, parent: NodeId, diags: &mut Diags) -> bool {
-
-        self.dbg_enter("parse_single_expr");
-        // Add the assert keyword as a child of the parent
-        let nid = self.add_to_parent_and_advance(parent);
-        let mut result = self.expect_expr(nid, diags);
-        if result {
-            // Expression was OK
-            result &= self.expect_semi(diags, nid);
-        }
-
-        self.dbg_exit("parse_single_expr", result)
-    }
-
     /// Parser for a statement with one or more comma separated expressions
     /// For example: print <expr> [, <expr>] ;
-    fn parse_multi_expr(&mut self, parent: NodeId, diags: &mut Diags) -> bool {
+    fn parse_expr(&mut self, parent: NodeId, diags: &mut Diags) -> bool {
 
         self.dbg_enter("parse_multi_expr");
         let mut result = true;

@@ -301,6 +301,7 @@ impl<'toks> LinearDb {
                 self.operand_vec.push(LinOperand::new(None, parent_nid,ast,tok));
                 returned_operands.push(idx);
             }
+            LexToken::Assert |
             LexToken::Wr8  |
             LexToken::Wr16 |
             LexToken::Wr24 |
@@ -309,14 +310,6 @@ impl<'toks> LinearDb {
             LexToken::Wr48 |
             LexToken::Wr56 |
             LexToken::Wr64 |
-            LexToken::Assert => {
-                // A vector to track the operands of this expression.
-                let mut lops = Vec::new();
-                result &= self.record_children_r(rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
-                let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tinfo.tok));
-                // 1 operand expected
-                result &= self.process_operands(1, &mut lops, ir_lid, diags, tinfo);
-            }
             LexToken::Wrs |
             LexToken::Print => {
                 // A vector to track the operands of this expression.
@@ -324,7 +317,8 @@ impl<'toks> LinearDb {
                 result &= self.record_children_r(rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
                 let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tinfo.tok));
 
-                // Unlimited number of operands
+                // add the operands to this new IR.  These IRs are statements that do not
+                // return a value.
                 for idx in lops {
                     self.add_operand_idx_to_ir(ir_lid, idx);
                 }
