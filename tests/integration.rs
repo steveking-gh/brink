@@ -1274,6 +1274,33 @@ fn wrx_5() {
     fs::remove_file("wrx_5.bin").unwrap();
 }
 
+#[test]
+fn wrx_6() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/wrx_6.brink")
+                .arg("-o wrx_6.bin")
+                .assert()
+                .success();
+
+    // Verify output file is correct.  If so, then clean up.
+    let bytevec = fs::read("wrx_6.bin").unwrap();
+    let temp : Vec<u8> = vec![
+        1, 2, 2, 3, 3, 3, // wr8
+        1, 0, 2, 0, 2, 0, 3, 0, 3, 0, 3, 0, // wr16
+        1, 0, 0, 2, 0, 0, 2, 0, 0, 3, 0, 0, 3, 0, 0, 3, 0, 0, // wr24
+        1, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0, // wr32
+        1, 0, 0, 0, 0, 2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 3, 0, 0, 0, 0, 3, 0, 0, 0, 0, 3, 0, 0, 0, 0, // wr40
+        1, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, // wr48
+        1, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, // wr56
+        1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, // wr64
+        ];
+    println!("Bytevec length = {}", bytevec.len() );
+    assert!(bytevec.len() == 6 + 12 + 18 + 24 + 30 + 36 + 42 + 48);
+    assert!(bytevec == temp);
+    fs::remove_file("wrx_6.bin").unwrap();
+}
+
 
 } // mod tests
 

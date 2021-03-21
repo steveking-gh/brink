@@ -4,8 +4,6 @@ __WARNING: Brink is under construction.  Please come back later!__
 
 __^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^__
 
-
-
 Brink is a domain specific language for linking and compositing of
 an output file.  Brink simplifies construction of complex files by managing sizes,
 offsets and ordering in a readable declarative style.  Brink was created with
@@ -49,6 +47,7 @@ You can of course print to console during generation of your output image.
 Will print the message:
 
     Output size is 13 bytes
+
 ## Unit Testing
 
 Brink supports unit tests.

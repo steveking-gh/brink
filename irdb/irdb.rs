@@ -197,6 +197,7 @@ impl IRDb {
     }
 
     // Print accepts most expressions without side effects
+    // TODO add the restrictions that do exist, e.g. no identifiers
     fn validate_string_expr_operands(&self, _ir: &IR, _diags: &mut Diags) -> bool {
         true
     }
@@ -222,15 +223,49 @@ impl IRDb {
     fn validate_numeric_operands2(&self, ir: &IR, diags: &mut Diags) -> bool {
         let len = ir.operands.len();
         if len != 3 {
-            let m = format!("'{:?}' expression requires 2 input and one output operands, but found {} total operands.", ir.kind, len);
+            let m = format!("'{:?}' expression requires 2 input and one output \
+                                    operands, but found {} total operands.", ir.kind, len);
             diags.err1("IRDB_6", &m, ir.src_loc.clone());
             return false;
         }
         for op_num in 0..2 {
             let opnd = &self.parms[ir.operands[op_num]];
             if ![DataType::Integer, DataType::I64, DataType::U64].contains(&opnd.data_type) {
-                let m = format!("'{:?}' expression requires an integer, found '{:?}'.", ir.kind, opnd.data_type);
+                let m = format!("'{:?}' expression requires an integer, found '{:?}'.",
+                                    ir.kind, opnd.data_type);
                 diags.err2("IRDB_7", &m, ir.src_loc.clone(), opnd.src_loc.clone());
+                return false;
+            }
+        }
+        true
+    }
+
+    // Expect 1 numeric operand (value) followed by one optional numeric operand (repeat count)
+    fn validate_wrx_operands(&self, ir: &IR, diags: &mut Diags) -> bool {
+        let len = ir.operands.len();
+        if len != 1 && len != 2 {
+            let m = format!("'{:?}' requires 1 or 2 input operands, \
+                                  but found {} total operands.", ir.kind, len);
+            diags.err1("IRDB_8", &m, ir.src_loc.clone());
+            return false;
+        }
+
+        // First operand must be numeric
+        let opnd = &self.parms[ir.operands[0]];
+        if ![DataType::Integer, DataType::I64, DataType::U64].contains(&opnd.data_type) {
+            let m = format!("'{:?}' requires an integer for this operand, \
+                                    found '{:?}'.", ir.kind, opnd.data_type);
+            diags.err2("IRDB_9", &m, ir.src_loc.clone(), opnd.src_loc.clone());
+            return false;
+        }
+
+        // Second *optional* operand must be numeric
+        if len == 2 {
+            let opnd = &self.parms[ir.operands[1]];
+            if ![DataType::Integer, DataType::I64, DataType::U64].contains(&opnd.data_type) {
+                let m = format!("'{:?}' requires an integer for this operand, \
+                                        found '{:?}'.", ir.kind, opnd.data_type);
+                diags.err2("IRDB_9", &m, ir.src_loc.clone(), opnd.src_loc.clone());
                 return false;
             }
         }
@@ -246,7 +281,7 @@ impl IRDb {
             IRKind::Wr40 |
             IRKind::Wr48 |
             IRKind::Wr56 |
-            IRKind::Wr64 |
+            IRKind::Wr64 => { self.validate_wrx_operands(ir, diags) }
             IRKind::Assert => { self.validate_numeric_operand(ir, diags) }
             IRKind::Wrs |
             IRKind::Print => { self.validate_string_expr_operands(ir, diags) }

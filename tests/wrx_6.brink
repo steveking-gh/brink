@@ -1,0 +1,30 @@
+
+// Test expressions in wrx
+section foo {
+    wr8  1, 1;
+    wr8  2, 1 + 1;
+    wr8  3, 1 + 1 + 1;
+    wr16  1, 1;
+    wr16  2, 2;
+    wr16  3, 3;
+    wr24  1, 1;
+    wr24  2, 2;
+    wr24  3, 3;
+    wr32  1, 1;
+    wr32  2, 2;
+    wr32  3, 3;
+    wr40  1, 1;
+    wr40  2, 2;
+    wr40  3, 3;
+    wr48  1, 1;
+    wr48  2, 2;
+    wr48  3, 3;
+    wr56  1, 1;
+    wr56  2, 2;
+    wr56  3, 3;
+    wr64  1, 1;
+    wr64  2, 2;
+    wr64  3, 3;
+}
+
+output foo;

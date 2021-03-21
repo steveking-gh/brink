@@ -79,6 +79,22 @@ pub struct Engine {
     start_addr: u64,
 }
 
+fn get_wrx_byte_width(ir : &IR) -> usize {
+    let width = match ir.kind {
+        IRKind::Wr8  => 1,
+        IRKind::Wr16 => 2,
+        IRKind::Wr24 => 3,
+        IRKind::Wr32 => 4,
+        IRKind::Wr40 => 5,
+        IRKind::Wr48 => 6,
+        IRKind::Wr56 => 7,
+        IRKind::Wr64 => 8,
+        bad => { panic!("Called get_wrx_byte_width with {:?}", bad); }
+    };
+
+    width
+}
+
 impl Engine {
 
     /// Debug trace that produces an indented output with section name to make
@@ -110,6 +126,58 @@ impl Engine {
         current.sec += sz;
         
         true
+    }
+
+    // Used for Wr8 though Wr64
+    fn iterate_wrx(&mut self, ir: &IR, irdb: &IRDb, diags: &mut Diags,
+                    current: &mut Location) -> bool {
+        
+        assert!(ir.operands.len() < 3);
+        let byte_size = get_wrx_byte_width(ir) as u64;
+
+        self.trace(format!("Engine::iterate_wrx-{}: img {}, sec {}", byte_size*8,
+                   current.img, current.sec).as_str());
+
+        let mut result = true;
+
+        // determine the optional repeat count value
+        let mut repeat_count = 1;
+        if ir.operands.len() == 2 {
+            // Yes, we have a repeat count
+            // A repeat count of 0 is not an error.
+            let op = self.parms[1].borrow();
+            match op.data_type {
+                DataType::U64 => { repeat_count = op.to_u64(); }
+                DataType::Integer |
+                DataType::I64 => {
+                    let temp = op.to_i64();
+                    if temp < 0 {
+                        let msg = format!("Repeat count cannot be negative, \
+                                            but found '{}'", temp );
+                        let src_loc = irdb.parms[1].src_loc.clone();
+                        diags.err1("EXEC_32", &msg, src_loc);
+                        result = false;
+                        repeat_count = 0;
+                    } else {
+                        repeat_count = op.to_u64(); }
+                    }
+                bad => {
+                    let msg = format!("Repeat count cannot be type '{:?}'", bad );
+                    let src_loc = irdb.parms[1].src_loc.clone();
+                    diags.err1("EXEC_31", &msg, src_loc);
+                    result = false;
+                }
+            }
+        }
+
+        // total size is the size of the wrx times the optional repeat count
+        let sz = byte_size * repeat_count;
+        self.trace(format!("Engine::iterate_wrx-{}: size is {}", byte_size * 8, sz).as_str());
+        // Will panic if usize does not fit in u64
+        current.img += sz;
+        current.sec += sz;
+        
+        result
     }
 
     /// Compute the string representation of the expression.
@@ -732,28 +800,28 @@ impl Engine {
                     IRKind::DoubleEq |
                     IRKind::GEq |
                     IRKind::LEq |
-                    IRKind::NEq => { self.iterate_arithmetic(&ir, irdb, operation, &current, diags) }
+                    IRKind::NEq =>    self.iterate_arithmetic(&ir, irdb, operation, &current, diags),
                     IRKind::ToI64 |
-                    IRKind::ToU64 => { self.iterate_type_conversion(&ir, irdb, operation, &current, diags) }
-                    IRKind::Sizeof => { self.iterate_sizeof(&ir, irdb, diags, &mut current) }
+                    IRKind::ToU64 =>  self.iterate_type_conversion(&ir, irdb, operation, &current, diags),
+                    IRKind::Sizeof => self.iterate_sizeof(&ir, irdb, diags, &mut current),
 
                     // Unlike print, we have to iterate on the string write operation since
                     // the size of the string affects the size of the output image.
-                    IRKind::Wrs => { self.iterate_wrs(&ir, irdb, diags, &mut current) }
                     IRKind::Abs |
                     IRKind::Img |
-                    IRKind::Sec => { self.iterate_address(ir, irdb, diags, &current) }
-                    IRKind::SectionStart => { self.iterate_section_start(ir, irdb, diags, &mut current) }
-                    IRKind::SectionEnd => { self.iterate_section_end(ir, irdb, diags, &mut current) }
+                    IRKind::Sec => self.iterate_address(ir, irdb, diags, &current),
+                    IRKind::Wrs => self.iterate_wrs(&ir, irdb, diags, &mut current),
+                    IRKind::SectionStart => self.iterate_section_start(ir, irdb, diags, &mut current),
+                    IRKind::SectionEnd =>   self.iterate_section_end(ir, irdb, diags, &mut current),
 
-                    IRKind::Wr8  => { current.sec += 1; current.img += 1; true }
-                    IRKind::Wr16 => { current.sec += 2; current.img += 2; true }
-                    IRKind::Wr24 => { current.sec += 3; current.img += 3; true }
-                    IRKind::Wr32 => { current.sec += 4; current.img += 4; true }
-                    IRKind::Wr40 => { current.sec += 5; current.img += 5; true }
-                    IRKind::Wr48 => { current.sec += 6; current.img += 6; true }
-                    IRKind::Wr56 => { current.sec += 7; current.img += 7; true }
-                    IRKind::Wr64 => { current.sec += 8; current.img += 8; true }
+                    IRKind::Wr8  |
+                    IRKind::Wr16 |
+                    IRKind::Wr24 |
+                    IRKind::Wr32 |
+                    IRKind::Wr40 |
+                    IRKind::Wr48 |
+                    IRKind::Wr56 |
+                    IRKind::Wr64 => self.iterate_wrx(&ir, irdb, diags, &mut current),
                     // The following IR types are evaluated only at execute time.
                     // Nothing to do during iteration.
                     IRKind::Label |
@@ -881,17 +949,7 @@ impl Engine {
     fn execute_wrx(&self, ir: &IR, _irdb: &IRDb, diags: &mut Diags, file: &mut File)
                    -> Result<()> {
         self.trace(format!("Engine::execute_wrx: {:?}", ir.kind ).as_str());
-        let wrx_byte_width = match ir.kind {
-            IRKind::Wr8  => 1,
-            IRKind::Wr16 => 2,
-            IRKind::Wr24 => 3,
-            IRKind::Wr32 => 4,
-            IRKind::Wr40 => 5,
-            IRKind::Wr48 => 6,
-            IRKind::Wr56 => 7,
-            IRKind::Wr64 => 8,
-            bad => { panic!("Called execute_wrs with {:?}", bad); }
-        };
+        let byte_size = get_wrx_byte_width(ir);
 
         let opnd_num = ir.operands[0];
         self.trace(format!("engine::execute_wrx: checking operand {}", opnd_num).as_str());
@@ -913,16 +971,31 @@ impl Engine {
             bad => { panic!("Unexpected parameter type {:?} in execute_wrx", bad); }
         };
 
-        // The map_error lambda just converts io::error to a std::error
-        // Write only the number of bytes required for the width of the wrx
-        let result = file.write_all(&buf[0..wrx_byte_width])
-                                    .map_err(|err|err.into());
-        if result.is_err() {
-            let msg = format!("{:?} failed", ir.kind);
-            diags.err1("EXEC_18", &msg, ir.src_loc.clone());
+        let mut repeat_count = 1;
+
+        if ir.operands.len() == 2 {
+            // Yes, we have a repeat count
+            // We already validated the operands in IRDB.
+            let repeat_opnd_num = ir.operands[1];
+            let op = self.parms[repeat_opnd_num].borrow();
+            repeat_count = op.to_u64();
         }
 
-        result
+        self.trace(format!("Repeat count = {}", repeat_count).as_str());
+        // The map_error lambda just converts io::error to a std::error
+        // Write only the number of bytes required for the width of the wrx
+        while repeat_count > 0 {
+            let result = file.write_all(&buf[0..byte_size])
+                                        .map_err(|err|err.into());
+            if result.is_err() {
+                let msg = format!("{:?} failed", ir.kind);
+                diags.err1("EXEC_18", &msg, ir.src_loc.clone());
+                return result;
+            }
+            repeat_count -= 1;
+        }
+
+        Ok(())
     }
 
     pub fn execute(&self, irdb: &IRDb, diags: &mut Diags, file: &mut File)
