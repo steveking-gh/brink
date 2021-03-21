@@ -474,9 +474,9 @@ impl<'toks> Ast<'toks> {
                 LexToken::Wr48 |
                 LexToken::Wr56 |
                 LexToken::Wr64 |
-                LexToken::Assert => self.parse_numeric_expr(parent, diags),
+                LexToken::Assert => self.parse_single_expr(parent, diags),
                 LexToken::Wrs |
-                LexToken::Print => self.parse_string_expr(parent, diags),
+                LexToken::Print => self.parse_multi_expr(parent, diags),
                 _ => {
                     self.err_invalid_expression(diags, "AST_3");
                     false
@@ -738,11 +738,11 @@ impl<'toks> Ast<'toks> {
         self.dbg_exit_pratt("parse_pratt", top, true)
     }
 
-    /// Parser for an assert statement
-    /// assert <expr> ;
-    fn parse_numeric_expr(&mut self, parent: NodeId, diags: &mut Diags) -> bool {
+    /// Parser for a single expression statement, no commas.
+    /// For example: assert <expr> ;
+    fn parse_single_expr(&mut self, parent: NodeId, diags: &mut Diags) -> bool {
 
-        self.dbg_enter("parse_numeric_expr");
+        self.dbg_enter("parse_single_expr");
         // Add the assert keyword as a child of the parent
         let nid = self.add_to_parent_and_advance(parent);
         let mut result = self.expect_expr(nid, diags);
@@ -751,14 +751,14 @@ impl<'toks> Ast<'toks> {
             result &= self.expect_semi(diags, nid);
         }
 
-        self.dbg_exit("parse_numeric_expr", result)
+        self.dbg_exit("parse_single_expr", result)
     }
 
-    /// Parser for a print statement with one or more expressions
-    /// print <expr> [, <expr>] ;
-    fn parse_string_expr(&mut self, parent: NodeId, diags: &mut Diags) -> bool {
+    /// Parser for a statement with one or more comma separated expressions
+    /// For example: print <expr> [, <expr>] ;
+    fn parse_multi_expr(&mut self, parent: NodeId, diags: &mut Diags) -> bool {
 
-        self.dbg_enter("parse_string_expr");
+        self.dbg_enter("parse_multi_expr");
         let mut result = true;
         // Add the print keyword as a child of the parent
         let print_nid = self.add_to_parent_and_advance(parent);
@@ -789,7 +789,7 @@ impl<'toks> Ast<'toks> {
             } else {
                 // the print statement ended in some unusual way, e.g. trailing comma.
                 // fuzz test found this with print 1,;
-                let msg = "Print statement ended unexpectedly";
+                let msg = "Statement ended unexpectedly";
                 let tinfo = self.get_tinfo(print_nid);
                 diags.err1("AST_21", &msg, tinfo.span());
                 result = false;
@@ -797,7 +797,7 @@ impl<'toks> Ast<'toks> {
             }
         }
 
-        self.dbg_exit("parse_string_expr", result)
+        self.dbg_exit("parse_multi_expr", result)
     }
 
     fn parse_label(&mut self, parent: NodeId, _diags: &mut Diags) -> bool {
