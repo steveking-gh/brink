@@ -231,11 +231,35 @@ impl Engine {
         }
     }
 
+    fn do_u64_mod(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
+        let check = in0.checked_rem(in1);
+        if check.is_none() {
+            let msg = format!("Exception in modulo expression '{} % {}'", in0, in1);
+            diags.err1("EXEC_28", &msg, ir.src_loc.clone());
+            false
+        } else {
+            *out = check.unwrap();
+            true
+        }
+    }
+
     fn do_i64_div(&self, ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
         let check = in0.checked_div(in1);
         if check.is_none() {
             let msg = format!("Exception in divide expression '{} / {}'", in0, in1);
             diags.err1("EXEC_27", &msg, ir.src_loc.clone());
+            false
+        } else {
+            *out = check.unwrap();
+            true
+        }
+    }
+
+    fn do_i64_mod(&self, ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
+        let check = in0.checked_rem(in1);
+        if check.is_none() {
+            let msg = format!("Exception in modulo expression '{} % {}'", in0, in1);
+            diags.err1("EXEC_30", &msg, ir.src_loc.clone());
             false
         } else {
             *out = check.unwrap();
@@ -425,6 +449,7 @@ impl Engine {
                 IRKind::Subtract   => { result &= self.do_u64_sub(ir, in0, in1, out, diags); }
                 IRKind::Multiply   => { result &= self.do_u64_mul(ir, in0, in1, out, diags); }
                 IRKind::Divide     => { result &= self.do_u64_div(ir, in0, in1, out, diags); }
+                IRKind::Modulo     => { result &= self.do_u64_mod(ir, in0, in1, out, diags); }
                 IRKind::LeftShift  => { result &= self.do_u64_shl(ir, in0, in1, out, diags); }
                 IRKind::RightShift => { result &= self.do_u64_shr(ir, in0, in1, out, diags); }            
                 bad => panic!("Forgot to handle u64 {:?}", bad),
@@ -452,6 +477,7 @@ impl Engine {
                 IRKind::Subtract   => { let out = out_parm.val.downcast_mut::<i64>().unwrap(); result &= self.do_i64_sub(ir, in0, in1, out, diags); }
                 IRKind::Multiply   => { let out = out_parm.val.downcast_mut::<i64>().unwrap(); result &= self.do_i64_mul(ir, in0, in1, out, diags); }
                 IRKind::Divide     => { let out = out_parm.val.downcast_mut::<i64>().unwrap(); result &= self.do_i64_div(ir, in0, in1, out, diags); }
+                IRKind::Modulo     => { let out = out_parm.val.downcast_mut::<i64>().unwrap(); result &= self.do_i64_mod(ir, in0, in1, out, diags); }
                 IRKind::LeftShift  => { let out = out_parm.val.downcast_mut::<i64>().unwrap(); result &= self.do_i64_shl(ir, in0, in1, out, diags); }
                 IRKind::RightShift => { let out = out_parm.val.downcast_mut::<i64>().unwrap(); result &= self.do_i64_shr(ir, in0, in1, out, diags); }
 
@@ -702,6 +728,7 @@ impl Engine {
                     IRKind::LogicalOr |
                     IRKind::Multiply |
                     IRKind::Divide |
+                    IRKind::Modulo |
                     IRKind::DoubleEq |
                     IRKind::GEq |
                     IRKind::LEq |
@@ -935,6 +962,7 @@ impl Engine {
                 IRKind::BitOr |
                 IRKind::LogicalOr |
                 IRKind::Multiply |
+                IRKind::Modulo |
                 IRKind::Divide |
                 IRKind::Add |
                 IRKind::Subtract |
