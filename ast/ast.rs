@@ -474,9 +474,9 @@ impl<'toks> Ast<'toks> {
                 LexToken::Wr48 |
                 LexToken::Wr56 |
                 LexToken::Wr64 |
-                LexToken::Assert => self.parse_single_expr(parent, diags),
                 LexToken::Wrs |
                 LexToken::Print => self.parse_multi_expr(parent, diags),
+                LexToken::Assert => self.parse_single_expr(parent, diags),
                 _ => {
                     self.err_invalid_expression(diags, "AST_3");
                     false
