@@ -459,16 +459,16 @@ Example:
     output foo;
 
 ---
-## `wr8 <expression>;`
-## `wr16 <expression>;`
-## `wr24 <expression>;`
-## `wr32 <expression>;`
-## `wr40 <expression>;`
-## `wr48 <expression>;`
-## `wr56 <expression>;`
-## `wr64 <expression>;`
+## `wr8 <expression> [, <expression>];`
+## `wr16 <expression> [, <expression>];`
+## `wr24 <expression> [, <expression>];`
+## `wr32 <expression> [, <expression>];`
+## `wr40 <expression> [, <expression>];`
+## `wr48 <expression> [, <expression>];`
+## `wr56 <expression> [, <expression>];`
+## `wr64 <expression> [, <expression>];`
 
-Evaluates the expression and writes the result as a little-endian binary value to the output file.  Upper bits of the result value are silently truncated to the specified bit length.
+Evaluates the first expression and writes the result as a little-endian binary value to the output file.  Upper bits of the result value are silently truncated to the specified bit length.  The optional second expression specifies the repetition count.
 
 Example:
 
@@ -486,6 +486,14 @@ Example:
     }
     
     output foo 10;
+
+Another example using the optional repetition expression.
+
+    section foo {
+        wr32 0x12345678, 10; // write 0x12345678 10 times to the output file.
+        wr8 0, abs() % 4096; // write zero enough times to align to 4KB boundary.
+    }
+
 
 ---
 
