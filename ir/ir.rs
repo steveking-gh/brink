@@ -96,6 +96,7 @@ impl IROperand {
                         .strip_suffix('\"').unwrap()
                         .replace("\\\"", "\"")
                         .replace("\\n", "\n")
+                        .replace("\\0", "\0")
                         .replace("\\t", "\t")));
             }
             DataType::U64 => {

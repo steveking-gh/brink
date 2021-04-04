@@ -1,5 +1,5 @@
 section foo {
-    wrs "123 ";
+    wrs "123\0456 ";
     wrs "Wow! ", to_i64(sizeof(foo)), " ", 1+1, "\n";
 }
 

@@ -1112,7 +1112,7 @@ fn wrs_1() {
                 .success();
 
     // Verify output file is correct.  If so, then clean up.
-    assert_eq!("123 Wow! 14 2\n", fs::read_to_string("wrs_1.bin").unwrap());
+    assert_eq!("123\0456 Wow! 18 2\n", fs::read_to_string("wrs_1.bin").unwrap());
     fs::remove_file("wrs_1.bin").unwrap();
 }
 

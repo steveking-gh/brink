@@ -260,7 +260,7 @@ Example:
 
 ## `align <align expression> [, <pad byte value>];`
 
-The align statement writes pad bytes into the current section until the current location counter reaches the specified alignment.  Align writes 0 as the default pad byte value, but the user may optionally specify a different value. 
+The align statement writes pad bytes into the current section until the absolute location counter reaches the specified alignment.  Align writes 0 as the default pad byte value, but the user may optionally specify a different value.
 
 Example:
 
@@ -341,7 +341,8 @@ Writes the specified quoted string to the output.  Brink supports utf-8 quoted s
 
 * quote (\\\")
 * tab (\t)
-* newline (\n).
+* newline (\n)
+* null (\0)
 
 Newlines are Linux style, so "A\n" is a two byte string on all platforms.
 
@@ -518,3 +519,6 @@ Another example using the optional repetition expression.
 
 Evaluates the comma separated list of expressions and writes the resulting string to the output file.  Wrs accepts the same expressions and operates similarly to the print statement.  For more information, see [print](#print-expression--expression-).
 
+The wrs statement does not write a terminating 0 byte after the string.  Users creating null terminated (C style) strings in an output file should add an explicit \0.
+
+    wrs "my null terminated string\0";
