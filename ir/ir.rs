@@ -16,6 +16,7 @@ pub enum DataType {
 pub enum IRKind {
     Abs,
     Add,
+    Align,
     Assert,
     BitAnd,
     BitOr,

@@ -25,11 +25,10 @@ impl<'toks> LinOperand {
 
     /// Create a new linear operand.  If the ir_lid exists, then this
     /// operand is the output of the specified lid.
-    pub fn new(ir_lid: Option<usize>, nid: NodeId, ast: &'toks Ast,
-                tok: LexToken) -> LinOperand {
-        let tinfo = ast.get_tinfo(nid);
+    // pseudo functions like align.
+    pub fn new(ir_lid: Option<usize>, tinfo: &TokenInfo) -> LinOperand {
         let src_loc = tinfo.loc.clone();
-        LinOperand { ir_lid, src_loc, sval: tinfo.val.to_string(), tok }
+        LinOperand { ir_lid, src_loc, sval: tinfo.val.to_string(), tok: tinfo.tok }
     }
 
     pub fn is_output_of(&self) -> Option<usize> {
@@ -71,6 +70,7 @@ fn tok_to_irkind(tok: LexToken) -> IRKind {
         LexToken::Wr56 => { IRKind::Wr56 }
         LexToken::Wr64 => { IRKind::Wr64 }
         LexToken::Assert => { IRKind::Assert }
+        LexToken::Align => { IRKind::Align }
         LexToken::Wrs => { IRKind::Wrs }
         LexToken::NEq => { IRKind::NEq }
         LexToken::DoubleEq => { IRKind::DoubleEq }
@@ -120,15 +120,15 @@ boxed info object.
 impl<'toks> LinearDb {
 
     // Adds an existing operand by it's operand_vec index to the specified LinIR
-    pub fn add_operand_idx_to_ir(&mut self, ir_lid: usize, idx: usize) {
+    pub fn add_existing_operand_to_ir(&mut self, ir_lid: usize, idx: usize) {
         self.ir_vec[ir_lid].add_operand(idx);
     }
 
     // Returns the linear operand index occupied by the new operand
-    pub fn add_operand_to_ir(&mut self, ir_lid: usize, operand: LinOperand) -> usize {
+    pub fn add_new_operand_to_ir(&mut self, ir_lid: usize, operand: LinOperand) -> usize {
         let idx = self.operand_vec.len();
         self.operand_vec.push(operand);
-        self.add_operand_idx_to_ir(ir_lid, idx);
+        self.add_existing_operand_to_ir(ir_lid, idx);
         idx
     }
 
@@ -186,7 +186,7 @@ impl<'toks> LinearDb {
         if self.operand_count_is_valid(expected, lops, diags, tinfo) {
             // Preserve the order of the operands front to back.
             for idx in lops {
-                self.add_operand_idx_to_ir(ir_lid, *idx);
+                self.add_existing_operand_to_ir(ir_lid, *idx);
             }
         } else {
             return false;
@@ -226,7 +226,7 @@ impl<'toks> LinearDb {
         let tinfo = ast.get_tinfo(parent_nid);
         let tok = tinfo.tok;
         let mut result = true;
-        match tinfo.tok {
+        match tok {
             LexToken::Wr => {
                 // A vector to track the operands of this expression.
                 let mut lops = Vec::new();
@@ -261,8 +261,8 @@ impl<'toks> LinearDb {
                 result &= self.process_operands(1, &mut lops, ir_lid, diags, tinfo);
 
                 // Add a destination operand to the operation to hold the result
-                let idx = self.add_operand_to_ir(ir_lid, LinOperand::new(
-                        Some(ir_lid), parent_nid, ast, tok));
+                let idx = self.add_new_operand_to_ir(ir_lid, LinOperand::new(
+                        Some(ir_lid), tinfo));
                 // Also add the destination operand to the local operands
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);
@@ -283,8 +283,8 @@ impl<'toks> LinearDb {
                 result &= self.process_optional_operands(1, &mut lops, ir_lid, diags, tinfo);
 
                 // Add a destination operand to the operation to hold the result
-                let idx = self.add_operand_to_ir(ir_lid, LinOperand::new(
-                        Some(ir_lid), parent_nid, ast, tok));
+                let idx = self.add_new_operand_to_ir(ir_lid, LinOperand::new(
+                        Some(ir_lid), tinfo));
                 // Also add the destination operand to the local operands
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);
@@ -298,8 +298,54 @@ impl<'toks> LinearDb {
                 // and return them as local operands.
                 // This case terminates recursion.
                 let idx = self.operand_vec.len();
-                self.operand_vec.push(LinOperand::new(None, parent_nid,ast,tok));
+                self.operand_vec.push(LinOperand::new(None, tinfo));
                 returned_operands.push(idx);
+            }
+            LexToken::Align => {
+                // To implement Align, we map to IR as follows:
+                // align align_val, fill_val; ==> align align_val align_amount; wr8 fill_val, align_amount;
+                // A vector to track the operands of this expression.
+                let mut lops = Vec::new();
+                let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tinfo.tok));
+                result &= self.record_children_r(rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
+
+                // We expect 1 or 2 operands for align.
+                // align <align_amount> [, optional pad byte value];
+                if lops.len() != 1 && lops.len() != 2{
+                    let tinfo = ast.get_tinfo(parent_nid);
+                    let m = format!("{:?} requires 2 operands, but found {}", tinfo.tok, lops.len());
+                    diags.err1("LINEAR_8", &m, tinfo.span());
+                    return false;
+                }
+
+                // The align, add the alignment amount
+                self.add_existing_operand_to_ir(ir_lid, lops[0]);
+
+                // To the align, add the destination operand to store the result
+                let align_result = self.add_new_operand_to_ir(ir_lid, LinOperand::new(
+                    Some(ir_lid), tinfo));
+
+                // Create a wr8_tinfo copied from the align tinfo
+                let mut wr8_tinfo = tinfo.clone();
+                wr8_tinfo.tok = LexToken::Wr8;
+                let wr8_lid = self.new_ir(parent_nid, ast, tok_to_irkind(wr8_tinfo.tok));
+
+                if lops.len() == 2 {
+                    // The user specified a pad byte value.  This expression is the first operand
+                    // of the wr8
+                    self.add_existing_operand_to_ir(wr8_lid, lops[1]);
+                } else {
+                    // Add a default integer 0 operand
+                    let mut pad_byte_tinfo = tinfo.clone();
+                    pad_byte_tinfo.tok = LexToken::Integer;
+                    pad_byte_tinfo.val = "0";
+                    self.add_new_operand_to_ir(wr8_lid, LinOperand::new(
+                        None, &pad_byte_tinfo));
+                }
+
+                // The align result as the number of bytes to write in wr8
+                self.add_existing_operand_to_ir(wr8_lid, align_result);
+
             }
             LexToken::Assert |
             LexToken::Wr8  |
@@ -320,7 +366,7 @@ impl<'toks> LinearDb {
                 // add the operands to this new IR.  These IRs are statements that do not
                 // return a value.
                 for idx in lops {
-                    self.add_operand_idx_to_ir(ir_lid, idx);
+                    self.add_existing_operand_to_ir(ir_lid, idx);
                 }
             }
             LexToken::ToI64 |
@@ -332,8 +378,8 @@ impl<'toks> LinearDb {
                 // 1 operand expected
                 result &= self.process_operands(1, &mut lops, ir_lid, diags, tinfo);
                 // Add a destination operand to the operation to hold the result
-                let idx = self.add_operand_to_ir(ir_lid, LinOperand::new(
-                    Some(ir_lid), parent_nid, ast, tok));
+                let idx = self.add_new_operand_to_ir(ir_lid, LinOperand::new(
+                    Some(ir_lid), tinfo));
                 // Also add the destination operand to the local operands
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);
@@ -362,8 +408,8 @@ impl<'toks> LinearDb {
                 result &= self.process_operands(2, &mut lops, ir_lid, diags, tinfo);
 
                 // Add a destination operand to the operation to hold the result
-                let idx = self.add_operand_to_ir(ir_lid, LinOperand::new(
-                    Some(ir_lid), parent_nid, ast, tok));
+                let idx = self.add_new_operand_to_ir(ir_lid, LinOperand::new(
+                    Some(ir_lid), tinfo));
                 // Also add the destination operand to the local operands
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);
@@ -377,8 +423,8 @@ impl<'toks> LinearDb {
                 // 1 operand expected, which is the name of the section.
                 if self.operand_count_is_valid(1, &lops, diags, tinfo) {
                     let sec_id_lid = lops.pop().unwrap();
-                    self.add_operand_idx_to_ir(start_lid, sec_id_lid);
-                    self.add_operand_idx_to_ir(end_lid, sec_id_lid);
+                    self.add_existing_operand_to_ir(start_lid, sec_id_lid);
+                    self.add_existing_operand_to_ir(end_lid, sec_id_lid);
                 } else {
                     result = false;
                 }
@@ -395,7 +441,7 @@ impl<'toks> LinearDb {
                 // Add an identifier name operand
                 let operand = LinOperand { ir_lid: Some(ir_lid), src_loc: tinfo.loc.clone(),
                                 sval: name_without_colon, tok};
-                self.add_operand_to_ir(ir_lid, operand);
+                self.add_new_operand_to_ir(ir_lid, operand);
             }
 
             LexToken::Semicolon |

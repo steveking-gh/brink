@@ -1301,6 +1301,18 @@ fn wrx_6() {
     fs::remove_file("wrx_6.bin").unwrap();
 }
 
+#[test]
+#[serial]
+fn align_1() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/align_1.brink")
+                .assert()
+                .success();
+
+    fs::remove_file("output.bin").unwrap();
+}
+
 
 } // mod tests
 

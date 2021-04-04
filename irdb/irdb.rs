@@ -52,6 +52,7 @@ impl IRDb {
         
         match lop.tok {
             // The following produce a boolean regardless of input data types
+            ast::LexToken::Align |
             ast::LexToken::DoubleEq |
             ast::LexToken::NEq |
             ast::LexToken::GEq |
@@ -203,7 +204,7 @@ impl IRDb {
     }
 
     // Expect 1 operand which is an integer of some sort or bool
-    fn validate_numeric_operand(&self, ir: &IR, diags: &mut Diags) -> bool {
+    fn validate_numeric_1(&self, ir: &IR, diags: &mut Diags) -> bool {
         let len = ir.operands.len();
         if len != 1 {
             let m = format!("'{:?}' expressions must evaluate to one operand, but found {}.", ir.kind, len);
@@ -220,7 +221,7 @@ impl IRDb {
     }
 
     // Expect 2 operand which are int or bool
-    fn validate_numeric_operands2(&self, ir: &IR, diags: &mut Diags) -> bool {
+    fn validate_numeric_2(&self, ir: &IR, diags: &mut Diags) -> bool {
         let len = ir.operands.len();
         if len != 3 {
             let m = format!("'{:?}' expression requires 2 input and one output \
@@ -241,7 +242,7 @@ impl IRDb {
     }
 
     // Expect 1 numeric operand (value) followed by one optional numeric operand (repeat count)
-    fn validate_wrx_operands(&self, ir: &IR, diags: &mut Diags) -> bool {
+    fn validate_numeric_1_or_2(&self, ir: &IR, diags: &mut Diags) -> bool {
         let len = ir.operands.len();
         if len != 1 && len != 2 {
             let m = format!("'{:?}' requires 1 or 2 input operands, \
@@ -274,6 +275,7 @@ impl IRDb {
 
     fn validate_operands(&self, ir: &IR, diags: &mut Diags) -> bool {
         let result = match ir.kind {
+            IRKind::Align |
             IRKind::Wr8 |
             IRKind::Wr16 |
             IRKind::Wr24 |
@@ -281,8 +283,8 @@ impl IRDb {
             IRKind::Wr40 |
             IRKind::Wr48 |
             IRKind::Wr56 |
-            IRKind::Wr64 => { self.validate_wrx_operands(ir, diags) }
-            IRKind::Assert => { self.validate_numeric_operand(ir, diags) }
+            IRKind::Wr64 => { self.validate_numeric_1_or_2(ir, diags) }
+            IRKind::Assert => { self.validate_numeric_1(ir, diags) }
             IRKind::Wrs |
             IRKind::Print => { self.validate_string_expr_operands(ir, diags) }
             IRKind::NEq |
@@ -299,7 +301,7 @@ impl IRDb {
             IRKind::BitOr |
             IRKind::LogicalOr |
             IRKind::Subtract |
-            IRKind::Add => { self.validate_numeric_operands2(ir, diags) }
+            IRKind::Add => { self.validate_numeric_2(ir, diags) }
             IRKind::ToI64 |
             IRKind::ToU64 |
             IRKind::U64 |

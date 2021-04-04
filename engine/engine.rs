@@ -40,11 +40,27 @@ impl Parameter {
         }
     }
 
+    fn to_u64_mut(&mut self) -> &mut u64 {
+        match self.data_type {
+            // Integers stored as i64
+            DataType::U64 => { self.val.downcast_mut::<u64>().unwrap() },
+            bad => panic!("Bad downcast conversion of {:?} to &mut u64!", bad),
+        }
+    }
+
     fn to_i64(&self) -> i64 {
         match self.data_type {
             DataType::Integer |
             DataType::I64 => { *self.val.downcast_ref::<i64>().unwrap() },
             bad => panic!("Bad downcast conversion of {:?} to i64!", bad),
+        }
+    }
+
+    fn to_i64_mut(&mut self) -> &mut i64 {
+        match self.data_type {
+            DataType::Integer |
+            DataType::I64 => { self.val.downcast_mut::<i64>().unwrap() },
+            bad => panic!("Bad downcast conversion of {:?} to &mut i64!", bad),
         }
     }
 
@@ -145,7 +161,7 @@ impl Engine {
         if ir.operands.len() == 2 {
             // Yes, we have a repeat count
             // A repeat count of 0 is not an error.
-            let op = self.parms[1].borrow();
+            let op = self.parms[ir.operands[1]].borrow();
             match op.data_type {
                 DataType::U64 => { repeat_count = op.to_u64(); }
                 DataType::Integer |
@@ -153,8 +169,8 @@ impl Engine {
                     let temp = op.to_i64();
                     if temp < 0 {
                         let msg = format!("Repeat count cannot be negative, \
-                                            but found '{}'", temp );
-                        let src_loc = irdb.parms[1].src_loc.clone();
+                                                but found '{}'", temp );
+                        let src_loc = irdb.parms[ir.operands[1]].src_loc.clone();
                         diags.err1("EXEC_32", &msg, src_loc);
                         result = false;
                         repeat_count = 0;
@@ -163,7 +179,7 @@ impl Engine {
                     }
                 bad => {
                     let msg = format!("Repeat count cannot be type '{:?}'", bad );
-                    let src_loc = irdb.parms[1].src_loc.clone();
+                    let src_loc = irdb.parms[ir.operands[1]].src_loc.clone();
                     diags.err1("EXEC_31", &msg, src_loc);
                     result = false;
                 }
@@ -532,22 +548,22 @@ impl Engine {
 
             match operation {
                 // output of compare is u64 regardless of inputs
-                IRKind::LogicalAnd => { let out = out_parm.val.downcast_mut::<u64>().unwrap(); *out = ((in0 != 0) && (in1 != 0)) as u64 }
-                IRKind::LogicalOr  => { let out = out_parm.val.downcast_mut::<u64>().unwrap(); *out = ((in0 != 0) || (in1 != 0)) as u64 }
-                IRKind::LEq        => { let out = out_parm.val.downcast_mut::<u64>().unwrap(); *out = (in0 <= in1) as u64 }
-                IRKind::GEq        => { let out = out_parm.val.downcast_mut::<u64>().unwrap(); *out = (in0 >= in1) as u64 }
-                IRKind::NEq        => { let out = out_parm.val.downcast_mut::<u64>().unwrap(); *out = (in0 != in1) as u64 }
-                IRKind::DoubleEq   => { let out = out_parm.val.downcast_mut::<u64>().unwrap(); *out = (in0 == in1) as u64 }
+                IRKind::LogicalAnd => { let out = out_parm.to_u64_mut(); *out = ((in0 != 0) && (in1 != 0)) as u64 }
+                IRKind::LogicalOr  => { let out = out_parm.to_u64_mut(); *out = ((in0 != 0) || (in1 != 0)) as u64 }
+                IRKind::LEq        => { let out = out_parm.to_u64_mut(); *out = (in0 <= in1) as u64 }
+                IRKind::GEq        => { let out = out_parm.to_u64_mut(); *out = (in0 >= in1) as u64 }
+                IRKind::NEq        => { let out = out_parm.to_u64_mut(); *out = (in0 != in1) as u64 }
+                IRKind::DoubleEq   => { let out = out_parm.to_u64_mut(); *out = (in0 == in1) as u64 }
                 
-                IRKind::BitOr      => { let out = out_parm.val.downcast_mut::<i64>().unwrap(); *out = in0 | in1 }
-                IRKind::BitAnd     => { let out = out_parm.val.downcast_mut::<i64>().unwrap(); *out = in0 & in1 }
-                IRKind::Add        => { let out = out_parm.val.downcast_mut::<i64>().unwrap(); result &= self.do_i64_add(ir, in0, in1, out, diags); }
-                IRKind::Subtract   => { let out = out_parm.val.downcast_mut::<i64>().unwrap(); result &= self.do_i64_sub(ir, in0, in1, out, diags); }
-                IRKind::Multiply   => { let out = out_parm.val.downcast_mut::<i64>().unwrap(); result &= self.do_i64_mul(ir, in0, in1, out, diags); }
-                IRKind::Divide     => { let out = out_parm.val.downcast_mut::<i64>().unwrap(); result &= self.do_i64_div(ir, in0, in1, out, diags); }
-                IRKind::Modulo     => { let out = out_parm.val.downcast_mut::<i64>().unwrap(); result &= self.do_i64_mod(ir, in0, in1, out, diags); }
-                IRKind::LeftShift  => { let out = out_parm.val.downcast_mut::<i64>().unwrap(); result &= self.do_i64_shl(ir, in0, in1, out, diags); }
-                IRKind::RightShift => { let out = out_parm.val.downcast_mut::<i64>().unwrap(); result &= self.do_i64_shr(ir, in0, in1, out, diags); }
+                IRKind::BitOr      => { let out = out_parm.to_i64_mut(); *out = in0 | in1 }
+                IRKind::BitAnd     => { let out = out_parm.to_i64_mut(); *out = in0 & in1 }
+                IRKind::Add        => { let out = out_parm.to_i64_mut(); result &= self.do_i64_add(ir, in0, in1, out, diags); }
+                IRKind::Subtract   => { let out = out_parm.to_i64_mut(); result &= self.do_i64_sub(ir, in0, in1, out, diags); }
+                IRKind::Multiply   => { let out = out_parm.to_i64_mut(); result &= self.do_i64_mul(ir, in0, in1, out, diags); }
+                IRKind::Divide     => { let out = out_parm.to_i64_mut(); result &= self.do_i64_div(ir, in0, in1, out, diags); }
+                IRKind::Modulo     => { let out = out_parm.to_i64_mut(); result &= self.do_i64_mod(ir, in0, in1, out, diags); }
+                IRKind::LeftShift  => { let out = out_parm.to_i64_mut(); result &= self.do_i64_shl(ir, in0, in1, out, diags); }
+                IRKind::RightShift => { let out = out_parm.to_i64_mut(); result &= self.do_i64_shr(ir, in0, in1, out, diags); }
 
                 bad => panic!("Forgot to handle i64 {:?}", bad),
             }
@@ -575,7 +591,7 @@ impl Engine {
         let mut out_parm = self.parms[out_parm_num].borrow_mut();
 
         let sec_name = in_parm0.to_identifier();
-        let out = out_parm.val.downcast_mut::<u64>().unwrap();
+        let out = out_parm.to_u64_mut();
 
         // We've already verified that the section identifier exists,
         // but unless the section actually got used in the output,
@@ -639,6 +655,52 @@ impl Engine {
             }
         }
         
+        true
+    }
+
+    /// Compute the required number of bytes to align the current absolute location.
+    /// We don't actually align anything yet, since that happens in a subsequent
+    /// wr8 instruction.
+    fn iterate_align(&mut self, ir: &IR, _irdb: &IRDb, _diags: &mut Diags,
+                        current: &Location) -> bool {
+        self.trace(format!("Engine::iterate_align: img {}, sec {}",
+                            current.img, current.sec).as_str());
+
+        let num_operands = ir.operands.len();
+
+        // The first parameter is the align amount
+        // The optional second parameter is the pad value.  We don't care about
+        // the pad value anymore, since that parameter pertains only to the wr8.
+        // The final parameter is the result operand for the number
+        // of bytes required to align.
+        assert!(num_operands == 2 || num_operands == 3);
+        let out_parm_num = if num_operands == 2 {
+            ir.operands[1]
+        } else {
+            ir.operands[2]
+        };
+
+        let mut out_parm = self.parms[out_parm_num].borrow_mut();
+        let out = out_parm.to_u64_mut();
+
+        let align_parm_num = ir.operands[0];
+        let align_parm = self.parms[align_parm_num].borrow();
+        let align_val = align_parm.to_u64();
+
+        // We'll at least panic at runtime if conversion from
+        // usize to u64 fails instead of bad output binary.
+        let img : u64 = current.img.try_into().unwrap();
+        let abs_val = img + self.start_addr;
+
+        let remainder = abs_val.checked_rem(align_val).unwrap();
+
+        *out = if remainder == 0 {
+            0 // we're already aligned, no pad bytes needed
+        } else {
+            align_val - remainder
+        };
+
+        debug!("Engine::iterate_align: alignment amount is {}", *out);
         true
     }
 
@@ -822,6 +884,8 @@ impl Engine {
                     IRKind::Wr48 |
                     IRKind::Wr56 |
                     IRKind::Wr64 => self.iterate_wrx(&ir, irdb, diags, &mut current),
+                    IRKind::Align => self.iterate_align(&ir, irdb, diags, &mut current),
+                    
                     // The following IR types are evaluated only at execute time.
                     // Nothing to do during iteration.
                     IRKind::Label |
@@ -1017,6 +1081,7 @@ impl Engine {
                 IRKind::Print => { self.execute_print(ir, irdb, diags, file) }
                 IRKind::Wrs => { self.execute_wrs(ir, irdb, diags, file) }
                 // the rest of these operations are computed during iteration
+                IRKind::Align |
                 IRKind::Abs |
                 IRKind::Img |
                 IRKind::Sec |
