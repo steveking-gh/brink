@@ -1313,6 +1313,29 @@ fn align_1() {
     fs::remove_file("output.bin").unwrap();
 }
 
+#[test]
+#[serial]
+fn align_2() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/align_2.brink")
+                .arg("-o align_2.bin")
+                .assert()
+                .success();
+
+    // Verify output file is correct.  If so, then clean up.
+    let bytevec = fs::read("align_2.bin").unwrap();
+    let temp : Vec<u8> = vec![
+        1, 2, 3, 4, 5, 0, 0, 0,   0, 0, 0, 0, 0, 0, 0, 0,  // align 16;
+        0xAA, 0xAA, 0xAA, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,    // align 8, 0xFF;
+        0xAA, 0xAA, 0xAA, 0x77                             // align 7, 0x77;
+        ];
+    println!("Bytevec length = {}", bytevec.len() );
+    assert!(bytevec.len() == 28);
+    assert!(bytevec == temp);
+    fs::remove_file("align_2.bin").unwrap();
+}
+
 
 } // mod tests
 

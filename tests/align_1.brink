@@ -2,6 +2,7 @@ section foo {
     wrs "Hello";
     align 32;
     assert sizeof(foo) == 32;
+    assert abs() == 32;
 }
 
 output foo;

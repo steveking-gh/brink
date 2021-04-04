@@ -1,0 +1,23 @@
+section foo {
+    wr8 1;
+    wr8 2;
+    wr8 3;
+    wr8 4;
+    wr8 5;
+    align 16;
+    assert abs() == 16;
+    assert img() == 16;
+    assert sec() == 16;
+    wr8 0xAA, 3;
+    align 8, 0xFF;
+    assert abs() == 24;
+    assert img() == 24;
+    assert sec() == 24;
+    align 24, 0xEE; // should do Nothing
+    wr8 0xAA, 3;
+    align 3, 0x33; // should do nothing
+    align 7, 0x77; // should pad to 28 (28 % 7 == 0)
+    assert sizeof(foo) == 28;
+}
+
+output foo;
