@@ -258,6 +258,23 @@ Example:
 
 ---
 
+## `align <align expression> [, <pad byte value>];`
+
+The align statement writes pad bytes into the current section until the current location counter reaches the specified alignment.  Align writes 0 as the default pad byte value, but the user may optionally specify a different value. 
+
+Example:
+
+    section foo {
+        wrs "Hello";
+        align 32;
+        assert sizeof(foo) == 32;
+        assert abs() == 32;
+    }
+    
+    output foo;
+
+---
+
 ## `assert <expression>;`
 
 The assert statement reports an error if the specified expression does not evaluate to a true (non-zero) value.  Assert expressions provide a means of error checking and do not affect the output file.
