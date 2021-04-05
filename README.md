@@ -258,7 +258,7 @@ Example:
 
 ---
 
-## `align <align expression> [, <pad byte value>];`
+## `align <expression> [, <pad byte value>];`
 
 The align statement writes pad bytes into the current section until the absolute location counter reaches the specified alignment.  Align writes 0 as the default pad byte value, but the user may optionally specify a different value.
 
@@ -426,6 +426,52 @@ When a section offset specifies an identifier, the identifier must be in the sco
     }
 
     output foo 0x1000;
+
+---
+
+## `set_sec <expression> [, <pad byte value>];`
+## `set_img <expression> [, <pad byte value>];`
+## `set_abs <expression> [, <pad byte value>];`
+
+The set_sec, set_img and set_abs statements pad the output until the respective location counter reaches the specified value.  Users may specify an optional pad byte value or use the default value of 0.
+
+These statements may be used to pad sections or images to the specified length.
+
+| Statement | Description                                                  |
+|-----------|--------------------------------------------------------------|
+| set_sec   | Pads until the *section* offset reaches the specified value. |
+| set_img   | Likewise for the *image* offset.                             |
+| set_abs   | Likewise for the *absolute address*                          |
+
+Note that these statements cannot cause the current location counter to move backwards.  If the specified value is less the corresponding location, brink reports an error.
+
+Example:
+
+    section foo {
+        wr8 1;
+        wr8 2;
+        wr8 3;
+        wr8 4;
+        wr8 5;
+        set_sec 16;
+        assert abs() == 16;
+        assert img() == 16;
+        assert sec() == 16;
+        wr8 0xAA, 3;
+        set_sec 24, 0xFF;
+        assert abs() == 24;
+        assert img() == 24;
+        assert sec() == 24;
+        set_sec 24, 0xEE; // should do Nothing
+        wr8 0xAA, 3;
+        set_sec 27, 0x33; // should do nothing
+        set_sec 28, 0x77; // should pad to 28
+        assert sizeof(foo) == 28;
+    }
+
+    output foo;
+
+---
 
 ## `sizeof( <identifier> ) -> U64`
 

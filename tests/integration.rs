@@ -1336,6 +1336,95 @@ fn align_2() {
     fs::remove_file("align_2.bin").unwrap();
 }
 
+#[test]
+#[serial]
+fn set_sec_1() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/set_sec_1.brink")
+                .assert()
+                .success();
+
+    fs::remove_file("output.bin").unwrap();
+}
+
+#[test]
+fn set_sec_2() {
+    let _cmd = Command::cargo_bin("brink")
+    .unwrap()
+    .arg("tests/set_sec_2.brink")
+    .assert()
+    .failure()
+    .stderr(predicates::str::contains("[EXEC_22]"));
+}
+
+#[test]
+#[serial]
+fn set_img_1() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/set_img_1.brink")
+                .assert()
+                .success();
+
+    fs::remove_file("output.bin").unwrap();
+}
+
+#[test]
+fn set_img_2() {
+    let _cmd = Command::cargo_bin("brink")
+    .unwrap()
+    .arg("tests/set_img_2.brink")
+    .assert()
+    .failure()
+    .stderr(predicates::str::contains("[EXEC_22]"));
+}
+
+#[test]
+#[serial]
+fn set_abs_1() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/set_abs_1.brink")
+                .assert()
+                .success();
+
+    fs::remove_file("output.bin").unwrap();
+}
+
+#[test]
+fn set_abs_2() {
+    let _cmd = Command::cargo_bin("brink")
+    .unwrap()
+    .arg("tests/set_abs_2.brink")
+    .assert()
+    .failure()
+    .stderr(predicates::str::contains("[EXEC_22]"));
+}
+
+#[test]
+#[serial]
+fn set_sec_3() {
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/set_sec_3.brink")
+                .arg("-o set_sec_3.bin")
+                .assert()
+                .success();
+
+    // Verify output file is correct.  If so, then clean up.
+    let bytevec = fs::read("set_sec_3.bin").unwrap();
+    let temp : Vec<u8> = vec![
+        1, 2, 3, 4, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  // set_sec 16;
+        0xAA, 0xAA, 0xAA, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,  // set_sec 24, 0xFF;
+        0xAA, 0xAA, 0xAA, 0x77                           // set_sec 28, 0x77;
+        ];
+    println!("Bytevec length = {}", bytevec.len() );
+    assert!(bytevec.len() == 28);
+    assert!(bytevec == temp);
+    fs::remove_file("set_sec_3.bin").unwrap();
+}
+
 
 } // mod tests
 

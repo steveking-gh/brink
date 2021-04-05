@@ -19,6 +19,9 @@ use log::{error, warn, info, debug, trace};
 pub enum LexToken {
     #[token("section")] Section,
     #[token("align")] Align,
+    #[token("set_sec")] SetSec,
+    #[token("set_img")] SetImg,
+    #[token("set_abs")] SetAbs,
     #[token("assert")] Assert,
     #[token("sizeof")] Sizeof,
     #[token("print")] Print,
@@ -478,6 +481,9 @@ impl<'toks> Ast<'toks> {
                 LexToken::Wrs |
                 LexToken::Assert |
                 LexToken::Align |
+                LexToken::SetSec |
+                LexToken::SetImg |
+                LexToken::SetAbs |
                 LexToken::Print => self.parse_expr(parent, diags),
                 _ => {
                     self.err_invalid_expression(diags, "AST_3");

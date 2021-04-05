@@ -53,6 +53,9 @@ impl IRDb {
         match lop.tok {
             // The following produce a boolean regardless of input data types
             ast::LexToken::Align |
+            ast::LexToken::SetSec |
+            ast::LexToken::SetImg |
+            ast::LexToken::SetAbs |
             ast::LexToken::DoubleEq |
             ast::LexToken::NEq |
             ast::LexToken::GEq |
@@ -276,6 +279,9 @@ impl IRDb {
     fn validate_operands(&self, ir: &IR, diags: &mut Diags) -> bool {
         let result = match ir.kind {
             IRKind::Align |
+            IRKind::SetSec |
+            IRKind::SetImg |
+            IRKind::SetAbs |
             IRKind::Wr8 |
             IRKind::Wr16 |
             IRKind::Wr24 |

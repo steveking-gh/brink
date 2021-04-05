@@ -1,0 +1,10 @@
+section foo {
+    wrs "Hello";
+    set_img 0x20;
+    assert sizeof(foo) == 0x20;
+    assert abs() == 0x1020;
+    assert img() == 0x20;
+    assert sec() == 0x20;
+}
+
+output foo 0x1000;

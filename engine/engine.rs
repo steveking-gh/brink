@@ -689,7 +689,7 @@ impl Engine {
 
         // We'll at least panic at runtime if conversion from
         // usize to u64 fails instead of bad output binary.
-        let img : u64 = current.img.try_into().unwrap();
+        let img : u64 = current.img;
         let abs_val = img + self.start_addr;
 
         let remainder = abs_val.checked_rem(align_val).unwrap();
@@ -701,6 +701,57 @@ impl Engine {
         };
 
         debug!("Engine::iterate_align: alignment amount is {}", *out);
+        true
+    }
+
+    /// Compute the required number of bytes to pad the current section to the specified size.
+    /// We don't actually pad anything yet, since that happens in a subsequent
+    /// wr8 instruction.
+    /// This function covers set_sec, set_img and set_abs.
+    fn iterate_set(&mut self, ir: &IR, _irdb: &IRDb, diags: &mut Diags,
+                        current: &Location) -> bool {
+        self.trace(format!("Engine::iterate_set: {:?}: img {}, sec {}", ir.kind,
+                                current.img, current.sec).as_str());
+
+        let num_operands = ir.operands.len();
+
+        // The first parameter is the pad amount
+        // The optional second parameter is the pad value.  We don't care about
+        // the pad value anymore, since that parameter pertains only to the wr8.
+        // The final parameter is the result operand for the number
+        // of bytes required to pad.
+        assert!(num_operands == 2 || num_operands == 3);
+        let out_parm_num = if num_operands == 2 {
+            ir.operands[1]
+        } else {
+            ir.operands[2]
+        };
+
+        let mut out_parm = self.parms[out_parm_num].borrow_mut();
+        let out = out_parm.to_u64_mut();
+
+        let set_parm_num = ir.operands[0];
+        let set_parm = self.parms[set_parm_num].borrow();
+        let set_val = set_parm.to_u64();
+
+        let loc = match ir.kind {
+            IRKind::SetAbs => current.img + self.start_addr,
+            IRKind::SetImg => current.img,
+            IRKind::SetSec => current.sec,
+            bad => panic!("called iterate_set for IR {:?}", bad),
+        };
+
+        // The current location can never move backwards
+        if set_val < loc {
+            let msg = format!("Set statement moves location counter backwards from {} to {}.",
+                    loc, set_val);
+            diags.err1("EXEC_22", &msg, ir.src_loc.clone());
+            return false;
+        }
+
+        *out = set_val - loc;
+
+        debug!("Engine::iterate_set: {:?} set amount is {}", ir.kind, *out);
         true
     }
 
@@ -770,7 +821,7 @@ impl Engine {
     fn iterate_section_start(&mut self, ir: &IR, irdb: &IRDb, _diags: &mut Diags,
                              current: &mut Location) -> bool {
         let sec_name = irdb.get_opnd_as_identifier(&ir, 0).to_string();
-        // For debugging, push our current section on the name stack
+        // Track that's we've entered this new section
         self.sec_names.push(sec_name);
         self.trace(format!("Engine::iterate_section_start: img {}, sec {}",
                             current.img, current.sec).as_str());
@@ -788,7 +839,7 @@ impl Engine {
         self.trace(format!("Engine::iterate_section_end: '{}', img {}, sec {}",
                 sec_name, current.img, current.sec).as_str());
         current.sec += self.sec_offsets.pop().unwrap();
-        // For debugging, pop our current section from the name stack
+        // Track that's we've exited this section
         self.sec_names.pop();
         
         true
@@ -885,6 +936,9 @@ impl Engine {
                     IRKind::Wr56 |
                     IRKind::Wr64 => self.iterate_wrx(&ir, irdb, diags, &mut current),
                     IRKind::Align => self.iterate_align(&ir, irdb, diags, &mut current),
+                    IRKind::SetSec |
+                    IRKind::SetImg |
+                    IRKind::SetAbs => self.iterate_set(&ir, irdb, diags, &mut current),
                     
                     // The following IR types are evaluated only at execute time.
                     // Nothing to do during iteration.
@@ -1081,6 +1135,9 @@ impl Engine {
                 IRKind::Print => { self.execute_print(ir, irdb, diags, file) }
                 IRKind::Wrs => { self.execute_wrs(ir, irdb, diags, file) }
                 // the rest of these operations are computed during iteration
+                IRKind::SetSec |
+                IRKind::SetImg |
+                IRKind::SetAbs |
                 IRKind::Align |
                 IRKind::Abs |
                 IRKind::Img |

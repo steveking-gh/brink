@@ -1,0 +1,6 @@
+section foo {
+    wrs "Hello";
+    set_sec 0x1; // moves backward, should fail
+}
+
+output foo 0x1000;

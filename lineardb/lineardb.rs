@@ -71,6 +71,9 @@ fn tok_to_irkind(tok: LexToken) -> IRKind {
         LexToken::Wr64 => { IRKind::Wr64 }
         LexToken::Assert => { IRKind::Assert }
         LexToken::Align => { IRKind::Align }
+        LexToken::SetSec => { IRKind::SetSec }
+        LexToken::SetImg => { IRKind::SetImg }
+        LexToken::SetAbs => { IRKind::SetAbs }
         LexToken::Wrs => { IRKind::Wrs }
         LexToken::NEq => { IRKind::NEq }
         LexToken::DoubleEq => { IRKind::DoubleEq }
@@ -301,16 +304,21 @@ impl<'toks> LinearDb {
                 self.operand_vec.push(LinOperand::new(None, tinfo));
                 returned_operands.push(idx);
             }
+            LexToken::SetSec |
+            LexToken::SetImg |
+            LexToken::SetAbs |
             LexToken::Align => {
-                // To implement Align, we map to IR as follows:
-                // align align_val, fill_val; ==> align align_val align_amount; wr8 fill_val, align_amount;
+                // To implement align or pad, we map to IR as follows:
+                // align val, fill_val; ==> align val, count; wr8 fill_val, count;
+                // pad   val, fill_val; ==> pad   val, count; wr8 fill_val, count;
                 // A vector to track the operands of this expression.
                 let mut lops = Vec::new();
                 let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tinfo.tok));
                 result &= self.record_children_r(rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
 
-                // We expect 1 or 2 operands for align.
-                // align <align_amount> [, optional pad byte value];
+                // We expect 1 or 2 operands
+                // align value [, optional pad byte value];
+                // pad   value [, optional pad byte value];
                 if lops.len() != 1 && lops.len() != 2{
                     let tinfo = ast.get_tinfo(parent_nid);
                     let m = format!("{:?} requires 2 operands, but found {}", tinfo.tok, lops.len());
@@ -318,11 +326,11 @@ impl<'toks> LinearDb {
                     return false;
                 }
 
-                // The align, add the alignment amount
+                // Add the user specified value to the IR
                 self.add_existing_operand_to_ir(ir_lid, lops[0]);
 
-                // To the align, add the destination operand to store the result
-                let align_result = self.add_new_operand_to_ir(ir_lid, LinOperand::new(
+                // Add the destination operand to store the calculated count
+                let count_output = self.add_new_operand_to_ir(ir_lid, LinOperand::new(
                     Some(ir_lid), tinfo));
 
                 // Create a wr8_tinfo copied from the align tinfo
@@ -344,9 +352,10 @@ impl<'toks> LinearDb {
                 }
 
                 // The align result as the number of bytes to write in wr8
-                self.add_existing_operand_to_ir(wr8_lid, align_result);
+                self.add_existing_operand_to_ir(wr8_lid, count_output);
 
             }
+
             LexToken::Assert |
             LexToken::Wr8  |
             LexToken::Wr16 |
