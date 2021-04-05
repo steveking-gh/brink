@@ -2,5 +2,3 @@
 **/Cargo.lock
 **/output.bin
 ast/fuzz/cov
-*.svg
-*.dot
