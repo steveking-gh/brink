@@ -50,13 +50,13 @@ Will print the message:
 
 ## The Location Counter
 
-Like the [GNU linker 'ld'](https://ftp.gnu.org/old-gnu/Manuals/ld-2.9.1/html_mono/ld.html), brink uses the concept of a *location counter*.  The location counter is the current position in the output file, referenced from either the start of the current section, the start of the entire output file (or image) or the absolute logical address.
+Like the [GNU linker 'ld'](https://ftp.gnu.org/old-gnu/Manuals/ld-2.9.1/html_mono/ld.html), brink uses the concept of a *location counter*.  The location counter is the current position in the output file, referenced from either the start of the current section, the start of the entire output file (or image) or the absolute logical address.  The location counter can only move forward.
 
 The following diagram shows the basic concepts.  Users specify the starting logical address using an [output](#output-section-identifier-absolute-starting-address) statement.
 
 ![Location Counter and sec/img/abs offsets](./images/location_counter.svg)
 
-Programs can query the location counter using the [abs](#abs-identifier----u64), [img](#img-identifier----u64) and [sec](#sec-identifier----u64) statements.  Programs force the location counter forward to a specific offset or address using the set_sec, set_img and set_abs statements.  Like the GNU linker, brink reports an error if any set operation would cause the location counter to move backwards.
+Programs can query the location counter using the [abs](#abs-identifier----u64), [img](#img-identifier----u64) and [sec](#sec-identifier----u64) statements.  Programs force the location counter forward to a specific offset or address using the [set_sec](#set_sec-expression--pad-byte-value), [set_img](#set_img-expression--pad-byte-value) and [set_abs](#set_abs-expression--pad-byte-value) statements.  Brink reports an error if any set operation would cause the location counter to move backwards.
 ## Unit Testing
 
 Brink supports unit tests.
