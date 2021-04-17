@@ -670,6 +670,7 @@ impl IdentDb {
             let lir = &lindb.ir_vec[lid];
             lid += 1;
             match lir.op {
+                // TODO need img and abs here?
                 IRKind::Sec => {
                     result &= self.verify_operand_refs(lir, lindb, diags);
                 }
@@ -801,6 +802,17 @@ impl IdentDb {
                     continue;
                 }
                 if self.is_valid_label_ref(lop) {
+                    // labels have no size, so verify the linear operation is not a sizeof()
+                    match lir.op {
+                        IRKind::Sizeof => {
+                            let msg = format!("Sizeof cannot refer to a label name.  Labels have no size.");
+                            diags.err1("LINEAR_9", &msg, lop.src_loc.clone());
+                            // keep processing after error to report other problems
+                            result = false;
+                        }
+
+                        _ => { }
+                    }
                     continue;
                 }
 

@@ -1027,6 +1027,26 @@ fn label_1() {
 }
 
 #[test]
+fn label_2() {
+    let _cmd = Command::cargo_bin("brink")
+    .unwrap()
+    .arg("tests/label_2.brink")
+    .assert()
+    .failure()
+    .stderr(predicates::str::contains("[LINEAR_9]"));
+}
+
+#[test]
+fn label_3() {
+    let _cmd = Command::cargo_bin("brink")
+    .unwrap()
+    .arg("tests/label_3.brink")
+    .assert()
+    .failure()
+    .stderr(predicates::str::contains("[LINEAR_2]"));
+}
+
+#[test]
 fn quoted_escapes_1() {
     let _cmd = Command::cargo_bin("brink")
                 .unwrap()

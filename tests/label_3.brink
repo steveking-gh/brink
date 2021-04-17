@@ -1,0 +1,7 @@
+section foo {
+    lab1: wrs "Wow!";
+    lab1: // duplicate, should fail
+}
+
+output foo 0x1000;
+

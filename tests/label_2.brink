@@ -1,0 +1,6 @@
+section foo {
+    lab1: wrs "Wow!";
+    print sizeof(lab1); // should fail
+}
+
+output foo 0x1000;

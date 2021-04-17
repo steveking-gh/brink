@@ -336,9 +336,31 @@ Example:
 
 ---
 
+## Labels
+Labels assign an identifier to a specific location in the output file.  Other source code can then refer to the location of the label by name.  Labels have global scope and label names must be globally unique.  Multiple different labels can refer to the same location.
+
+Labels have the form `<label identifier>:`
+
+For example:
+
+    section foo {
+        // assign the label 'lab1' to the current location
+        lab1: wrs "Wow!";
+        // assign the label 'lab2' to the current location
+        lab2:
+        assert abs(lab1) == 0x1000;
+        assert abs(lab2) == 0x1004;
+        assert abs(lab3) == 0x1004;
+        // yet another label, same location as 'lab2'
+        lab3:
+    }
+
+    output foo 0x1000;
+---
+
 ## `output <section identifier> [absolute starting address];`
 
-An output statement specifies the section to write to the output file and an optional absolute starting address.  Without a starting address, `output` defaults to a starting address of 0.
+An output statement specifies the top section to write to the output file and an optional absolute starting address.  Without a starting address, `output` defaults to a starting address of 0.
 
 **A Brink program must have exactly one output statement.**
 
