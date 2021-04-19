@@ -1,9 +1,5 @@
 # Brink
 
-__WARNING: Brink is under construction.  Please come back later!__
-
-__^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^__
-
 Brink is a domain specific language for linking and compositing of
 an output file.  Brink simplifies construction of complex files by managing sizes,
 offsets and ordering in a readable declarative style.  Brink was created with
@@ -554,6 +550,7 @@ Example:
     output foo;
 
 ---
+
 ## `wr8 <expression> [, <expression>];`
 ## `wr16 <expression> [, <expression>];`
 ## `wr24 <expression> [, <expression>];`
@@ -589,6 +586,24 @@ Another example using the optional repetition expression.
         wr8 0, abs() % 4096; // write zero enough times to align to 4KB boundary.
     }
 
+---
+
+## `wrf "<quoted file path>";`
+
+Write the file at the specified path into the output file.  Brink treats all input files as binary files.  Paths can be relative to the current directory or absolute.
+
+For example, given the file test_source_1.txt containing:
+
+    Hello!
+
+The following program simply copies these 6 UTF-8 characters to the output file.
+
+    section foo {
+        wrf "test_source_1.txt"; // Hello!
+        assert(sizeof(foo) == 6);
+    }
+
+    output foo;
 
 ---
 
