@@ -1,0 +1,5 @@
+section foo {
+    wrf "tests/does_not_exist.txt"; // should fail
+}
+
+output foo;

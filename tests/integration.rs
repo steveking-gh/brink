@@ -1460,6 +1460,16 @@ fn wrf_1() {
     fs::remove_file("wrf_1.bin").unwrap();
 }
 
+#[test]
+fn wrf_2() {
+    let _cmd = Command::cargo_bin("brink")
+    .unwrap()
+    .arg("tests/wrf_2.brink")
+    .assert()
+    .failure()
+    .stderr(predicates::str::contains("[IRDB_13]"));
+}
+
 
 } // mod tests
 
