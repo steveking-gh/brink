@@ -1,9 +1,9 @@
 # Brink
 
-Brink is a domain specific language for linking and compositing of
-an output file.  Brink simplifies construction of complex files by managing sizes,
-offsets and ordering in a readable declarative style.  Brink was created with
-FLASH or other NVM images in mind, especially for use in embedded systems.
+Brink is a domain specific language for linking and composing of an output file.
+Brink simplifies construction of complex files by managing sizes, offsets and
+ordering in a readable declarative style.  Brink was created with FLASH or other
+NVM images in mind, especially for use in embedded systems.
 
 ## Examples
 
