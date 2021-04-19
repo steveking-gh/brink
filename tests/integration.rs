@@ -1470,6 +1470,16 @@ fn wrf_2() {
     .stderr(predicates::str::contains("[IRDB_13]"));
 }
 
+#[test]
+fn wrf_3() {
+    let _cmd = Command::cargo_bin("brink")
+    .unwrap()
+    .arg("tests/wrf_3.brink")
+    .assert()
+    .failure()
+    .stderr(predicates::str::contains("[AST_19]"));
+}
+
 
 } // mod tests
 

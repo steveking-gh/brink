@@ -1,0 +1,5 @@
+section foo {
+    wrf unquoted; // should fail
+}
+
+output foo;
