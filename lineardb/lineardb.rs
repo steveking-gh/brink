@@ -75,6 +75,7 @@ fn tok_to_irkind(tok: LexToken) -> IRKind {
         LexToken::SetImg => { IRKind::SetImg }
         LexToken::SetAbs => { IRKind::SetAbs }
         LexToken::Wrs => { IRKind::Wrs }
+        LexToken::Wrf => { IRKind::Wrf }
         LexToken::NEq => { IRKind::NEq }
         LexToken::DoubleEq => { IRKind::DoubleEq }
         LexToken::GEq => { IRKind::GEq }
@@ -366,6 +367,7 @@ impl<'toks> LinearDb {
             LexToken::Wr56 |
             LexToken::Wr64 |
             LexToken::Wrs |
+            LexToken::Wrf |
             LexToken::Print => {
                 // A vector to track the operands of this expression.
                 let mut lops = Vec::new();

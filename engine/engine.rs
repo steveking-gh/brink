@@ -1,4 +1,4 @@
-use std::{convert::TryFrom};
+use std::{convert::TryFrom, io::Read};
 use ir::{DataType, IR, IRKind};
 use irdb::IRDb;
 use diags::Diags;
@@ -195,6 +195,35 @@ impl Engine {
         
         result
     }
+
+    /// Used for wr file
+    /// There is nothing really to iterate other than advancing
+    /// the location counter by the size of the file.
+    fn iterate_wrf(&mut self, ir: &IR, irdb: &IRDb, _diags: &mut Diags,
+                        current: &mut Location) -> bool {
+        
+        // The operand is a file path
+        assert!(ir.operands.len() < 2);
+
+        let path_opnd = self.parms[ir.operands[0]].borrow();
+        let file_path = path_opnd.to_str();
+
+        // we already verified this is a legit file path,
+        // so unwrap is ok.
+        let file_info = irdb.files.get(file_path).unwrap();
+        
+        let byte_size = file_info.size;
+
+        self.trace(format!("Engine::iterate_wrf '{}' with size {}: \
+                                img {}, sec {}", file_path, byte_size,
+                                current.img, current.sec).as_str());
+
+        current.img += byte_size;
+        current.sec += byte_size;
+        
+        true
+    }
+
 
     /// Compute the string representation of the expression.
     /// Returns the resulting string in xstr.
@@ -939,6 +968,8 @@ impl Engine {
                     IRKind::SetSec |
                     IRKind::SetImg |
                     IRKind::SetAbs => self.iterate_set(&ir, irdb, diags, &mut current),
+
+                    IRKind::Wrf => self.iterate_wrf(&ir, irdb, diags, &mut current),
                     
                     // The following IR types are evaluated only at execute time.
                     // Nothing to do during iteration.
@@ -1064,6 +1095,67 @@ impl Engine {
         result
     }
 
+    fn execute_wrf(&self, ir: &IR, irdb: &IRDb, diags: &mut Diags, file: &mut File)
+                   -> Result<()> {
+        self.trace("Engine::execute_wrf:");
+
+        let path_opnd = self.parms[ir.operands[0]].borrow();
+        let path = path_opnd.to_str();
+
+        // we already verified this is a legit file path,
+        // so unwrap is ok.
+        let file_info = irdb.files.get(path).unwrap();
+
+        // open the file, which may fail
+        let fh_result = File::open(path);
+
+        if fh_result.is_err() {
+            let fh_err = fh_result.err().unwrap();
+            let msg = format!("Opening file '{}' failed with OS error '{:?}'.",
+                            path, fh_err.raw_os_error());
+            diags.err1("EXEC_33", &msg, ir.src_loc.clone());
+            return Err(anyhow!(fh_err));
+        }
+
+        let mut source_file = fh_result.unwrap();
+
+        // read/write in 64K chunks
+        // TODO don't hardcode this number
+        let mut buf = [0u8; 0x10000];
+        let mut total_bytes = 0;
+        loop {
+            // the map_error lambda just converts io::error to a std::error
+            let read_result = source_file.read(&mut buf);
+
+            if read_result.is_err() {
+                let read_err = read_result.err().unwrap();
+                let msg = format!("Reading file '{}' failed with OS error '{:?}'.",
+                                path, read_err.raw_os_error());
+                diags.err1("EXEC_34", &msg, ir.src_loc.clone());
+                return Err(anyhow!(read_err));
+            }
+
+            let bytes_read = read_result.unwrap();
+            total_bytes += bytes_read;
+            let write_result = file.write_all(&buf[0..bytes_read])
+                                        .map_err(|err|err.into());
+            if write_result.is_err() {
+                let msg = format!("Writing buffer failed");
+                diags.err1("EXEC_35", &msg, ir.src_loc.clone());
+                return write_result;
+            }
+
+            if bytes_read < buf.len() {
+                break; // source file is exhausted, nothing more to write
+            }
+        }
+
+        assert!(total_bytes as u64 == file_info.size);
+
+        
+        Ok(())
+    }
+
     fn execute_wrx(&self, ir: &IR, _irdb: &IRDb, diags: &mut Diags, file: &mut File)
                    -> Result<()> {
         self.trace(format!("Engine::execute_wrx: {:?}", ir.kind ).as_str());
@@ -1134,6 +1226,7 @@ impl Engine {
                 IRKind::Assert => { self.execute_assert(ir, irdb, diags, file) }
                 IRKind::Print => { self.execute_print(ir, irdb, diags, file) }
                 IRKind::Wrs => { self.execute_wrs(ir, irdb, diags, file) }
+                IRKind::Wrf => { self.execute_wrf(ir, irdb, diags, file) }
                 // the rest of these operations are computed during iteration
                 IRKind::SetSec |
                 IRKind::SetImg |

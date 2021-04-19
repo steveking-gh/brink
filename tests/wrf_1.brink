@@ -1,0 +1,6 @@
+section foo {
+    wrf "tests/test_source_1.txt"; // Hello!
+    assert(sizeof(foo) == 6);
+}
+
+output foo;

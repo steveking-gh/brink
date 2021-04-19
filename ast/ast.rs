@@ -39,6 +39,7 @@ pub enum LexToken {
     #[token("wr48")] Wr48,
     #[token("wr56")] Wr56,
     #[token("wr64")] Wr64,
+    #[token("wrf")] Wrf,
     #[token("wr")] Wr,
     #[token("output")] Output,
     #[token("==")] DoubleEq,
@@ -470,6 +471,7 @@ impl<'toks> Ast<'toks> {
             let parse_ok = match tinfo.tok {
                 LexToken::Label => self.parse_label(parent, diags),
                 LexToken::Wr => self.parse_wr(parent, diags),
+                LexToken::Wrf |
                 LexToken::Wr8 |
                 LexToken::Wr16 |
                 LexToken::Wr24 |
@@ -513,9 +515,9 @@ impl<'toks> Ast<'toks> {
         // Add the wr keyword as a child of the parent and advance
         let wr_nid = self.add_to_parent_and_advance(parent_nid);
 
-        // Next, an identifier (section name) is expected
+        // Next, an identifier is expected
         if self.expect_leaf(diags, wr_nid, LexToken::Identifier, "AST_15",
-                    "Expected a section name after 'wr'") {
+                    "Expected a section identifier after 'wr'") {
             result = self.expect_semi(diags, wr_nid);
         }
         self.dbg_exit("parse_wr", result)
@@ -844,11 +846,6 @@ impl<'toks> Ast<'toks> {
         let tinfo = self.get_tinfo(nid);
 
         let (label,color) = match tinfo.tok {
-            LexToken::Section |
-            LexToken::Wr |
-            LexToken::Wrs |
-            LexToken::Output => (tinfo.val, Ast::DOT_DEFAULT_FILL),
-            LexToken::Identifier => (tinfo.val, Ast::DOT_DEFAULT_FILL),
             LexToken::QuotedString => {
                 if tinfo.val.len() <= 8 {
                     (tinfo.val.strip_prefix('\"')
@@ -1132,8 +1129,8 @@ impl<'toks> AstDb<'toks> {
         let mut sections: HashMap<&'toks str, Section<'toks>> = HashMap::new();
         let mut output: Option<Output<'toks>> = None;
 
-        // First phase, record all sections and the output.
-        // Sections are defined only at top level so no need for recursion.
+        // First phase, record all sections, files, and the output.
+        // These are defined only at top level so no need for recursion.
         for nid in ast.root.children(&ast.arena) {
             let tinfo = ast.get_tinfo(nid);
             result = result && match tinfo.tok {

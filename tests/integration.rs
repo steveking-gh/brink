@@ -1445,6 +1445,21 @@ fn set_sec_3() {
     fs::remove_file("set_sec_3.bin").unwrap();
 }
 
+#[test]
+fn wrf_1() {
+    // clean-up any stale outputs
+    let _cmd = Command::cargo_bin("brink")
+                .unwrap()
+                .arg("tests/wrf_1.brink")
+                .arg("-o wrf_1.bin")
+                .assert()
+                .success();
+
+    // Verify output file is correct.  If so, then clean up.
+    assert_eq!("Hello!", fs::read_to_string("wrf_1.bin").unwrap());
+    fs::remove_file("wrf_1.bin").unwrap();
+}
+
 
 } // mod tests
 

@@ -6,12 +6,21 @@ use lineardb::{LinearDb};
 use log::{error, warn, info, debug, trace};
 
 use ir::{DataType, IR, IRKind, IROperand};
-use std::{collections::HashMap, ops::Range};
+use std::{collections::HashMap, fs, ops::Range, path::Path, path::PathBuf};
 use parse_int::parse;
+
+pub struct FileInfo {
+    pub path: String,
+    pub size: u64,
+    pub src_loc: Range<usize>,
+}
 
 pub struct IRDb {
     pub ir_vec: Vec<IR>,
     pub parms: Vec<IROperand>,
+
+    /// Map a file path to the file info object
+    pub files: HashMap<String,FileInfo>,
 
     /// The optional absolute starting address specified
     /// in the output statement.  Zero by default.
@@ -157,6 +166,7 @@ impl IRDb {
             ast::LexToken::Semicolon |
             ast::LexToken::Wrs |
             ast::LexToken::Wr |
+            ast::LexToken::Wrf |
             ast::LexToken::Output |
             ast::LexToken::Unknown => { panic!("Token '{:?}' has no associated data type.", lop.tok); }
         };
@@ -203,6 +213,71 @@ impl IRDb {
     // Print accepts most expressions without side effects
     // TODO add the restrictions that do exist, e.g. no identifiers
     fn validate_string_expr_operands(&self, _ir: &IR, _diags: &mut Diags) -> bool {
+        true
+    }
+
+    // Validate write file operands
+    fn validate_wrf_operands(&mut self, ir: &IR, diags: &mut Diags) -> bool {
+        let len = ir.operands.len();
+        if len != 1 {
+            let m = format!("'{:?}' statements must have 1 operand, but found {}.",
+                            ir.kind, len);
+            diags.err1("IRDB_10", &m, ir.src_loc.clone());
+            return false;
+        }
+
+        let path_opnd = &self.parms[ir.operands[0]];
+        if path_opnd.data_type != DataType::QuotedString {
+            let m = format!("'{:?}' operand must be a file path in \
+                    double-quotes, found '{:?}'.",
+                    ir.kind, path_opnd.data_type);
+            diags.err2("IRDB_11", &m, ir.src_loc.clone(),
+                     path_opnd.src_loc.clone());
+            return false;
+        }
+
+        let path_str = path_opnd.to_str();
+        let path = Path::new(path_str);
+
+        // Determine if we already know about this file
+        if self.files.contains_key(path_str) {
+            return true; // Already recorded this file, nothing more to do.
+        }
+
+        // open the file and determine the size
+        let fm_result = fs::metadata(path);
+        if fm_result.is_err() {
+            // Canonicalizing a missing file doesn't work, so
+            // just use the current directory.
+            let pbuf_result = PathBuf::from("./").canonicalize();
+            let full_path = if pbuf_result.is_err() {
+                "!!Cannot determine full path!!".to_string()
+            } else {
+                // Hmm... seems like a lot of work to get the string
+                pbuf_result.unwrap().to_str().unwrap().to_string()
+            };
+            let os_err = fm_result.err().unwrap().to_string();
+            let m = format!("Error getting metadata for file '{}'\n\
+                    OS error is '{}'\n\
+                    Looking in directory '{}", path_str, os_err, full_path);
+            diags.err1("IRDB_13", &m, path_opnd.src_loc.clone());
+            return false;
+        }
+
+        let fm = fm_result.unwrap();
+
+        if !fm.is_file() {
+            let m = format!("'{}' must be a regular file.", path_str);
+            diags.err1("IRDB_14", &m, path_opnd.src_loc.clone());
+            return false;
+        }
+
+        let size = fm.len();
+
+        let finfo = FileInfo { path: path_str.to_string(), size,
+                                src_loc: path_opnd.src_loc.clone() };
+
+        self.files.insert(path_str.to_string(), finfo);
         true
     }
 
@@ -276,7 +351,7 @@ impl IRDb {
         true
     }
 
-    fn validate_operands(&self, ir: &IR, diags: &mut Diags) -> bool {
+    fn validate_operands(&mut self, ir: &IR, diags: &mut Diags) -> bool {
         let result = match ir.kind {
             IRKind::Align |
             IRKind::SetSec |
@@ -291,6 +366,7 @@ impl IRDb {
             IRKind::Wr56 |
             IRKind::Wr64 => { self.validate_numeric_1_or_2(ir, diags) }
             IRKind::Assert => { self.validate_numeric_1(ir, diags) }
+            IRKind::Wrf => { self.validate_wrf_operands(ir, diags) }
             IRKind::Wrs |
             IRKind::Print => { self.validate_string_expr_operands(ir, diags) }
             IRKind::NEq |
@@ -382,7 +458,8 @@ impl IRDb {
         }
 
         let mut ir_db = IRDb { ir_vec: Vec::new(), parms: Vec::new(),
-            sized_locs: HashMap::new(), addressed_locs: HashMap::new(), start_addr };
+            sized_locs: HashMap::new(), addressed_locs: HashMap::new(), start_addr,
+            files: HashMap::new() };
 
         if !ir_db.process_lin_operands(lin_db, diags) {
             return None;
