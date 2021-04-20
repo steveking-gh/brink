@@ -5,9 +5,28 @@ Brink simplifies construction of complex files by managing sizes, offsets and
 ordering in a readable declarative style.  Brink was created with FLASH or other
 NVM images in mind, especially for use in embedded systems.
 
-## Examples
+## Hello World
 
-For a source file called my_file.brink:
+For a source file called hello.brink:
+
+    /*
+     * A section defines part of an output.
+     */
+    section foo {
+        // Print a quoted string to the console
+        print "Hello World!\n";
+    }
+
+    // An output statement outputs the section to a file
+    output foo;
+
+Running the command:
+
+    $ brink hello.brink
+
+Produces `Hello World!` to the console.  Brink also produced an empty file called `output.bin`.  This file is the default output when you don't specify some other name on the command line with the `-o` option.  Why is the file empty?  Because nothing in our program produced output file content -- we just printed the console message.
+
+Let's fix that.  We can replace the `print` command with the `wrs` command, which is shorthand for 'write string':
 
     /*
      * A section defines part of an output.
@@ -17,13 +36,18 @@ For a source file called my_file.brink:
         wrs "Hello World!\n";
     }
 
-    // An output statement outputs the section
+    // An output statement outputs the section to a file
     output foo;
 
-Running the command:
-`brink my_file.brink` Produces a file containing the string `Hello World!\n`.
+Now, running the command again:
+    
+    $ brink hello.brink
+    
+Produces output.bin containing the string `Hello World!\n`.
 
-Brink supports assert expressions for error checking.  This example verifies that the size of the section is 13 bytes long.
+## Assertions
+
+Brink supports assert expressions for error checking.  This example verifies that the size of the section 'bar' is 13 bytes long.
 
     section bar {
         wrs "Hello World!\n";
@@ -31,7 +55,7 @@ Brink supports assert expressions for error checking.  This example verifies tha
     }
     output bar;
 
-You can of course print to console during generation of your output image.
+To aid in debug, you can of course print this length information to the console during generation of your output:
 
     section bar {
         print "Output size is ", sizeof(bar), " bytes\n";
@@ -40,9 +64,11 @@ You can of course print to console during generation of your output image.
     }
     output bar;
 
-Will print the message:
+Prints the console message:
 
     Output size is 13 bytes
+
+In addition to writing to 'output.bin'.
 
 ## The Location Counter
 
@@ -127,7 +153,19 @@ Produces `output.bin`:
 
 ---
 ## Brink Language Reference
+
 ---
+## Comments
+
+Brink supports C language line and block comments.
+
+## Whitespace
+
+Brink supports lenient C language style whitespace rules.
+
+## Semicolon Termination
+
+Like C language, statements must be terminated with a trailing semicolon character.
 
 ## Types
 
