@@ -5,6 +5,30 @@ Brink simplifies construction of complex files by managing sizes, offsets and
 ordering in a readable declarative style.  Brink was created with FLASH or other
 NVM images in mind, especially for use in embedded systems.
 
+## What Can Brink Do?
+
+Brink can assemble any number of input files into a unified output.
+
+<img src="./images/unified_binary.svg" width="400">
+
+---
+
+Brink can calculate the relative or absolute offsets, allowing the output to contain pointer tables, cross-references and so on.
+
+<img src="./images/offsets.svg" width="400">
+
+---
+
+Brink can add pad bytes to force parts of the file to be a certain size.
+
+<img src="./images/pad.svg" width="400">
+
+---
+
+Brink can add pad bytes to force parts of the file to start at an aligned boundary.
+
+<img src="./images/align.svg" width="400">
+
 ## Hello World
 
 For a source file called hello.brink:
@@ -20,11 +44,13 @@ For a source file called hello.brink:
     // An output statement outputs the section to a file
     output foo;
 
-Running the command:
+Running brink on the file produces the expected message:
 
     $ brink hello.brink
+    Hello World!
+    $
 
-Produces `Hello World!` to the console.  Brink also produced an empty file called `output.bin`.  This file is the default output when you don't specify some other name on the command line with the `-o` option.  Why is the file empty?  Because nothing in our program produced output file content -- we just printed the console message.
+Brink also produced an empty file called `output.bin`.  This file is the default output when you don't specify some other name on the command line with the `-o` option.  Why is the file empty?  Because nothing in our program produced output file content -- we just printed the console message.
 
 Let's fix that.  We can replace the `print` command with the `wrs` command, which is shorthand for 'write string':
 
@@ -40,9 +66,10 @@ Let's fix that.  We can replace the `print` command with the `wrs` command, whic
     output foo;
 
 Now, running the command again:
-    
+
     $ brink hello.brink
-    
+    $
+
 Produces output.bin containing the string `Hello World!\n`.
 
 ## Assertions
@@ -89,8 +116,8 @@ Brink supports unit tests.
 
 Brink supports fuzz tests for its various submodules.  Fuzz testing starts from
 a corpus of random inputs and then further randomizes those inputs to try to
-cause crashes and hangs.  At the time of writing (Rust 1.49.0), fuzz testing
-**required the nightly build**.
+cause crashes and hangs.  At the time of writing (Rust 1.51.0), fuzz testing
+**requires the nightly build**.
 
 To run fuzz tests:
 
@@ -152,9 +179,8 @@ Produces `output.bin`:
     I'm foo
 
 ---
-## Brink Language Reference
+# Brink Language Reference
 
----
 ## Comments
 
 Brink supports C language line and block comments.
