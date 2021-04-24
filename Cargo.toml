@@ -11,7 +11,16 @@ members = [
 
 [package]
 name = "brink"
-version = "0.1.0"
+version = "0.9.0"
+license-file = "LICENSE.txt"
+readme = "README.md"
+homepage = "https://github.com/steveking-gh/brink"
+repository = "https://github.com/steveking-gh/brink"
+keywords = ["linker",
+            "domain-specific-language",
+            "command-line-interface",
+            "build"]
+categories = "Build Utils"
 authors = ["Steve King <sk@metrokings.com>"]
 edition = "2018"
 
