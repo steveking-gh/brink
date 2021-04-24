@@ -29,6 +29,13 @@ Brink can add pad bytes to force parts of the file to start at an aligned bounda
 
 <img src="./images/align.svg" width="400">
 
+---
+
+Brink can write your own strings and data defined within your brink source file.
+
+<img src="./images/adhoc.svg" width="400">
+
+---
 ## Hello World
 
 For a source file called hello.brink:
