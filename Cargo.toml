@@ -11,7 +11,7 @@ members = [
 
 [package]
 name = "brink"
-version = "0.9.0"
+version = "1.0.0"
 license-file = "LICENSE.txt"
 readme = "README.md"
 homepage = "https://github.com/steveking-gh/brink"

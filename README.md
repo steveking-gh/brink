@@ -5,6 +5,33 @@ Brink simplifies construction of complex files by managing sizes, offsets and
 ordering in a readable declarative style.  Brink was created with FLASH or other
 NVM images in mind, especially for use in embedded systems.
 
+# Quick Start
+
+## Build From Source
+
+### Step 1: Install Rust
+
+Brink is written in rust, which works on all major operating systems.  Installing rust is simple and documented in the [Rust Getting Started](https://www.rust-lang.org/learn/get-started) guide.
+
+### Step 2: Clone Brink
+
+From a command prompt, clone brink and change directory to your clone.  For example:
+
+    $ git clone git@github.com:steveking-gh/brink.git
+    $ cd brink
+
+### Step 3: Build and Run Self-Tests
+
+    $ cargo test --release
+
+All tests should should pass, 0 tests should fail.
+
+### Step 4: Install Brink
+
+The previous build step created the brink binary as `./target/release/brink`.  You can install the brink binary anywhere on your system.  As a convenience, cargo provides an per-user installation as `$HOME/.cargo/bin/brink`.  
+
+    $ cargo install --path ./
+
 ## What Can Brink Do?
 
 Brink can assemble any number of input files into a unified output.
