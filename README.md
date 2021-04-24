@@ -13,7 +13,7 @@ Brink can assemble any number of input files into a unified output.
 
 ---
 
-Brink can calculate the relative or absolute offsets, allowing the output to contain pointer tables, cross-references and so on.
+Brink can calculate relative or absolute offsets, allowing the output to contain pointer tables, cross-references and so on.
 
 <img src="./images/offsets.svg" width="400">
 
@@ -25,7 +25,7 @@ Brink can add pad bytes to force parts of the file to be a certain size.
 
 ---
 
-Brink can add pad bytes to force parts of the file to start at an aligned boundary.
+Brink can add pad bytes to force parts of the file to start at an aligned boundary or at an absolute location.
 
 <img src="./images/align.svg" width="400">
 
@@ -36,6 +36,13 @@ Brink can write your own strings and data defined within your brink source file.
 <img src="./images/adhoc.svg" width="400">
 
 ---
+
+Brink provides full featured assert and print statement support to help with debugging complex output files.
+
+<img src="./images/debug.svg" width="400">
+
+---
+
 ## Hello World
 
 For a source file called hello.brink:
