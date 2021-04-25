@@ -1,3 +1,5 @@
+[![Rust](https://github.com/steveking-gh/brink/actions/workflows/rust.yml/badge.svg)](https://github.com/steveking-gh/brink/actions/workflows/rust.yml)
+
 # Brink
 
 Brink is a domain specific language for linking and composing of an output file.
