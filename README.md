@@ -19,7 +19,7 @@ Brink is written in rust, which works on all major operating systems.  Installin
 
 From a command prompt, clone brink and change directory to your clone.  For example:
 
-    $ git clone git@github.com:steveking-gh/brink.git
+    $ git clone https://github.com/steveking-gh/brink.git
     $ cd brink
 
 ### Step 3: Build and Run Self-Tests
@@ -30,7 +30,7 @@ All tests should should pass, 0 tests should fail.
 
 ### Step 4: Install Brink
 
-The previous build step created the brink binary as `./target/release/brink`.  You can install the brink binary anywhere on your system.  As a convenience, cargo provides an per-user installation as `$HOME/.cargo/bin/brink`.  
+The previous build step created the brink binary as `./target/release/brink`.  You can install the brink binary anywhere on your system.  As a convenience, cargo provides a per-user installation as `$HOME/.cargo/bin/brink`.  
 
     $ cargo install --path ./
 
