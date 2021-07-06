@@ -1,12 +1,12 @@
 // Copyright (c) 2020 Steve King
 // See license.txt.
+#![forbid(unsafe_code)]
+#![warn(clippy::all, rust_2018_idioms)]
 
-#![warn(clippy::all)]
 
 use std::env;
 use std::{io,fs};
 use anyhow::{Result,Context};
-extern crate clap;
 use clap::{Arg, App};
 
 // Local libraries
