@@ -1,93 +1,147 @@
-use logos::{Logos};
 use indextree::{Arena, NodeId};
+use logos::Logos;
 pub type Span = std::ops::Range<usize>;
-use std::{collections::{HashMap,HashSet}, ops::Range};
-use diags::Diags;
 use anyhow::{Context, bail};
+use diags::Diags;
 use std::fs::File;
 use std::io::prelude::*;
-
+use std::{
+    collections::{HashMap, HashSet},
+    ops::Range,
+};
 
 #[allow(unused_imports)]
 #[allow(unused_imports)]
-use log::{error, warn, info, debug, trace};
+use log::{debug, error, info, trace, warn};
 
 /// All tokens in brink created with the logos macro.
 /// Keep this simple and do not be tempted to attach
 /// unstructured values these enum.
 #[derive(Logos, Debug, Clone, Copy, PartialEq)]
 pub enum LexToken {
-    #[token("section")] Section,
-    #[token("align")] Align,
-    #[token("set_sec")] SetSec,
-    #[token("set_img")] SetImg,
-    #[token("set_abs")] SetAbs,
-    #[token("assert")] Assert,
-    #[token("sizeof")] Sizeof,
-    #[token("print")] Print,
-    #[token("to_u64")] ToU64,
-    #[token("to_i64")] ToI64,
-    #[token("abs")] Abs,
-    #[token("img")] Img,
-    #[token("sec")] Sec,
-    #[token("wrs")] Wrs,
-    #[token("wr8")] Wr8,
-    #[token("wr16")] Wr16,
-    #[token("wr24")] Wr24,
-    #[token("wr32")] Wr32,
-    #[token("wr40")] Wr40,
-    #[token("wr48")] Wr48,
-    #[token("wr56")] Wr56,
-    #[token("wr64")] Wr64,
-    #[token("wrf")] Wrf,
-    #[token("wr")] Wr,
-    #[token("output")] Output,
-    #[token("==")] DoubleEq,
-    #[token("!=")] NEq,
-    #[token(">=")] GEq,
-    #[token("<=")] LEq,
-    #[token("&&")] DoubleAmpersand,
-    #[token("||")] DoublePipe,
-    #[token("&")] Ampersand,
-    #[token("|")] Pipe,
-    #[token("+")] Plus,
-    #[token("-")] Minus,
-    #[token("*")] Asterisk,
-    #[token("/")] FSlash,
-    #[token("%")] Percent,
-    #[token(",")] Comma,
-    #[token("<<")] DoubleLess,
-    #[token(">>")] DoubleGreater,
-    #[token("{")] OpenBrace,
-    #[token("}")] CloseBrace,
-    #[token("(")] OpenParen,
-    #[token(")")] CloseParen,
-    #[token(";")] Semicolon,
-    #[regex("[_a-zA-Z][0-9a-zA-Z_]*:")] Label,
-    #[regex("[_a-zA-Z][0-9a-zA-Z_]*")] Identifier,
+    #[token("section")]
+    Section,
+    #[token("align")]
+    Align,
+    #[token("set_sec")]
+    SetSec,
+    #[token("set_img")]
+    SetImg,
+    #[token("set_abs")]
+    SetAbs,
+    #[token("assert")]
+    Assert,
+    #[token("sizeof")]
+    Sizeof,
+    #[token("print")]
+    Print,
+    #[token("to_u64")]
+    ToU64,
+    #[token("to_i64")]
+    ToI64,
+    #[token("abs")]
+    Abs,
+    #[token("img")]
+    Img,
+    #[token("sec")]
+    Sec,
+    #[token("wrs")]
+    Wrs,
+    #[token("wr8")]
+    Wr8,
+    #[token("wr16")]
+    Wr16,
+    #[token("wr24")]
+    Wr24,
+    #[token("wr32")]
+    Wr32,
+    #[token("wr40")]
+    Wr40,
+    #[token("wr48")]
+    Wr48,
+    #[token("wr56")]
+    Wr56,
+    #[token("wr64")]
+    Wr64,
+    #[token("wrf")]
+    Wrf,
+    #[token("wr")]
+    Wr,
+    #[token("output")]
+    Output,
+    #[token("==")]
+    DoubleEq,
+    #[token("!=")]
+    NEq,
+    #[token(">=")]
+    GEq,
+    #[token("<=")]
+    LEq,
+    #[token("&&")]
+    DoubleAmpersand,
+    #[token("||")]
+    DoublePipe,
+    #[token("&")]
+    Ampersand,
+    #[token("|")]
+    Pipe,
+    #[token("+")]
+    Plus,
+    #[token("-")]
+    Minus,
+    #[token("*")]
+    Asterisk,
+    #[token("/")]
+    FSlash,
+    #[token("%")]
+    Percent,
+    #[token(",")]
+    Comma,
+    #[token("<<")]
+    DoubleLess,
+    #[token(">>")]
+    DoubleGreater,
+    #[token("{")]
+    OpenBrace,
+    #[token("}")]
+    CloseBrace,
+    #[token("(")]
+    OpenParen,
+    #[token(")")]
+    CloseParen,
+    #[token(";")]
+    Semicolon,
+    #[regex("[_a-zA-Z][0-9a-zA-Z_]*:")]
+    Label,
+    #[regex("[_a-zA-Z][0-9a-zA-Z_]*")]
+    Identifier,
 
     // Plain vanilla numbers that are ambiguously signed or unsigned
-    #[regex("[1-9][_0-9]*|0")] Integer,
+    #[regex("[1-9][_0-9]*|0")]
+    Integer,
 
     // Unsigned literals are suffixed with 'u'
     // binary and hex numbers are unsigned by default and don't require u suffix
-    #[regex("0[bB][01][_01]*u?|0[xX][0-9a-fA-F][_0-9a-fA-F]*u?|[1-9][_0-9]*u|0u")] U64,
+    #[regex("0[bB][01][_01]*u?|0[xX][0-9a-fA-F][_0-9a-fA-F]*u?|[1-9][_0-9]*u|0u")]
+    U64,
 
     // Signed literals are suffixed with 'i' and/or start with a minus sign
-    #[regex("0[bB][01][_01]*i|0[xX][0-9a-fA-F][_0-9a-fA-F]*i|[1-9][_0-9]*i|-[1-9][_0-9]*i?|0i")] I64,
-    
+    #[regex("0[bB][01][_01]*i|0[xX][0-9a-fA-F][_0-9a-fA-F]*i|[1-9][_0-9]*i|-[1-9][_0-9]*i?|0i")]
+    I64,
+
     // Not only is \ special in strings and must be escaped, but also special in
     // regex.  We use raw string here to avoid having the escape the \ for the
     // string itself. The \\ in this raw string are escape \ for the regex
     // engine underneath.
-    #[regex(r#""(\\"|\\.|[^"])*""#)] QuotedString,
+    #[regex(r#""(\\"|\\.|[^"])*""#)]
+    QuotedString,
 
     // Comments and whitespace are stripped from user input during processing.
     // This stripping happens *after* we record all the line/offset info
     // with codespan for error reporting.
     #[regex(r#"/\*([^*]|\*[^/])+\*/"#, logos::skip)] // block comments
     #[regex(r#"//[^\r\n]*(\r\n|\n)?"#, logos::skip)] // line comments
-    #[regex(r#"[ \t\n\f]+"#, logos::skip)]           // whitespace
+    #[regex(r#"[ \t\n\f]+"#, logos::skip)] // whitespace
     #[error]
     Unknown,
 }
@@ -109,7 +163,9 @@ pub struct TokenInfo<'toks> {
 }
 
 impl<'toks> TokenInfo<'toks> {
-    pub fn span(&self) -> Span { self.loc.clone() }
+    pub fn span(&self) -> Span {
+        self.loc.clone()
+    }
 }
 
 /**
@@ -125,7 +181,7 @@ pub struct Ast<'toks> {
 
     /// A vector of info about for tokens identified by logos.
     tv: Vec<TokenInfo<'toks>>,
- 
+
     /// The artificial root of the tree.  The children of this
     /// tree are the top level tokens in the user's source file.
     root: NodeId,
@@ -135,7 +191,6 @@ pub struct Ast<'toks> {
 }
 
 impl<'toks> Ast<'toks> {
-
     /// Peek at the next token info object, if any.
     fn peek(&self) -> Option<&TokenInfo<'toks>> {
         self.tv.get(self.tok_num)
@@ -156,9 +211,18 @@ impl<'toks> Ast<'toks> {
         let mut lex = LexToken::lexer(fstr);
         while let Some(tok) = lex.next() {
             debug!("ast::new: Token {} = {:?}", tv.len(), tok);
-            tv.push(TokenInfo{tok, val:lex.slice(), loc: lex.span()});
+            tv.push(TokenInfo {
+                tok,
+                val: lex.slice(),
+                loc: lex.span(),
+            });
         }
-        let mut ast = Self { arena, tv, root, tok_num: 0 };
+        let mut ast = Self {
+            arena,
+            tv,
+            root,
+            tok_num: 0,
+        };
         if !ast.parse(diags) {
             // ast construction failed.  Let the caller report
             // this in whatever way they want.
@@ -171,11 +235,15 @@ impl<'toks> Ast<'toks> {
     // Boilerplate entry for recursive descent parsing functions.
     fn dbg_enter(&self, func_name: &str) {
         if let Some(tinfo) = self.peek() {
-            trace!("Ast::{} ENTER, {}:{} is {:?}", func_name, self.tok_num,
-                   tinfo.val, tinfo.tok);
+            trace!(
+                "Ast::{} ENTER, {}:{} is {:?}",
+                func_name, self.tok_num, tinfo.val, tinfo.tok
+            );
         } else {
-            trace!("Ast::{} ENTER, {}:{} is {}", func_name, self.tok_num,
-                   "<end of input>", "<end of input>");
+            trace!(
+                "Ast::{} ENTER, {}:{} is {}",
+                func_name, self.tok_num, "<end of input>", "<end of input>"
+            );
         }
     }
 
@@ -191,13 +259,17 @@ impl<'toks> Ast<'toks> {
     /// This function returns the result and should be the last statement
     /// in each function
     fn dbg_exit_pratt(&self, func_name: &str, top: &Option<NodeId>, result: bool) -> bool {
-        trace!("Ast::{} EXIT {} with node id {:?}", func_name,
-                if result {"OK"} else {"!! FAIL !!"}, top);
+        trace!(
+            "Ast::{} EXIT {} with node id {:?}",
+            func_name,
+            if result { "OK" } else { "!! FAIL !!" },
+            top
+        );
         result
     }
 
     /// Return an iterator over the children of the specified AST node
-    pub fn children(&self, nid: NodeId) -> indextree::Children<usize>{
+    pub fn children(&self, nid: NodeId) -> indextree::Children<'_, usize> {
         nid.children(&self.arena)
     }
 
@@ -210,7 +282,10 @@ impl<'toks> Ast<'toks> {
     /// parent. The value is always a string reference to source code regardless
     /// of the semantic meaning of the child.
     pub fn get_child_str(&'toks self, parent_nid: NodeId, child_num: usize) -> Option<&'toks str> {
-        debug!("Ast::get_child_str: child number {} for parent nid {}", child_num, parent_nid);
+        debug!(
+            "Ast::get_child_str: child number {} for parent nid {}",
+            child_num, parent_nid
+        );
         let mut children = parent_nid.children(&self.arena);
         if let Some(name_nid) = children.nth(child_num) {
             let tinfo = self.get_tinfo(name_nid);
@@ -244,7 +319,7 @@ impl<'toks> Ast<'toks> {
                     // Skip the bad token.
                     self.tok_num += 1;
                     false
-                },
+                }
             };
         }
         self.dbg_exit("parse", result)
@@ -252,8 +327,12 @@ impl<'toks> Ast<'toks> {
 
     fn err_expected_after(&self, diags: &mut Diags, code: &str, msg: &str) {
         let m = format!("{}, but found '{}'", msg, self.tv[self.tok_num].val);
-        diags.err2(code, &m, self.tv[self.tok_num].span(), 
-                self.tv[self.tok_num-1].span());
+        diags.err2(
+            code,
+            &m,
+            self.tv[self.tok_num].span(),
+            self.tv[self.tok_num - 1].span(),
+        );
     }
 
     fn err_invalid_expression(&self, diags: &mut Diags, code: &str) {
@@ -289,7 +368,10 @@ impl<'toks> Ast<'toks> {
                 }
             }
         }
-        debug!("Ast::advance_past_semicolon: Stopped on token {}", self.tok_num);
+        debug!(
+            "Ast::advance_past_semicolon: Stopped on token {}",
+            self.tok_num
+        );
         self.dbg_exit("advance_past_semicolon", true);
     }
 
@@ -302,9 +384,14 @@ impl<'toks> Ast<'toks> {
         nid
     }
 
-    fn expect_leaf(&mut self, diags: &mut Diags, parent : NodeId, expected_token: LexToken, code: &str,
-        context: &str) -> bool {
-
+    fn expect_leaf(
+        &mut self,
+        diags: &mut Diags,
+        parent: NodeId,
+        expected_token: LexToken,
+        code: &str,
+        context: &str,
+    ) -> bool {
         self.dbg_enter("expect_leaf");
 
         let mut result = false;
@@ -325,8 +412,7 @@ impl<'toks> Ast<'toks> {
 
     /// Process an expected semicolon.  This function is just a convenient
     /// specialization of expect_leaf().
-    fn expect_semi(&mut self, diags: &mut Diags, parent : NodeId) -> bool {
-
+    fn expect_semi(&mut self, diags: &mut Diags, parent: NodeId) -> bool {
         if let Some(tinfo) = self.peek() {
             if LexToken::Semicolon == tinfo.tok {
                 self.add_to_parent_and_advance(parent);
@@ -342,8 +428,7 @@ impl<'toks> Ast<'toks> {
     }
 
     /// Expect the specified token, add it to the parent and advance.
-    fn expect_token(&mut self, tok: LexToken, diags: &mut Diags, parent : NodeId) -> bool {
-
+    fn expect_token(&mut self, tok: LexToken, diags: &mut Diags, parent: NodeId) -> bool {
         if let Some(tinfo) = self.peek() {
             if tok == tinfo.tok {
                 self.add_to_parent_and_advance(parent);
@@ -360,15 +445,17 @@ impl<'toks> Ast<'toks> {
     }
 
     /// Expect an expression which cannot be None.
-    fn expect_expr(&mut self, parent : NodeId, diags: &mut Diags) -> bool {
-
+    fn expect_expr(&mut self, parent: NodeId, diags: &mut Diags) -> bool {
         let mut expr_opt = None;
         if !self.parse_pratt(0, &mut expr_opt, diags) {
             return false;
         }
         if expr_opt.is_none() {
             let tinfo = self.get_tinfo(parent);
-            let msg = format!("Expected valid expression inside parentheses after {:?}", tinfo.tok);
+            let msg = format!(
+                "Expected valid expression inside parentheses after {:?}",
+                tinfo.tok
+            );
             diags.err1("AST_12", &msg, tinfo.span());
             return false;
         }
@@ -380,9 +467,7 @@ impl<'toks> Ast<'toks> {
     /// Expect zero or one instance of specified tokens.
     /// If we find an allowed found, add it to the parent and advance.
     /// If not found, do nothing and return success
-    fn optional_token(&mut self, tokvec: &[LexToken], diags: &mut Diags,
-                        parent : NodeId) -> bool {
-
+    fn optional_token(&mut self, tokvec: &[LexToken], diags: &mut Diags, parent: NodeId) -> bool {
         if let Some(tinfo) = self.peek() {
             if tokvec.contains(&tinfo.tok) {
                 self.add_to_parent_and_advance(parent);
@@ -397,7 +482,6 @@ impl<'toks> Ast<'toks> {
     /// Expect the specified token and advance without adding to the parent.
     // TODO reorder parameters so diags is last
     fn expect_token_no_add(&mut self, tok: LexToken, diags: &mut Diags) -> bool {
-
         if let Some(tinfo) = self.peek() {
             if tok == tinfo.tok {
                 self.tok_num += 1;
@@ -411,10 +495,10 @@ impl<'toks> Ast<'toks> {
         }
 
         false
-    }    
+    }
 
     /// Parse a section definition.
-    fn parse_section(&mut self, parent : NodeId, diags: &mut Diags) -> bool {
+    fn parse_section(&mut self, parent: NodeId, diags: &mut Diags) -> bool {
         self.dbg_enter("parse_section");
         let mut result = false;
         // Sections are always children of the root node, but no need to make
@@ -422,14 +506,24 @@ impl<'toks> Ast<'toks> {
         let sec_nid = self.add_to_parent_and_advance(parent);
 
         // After 'section' an identifier is expected
-        if self.expect_leaf(diags, sec_nid, LexToken::Identifier, "AST_1",
-                     "Expected an identifier after section") {
+        if self.expect_leaf(
+            diags,
+            sec_nid,
+            LexToken::Identifier,
+            "AST_1",
+            "Expected an identifier after section",
+        ) {
             // After a section identifier, expect an open brace.
             // Remember the location of the opening brace to help with
             // user missing brace errors.
             let brace_toknum = self.tok_num;
-            if self.expect_leaf(diags, sec_nid, LexToken::OpenBrace, "AST_2",
-                         "Expected { after identifier") {
+            if self.expect_leaf(
+                diags,
+                sec_nid,
+                LexToken::OpenBrace,
+                "AST_2",
+                "Expected { after identifier",
+            ) {
                 result = self.parse_section_contents(sec_nid, diags, brace_toknum);
             }
         }
@@ -437,15 +531,21 @@ impl<'toks> Ast<'toks> {
     }
 
     /// Parse all possible content within a section.
-    fn parse_section_contents(&mut self, parent : NodeId, diags: &mut Diags,
-                              brace_tok_num: usize) -> bool {
-
+    fn parse_section_contents(
+        &mut self,
+        parent: NodeId,
+        diags: &mut Diags,
+        brace_tok_num: usize,
+    ) -> bool {
         self.dbg_enter("parse_section_contents");
         let mut result = true; // todo fixme
 
         let mut tok_num_old = 0;
         while let Some(tinfo) = self.peek() {
-            debug!("Ast::parse_section_contents: token {}:{}", self.tok_num, tinfo.val);
+            debug!(
+                "Ast::parse_section_contents: token {}:{}",
+                self.tok_num, tinfo.val
+            );
             if tok_num_old == self.tok_num {
                 // In some error cases, such as a missing closing brace, parsing
                 // can get stuck without advancing the token pointer.  For
@@ -471,22 +571,22 @@ impl<'toks> Ast<'toks> {
             let parse_ok = match tinfo.tok {
                 LexToken::Label => self.parse_label(parent, diags),
                 LexToken::Wr => self.parse_wr(parent, diags),
-                LexToken::Wrf |
-                LexToken::Wr8 |
-                LexToken::Wr16 |
-                LexToken::Wr24 |
-                LexToken::Wr32 |
-                LexToken::Wr40 |
-                LexToken::Wr48 |
-                LexToken::Wr56 |
-                LexToken::Wr64 |
-                LexToken::Wrs |
-                LexToken::Assert |
-                LexToken::Align |
-                LexToken::SetSec |
-                LexToken::SetImg |
-                LexToken::SetAbs |
-                LexToken::Print => self.parse_expr(parent, diags),
+                LexToken::Wrf
+                | LexToken::Wr8
+                | LexToken::Wr16
+                | LexToken::Wr24
+                | LexToken::Wr32
+                | LexToken::Wr40
+                | LexToken::Wr48
+                | LexToken::Wr56
+                | LexToken::Wr64
+                | LexToken::Wrs
+                | LexToken::Assert
+                | LexToken::Align
+                | LexToken::SetSec
+                | LexToken::SetImg
+                | LexToken::SetAbs
+                | LexToken::Print => self.parse_expr(parent, diags),
                 _ => {
                     self.err_invalid_expression(diags, "AST_3");
                     false
@@ -494,8 +594,11 @@ impl<'toks> Ast<'toks> {
             };
 
             if !parse_ok {
-                debug!("Ast::parse_section_contents: skipping to next ; starting from {}", self.tok_num);
-                // Consume the bad token and skip forward    
+                debug!(
+                    "Ast::parse_section_contents: skipping to next ; starting from {}",
+                    self.tok_num
+                );
+                // Consume the bad token and skip forward
                 self.advance_past_semicolon();
                 result = false;
             }
@@ -507,8 +610,7 @@ impl<'toks> Ast<'toks> {
     }
 
     // Parser for writing a section
-    fn parse_wr(&mut self, parent_nid : NodeId, diags: &mut Diags) -> bool {
-
+    fn parse_wr(&mut self, parent_nid: NodeId, diags: &mut Diags) -> bool {
         self.dbg_enter("parse_wr");
         let mut result = false;
 
@@ -516,8 +618,13 @@ impl<'toks> Ast<'toks> {
         let wr_nid = self.add_to_parent_and_advance(parent_nid);
 
         // Next, an identifier is expected
-        if self.expect_leaf(diags, wr_nid, LexToken::Identifier, "AST_15",
-                    "Expected a section identifier after 'wr'") {
+        if self.expect_leaf(
+            diags,
+            wr_nid,
+            LexToken::Identifier,
+            "AST_15",
+            "Expected a section identifier after 'wr'",
+        ) {
             result = self.expect_semi(diags, wr_nid);
         }
         self.dbg_exit("parse_wr", result)
@@ -525,28 +632,18 @@ impl<'toks> Ast<'toks> {
 
     /// Returns the (lhs,rhs) binding power for any token
     /// Higher numbers are stronger binding.
-    fn get_binding_power(tok: LexToken) -> (u8,u8) {
+    fn get_binding_power(tok: LexToken) -> (u8, u8) {
         match tok {
-            LexToken::Integer |
-            LexToken::I64 |
-            LexToken::U64 => (15,16),
-            LexToken::Percent |
-            LexToken::FSlash |
-            LexToken::Asterisk => (13,14),
-            LexToken::Minus |
-            LexToken::Plus => (11,12),
-            LexToken::Ampersand |
-            LexToken::Pipe => (9,10),
-            LexToken::DoubleGreater |
-            LexToken::DoubleLess => (7,8),
-            LexToken::DoubleEq |
-            LexToken::NEq |
-            LexToken::LEq |
-            LexToken::GEq => (5,6),
-            LexToken::DoubleAmpersand => (3,4),
-            LexToken::DoublePipe => (1,2),
+            LexToken::Integer | LexToken::I64 | LexToken::U64 => (15, 16),
+            LexToken::Percent | LexToken::FSlash | LexToken::Asterisk => (13, 14),
+            LexToken::Minus | LexToken::Plus => (11, 12),
+            LexToken::Ampersand | LexToken::Pipe => (9, 10),
+            LexToken::DoubleGreater | LexToken::DoubleLess => (7, 8),
+            LexToken::DoubleEq | LexToken::NEq | LexToken::LEq | LexToken::GEq => (5, 6),
+            LexToken::DoubleAmpersand => (3, 4),
+            LexToken::DoublePipe => (1, 2),
             // comma is one of the fall through cases with 0 precedence
-            _ => (0,0),
+            _ => (0, 0),
         }
     }
 
@@ -557,7 +654,6 @@ impl<'toks> Ast<'toks> {
     /// for a nice explanation of Pratt parsers with Rust.
     /// On successful return, the terminal semicolon will be the next unprocessed token.
     fn parse_pratt(&mut self, min_bp: u8, top: &mut Option<NodeId>, diags: &mut Diags) -> bool {
-
         self.dbg_enter("parse_pratt");
         debug!("Ast::parse_pratt: Min BP = {}", min_bp);
         let lhs_tinfo = self.peek();
@@ -568,15 +664,13 @@ impl<'toks> Ast<'toks> {
 
         let lhs_tinfo = lhs_tinfo.unwrap();
 
-        *top = None; // Initialize 
+        *top = None; // Initialize
 
         match lhs_tinfo.tok {
-
             // Finding a close paren or a semi-colon terminates an expression.
-            LexToken::CloseParen |
-            LexToken::Semicolon => {
-                 /* top will be None */
-                 *top = None;
+            LexToken::CloseParen | LexToken::Semicolon => {
+                /* top will be None */
+                *top = None;
             }
 
             // This open paren is precedence control in an expression, e.g. (1+2)*3.
@@ -595,19 +689,14 @@ impl<'toks> Ast<'toks> {
             }
 
             // These simple atoms end up as leaf nodes in the AST
-            LexToken::QuotedString |
-            LexToken::Integer |
-            LexToken::I64 |
-            LexToken::U64 => {
+            LexToken::QuotedString | LexToken::Integer | LexToken::I64 | LexToken::U64 => {
                 *top = Some(self.arena.new_node(self.tok_num));
                 self.tok_num += 1;
             }
 
             // Built-in functions with an optional identifier inside parens
             // ( [optional identifier] )
-            LexToken::Abs |
-            LexToken::Img |
-            LexToken::Sec => {
+            LexToken::Abs | LexToken::Img | LexToken::Sec => {
                 // Create the node for the function and move past
                 *top = Some(self.arena.new_node(self.tok_num));
                 self.tok_num += 1;
@@ -640,11 +729,9 @@ impl<'toks> Ast<'toks> {
                 }
             }
 
-
             // Built-in functions with a non-optional expression inside parens
             // ( <expr> )
-            LexToken::ToI64 |
-            LexToken::ToU64 => {
+            LexToken::ToI64 | LexToken::ToU64 => {
                 *top = Some(self.arena.new_node(self.tok_num));
                 self.tok_num += 1;
 
@@ -684,26 +771,26 @@ impl<'toks> Ast<'toks> {
             match op_tinfo.tok {
                 // Comma, close paren and semi are terminating conditions
                 // because some upper layer is specifically looking for them.
-                LexToken::Comma |
-                LexToken::CloseParen |
-                LexToken::Semicolon => { break; }
-                LexToken::ToI64 |
-                LexToken::ToU64 |
-                LexToken::NEq |
-                LexToken::DoubleEq |
-                LexToken::DoubleGreater |
-                LexToken::DoubleLess |
-                LexToken::Ampersand |
-                LexToken::Pipe |
-                LexToken::DoubleAmpersand |
-                LexToken::DoublePipe |
-                LexToken::GEq |
-                LexToken::LEq |
-                LexToken::Plus |
-                LexToken::Minus |
-                LexToken::Asterisk |
-                LexToken::Percent |
-                LexToken::FSlash => {}
+                LexToken::Comma | LexToken::CloseParen | LexToken::Semicolon => {
+                    break;
+                }
+                LexToken::ToI64
+                | LexToken::ToU64
+                | LexToken::NEq
+                | LexToken::DoubleEq
+                | LexToken::DoubleGreater
+                | LexToken::DoubleLess
+                | LexToken::Ampersand
+                | LexToken::Pipe
+                | LexToken::DoubleAmpersand
+                | LexToken::DoublePipe
+                | LexToken::GEq
+                | LexToken::LEq
+                | LexToken::Plus
+                | LexToken::Minus
+                | LexToken::Asterisk
+                | LexToken::Percent
+                | LexToken::FSlash => {}
                 _ => {
                     let msg = format!("Invalid operation '{}'", op_tinfo.val);
                     diags.err1("AST_9", &msg, op_tinfo.span());
@@ -711,10 +798,12 @@ impl<'toks> Ast<'toks> {
                 }
             }
 
-            let (lbp,rbp) = Ast::get_binding_power(op_tinfo.tok);
+            let (lbp, rbp) = Ast::get_binding_power(op_tinfo.tok);
 
-            debug!("Ast::parse_pratt: operation '{}' with (lbp,rbp) = ({},{})",
-                    op_tinfo.val, lbp, rbp );
+            debug!(
+                "Ast::parse_pratt: operation '{}' with (lbp,rbp) = ({},{})",
+                op_tinfo.val, lbp, rbp
+            );
 
             // A decrease in operator precedence ends the iteration.
             if lbp < min_bp {
@@ -751,7 +840,6 @@ impl<'toks> Ast<'toks> {
     /// Parser for a statement with one or more comma separated expressions
     /// For example: print <expr> [, <expr>] ;
     fn parse_expr(&mut self, parent: NodeId, diags: &mut Diags) -> bool {
-
         self.dbg_enter("parse_multi_expr");
         let mut result = true;
         // Add the print keyword as a child of the parent
@@ -773,7 +861,7 @@ impl<'toks> Ast<'toks> {
                 if let Some(tinfo) = self.peek() {
                     if tinfo.tok == LexToken::Comma {
                         self.tok_num += 1;
-                        continue
+                        continue;
                     }
                 }
 
@@ -802,20 +890,23 @@ impl<'toks> Ast<'toks> {
         self.dbg_exit("parse_assert", true)
     }
 
-    fn parse_output(&mut self, parent : NodeId, diags: &mut Diags) -> bool {
-
+    fn parse_output(&mut self, parent: NodeId, diags: &mut Diags) -> bool {
         self.dbg_enter("parse_output");
         let mut result = false;
         // Add the section keyword as a child of the parent and advance
         let output_nid = self.add_to_parent_and_advance(parent);
 
         // After 'output' a section identifier is expected
-        if self.expect_leaf(diags, output_nid, LexToken::Identifier, "AST_7",
-                    "Expected a section name after output") {
-
+        if self.expect_leaf(
+            diags,
+            output_nid,
+            LexToken::Identifier,
+            "AST_7",
+            "Expected a section name after output",
+        ) {
             // After the section identifier, an optional absolute starting address
             result = self.optional_token(&[LexToken::U64, LexToken::Integer], diags, output_nid);
-                        
+
             // finally a semicolon
             result &= self.expect_semi(diags, output_nid);
         }
@@ -823,16 +914,15 @@ impl<'toks> Ast<'toks> {
         self.dbg_exit("parse_output", result)
     }
 
-    
-     /// Adds the current token as a child of the parent and advances
-     /// the token index.  The current token MUST BE VALID!
-    fn parse_leaf(&mut self, parent : NodeId) {
+    /// Adds the current token as a child of the parent and advances
+    /// the token index.  The current token MUST BE VALID!
+    fn parse_leaf(&mut self, parent: NodeId) {
         let nid = self.arena.new_node(self.tok_num);
         parent.append(nid, &mut self.arena);
         self.tok_num += 1;
     }
 
-    pub fn get_tinfo(&self, nid: NodeId) -> &'toks TokenInfo {
+    pub fn get_tinfo(&self, nid: NodeId) -> &'toks TokenInfo<'_> {
         let tok_num = *self.arena[nid].get();
         &self.tv[tok_num]
     }
@@ -841,30 +931,39 @@ impl<'toks> Ast<'toks> {
     const DOT_DEFAULT_EDGE: &'static str = "#808080";
     const DOT_DEFAULT_PEN: &'static str = "#808080";
 
-    fn dump_r(&self, nid: NodeId, depth: usize, file: &mut File) ->anyhow::Result<()> {
-        debug!("AST: {}: {}{}", nid, " ".repeat(depth * 4), self.get_tinfo(nid).val);
+    fn dump_r(&self, nid: NodeId, depth: usize, file: &mut File) -> anyhow::Result<()> {
+        debug!(
+            "AST: {}: {}{}",
+            nid,
+            " ".repeat(depth * 4),
+            self.get_tinfo(nid).val
+        );
         let tinfo = self.get_tinfo(nid);
 
-        let (label,color) = match tinfo.tok {
+        let (label, color) = match tinfo.tok {
             LexToken::QuotedString => {
                 if tinfo.val.len() <= 8 {
-                    (tinfo.val.strip_prefix('\"')
-                              .unwrap()
-                              .strip_suffix('\"')
-                              .unwrap(), Ast::DOT_DEFAULT_FILL)
+                    (
+                        tinfo
+                            .val
+                            .strip_prefix('\"')
+                            .unwrap()
+                            .strip_suffix('\"')
+                            .unwrap(),
+                        Ast::DOT_DEFAULT_FILL,
+                    )
                 } else {
                     ("<string>", Ast::DOT_DEFAULT_FILL)
                 }
             }
             LexToken::Unknown => ("<unknown>", "red"),
-            _ => (tinfo.val,Ast::DOT_DEFAULT_FILL)
+            _ => (tinfo.val, Ast::DOT_DEFAULT_FILL),
         };
 
-        file.write(format!("{} [label=\"{}\",fillcolor=\"{}\"]\n",nid,label,color)
-                .as_bytes()).context("ast.dot write failed")?;
+        file.write(format!("{} [label=\"{}\",fillcolor=\"{}\"]\n", nid, label, color).as_bytes())
+            .context("ast.dot write failed")?;
         let children = nid.children(&self.arena);
         for child_nid in children {
-
             /*
             let child_tinfo = self.get_tinfo(child_nid);
             if child_tinfo.tok == LexToken::Semicolon {
@@ -872,8 +971,9 @@ impl<'toks> Ast<'toks> {
             }
             */
 
-            file.write(format!("{} -> {}\n", nid, child_nid).as_bytes()).context("ast.dot write failed")?;
-            self.dump_r(child_nid, depth+1, file)?;
+            file.write(format!("{} -> {}\n", nid, child_nid).as_bytes())
+                .context("ast.dot write failed")?;
+            self.dump_r(child_nid, depth + 1, file)?;
         }
         Ok(())
     }
@@ -881,24 +981,32 @@ impl<'toks> Ast<'toks> {
     /**
      * Recursively dumps the AST to the console.
      */
-    pub fn dump(&self, fname : &str) -> anyhow::Result<()> {
-
+    pub fn dump(&self, fname: &str) -> anyhow::Result<()> {
         debug!("");
 
-        let mut file = File::create(fname).context(
-            format!("Error attempting to create debug file '{}'", fname))?;
-            file.write(b"digraph {\n").context("ast.dot write failed")?;
-            file.write(format!("node [style=filled,fillcolor=\"{}\",color=\"{}\"]\n",
-                    Ast::DOT_DEFAULT_FILL,Ast::DOT_DEFAULT_PEN).as_bytes()).context("ast.dot write failed")?;
-            file.write(format!("edge [color=\"{}\"]\n",
-                    Ast::DOT_DEFAULT_EDGE).as_bytes()).context("ast.dot write failed")?;
+        let mut file = File::create(fname)
+            .context(format!("Error attempting to create debug file '{}'", fname))?;
+        file.write(b"digraph {\n").context("ast.dot write failed")?;
+        file.write(
+            format!(
+                "node [style=filled,fillcolor=\"{}\",color=\"{}\"]\n",
+                Ast::DOT_DEFAULT_FILL,
+                Ast::DOT_DEFAULT_PEN
+            )
+            .as_bytes(),
+        )
+        .context("ast.dot write failed")?;
+        file.write(format!("edge [color=\"{}\"]\n", Ast::DOT_DEFAULT_EDGE).as_bytes())
+            .context("ast.dot write failed")?;
 
-            file.write(format!("{} [label=\"root\"]\n",self.root).as_bytes()).context("ast.dot write failed")?;
-            let children = self.root.children(&self.arena);
-            for child_nid in children {
-                file.write(format!("{} -> {}\n",self.root, child_nid).as_bytes()).context("ast.dot write failed")?;
-                self.dump_r(child_nid, 0, &mut file)?;
-            }
+        file.write(format!("{} [label=\"root\"]\n", self.root).as_bytes())
+            .context("ast.dot write failed")?;
+        let children = self.root.children(&self.arena);
+        for child_nid in children {
+            file.write(format!("{} -> {}\n", self.root, child_nid).as_bytes())
+                .context("ast.dot write failed")?;
+            self.dump_r(child_nid, 0, &mut file)?;
+        }
 
         file.write(b"}\n").context("ast.dot write failed")?;
         debug!("");
@@ -909,27 +1017,30 @@ impl<'toks> Ast<'toks> {
 /*******************************
  * Section
  ******************************/
- #[derive(Debug)]
- pub struct Section<'toks> {
+#[derive(Debug)]
+pub struct Section<'toks> {
     pub tinfo: &'toks TokenInfo<'toks>,
     pub nid: NodeId,
 }
 
 impl<'toks> Section<'toks> {
     pub fn new(ast: &'toks Ast, nid: NodeId) -> Section<'toks> {
-        Section { tinfo: ast.get_tinfo(nid), nid }
+        Section {
+            tinfo: ast.get_tinfo(nid),
+            nid,
+        }
     }
 }
 
 /*******************************
  * Label
  ******************************/
- #[derive(Debug)]
+#[derive(Debug)]
 pub struct Label {
-   pub nid: NodeId,
+    pub nid: NodeId,
 
-   /// Location in source code of the label
-   pub loc: Range<usize>,
+    /// Location in source code of the label
+    pub loc: Range<usize>,
 }
 
 /*******************************
@@ -953,7 +1064,12 @@ impl<'toks> Output<'toks> {
 
         // Optional start address is the second child.
         let addr_nid = children.next();
-        Output { tinfo: ast.get_tinfo(nid), nid, sec_nid, addr_nid}
+        Output {
+            tinfo: ast.get_tinfo(nid),
+            nid,
+            sec_nid,
+            addr_nid,
+        }
     }
 }
 
@@ -971,14 +1087,17 @@ pub struct AstDb<'toks> {
 }
 
 impl<'toks> AstDb<'toks> {
-
     // Control recursion to some safe level.  100 is just a guesstimate.
-    const MAX_RECURSION_DEPTH:usize = 100;
+    const MAX_RECURSION_DEPTH: usize = 100;
 
     /// Processes a section in the AST
     /// All section names are also label names
-    fn record_section(diags: &mut Diags, sec_nid: NodeId, ast: &'toks Ast,
-                      sections: &mut HashMap<&'toks str, Section<'toks>> ) -> bool {
+    fn record_section(
+        diags: &mut Diags,
+        sec_nid: NodeId,
+        ast: &'toks Ast,
+        sections: &mut HashMap<&'toks str, Section<'toks>>,
+    ) -> bool {
         debug!("AstDb::record_section: NodeId {}", sec_nid);
 
         let mut children = sec_nid.children(&ast.arena);
@@ -1000,9 +1119,17 @@ impl<'toks> AstDb<'toks> {
 
     /// Returns true if the specified child of the specified node is a section
     /// name that exists.  Otherwise, prints a diagnostic and returns false.
-    fn validate_section_name(&self, child_num: usize, parent_nid: NodeId, ast: &'toks Ast,
-                    diags: &mut Diags) -> bool {
-        debug!("AstDb::validate_section_name: NodeId {} for child {}", parent_nid, child_num);
+    fn validate_section_name(
+        &self,
+        child_num: usize,
+        parent_nid: NodeId,
+        ast: &'toks Ast,
+        diags: &mut Diags,
+    ) -> bool {
+        debug!(
+            "AstDb::validate_section_name: NodeId {} for child {}",
+            parent_nid, child_num
+        );
 
         let mut children = parent_nid.children(&ast.arena);
 
@@ -1039,8 +1166,12 @@ impl<'toks> AstDb<'toks> {
         true
     }
 
-    pub fn record_output(diags: &mut Diags, nid: NodeId, ast: &'toks Ast,
-                         output: &mut Option<Output<'toks>>) -> bool {
+    pub fn record_output(
+        diags: &mut Diags,
+        nid: NodeId,
+        ast: &'toks Ast,
+        output: &mut Option<Output<'toks>>,
+    ) -> bool {
         let tinfo = ast.get_tinfo(nid);
         if output.is_some() {
             let m = "Multiple output statements are not allowed.";
@@ -1049,7 +1180,7 @@ impl<'toks> AstDb<'toks> {
             return false;
         }
 
-        *output = Some(Output::new(&ast,nid));
+        *output = Some(Output::new(&ast, nid));
         true // succeed
     }
 
@@ -1057,15 +1188,26 @@ impl<'toks> AstDb<'toks> {
     /// Nested sections tracks the current hierarchy of section writes so we
     /// catch cycles.
     // TODO - After we validate nesting, we should create an iterator over the AST
-    fn validate_nesting_r(&mut self, rdepth: usize, parent_nid: NodeId, ast: &'toks Ast,
-                 nested_sections: &mut HashSet<&'toks str>, diags: &mut Diags ) -> bool {
-
-        debug!("AstDb::validate_nesting_r: ENTER at depth {} for parent nid: {}", rdepth, parent_nid);
+    fn validate_nesting_r(
+        &mut self,
+        rdepth: usize,
+        parent_nid: NodeId,
+        ast: &'toks Ast,
+        nested_sections: &mut HashSet<&'toks str>,
+        diags: &mut Diags,
+    ) -> bool {
+        debug!(
+            "AstDb::validate_nesting_r: ENTER at depth {} for parent nid: {}",
+            rdepth, parent_nid
+        );
 
         if rdepth > AstDb::MAX_RECURSION_DEPTH {
             let tinfo = ast.get_tinfo(parent_nid);
-            let m = format!("Maximum recursion depth ({}) exceeded when processing '{}'.",
-                            AstDb::MAX_RECURSION_DEPTH, tinfo.val);
+            let m = format!(
+                "Maximum recursion depth ({}) exceeded when processing '{}'.",
+                AstDb::MAX_RECURSION_DEPTH,
+                tinfo.val
+            );
             diags.err1("AST_5", &m, tinfo.span());
             return false;
         }
@@ -1096,8 +1238,8 @@ impl<'toks> AstDb<'toks> {
                     let section = self.sections.get(sec_str).unwrap();
                     let children = section.nid.children(&ast.arena);
                     for nid in children {
-                        result &= self.validate_nesting_r(rdepth + 1, nid,
-                                                          ast, nested_sections, diags);
+                        result &=
+                            self.validate_nesting_r(rdepth + 1, nid, ast, nested_sections, diags);
                     }
                     // We're done with the section, so remove it from the nesting hash.
                     nested_sections.remove(sec_str);
@@ -1108,15 +1250,16 @@ impl<'toks> AstDb<'toks> {
                 // When no children exist, this case terminates recursion.
                 let children = parent_nid.children(&ast.arena);
                 for nid in children {
-                    result &= self.validate_nesting_r(rdepth + 1, nid,
-                                                      ast, nested_sections, diags);
+                    result &= self.validate_nesting_r(rdepth + 1, nid, ast, nested_sections, diags);
                 }
                 result
             }
         };
 
-        debug!("AstDb::validate_nesting_r: EXIT({}) at depth {} for nid: {}",
-                result, rdepth, parent_nid);
+        debug!(
+            "AstDb::validate_nesting_r: EXIT({}) at depth {} for nid: {}",
+            result, rdepth, parent_nid
+        );
         result
     }
 
@@ -1133,16 +1276,20 @@ impl<'toks> AstDb<'toks> {
         // These are defined only at top level so no need for recursion.
         for nid in ast.root.children(&ast.arena) {
             let tinfo = ast.get_tinfo(nid);
-            result = result && match tinfo.tok {
-                LexToken::Section => Self::record_section(diags, nid, &ast, &mut sections),
-                LexToken::Output => Self::record_output(diags, nid, &ast, &mut output),
-                _ => {
-                    let msg = format!("Invalid top-level expression {}", tinfo.val);
-                    diags.err1("AST_24", &msg, tinfo.span().clone());
-                    diags.note0("AST_25", "At top-level, allowed expressions are 'section' and 'output'");
-                    false
-                }
-            };
+            result = result
+                && match tinfo.tok {
+                    LexToken::Section => Self::record_section(diags, nid, &ast, &mut sections),
+                    LexToken::Output => Self::record_output(diags, nid, &ast, &mut output),
+                    _ => {
+                        let msg = format!("Invalid top-level expression {}", tinfo.val);
+                        diags.err1("AST_24", &msg, tinfo.span().clone());
+                        diags.note0(
+                            "AST_25",
+                            "At top-level, allowed expressions are 'section' and 'output'",
+                        );
+                        false
+                    }
+                };
         }
 
         if !result {
@@ -1156,7 +1303,11 @@ impl<'toks> AstDb<'toks> {
         }
 
         let output_nid = output.as_ref().unwrap().nid;
-        let mut ast_db = AstDb { sections, labels: HashMap::new(), output: output.unwrap() };
+        let mut ast_db = AstDb {
+            sections,
+            labels: HashMap::new(),
+            output: output.unwrap(),
+        };
 
         if !ast_db.validate_section_name(0, output_nid, &ast, diags) {
             bail!("AST construction failed");
