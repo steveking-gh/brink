@@ -11,7 +11,6 @@ use std::{
 };
 
 #[allow(unused_imports)]
-#[allow(unused_imports)]
 use log::{debug, error, info, trace, warn};
 
 /// All tokens in brink created with the logos macro.
@@ -360,13 +359,14 @@ impl<'toks> Ast<'toks> {
         assert!(self.tok_num > 0);
         self.dbg_enter("advance_past_semicolon");
         if let Some(prev_tinfo) = self.tv.get(self.tok_num - 1)
-            && prev_tinfo.tok != LexToken::Semicolon {
-                while let Some(tinfo) = self.take() {
-                    if tinfo.tok == LexToken::Semicolon {
-                        break;
-                    }
+            && prev_tinfo.tok != LexToken::Semicolon
+        {
+            while let Some(tinfo) = self.take() {
+                if tinfo.tok == LexToken::Semicolon {
+                    break;
                 }
             }
+        }
         debug!(
             "Ast::advance_past_semicolon: Stopped on token {}",
             self.tok_num
@@ -858,10 +858,11 @@ impl<'toks> Ast<'toks> {
 
                 // Omit the comma from the AST to reduce clutter.
                 if let Some(tinfo) = self.peek()
-                    && tinfo.tok == LexToken::Comma {
-                        self.tok_num += 1;
-                        continue;
-                    }
+                    && tinfo.tok == LexToken::Comma
+                {
+                    self.tok_num += 1;
+                    continue;
+                }
 
                 // If not a comma, then we expect semi.
                 result &= self.expect_semi(diags, print_nid);
