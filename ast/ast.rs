@@ -345,7 +345,7 @@ impl<'toks> Ast<'toks> {
     }
 
     fn err_no_close_brace(&self, diags: &mut Diags, brace_tok_num: usize) {
-        let m = format!("Missing '}}'.  The following open brace is unmatched.");
+        let m = "Missing '}'.  The following open brace is unmatched.".to_string();
         diags.err1("AST_14", &m, self.tv[brace_tok_num].span());
     }
 
@@ -359,15 +359,14 @@ impl<'toks> Ast<'toks> {
     fn advance_past_semicolon(&mut self) {
         assert!(self.tok_num > 0);
         self.dbg_enter("advance_past_semicolon");
-        if let Some(prev_tinfo) = self.tv.get(self.tok_num - 1) {
-            if prev_tinfo.tok != LexToken::Semicolon {
+        if let Some(prev_tinfo) = self.tv.get(self.tok_num - 1)
+            && prev_tinfo.tok != LexToken::Semicolon {
                 while let Some(tinfo) = self.take() {
                     if tinfo.tok == LexToken::Semicolon {
                         break;
                     }
                 }
             }
-        }
         debug!(
             "Ast::advance_past_semicolon: Stopped on token {}",
             self.tok_num
@@ -606,7 +605,7 @@ impl<'toks> Ast<'toks> {
 
         // If we got here, we ran out of tokens before finding the close brace.
         self.err_no_close_brace(diags, brace_tok_num);
-        return self.dbg_exit("parse_section_contents", false);
+        self.dbg_exit("parse_section_contents", false)
     }
 
     // Parser for writing a section
@@ -858,12 +857,11 @@ impl<'toks> Ast<'toks> {
                 print_nid.append(expr_nid, &mut self.arena);
 
                 // Omit the comma from the AST to reduce clutter.
-                if let Some(tinfo) = self.peek() {
-                    if tinfo.tok == LexToken::Comma {
+                if let Some(tinfo) = self.peek()
+                    && tinfo.tok == LexToken::Comma {
                         self.tok_num += 1;
                         continue;
                     }
-                }
 
                 // If not a comma, then we expect semi.
                 result &= self.expect_semi(diags, print_nid);
@@ -873,7 +871,7 @@ impl<'toks> Ast<'toks> {
                 // fuzz test found this with print 1,;
                 let msg = "Statement ended unexpectedly";
                 let tinfo = self.get_tinfo(print_nid);
-                diags.err1("AST_21", &msg, tinfo.span());
+                diags.err1("AST_21", msg, tinfo.span());
                 result = false;
                 break;
             }
@@ -1113,7 +1111,7 @@ impl<'toks> AstDb<'toks> {
             diags.err2("AST_29", &m, sec_tinfo.span(), orig_tinfo.span());
             return false;
         }
-        sections.insert(sec_str, Section::new(&ast, sec_nid));
+        sections.insert(sec_str, Section::new(ast, sec_nid));
         true
     }
 
@@ -1139,7 +1137,7 @@ impl<'toks> AstDb<'toks> {
             let sec_name_nid_opt = children.next();
             if sec_name_nid_opt.is_none() {
                 // error, not enough children to reach section name
-                let m = format!("Missing section name");
+                let m = "Missing section name".to_string();
                 let section_tinfo = ast.get_tinfo(parent_nid);
                 diags.err1("AST_23", &m, section_tinfo.span());
                 return false;
@@ -1149,7 +1147,7 @@ impl<'toks> AstDb<'toks> {
         let sec_name_nid_opt = children.next();
         if sec_name_nid_opt.is_none() {
             // error, specified section does not exist
-            let m = format!("Missing section name");
+            let m = "Missing section name".to_string();
             let section_tinfo = ast.get_tinfo(parent_nid);
             diags.err1("AST_11", &m, section_tinfo.span());
             return false;
@@ -1176,11 +1174,11 @@ impl<'toks> AstDb<'toks> {
         if output.is_some() {
             let m = "Multiple output statements are not allowed.";
             let orig_tinfo = output.as_ref().unwrap().tinfo;
-            diags.err2("AST_10", &m, orig_tinfo.span(), tinfo.span());
+            diags.err2("AST_10", m, orig_tinfo.span(), tinfo.span());
             return false;
         }
 
-        *output = Some(Output::new(&ast, nid));
+        *output = Some(Output::new(ast, nid));
         true // succeed
     }
 
@@ -1217,7 +1215,7 @@ impl<'toks> AstDb<'toks> {
         result &= match tinfo.tok {
             // Wr statement must specify a valid section name
             LexToken::Wr => {
-                if !self.validate_section_name(0, parent_nid, &ast, diags) {
+                if !self.validate_section_name(0, parent_nid, ast, diags) {
                     return false;
                 }
                 let mut children = parent_nid.children(&ast.arena);
@@ -1230,7 +1228,7 @@ impl<'toks> AstDb<'toks> {
                 // Make sure we haven't already recursed through this section.
                 if nested_sections.contains(sec_str) {
                     let m = "Writing section creates a cycle.";
-                    diags.err1("AST_6", &m, sec_tinfo.span());
+                    diags.err1("AST_6", m, sec_tinfo.span());
                     false
                 } else {
                     // add this section to our nested sections tracker
@@ -1278,8 +1276,8 @@ impl<'toks> AstDb<'toks> {
             let tinfo = ast.get_tinfo(nid);
             result = result
                 && match tinfo.tok {
-                    LexToken::Section => Self::record_section(diags, nid, &ast, &mut sections),
-                    LexToken::Output => Self::record_output(diags, nid, &ast, &mut output),
+                    LexToken::Section => Self::record_section(diags, nid, ast, &mut sections),
+                    LexToken::Output => Self::record_output(diags, nid, ast, &mut output),
                     _ => {
                         let msg = format!("Invalid top-level expression {}", tinfo.val);
                         diags.err1("AST_24", &msg, tinfo.span().clone());
@@ -1309,7 +1307,7 @@ impl<'toks> AstDb<'toks> {
             output: output.unwrap(),
         };
 
-        if !ast_db.validate_section_name(0, output_nid, &ast, diags) {
+        if !ast_db.validate_section_name(0, output_nid, ast, diags) {
             bail!("AST construction failed");
         }
 
