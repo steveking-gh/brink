@@ -1,13 +1,13 @@
 pub type Span = std::ops::Range<usize>;
 use diags::Diags;
-use lineardb::{LinearDb};
+use lineardb::LinearDb;
 
 #[allow(unused_imports)]
-use log::{error, warn, info, debug, trace};
+use log::{debug, error, info, trace, warn};
 
 use ir::{DataType, IR, IRKind, IROperand};
-use std::{collections::HashMap, fs, ops::Range, path::Path, path::PathBuf};
 use parse_int::parse;
+use std::{collections::HashMap, fs, ops::Range, path::Path, path::PathBuf};
 
 pub struct FileInfo {
     pub path: String,
@@ -20,7 +20,7 @@ pub struct IRDb {
     pub parms: Vec<IROperand>,
 
     /// Map a file path to the file info object
-    pub files: HashMap<String,FileInfo>,
+    pub files: HashMap<String, FileInfo>,
 
     /// The optional absolute starting address specified
     /// in the output statement.  Zero by default.
@@ -28,15 +28,14 @@ pub struct IRDb {
 
     /// Maps an identifier to the (start,stop) indices in the ir_vec.
     /// Used for items with a size (potentially zero) such as sections.
-    pub sized_locs: HashMap<String,Range<usize>>,
+    pub sized_locs: HashMap<String, Range<usize>>,
 
     /// Maps an identifier to the start indices in the ir_vec.
     /// Used for items that are addressable, including sections and labels
-    pub addressed_locs: HashMap<String,usize>,
+    pub addressed_locs: HashMap<String, usize>,
 }
 
 impl IRDb {
-
     /// Returns the value of the specified operand for the specified IR.
     /// The operand number is for the *IR*, not the absolute operand
     /// index in the central operands vector.
@@ -53,47 +52,54 @@ impl IRDb {
     /// Get the datatype of the referenced operand by recursively inspecting
     /// the input operands.
     /// Returns None on error
-    fn get_operand_data_type_r(&mut self, depth: usize, lop_num: usize, lin_db: &LinearDb,
-                                diags: &mut Diags) -> Option<DataType> {
-        trace!("IRDb::get_operand_data_type_r: Enter at depth {} for lop number {}", depth, lop_num);
+    fn get_operand_data_type_r(
+        &mut self,
+        depth: usize,
+        lop_num: usize,
+        lin_db: &LinearDb,
+        diags: &mut Diags,
+    ) -> Option<DataType> {
+        trace!(
+            "IRDb::get_operand_data_type_r: Enter at depth {} for lop number {}",
+            depth, lop_num
+        );
         let lop = &lin_db.operand_vec[lop_num];
         let mut data_type = None;
-        
+
         match lop.tok {
             // The following produce a boolean regardless of input data types
-            ast::LexToken::Align |
-            ast::LexToken::SetSec |
-            ast::LexToken::SetImg |
-            ast::LexToken::SetAbs |
-            ast::LexToken::DoubleEq |
-            ast::LexToken::NEq |
-            ast::LexToken::GEq |
-            ast::LexToken::LEq |
-            ast::LexToken::Abs |
-            ast::LexToken::Img |
-            ast::LexToken::Sec |
-            ast::LexToken::DoublePipe |
-            ast::LexToken::DoubleAmpersand |
-            ast::LexToken::Sizeof |
-            ast::LexToken::ToU64 |
-            ast::LexToken::U64 => { data_type = Some(DataType::U64) } // TODO: this will be I64 when we convert bool
-            ast::LexToken::ToI64 |
-            ast::LexToken::I64 => { data_type = Some(DataType::I64) }
-            ast::LexToken::Integer => { data_type = Some(DataType::Integer) }
-            ast::LexToken::QuotedString => { data_type = Some(DataType::QuotedString) }
-            ast::LexToken::Label => { data_type = Some(DataType::Identifier) }
-            ast::LexToken::Identifier => { data_type = Some(DataType::Identifier) }
-            
+            ast::LexToken::Align
+            | ast::LexToken::SetSec
+            | ast::LexToken::SetImg
+            | ast::LexToken::SetAbs
+            | ast::LexToken::DoubleEq
+            | ast::LexToken::NEq
+            | ast::LexToken::GEq
+            | ast::LexToken::LEq
+            | ast::LexToken::Abs
+            | ast::LexToken::Img
+            | ast::LexToken::Sec
+            | ast::LexToken::DoublePipe
+            | ast::LexToken::DoubleAmpersand
+            | ast::LexToken::Sizeof
+            | ast::LexToken::ToU64
+            | ast::LexToken::U64 => data_type = Some(DataType::U64), // TODO: this will be I64 when we convert bool
+            ast::LexToken::ToI64 | ast::LexToken::I64 => data_type = Some(DataType::I64),
+            ast::LexToken::Integer => data_type = Some(DataType::Integer),
+            ast::LexToken::QuotedString => data_type = Some(DataType::QuotedString),
+            ast::LexToken::Label => data_type = Some(DataType::Identifier),
+            ast::LexToken::Identifier => data_type = Some(DataType::Identifier),
+
             // The following produce an output type that depends on inputs
-            ast::LexToken::DoubleLess |
-            ast::LexToken::DoubleGreater |
-            ast::LexToken::Pipe |
-            ast::LexToken::Ampersand |
-            ast::LexToken::Plus |
-            ast::LexToken::Minus |
-            ast::LexToken::Asterisk |
-            ast::LexToken::Percent |
-            ast::LexToken::FSlash => {
+            ast::LexToken::DoubleLess
+            | ast::LexToken::DoubleGreater
+            | ast::LexToken::Pipe
+            | ast::LexToken::Ampersand
+            | ast::LexToken::Plus
+            | ast::LexToken::Minus
+            | ast::LexToken::Asterisk
+            | ast::LexToken::Percent
+            | ast::LexToken::FSlash => {
                 // These operations have the same data type as their two inputs
                 // The data type must be numeric.
                 if lop.ir_lid.is_none() {
@@ -108,7 +114,7 @@ impl IRDb {
                 assert!(lin_ir.operand_vec[2] == lop_num);
                 let lhs_num = lin_ir.operand_vec[0];
                 let rhs_num = lin_ir.operand_vec[1];
-                
+
                 let lhs_opt = self.get_operand_data_type_r(depth + 1, lhs_num, lin_db, diags);
                 if let Some(lhs_dt) = lhs_opt {
                     let rhs_opt = self.get_operand_data_type_r(depth + 1, rhs_num, lin_db, diags);
@@ -117,8 +123,10 @@ impl IRDb {
                         if lhs_dt == rhs_dt {
                             let allowed = [DataType::I64, DataType::U64, DataType::Integer];
                             if !allowed.contains(&lhs_dt) {
-                                let msg = format!("Error, found data type '{:?}', but operation '{:?}' requires one of {:?}.",
-                                                lhs_dt, lop.tok, allowed);
+                                let msg = format!(
+                                    "Error, found data type '{:?}', but operation '{:?}' requires one of {:?}.",
+                                    lhs_dt, lop.tok, allowed
+                                );
                                 diags.err1("IRDB_2", &msg, lin_ir.src_loc.clone());
                             } else {
                                 data_type = Some(lhs_dt);
@@ -127,7 +135,9 @@ impl IRDb {
                             let mut dt_ok = false;
                             // Attempt to reconcile the data types
                             if rhs_dt == DataType::Integer {
-                                if [DataType::I64, DataType::U64, DataType::Integer].contains(&lhs_dt) {
+                                if [DataType::I64, DataType::U64, DataType::Integer]
+                                    .contains(&lhs_dt)
+                                {
                                     dt_ok = true; // Integers work with s/u types
                                     data_type = Some(lhs_dt);
                                 }
@@ -137,41 +147,48 @@ impl IRDb {
                                     data_type = Some(rhs_dt);
                                 }
                             }
-                
+
                             if !dt_ok {
-                                let msg = format!("Error, data type mismatch in input operands.  Left is {:?}, right is {:?}.",
-                                lhs_dt, rhs_dt);
+                                let msg = format!(
+                                    "Error, data type mismatch in input operands.  Left is {:?}, right is {:?}.",
+                                    lhs_dt, rhs_dt
+                                );
                                 diags.err1("IRDB_1", &msg, lin_ir.src_loc.clone());
                             }
                         }
                     }
                 }
             }
-            ast::LexToken::Wr8  |
-            ast::LexToken::Wr16 |
-            ast::LexToken::Wr24 |
-            ast::LexToken::Wr32 |
-            ast::LexToken::Wr40 |
-            ast::LexToken::Wr48 |
-            ast::LexToken::Wr56 |
-            ast::LexToken::Wr64 |
-            ast::LexToken::Assert |
-            ast::LexToken::Print |
-            ast::LexToken::Section |
-            ast::LexToken::OpenBrace |
-            ast::LexToken::CloseBrace |
-            ast::LexToken::Comma |
-            ast::LexToken::OpenParen |
-            ast::LexToken::CloseParen |
-            ast::LexToken::Semicolon |
-            ast::LexToken::Wrs |
-            ast::LexToken::Wr |
-            ast::LexToken::Wrf |
-            ast::LexToken::Output |
-            ast::LexToken::Unknown => { panic!("Token '{:?}' has no associated data type.", lop.tok); }
+            ast::LexToken::Wr8
+            | ast::LexToken::Wr16
+            | ast::LexToken::Wr24
+            | ast::LexToken::Wr32
+            | ast::LexToken::Wr40
+            | ast::LexToken::Wr48
+            | ast::LexToken::Wr56
+            | ast::LexToken::Wr64
+            | ast::LexToken::Assert
+            | ast::LexToken::Print
+            | ast::LexToken::Section
+            | ast::LexToken::OpenBrace
+            | ast::LexToken::CloseBrace
+            | ast::LexToken::Comma
+            | ast::LexToken::OpenParen
+            | ast::LexToken::CloseParen
+            | ast::LexToken::Semicolon
+            | ast::LexToken::Wrs
+            | ast::LexToken::Wr
+            | ast::LexToken::Wrf
+            | ast::LexToken::Output
+            | ast::LexToken::Unknown => {
+                panic!("Token '{:?}' has no associated data type.", lop.tok);
+            }
         };
 
-        trace!("IRDb::get_operand_data_type_r: Exit from depth {}, lop {} is {:?}", depth, lop_num, data_type);
+        trace!(
+            "IRDb::get_operand_data_type_r: Exit from depth {}, lop {} is {:?}",
+            depth, lop_num, data_type
+        );
         data_type
     }
 
@@ -196,8 +213,14 @@ impl IRDb {
 
             // During construction of the IROperand, the string in the linear operand is converted
             // to an actual typed value, which can fail, e.g. integer out of range
-            let opnd = IROperand::new( lop.ir_lid, &lop.sval, &lop.src_loc, data_type,
-                                                    is_constant, diags);
+            let opnd = IROperand::new(
+                lop.ir_lid,
+                &lop.sval,
+                &lop.src_loc,
+                data_type,
+                is_constant,
+                diags,
+            );
             if let Some(opnd) = opnd {
                 self.parms.push(opnd);
             } else {
@@ -220,19 +243,22 @@ impl IRDb {
     fn validate_wrf_operands(&mut self, ir: &IR, diags: &mut Diags) -> bool {
         let len = ir.operands.len();
         if len != 1 {
-            let m = format!("'{:?}' statements must have 1 operand, but found {}.",
-                            ir.kind, len);
+            let m = format!(
+                "'{:?}' statements must have 1 operand, but found {}.",
+                ir.kind, len
+            );
             diags.err1("IRDB_10", &m, ir.src_loc.clone());
             return false;
         }
 
         let path_opnd = &self.parms[ir.operands[0]];
         if path_opnd.data_type != DataType::QuotedString {
-            let m = format!("'{:?}' operand must be a file path in \
+            let m = format!(
+                "'{:?}' operand must be a file path in \
                     double-quotes, found '{:?}'.",
-                    ir.kind, path_opnd.data_type);
-            diags.err2("IRDB_11", &m, ir.src_loc.clone(),
-                     path_opnd.src_loc.clone());
+                ir.kind, path_opnd.data_type
+            );
+            diags.err2("IRDB_11", &m, ir.src_loc.clone(), path_opnd.src_loc.clone());
             return false;
         }
 
@@ -257,9 +283,12 @@ impl IRDb {
                 pbuf_result.unwrap().to_str().unwrap().to_string()
             };
             let os_err = fm_result.err().unwrap().to_string();
-            let m = format!("Error getting metadata for file '{}'\n\
+            let m = format!(
+                "Error getting metadata for file '{}'\n\
                     OS error is '{}'\n\
-                    Looking in directory '{}", path_str, os_err, full_path);
+                    Looking in directory '{}",
+                path_str, os_err, full_path
+            );
             diags.err1("IRDB_13", &m, path_opnd.src_loc.clone());
             return false;
         }
@@ -274,8 +303,11 @@ impl IRDb {
 
         let size = fm.len();
 
-        let finfo = FileInfo { path: path_str.to_string(), size,
-                                src_loc: path_opnd.src_loc.clone() };
+        let finfo = FileInfo {
+            path: path_str.to_string(),
+            size,
+            src_loc: path_opnd.src_loc.clone(),
+        };
 
         self.files.insert(path_str.to_string(), finfo);
         true
@@ -285,13 +317,19 @@ impl IRDb {
     fn validate_numeric_1(&self, ir: &IR, diags: &mut Diags) -> bool {
         let len = ir.operands.len();
         if len != 1 {
-            let m = format!("'{:?}' expressions must evaluate to one operand, but found {}.", ir.kind, len);
+            let m = format!(
+                "'{:?}' expressions must evaluate to one operand, but found {}.",
+                ir.kind, len
+            );
             diags.err1("IRDB_4", &m, ir.src_loc.clone());
             return false;
         }
         let opnd = &self.parms[ir.operands[0]];
         if ![DataType::Integer, DataType::I64, DataType::U64].contains(&opnd.data_type) {
-            let m = format!("'{:?}' expression requires an integer or boolean operand, found '{:?}'.", ir.kind, opnd.data_type);
+            let m = format!(
+                "'{:?}' expression requires an integer or boolean operand, found '{:?}'.",
+                ir.kind, opnd.data_type
+            );
             diags.err2("IRDB_5", &m, ir.src_loc.clone(), opnd.src_loc.clone());
             return false;
         }
@@ -302,16 +340,21 @@ impl IRDb {
     fn validate_numeric_2(&self, ir: &IR, diags: &mut Diags) -> bool {
         let len = ir.operands.len();
         if len != 3 {
-            let m = format!("'{:?}' expression requires 2 input and one output \
-                                    operands, but found {} total operands.", ir.kind, len);
+            let m = format!(
+                "'{:?}' expression requires 2 input and one output \
+                                    operands, but found {} total operands.",
+                ir.kind, len
+            );
             diags.err1("IRDB_6", &m, ir.src_loc.clone());
             return false;
         }
         for op_num in 0..2 {
             let opnd = &self.parms[ir.operands[op_num]];
             if ![DataType::Integer, DataType::I64, DataType::U64].contains(&opnd.data_type) {
-                let m = format!("'{:?}' expression requires an integer, found '{:?}'.",
-                                    ir.kind, opnd.data_type);
+                let m = format!(
+                    "'{:?}' expression requires an integer, found '{:?}'.",
+                    ir.kind, opnd.data_type
+                );
                 diags.err2("IRDB_7", &m, ir.src_loc.clone(), opnd.src_loc.clone());
                 return false;
             }
@@ -323,8 +366,11 @@ impl IRDb {
     fn validate_numeric_1_or_2(&self, ir: &IR, diags: &mut Diags) -> bool {
         let len = ir.operands.len();
         if len != 1 && len != 2 {
-            let m = format!("'{:?}' requires 1 or 2 input operands, \
-                                  but found {} total operands.", ir.kind, len);
+            let m = format!(
+                "'{:?}' requires 1 or 2 input operands, \
+                                  but found {} total operands.",
+                ir.kind, len
+            );
             diags.err1("IRDB_8", &m, ir.src_loc.clone());
             return false;
         }
@@ -332,8 +378,11 @@ impl IRDb {
         // First operand must be numeric
         let opnd = &self.parms[ir.operands[0]];
         if ![DataType::Integer, DataType::I64, DataType::U64].contains(&opnd.data_type) {
-            let m = format!("'{:?}' requires an integer for this operand, \
-                                    found '{:?}'.", ir.kind, opnd.data_type);
+            let m = format!(
+                "'{:?}' requires an integer for this operand, \
+                                    found '{:?}'.",
+                ir.kind, opnd.data_type
+            );
             diags.err2("IRDB_9", &m, ir.src_loc.clone(), opnd.src_loc.clone());
             return false;
         }
@@ -342,8 +391,11 @@ impl IRDb {
         if len == 2 {
             let opnd = &self.parms[ir.operands[1]];
             if ![DataType::Integer, DataType::I64, DataType::U64].contains(&opnd.data_type) {
-                let m = format!("'{:?}' requires an integer for this operand, \
-                                        found '{:?}'.", ir.kind, opnd.data_type);
+                let m = format!(
+                    "'{:?}' requires an integer for this operand, \
+                                        found '{:?}'.",
+                    ir.kind, opnd.data_type
+                );
                 diags.err2("IRDB_9", &m, ir.src_loc.clone(), opnd.src_loc.clone());
                 return false;
             }
@@ -353,48 +405,47 @@ impl IRDb {
 
     fn validate_operands(&mut self, ir: &IR, diags: &mut Diags) -> bool {
         let result = match ir.kind {
-            IRKind::Align |
-            IRKind::SetSec |
-            IRKind::SetImg |
-            IRKind::SetAbs |
-            IRKind::Wr8 |
-            IRKind::Wr16 |
-            IRKind::Wr24 |
-            IRKind::Wr32 |
-            IRKind::Wr40 |
-            IRKind::Wr48 |
-            IRKind::Wr56 |
-            IRKind::Wr64 => { self.validate_numeric_1_or_2(ir, diags) }
-            IRKind::Assert => { self.validate_numeric_1(ir, diags) }
-            IRKind::Wrf => { self.validate_wrf_operands(ir, diags) }
-            IRKind::Wrs |
-            IRKind::Print => { self.validate_string_expr_operands(ir, diags) }
-            IRKind::NEq |
-            IRKind::LEq |
-            IRKind::GEq |
-            IRKind::DoubleEq |
-            IRKind::LeftShift |
-            IRKind::RightShift |
-            IRKind::Multiply |
-            IRKind::Divide |
-            IRKind::Modulo |
-            IRKind::BitAnd |
-            IRKind::LogicalAnd |
-            IRKind::BitOr |
-            IRKind::LogicalOr |
-            IRKind::Subtract |
-            IRKind::Add => { self.validate_numeric_2(ir, diags) }
-            IRKind::ToI64 |
-            IRKind::ToU64 |
-            IRKind::U64 |
-            IRKind::I64 |
-            IRKind::SectionStart |
-            IRKind::SectionEnd |
-            IRKind::Sizeof |
-            IRKind::Label |
-            IRKind::Abs |
-            IRKind::Img |
-            IRKind::Sec => { true }
+            IRKind::Align
+            | IRKind::SetSec
+            | IRKind::SetImg
+            | IRKind::SetAbs
+            | IRKind::Wr8
+            | IRKind::Wr16
+            | IRKind::Wr24
+            | IRKind::Wr32
+            | IRKind::Wr40
+            | IRKind::Wr48
+            | IRKind::Wr56
+            | IRKind::Wr64 => self.validate_numeric_1_or_2(ir, diags),
+            IRKind::Assert => self.validate_numeric_1(ir, diags),
+            IRKind::Wrf => self.validate_wrf_operands(ir, diags),
+            IRKind::Wrs | IRKind::Print => self.validate_string_expr_operands(ir, diags),
+            IRKind::NEq
+            | IRKind::LEq
+            | IRKind::GEq
+            | IRKind::DoubleEq
+            | IRKind::LeftShift
+            | IRKind::RightShift
+            | IRKind::Multiply
+            | IRKind::Divide
+            | IRKind::Modulo
+            | IRKind::BitAnd
+            | IRKind::LogicalAnd
+            | IRKind::BitOr
+            | IRKind::LogicalOr
+            | IRKind::Subtract
+            | IRKind::Add => self.validate_numeric_2(ir, diags),
+            IRKind::ToI64
+            | IRKind::ToU64
+            | IRKind::U64
+            | IRKind::I64
+            | IRKind::SectionStart
+            | IRKind::SectionEnd
+            | IRKind::Sizeof
+            | IRKind::Label
+            | IRKind::Abs
+            | IRKind::Img
+            | IRKind::Sec => true,
         };
         result
     }
@@ -408,7 +459,11 @@ impl IRDb {
             // The operands are just indices into the operands array
             let operands = lir.operand_vec.clone();
             let src_loc = lir.src_loc.clone();
-            let ir = IR{kind, operands, src_loc};
+            let ir = IR {
+                kind,
+                operands,
+                src_loc,
+            };
             let ir_num = self.ir_vec.len();
             if self.validate_operands(&ir, diags) {
                 match kind {
@@ -420,7 +475,10 @@ impl IRDb {
                     IRKind::SectionStart => {
                         // create the section entry and set the starting IR number
                         let sec_name = self.get_opnd_as_identifier(&ir, 0).to_string();
-                        let rng = Range {start: ir_num, end: 0};
+                        let rng = Range {
+                            start: ir_num,
+                            end: 0,
+                        };
                         self.sized_locs.insert(sec_name.clone(), rng);
                         self.addressed_locs.insert(sec_name, ir_num);
                     }
@@ -441,7 +499,6 @@ impl IRDb {
     }
 
     pub fn new(lin_db: &LinearDb, diags: &mut Diags) -> Option<IRDb> {
-
         // If the user specified a starting address in the output statement
         // then convert to a real number
         let mut start_addr = 0;
@@ -453,13 +510,18 @@ impl IRDb {
                 let m = format!("Malformed integer operand {}", addr_str);
                 let primary_code_ref = lin_db.output_addr_loc.as_ref().unwrap();
                 diags.err1("IRDB_3", &m, primary_code_ref.clone());
-                return None;                
+                return None;
             }
         }
 
-        let mut ir_db = IRDb { ir_vec: Vec::new(), parms: Vec::new(),
-            sized_locs: HashMap::new(), addressed_locs: HashMap::new(), start_addr,
-            files: HashMap::new() };
+        let mut ir_db = IRDb {
+            ir_vec: Vec::new(),
+            parms: Vec::new(),
+            sized_locs: HashMap::new(),
+            addressed_locs: HashMap::new(),
+            start_addr,
+            files: HashMap::new(),
+        };
 
         if !ir_db.process_lin_operands(lin_db, diags) {
             return None;
@@ -469,12 +531,12 @@ impl IRDb {
         if !ir_db.process_linear_ir(lin_db, diags) {
             return None;
         }
-        
+
         Some(ir_db)
     }
 
     pub fn dump(&self) {
-        for (idx,ir) in self.ir_vec.iter().enumerate() {
+        for (idx, ir) in self.ir_vec.iter().enumerate() {
             let mut op = format!("lid {}: is {:?}", idx, ir.kind);
             // display the operand for this LinIR
             let mut first = true;
@@ -486,7 +548,10 @@ impl IRDb {
                     first = false;
                 }
                 if let Some(ir_lid) = operand.is_output_of() {
-                    op.push_str(&format!(" ({:?})tmp{}, output of lid {}", operand.data_type, *child, ir_lid));
+                    op.push_str(&format!(
+                        " ({:?})tmp{}, output of lid {}",
+                        operand.data_type, *child, ir_lid
+                    ));
                 } else {
                     match operand.data_type {
                         DataType::U64 => {
@@ -494,8 +559,7 @@ impl IRDb {
                             let v = operand.val.downcast_ref::<u64>().unwrap();
                             op.push_str(&format!(" ({:?}){:#X}", operand.data_type, v));
                         }
-                        DataType::Integer |
-                        DataType::I64 => {
+                        DataType::Integer | DataType::I64 => {
                             let v = operand.val.downcast_ref::<i64>().unwrap();
                             op.push_str(&format!(" ({:?}){}", operand.data_type, v));
                         }
@@ -503,13 +567,11 @@ impl IRDb {
                         _ => {
                             let v = operand.val.downcast_ref::<String>().unwrap();
                             op.push_str(&format!(" ({:?}){}", operand.data_type, v));
-                        },
+                        }
                     }
                 }
             }
             debug!("IRDb: {}", op);
         }
-    }    
+    }
 }
-
-

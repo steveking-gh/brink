@@ -1,7 +1,7 @@
-use std::any::Any;
-use std::ops::Range;
 use diags::Diags;
 use parse_int::parse;
+use std::any::Any;
+use std::ops::Range;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DataType {
@@ -70,38 +70,54 @@ pub struct IROperand {
 }
 
 impl IROperand {
-
-    pub fn new(ir_lid: Option<usize>, sval: &str, src_loc: &Range<usize>,
-               data_type: DataType, is_constant: bool, diags: &mut Diags) -> Option<IROperand> {
-
-        if let Some(val) = IROperand::convert_type(sval, data_type, src_loc,
-                                                            is_constant, diags) {
-            return Some(IROperand { ir_lid, src_loc: src_loc.clone(), is_constant,
-                        data_type, val });
+    pub fn new(
+        ir_lid: Option<usize>,
+        sval: &str,
+        src_loc: &Range<usize>,
+        data_type: DataType,
+        is_constant: bool,
+        diags: &mut Diags,
+    ) -> Option<IROperand> {
+        if let Some(val) = IROperand::convert_type(sval, data_type, src_loc, is_constant, diags) {
+            return Some(IROperand {
+                ir_lid,
+                src_loc: src_loc.clone(),
+                is_constant,
+                data_type,
+                val,
+            });
         }
 
         None
     }
-    
+
     pub fn is_output_of(&self) -> Option<usize> {
         return self.ir_lid;
     }
 
     /// Converts the specified string into the specified type
-    fn convert_type(sval: &str, data_type: DataType, src_loc: &Range<usize>,
-                    is_constant: bool, diags: &mut Diags) -> Option<Box<dyn Any>> {
+    fn convert_type(
+        sval: &str,
+        data_type: DataType,
+        src_loc: &Range<usize>,
+        is_constant: bool,
+        diags: &mut Diags,
+    ) -> Option<Box<dyn Any>> {
         match data_type {
             DataType::QuotedString => {
                 // Trim quotes and convert escape characters
                 // For trimming, don't use trim_matches since that
                 // will incorrectly strip trailing escaped quotes.
-                return Some(Box::new(sval
-                        .strip_prefix('\"').unwrap()
-                        .strip_suffix('\"').unwrap()
+                return Some(Box::new(
+                    sval.strip_prefix('\"')
+                        .unwrap()
+                        .strip_suffix('\"')
+                        .unwrap()
                         .replace("\\\"", "\"")
                         .replace("\\n", "\n")
                         .replace("\\0", "\0")
-                        .replace("\\t", "\t")));
+                        .replace("\\t", "\t"),
+                ));
             }
             DataType::U64 => {
                 if is_constant {
@@ -165,7 +181,6 @@ impl IROperand {
         None
     }
 
-
     pub fn clone_val_box(&self) -> Box<dyn Any> {
         match self.data_type {
             DataType::U64 => { Box::new(self.val.downcast_ref::<u64>().unwrap().clone()) },
@@ -188,33 +203,39 @@ impl IROperand {
 
     pub fn to_u64(&self) -> u64 {
         match self.data_type {
-            DataType::Integer => { *self.val.downcast_ref::<i64>().unwrap() as u64 },
-            DataType::U64 => { *self.val.downcast_ref::<u64>().unwrap() },
-            _ => { panic!("Internal error: Invalid type conversion to u64"); },
+            DataType::Integer => *self.val.downcast_ref::<i64>().unwrap() as u64,
+            DataType::U64 => *self.val.downcast_ref::<u64>().unwrap(),
+            _ => {
+                panic!("Internal error: Invalid type conversion to u64");
+            }
         }
     }
 
     pub fn to_i64(&self) -> i64 {
         match self.data_type {
-            DataType::Integer |
-            DataType::I64 => { *self.val.downcast_ref::<i64>().unwrap() },
-            _ => { panic!("Internal error: Invalid type conversion to i64"); },
+            DataType::Integer | DataType::I64 => *self.val.downcast_ref::<i64>().unwrap(),
+            _ => {
+                panic!("Internal error: Invalid type conversion to i64");
+            }
         }
     }
 
     pub fn to_str(&self) -> &str {
         match self.data_type {
-            DataType::QuotedString => { self.val.downcast_ref::<String>().unwrap() },
-            _ => { panic!("Internal error: Invalid type conversion to str"); },
+            DataType::QuotedString => self.val.downcast_ref::<String>().unwrap(),
+            _ => {
+                panic!("Internal error: Invalid type conversion to str");
+            }
         }
     }
     pub fn to_identifier(&self) -> &str {
         match self.data_type {
-            DataType::Identifier => { self.val.downcast_ref::<String>().unwrap() },
-            _ => { panic!("Internal error: Invalid type conversion to identifier"); },
+            DataType::Identifier => self.val.downcast_ref::<String>().unwrap(),
+            _ => {
+                panic!("Internal error: Invalid type conversion to identifier");
+            }
         }
     }
-
 }
 
 #[derive(Debug, Clone)]

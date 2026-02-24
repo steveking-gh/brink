@@ -3,21 +3,19 @@
 #![forbid(unsafe_code)]
 #![warn(clippy::all, rust_2018_idioms)]
 
-
+use anyhow::{Context, Result};
+use clap::{App, Arg};
 use std::env;
-use std::{io,fs};
-use anyhow::{Result,Context};
-use clap::{Arg, App};
+use std::{fs, io};
 
 // Local libraries
 use process::process;
 
-
 // Logging
 #[allow(unused_imports)]
-use log::{error, warn, info, debug, trace};
+use log::{debug, error, info, trace, warn};
 
-fn init_log(verbosity : u64) -> Result<(), fern::InitError>  {
+fn init_log(verbosity: u64) -> Result<(), fern::InitError> {
     let mut base_cfg = fern::Dispatch::new();
 
     base_cfg = match verbosity {
@@ -29,16 +27,10 @@ fn init_log(verbosity : u64) -> Result<(), fern::InitError>  {
     };
 
     let stdout_cfg = fern::Dispatch::new()
-            .format(|out, message, record| {
-            out.finish(format_args!(
-                "[{}] {}",
-                record.level(),
-                message))
-            })
-            .chain(io::stdout());
+        .format(|out, message, record| out.finish(format_args!("[{}] {}", record.level(), message)))
+        .chain(io::stdout());
 
-    base_cfg.chain(stdout_cfg)
-            .apply()?;
+    base_cfg.chain(stdout_cfg).apply()?;
     Ok(())
 }
 
@@ -89,16 +81,26 @@ fn main() -> Result<()> {
     // Read the brink file into a string and pass to parser.
     // A bland error message here is fine since clap already
     // provides nice error messages.
-    let in_file_name = args.value_of("INPUT")
-            .context("Unknown input file argument error.")?;
+    let in_file_name = args
+        .value_of("INPUT")
+        .context("Unknown input file argument error.")?;
 
     // remove carriage return from line endings for windows platforms
     let str_in = fs::read_to_string(&in_file_name)
-        .with_context(|| format!(
+        .with_context(|| {
+            format!(
                 "Failed to read from file {}.\nWorking directory is {}",
-                in_file_name, env::current_dir().unwrap().display()))?
-        .replace("\r\n","\n");
+                in_file_name,
+                env::current_dir().unwrap().display()
+            )
+        })?
+        .replace("\r\n", "\n");
 
-    process(&in_file_name, &str_in, &args, verbosity,
-             args.is_present("noprint"))
+    process(
+        &in_file_name,
+        &str_in,
+        &args,
+        verbosity,
+        args.is_present("noprint"),
+    )
 }

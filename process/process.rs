@@ -1,27 +1,31 @@
+use anyhow::{Context, Result, anyhow};
 use std::fs::File;
-use anyhow::{Result,Context,anyhow};
 extern crate clap;
 
 // Local libraries
+use ast::{Ast, AstDb};
 use diags::Diags;
-use ast::{Ast,AstDb};
-use lineardb::LinearDb;
-use irdb::IRDb;
 use engine::Engine;
+use irdb::IRDb;
+use lineardb::LinearDb;
 
 #[allow(unused_imports)]
-use log::{error, warn, info, debug, trace};
+use log::{debug, error, info, trace, warn};
 
 /// Entry point for all processing on the input source file
 /// name: The name of the file
 /// fstr: A string containing the file
-pub fn process(name: &str, fstr: &str, args: &clap::ArgMatches, verbosity: u64,
-                noprint: bool)
-               -> Result<()> {
+pub fn process(
+    name: &str,
+    fstr: &str,
+    args: &clap::ArgMatches,
+    verbosity: u64,
+    noprint: bool,
+) -> Result<()> {
     info!("Processing {}", name);
     debug!("File contains: {}", fstr);
 
-    let mut diags = Diags::new(name,fstr,verbosity,noprint);
+    let mut diags = Diags::new(name, fstr, verbosity, noprint);
 
     let ast = Ast::new(fstr, &mut diags);
     if ast.is_none() {
@@ -65,13 +69,15 @@ pub fn process(name: &str, fstr: &str, args: &clap::ArgMatches, verbosity: u64,
     }
     // Determine if the user specified an output file on the command line
     // Trim whitespace
-    let fname_str = String::from(args.value_of("output")
-                                            .unwrap_or("output.bin")
-                                            .trim_matches(' '));
+    let fname_str = String::from(
+        args.value_of("output")
+            .unwrap_or("output.bin")
+            .trim_matches(' '),
+    );
     debug!("process: output file name is {}", fname_str);
 
-    let mut file = File::create(&fname_str)
-            .context(format!("Unable to create output file {}", fname_str))?;
+    let mut file =
+        File::create(&fname_str).context(format!("Unable to create output file {}", fname_str))?;
 
     if engine.execute(&ir_db, &mut diags, &mut file).is_err() {
         return Err(anyhow!("[PROC_4]: Error detected, halting."));
