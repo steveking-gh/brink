@@ -53,7 +53,6 @@ impl IRDb {
     /// the input operands.
     /// Returns None on error
     fn get_operand_data_type_r(
-        &mut self,
         depth: usize,
         lop_num: usize,
         lin_db: &LinearDb,
@@ -115,9 +114,9 @@ impl IRDb {
                 let lhs_num = lin_ir.operand_vec[0];
                 let rhs_num = lin_ir.operand_vec[1];
 
-                let lhs_opt = self.get_operand_data_type_r(depth + 1, lhs_num, lin_db, diags);
+                let lhs_opt = Self::get_operand_data_type_r(depth + 1, lhs_num, lin_db, diags);
                 if let Some(lhs_dt) = lhs_opt {
-                    let rhs_opt = self.get_operand_data_type_r(depth + 1, rhs_num, lin_db, diags);
+                    let rhs_opt = Self::get_operand_data_type_r(depth + 1, rhs_num, lin_db, diags);
                     if let Some(rhs_dt) = rhs_opt {
                         // We now have both lhs and rhs data types
                         if lhs_dt == rhs_dt {
@@ -142,10 +141,11 @@ impl IRDb {
                                     data_type = Some(lhs_dt);
                                 }
                             } else if lhs_dt == DataType::Integer
-                                && [DataType::I64, DataType::U64].contains(&rhs_dt) {
-                                    dt_ok = true; // Integers work with s/u types
-                                    data_type = Some(rhs_dt);
-                                }
+                                && [DataType::I64, DataType::U64].contains(&rhs_dt)
+                            {
+                                dt_ok = true; // Integers work with s/u types
+                                data_type = Some(rhs_dt);
+                            }
 
                             if !dt_ok {
                                 let msg = format!(
@@ -198,7 +198,7 @@ impl IRDb {
         let mut result = true;
         let len = lin_db.operand_vec.len();
         for lop_num in 0..len {
-            let dt_opt = self.get_operand_data_type_r(0, lop_num, lin_db, diags);
+            let dt_opt = Self::get_operand_data_type_r(0, lop_num, lin_db, diags);
             if dt_opt.is_none() {
                 return false; // error case, just give up
             }
@@ -403,7 +403,6 @@ impl IRDb {
     }
 
     fn validate_operands(&mut self, ir: &IR, diags: &mut Diags) -> bool {
-        
         match ir.kind {
             IRKind::Align
             | IRKind::SetSec
