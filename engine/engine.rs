@@ -1,16 +1,16 @@
-use std::{convert::TryFrom, io::Read};
+use anyhow::{Result, anyhow};
+use diags::Diags;
 use ir::{DataType, IR, IRKind};
 use irdb::IRDb;
-use diags::Diags;
-use std::{any::Any, convert::TryInto, io::Write};
 use std::cell::RefCell;
 use std::fs::File;
-use anyhow::{Result,anyhow};
+use std::{any::Any, convert::TryInto, io::Write};
+use std::{convert::TryFrom, io::Read};
 
 #[allow(unused_imports)]
-use log::{error, warn, info, debug, trace};
+use log::{debug, error, info, trace, warn};
 
-#[derive(Clone,Debug,PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Location {
     img: u64,
     sec: u64,
@@ -24,9 +24,18 @@ impl Parameter {
     fn to_bool(&self) -> bool {
         match self.data_type {
             // TODO make boolean natively i64
-            DataType::I64 |
-            DataType::Integer => { (*self.val.downcast_ref::<i64>().unwrap() as u64) != 0 },
-            DataType::U64 => { *self.val.downcast_ref::<u64>().unwrap() != 0 },
+            DataType::I64 | DataType::Integer => {
+                let Some(val) = self.val.downcast_ref::<i64>() else {
+                    panic!("Bad downcast conversion to bool!")
+                };
+                (*val as u64) != 0
+            }
+            DataType::U64 => {
+                let Some(val) = self.val.downcast_ref::<u64>() else {
+                    panic!("Bad downcast conversion to bool!")
+                };
+                *val != 0
+            }
             bad => panic!("Bad downcast conversion of {:?} to bool!", bad),
         }
     }
@@ -34,8 +43,18 @@ impl Parameter {
     fn to_u64(&self) -> u64 {
         match self.data_type {
             // Integers stored as i64
-            DataType::Integer => { *self.val.downcast_ref::<i64>().unwrap() as u64 },
-            DataType::U64 => { *self.val.downcast_ref::<u64>().unwrap() },
+            DataType::Integer => {
+                let Some(val) = self.val.downcast_ref::<i64>() else {
+                    panic!("Bad downcast conversion to u64!")
+                };
+                *val as u64
+            }
+            DataType::U64 => {
+                let Some(val) = self.val.downcast_ref::<u64>() else {
+                    panic!("Bad downcast conversion to u64!")
+                };
+                *val
+            }
             bad => panic!("Bad downcast conversion of {:?} to u64!", bad),
         }
     }
@@ -43,37 +62,55 @@ impl Parameter {
     fn to_u64_mut(&mut self) -> &mut u64 {
         match self.data_type {
             // Integers stored as i64
-            DataType::U64 => { self.val.downcast_mut::<u64>().unwrap() },
+            DataType::U64 => {
+                let Some(val) = self.val.downcast_mut::<u64>() else {
+                    panic!("Bad downcast conversion to &mut u64!")
+                };
+                val
+            }
             bad => panic!("Bad downcast conversion of {:?} to &mut u64!", bad),
         }
     }
 
     fn to_i64(&self) -> i64 {
         match self.data_type {
-            DataType::Integer |
-            DataType::I64 => { *self.val.downcast_ref::<i64>().unwrap() },
+            DataType::Integer | DataType::I64 => {
+                let Some(val) = self.val.downcast_ref::<i64>() else {
+                    panic!("Bad downcast conversion to i64!")
+                };
+                *val
+            }
             bad => panic!("Bad downcast conversion of {:?} to i64!", bad),
         }
     }
 
     fn to_i64_mut(&mut self) -> &mut i64 {
         match self.data_type {
-            DataType::Integer |
-            DataType::I64 => { self.val.downcast_mut::<i64>().unwrap() },
+            DataType::Integer | DataType::I64 => {
+                let Some(val) = self.val.downcast_mut::<i64>() else {
+                    panic!("Bad downcast conversion to &mut i64!")
+                };
+                val
+            }
             bad => panic!("Bad downcast conversion of {:?} to &mut i64!", bad),
         }
     }
 
     fn to_str(&self) -> &str {
         match self.data_type {
-            DataType::QuotedString => { self.val.downcast_ref::<String>().unwrap() },
+            DataType::QuotedString => {
+                let Some(val) = self.val.downcast_ref::<String>() else {
+                    panic!("Bad downcast conversion to &str!")
+                };
+                val
+            }
             bad => panic!("Bad downcast conversion of {:?} to &str!", bad),
         }
     }
 
     fn to_identifier(&self) -> &str {
         match self.data_type {
-            DataType::Identifier => { self.val.downcast_ref::<String>().unwrap() },
+            DataType::Identifier => self.val.downcast_ref::<String>().unwrap(),
             bad => panic!("Bad downcast conversion of {:?} to identifier!", bad),
         }
     }
@@ -95,9 +132,9 @@ pub struct Engine {
     start_addr: u64,
 }
 
-fn get_wrx_byte_width(ir : &IR) -> usize {
+fn get_wrx_byte_width(ir: &IR) -> usize {
     let width = match ir.kind {
-        IRKind::Wr8  => 1,
+        IRKind::Wr8 => 1,
         IRKind::Wr16 => 2,
         IRKind::Wr24 => 3,
         IRKind::Wr32 => 4,
@@ -105,14 +142,15 @@ fn get_wrx_byte_width(ir : &IR) -> usize {
         IRKind::Wr48 => 6,
         IRKind::Wr56 => 7,
         IRKind::Wr64 => 8,
-        bad => { panic!("Called get_wrx_byte_width with {:?}", bad); }
+        bad => {
+            panic!("Called get_wrx_byte_width with {:?}", bad);
+        }
     };
 
     width
 }
 
 impl Engine {
-
     /// Debug trace that produces an indented output with section name to make
     /// section nesting more readable.
     fn trace(&self, msg: &str) {
@@ -124,10 +162,20 @@ impl Engine {
         trace!("{}{}: {}", "    ".repeat(sec_depth), sec_name, msg);
     }
 
-    fn iterate_wrs(&mut self, ir: &IR, irdb: &IRDb, diags: &mut Diags,
-                    current: &mut Location) -> bool {
-        self.trace(format!("Engine::iterate_wrs: img {}, sec {}",
-                   current.img, current.sec).as_str());
+    fn iterate_wrs(
+        &mut self,
+        ir: &IR,
+        irdb: &IRDb,
+        diags: &mut Diags,
+        current: &mut Location,
+    ) -> bool {
+        self.trace(
+            format!(
+                "Engine::iterate_wrs: img {}, sec {}",
+                current.img, current.sec
+            )
+            .as_str(),
+        );
 
         let xstr_opt = self.evaluate_string_expr(ir, irdb, diags);
         if xstr_opt.is_none() {
@@ -140,19 +188,30 @@ impl Engine {
         let sz = xstr.len() as u64;
         current.img += sz;
         current.sec += sz;
-        
+
         true
     }
 
     // Used for Wr8 though Wr64
-    fn iterate_wrx(&mut self, ir: &IR, irdb: &IRDb, diags: &mut Diags,
-                    current: &mut Location) -> bool {
-        
+    fn iterate_wrx(
+        &mut self,
+        ir: &IR,
+        irdb: &IRDb,
+        diags: &mut Diags,
+        current: &mut Location,
+    ) -> bool {
         assert!(ir.operands.len() < 3);
         let byte_size = get_wrx_byte_width(ir) as u64;
 
-        self.trace(format!("Engine::iterate_wrx-{}: img {}, sec {}", byte_size*8,
-                   current.img, current.sec).as_str());
+        self.trace(
+            format!(
+                "Engine::iterate_wrx-{}: img {}, sec {}",
+                byte_size * 8,
+                current.img,
+                current.sec
+            )
+            .as_str(),
+        );
 
         let mut result = true;
 
@@ -163,22 +222,27 @@ impl Engine {
             // A repeat count of 0 is not an error.
             let op = self.parms[ir.operands[1]].borrow();
             match op.data_type {
-                DataType::U64 => { repeat_count = op.to_u64(); }
-                DataType::Integer |
-                DataType::I64 => {
+                DataType::U64 => {
+                    repeat_count = op.to_u64();
+                }
+                DataType::Integer | DataType::I64 => {
                     let temp = op.to_i64();
                     if temp < 0 {
-                        let msg = format!("Repeat count cannot be negative, \
-                                                but found '{}'", temp );
+                        let msg = format!(
+                            "Repeat count cannot be negative, \
+                                                but found '{}'",
+                            temp
+                        );
                         let src_loc = irdb.parms[ir.operands[1]].src_loc.clone();
                         diags.err1("EXEC_32", &msg, src_loc);
                         result = false;
                         repeat_count = 0;
                     } else {
-                        repeat_count = op.to_u64(); }
+                        repeat_count = op.to_u64();
                     }
+                }
                 bad => {
-                    let msg = format!("Repeat count cannot be type '{:?}'", bad );
+                    let msg = format!("Repeat count cannot be type '{:?}'", bad);
                     let src_loc = irdb.parms[ir.operands[1]].src_loc.clone();
                     diags.err1("EXEC_31", &msg, src_loc);
                     result = false;
@@ -192,16 +256,20 @@ impl Engine {
         // Will panic if usize does not fit in u64
         current.img += sz;
         current.sec += sz;
-        
+
         result
     }
 
     /// Used for wr file
     /// There is nothing really to iterate other than advancing
     /// the location counter by the size of the file.
-    fn iterate_wrf(&mut self, ir: &IR, irdb: &IRDb, _diags: &mut Diags,
-                        current: &mut Location) -> bool {
-        
+    fn iterate_wrf(
+        &mut self,
+        ir: &IR,
+        irdb: &IRDb,
+        _diags: &mut Diags,
+        current: &mut Location,
+    ) -> bool {
         // The operand is a file path
         assert!(ir.operands.len() < 2);
 
@@ -211,19 +279,23 @@ impl Engine {
         // we already verified this is a legit file path,
         // so unwrap is ok.
         let file_info = irdb.files.get(file_path).unwrap();
-        
+
         let byte_size = file_info.size;
 
-        self.trace(format!("Engine::iterate_wrf '{}' with size {}: \
-                                img {}, sec {}", file_path, byte_size,
-                                current.img, current.sec).as_str());
+        self.trace(
+            format!(
+                "Engine::iterate_wrf '{}' with size {}: \
+                                img {}, sec {}",
+                file_path, byte_size, current.img, current.sec
+            )
+            .as_str(),
+        );
 
         current.img += byte_size;
         current.sec += byte_size;
-        
+
         true
     }
-
 
     /// Compute the string representation of the expression.
     /// Returns the resulting string in xstr.
@@ -236,14 +308,22 @@ impl Engine {
         for local_op_num in 0..num_ops {
             let op_num = ir.operands[local_op_num];
             let op = self.parms[op_num].borrow();
-            debug!("Processing string expr operand {} with data type {:?}", local_op_num, op.data_type);
+            debug!(
+                "Processing string expr operand {} with data type {:?}",
+                local_op_num, op.data_type
+            );
             match op.data_type {
-                DataType::QuotedString => { xstr.push_str(op.to_str()); }
-                DataType::U64 => { xstr.push_str(format!("{:#X}", op.to_u64()).as_str()); }
-                DataType::Integer |
-                DataType::I64 => { xstr.push_str(format!("{}", op.to_i64()).as_str()); }
+                DataType::QuotedString => {
+                    xstr.push_str(op.to_str());
+                }
+                DataType::U64 => {
+                    xstr.push_str(format!("{:#X}", op.to_u64()).as_str());
+                }
+                DataType::Integer | DataType::I64 => {
+                    xstr.push_str(format!("{}", op.to_i64()).as_str());
+                }
                 bad => {
-                    let msg = format!("Cannot stringify type '{:?}'", bad );
+                    let msg = format!("Cannot stringify type '{:?}'", bad);
                     let src_loc = irdb.parms[op_num].src_loc.clone();
                     diags.err1("EXEC_14", &msg, src_loc);
                     result = false;
@@ -252,13 +332,8 @@ impl Engine {
         }
 
         // If stringifying succeeded, return the String
-        if result {
-            Some(xstr)
-        } else {
-            None
-        }
+        if result { Some(xstr) } else { None }
     }
-
 
     fn do_u64_add(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
         let check = in0.checked_add(in1);
@@ -287,7 +362,10 @@ impl Engine {
     fn do_u64_sub(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
         let check = in0.checked_sub(in1);
         if check.is_none() {
-            let msg = format!("Subtract expression '{} - {}' will underflow type U64", in0, in1);
+            let msg = format!(
+                "Subtract expression '{} - {}' will underflow type U64",
+                in0, in1
+            );
             diags.err1("EXEC_4", &msg, ir.src_loc.clone());
             false
         } else {
@@ -299,7 +377,10 @@ impl Engine {
     fn do_i64_sub(&self, ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
         let check = in0.checked_sub(in1);
         if check.is_none() {
-            let msg = format!("Subtract expression '{} - {}' will underflow type I64", in0, in1);
+            let msg = format!(
+                "Subtract expression '{} - {}' will underflow type I64",
+                in0, in1
+            );
             diags.err1("EXEC_24", &msg, ir.src_loc.clone());
             false
         } else {
@@ -311,7 +392,10 @@ impl Engine {
     fn do_u64_mul(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
         let check = in0.checked_mul(in1);
         if check.is_none() {
-            let msg = format!("Multiply expression '{} * {}' will overflow type U64", in0, in1);
+            let msg = format!(
+                "Multiply expression '{} * {}' will overflow type U64",
+                in0, in1
+            );
             diags.err1("EXEC_6", &msg, ir.src_loc.clone());
             false
         } else {
@@ -323,7 +407,10 @@ impl Engine {
     fn do_i64_mul(&self, ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
         let check = in0.checked_mul(in1);
         if check.is_none() {
-            let msg = format!("Multiply expression '{} * {}' will overflow data type I64", in0, in1);
+            let msg = format!(
+                "Multiply expression '{} * {}' will overflow data type I64",
+                in0, in1
+            );
             diags.err1("EXEC_26", &msg, ir.src_loc.clone());
             false
         } else {
@@ -384,7 +471,10 @@ impl Engine {
         let mut result = true;
         let shift_amount = u32::try_from(in1);
         if shift_amount.is_err() {
-            let msg = format!("Shift amount {} is too large in Left Shift expression '{} << {}'", in1, in0, in1);
+            let msg = format!(
+                "Shift amount {} is too large in Left Shift expression '{} << {}'",
+                in1, in0, in1
+            );
             diags.err1("EXEC_9", &msg, ir.src_loc.clone());
             result = false;
         } else {
@@ -397,7 +487,10 @@ impl Engine {
         let mut result = true;
         let shift_amount = u32::try_from(in1);
         if shift_amount.is_err() {
-            let msg = format!("Shift amount {} is too large in Left Shift expression '{} << {}'", in1, in0, in1);
+            let msg = format!(
+                "Shift amount {} is too large in Left Shift expression '{} << {}'",
+                in1, in0, in1
+            );
             diags.err1("EXEC_29", &msg, ir.src_loc.clone());
             result = false;
         } else {
@@ -410,8 +503,10 @@ impl Engine {
         let mut result = true;
         let shift_amount = u32::try_from(in1);
         if shift_amount.is_err() {
-            let msg = format!("Shift amount {} is too large in Right Shift expression '{} >> {}'",
-                            in1, in0, in1);
+            let msg = format!(
+                "Shift amount {} is too large in Right Shift expression '{} >> {}'",
+                in1, in0, in1
+            );
             diags.err1("EXEC_10", &msg, ir.src_loc.clone());
             result = false;
         } else {
@@ -424,8 +519,10 @@ impl Engine {
         let mut result = true;
         let shift_amount = u32::try_from(in1);
         if shift_amount.is_err() {
-            let msg = format!("Shift amount {} is too large in Right Shift expression '{} >> {}'",
-                            in1, in0, in1);
+            let msg = format!(
+                "Shift amount {} is too large in Right Shift expression '{} >> {}'",
+                in1, in0, in1
+            );
             diags.err1("EXEC_20", &msg, ir.src_loc.clone());
             result = false;
         } else {
@@ -434,10 +531,21 @@ impl Engine {
         result
     }
 
-    fn iterate_type_conversion(&mut self, ir: &IR, irdb: &IRDb, operation: IRKind,
-                    current: &Location, diags: &mut Diags) -> bool {
-        self.trace(format!("Engine::iterate_type_conversion: img {}, sec {}",
-                               current.img, current.sec).as_str());
+    fn iterate_type_conversion(
+        &mut self,
+        ir: &IR,
+        irdb: &IRDb,
+        operation: IRKind,
+        current: &Location,
+        diags: &mut Diags,
+    ) -> bool {
+        self.trace(
+            format!(
+                "Engine::iterate_type_conversion: img {}, sec {}",
+                current.img, current.sec
+            )
+            .as_str(),
+        );
         // All operations here take one input and produce one output parameter
         let mut result = true;
         assert!(ir.operands.len() == 2);
@@ -454,8 +562,7 @@ impl Engine {
                         let in0 = in_parm0.to_u64();
                         *out = in0;
                     }
-                    DataType::Integer |
-                    DataType::I64 => {
+                    DataType::Integer | DataType::I64 => {
                         // I64 to U64
                         let in0 = in_parm0.to_i64();
                         *out = in0 as u64;
@@ -476,8 +583,7 @@ impl Engine {
                         let in0 = in_parm0.to_u64();
                         *out = in0 as i64;
                     }
-                    DataType::Integer |
-                    DataType::I64 => {
+                    DataType::Integer | DataType::I64 => {
                         // Trivial Integer or I64 to I64
                         let in0 = in_parm0.to_i64();
                         *out = in0;
@@ -492,16 +598,30 @@ impl Engine {
             }
 
             bad => {
-                panic!("Called iterate_type_conversion with bad IRKind operation {:?}", bad);
+                panic!(
+                    "Called iterate_type_conversion with bad IRKind operation {:?}",
+                    bad
+                );
             }
         }
         result
     }
 
-    fn iterate_arithmetic(&mut self, ir: &IR, irdb: &IRDb, operation: IRKind,
-                    current: &Location, diags: &mut Diags) -> bool {
-        self.trace(format!("Engine::iterate_arithmetic: img {}, sec {}",
-                               current.img, current.sec).as_str());
+    fn iterate_arithmetic(
+        &mut self,
+        ir: &IR,
+        irdb: &IRDb,
+        operation: IRKind,
+        current: &Location,
+        diags: &mut Diags,
+    ) -> bool {
+        self.trace(
+            format!(
+                "Engine::iterate_arithmetic: img {}, sec {}",
+                current.img, current.sec
+            )
+            .as_str(),
+        );
         // All operations here take two inputs and produces one output parameter
         assert!(ir.operands.len() == 3);
 
@@ -532,9 +652,11 @@ impl Engine {
             if !dt_ok {
                 let loc0 = irdb.parms[lhs_num].src_loc.clone();
                 let loc1 = irdb.parms[rhs_num].src_loc.clone();
-                let msg = format!("Input operand types do not match.  Left is '{:?}', right is '{:?}'",
-                                        lhs_dt, rhs_dt);
-                diags.err2("EXEC_13", &msg, loc0, loc1 );
+                let msg = format!(
+                    "Input operand types do not match.  Left is '{:?}', right is '{:?}'",
+                    lhs_dt, rhs_dt
+                );
+                diags.err2("EXEC_13", &msg, loc0, loc1);
                 return false;
             }
         }
@@ -550,25 +672,41 @@ impl Engine {
             let out = out_parm.val.downcast_mut::<u64>().unwrap();
 
             match operation {
-                IRKind::DoubleEq   => *out = (in0 == in1) as u64,
-                IRKind::NEq        => *out = (in0 != in1) as u64,
-                IRKind::GEq        => *out = (in0 >= in1) as u64,
-                IRKind::LEq        => *out = (in0 <= in1) as u64,
-                IRKind::BitAnd     => *out = in0 & in1,
+                IRKind::DoubleEq => *out = (in0 == in1) as u64,
+                IRKind::NEq => *out = (in0 != in1) as u64,
+                IRKind::GEq => *out = (in0 >= in1) as u64,
+                IRKind::LEq => *out = (in0 <= in1) as u64,
+                IRKind::BitAnd => *out = in0 & in1,
                 IRKind::LogicalAnd => *out = ((in0 != 0) && (in1 != 0)) as u64,
-                IRKind::BitOr      => *out = in0 | in1,
-                IRKind::LogicalOr  => *out = ((in0 != 0) || (in1 != 0)) as u64,
-                IRKind::Add        => { result &= self.do_u64_add(ir, in0, in1, out, diags); }
-                IRKind::Subtract   => { result &= self.do_u64_sub(ir, in0, in1, out, diags); }
-                IRKind::Multiply   => { result &= self.do_u64_mul(ir, in0, in1, out, diags); }
-                IRKind::Divide     => { result &= self.do_u64_div(ir, in0, in1, out, diags); }
-                IRKind::Modulo     => { result &= self.do_u64_mod(ir, in0, in1, out, diags); }
-                IRKind::LeftShift  => { result &= self.do_u64_shl(ir, in0, in1, out, diags); }
-                IRKind::RightShift => { result &= self.do_u64_shr(ir, in0, in1, out, diags); }            
+                IRKind::BitOr => *out = in0 | in1,
+                IRKind::LogicalOr => *out = ((in0 != 0) || (in1 != 0)) as u64,
+                IRKind::Add => {
+                    result &= self.do_u64_add(ir, in0, in1, out, diags);
+                }
+                IRKind::Subtract => {
+                    result &= self.do_u64_sub(ir, in0, in1, out, diags);
+                }
+                IRKind::Multiply => {
+                    result &= self.do_u64_mul(ir, in0, in1, out, diags);
+                }
+                IRKind::Divide => {
+                    result &= self.do_u64_div(ir, in0, in1, out, diags);
+                }
+                IRKind::Modulo => {
+                    result &= self.do_u64_mod(ir, in0, in1, out, diags);
+                }
+                IRKind::LeftShift => {
+                    result &= self.do_u64_shl(ir, in0, in1, out, diags);
+                }
+                IRKind::RightShift => {
+                    result &= self.do_u64_shr(ir, in0, in1, out, diags);
+                }
                 bad => panic!("Forgot to handle u64 {:?}", bad),
             };
-        } else if (lhs_dt == DataType::I64) || (rhs_dt == DataType::I64) ||
-                  ((lhs_dt == DataType::Integer) && (rhs_dt == DataType::Integer)) {
+        } else if (lhs_dt == DataType::I64)
+            || (rhs_dt == DataType::I64)
+            || ((lhs_dt == DataType::Integer) && (rhs_dt == DataType::Integer))
+        {
             // If either side is signed, treat the whole expression as signed
             // If both sides are ambiguous integers then treat the whole expression as signed
             let in0 = lhs.to_i64();
@@ -577,22 +715,67 @@ impl Engine {
 
             match operation {
                 // output of compare is u64 regardless of inputs
-                IRKind::LogicalAnd => { let out = out_parm.to_u64_mut(); *out = ((in0 != 0) && (in1 != 0)) as u64 }
-                IRKind::LogicalOr  => { let out = out_parm.to_u64_mut(); *out = ((in0 != 0) || (in1 != 0)) as u64 }
-                IRKind::LEq        => { let out = out_parm.to_u64_mut(); *out = (in0 <= in1) as u64 }
-                IRKind::GEq        => { let out = out_parm.to_u64_mut(); *out = (in0 >= in1) as u64 }
-                IRKind::NEq        => { let out = out_parm.to_u64_mut(); *out = (in0 != in1) as u64 }
-                IRKind::DoubleEq   => { let out = out_parm.to_u64_mut(); *out = (in0 == in1) as u64 }
-                
-                IRKind::BitOr      => { let out = out_parm.to_i64_mut(); *out = in0 | in1 }
-                IRKind::BitAnd     => { let out = out_parm.to_i64_mut(); *out = in0 & in1 }
-                IRKind::Add        => { let out = out_parm.to_i64_mut(); result &= self.do_i64_add(ir, in0, in1, out, diags); }
-                IRKind::Subtract   => { let out = out_parm.to_i64_mut(); result &= self.do_i64_sub(ir, in0, in1, out, diags); }
-                IRKind::Multiply   => { let out = out_parm.to_i64_mut(); result &= self.do_i64_mul(ir, in0, in1, out, diags); }
-                IRKind::Divide     => { let out = out_parm.to_i64_mut(); result &= self.do_i64_div(ir, in0, in1, out, diags); }
-                IRKind::Modulo     => { let out = out_parm.to_i64_mut(); result &= self.do_i64_mod(ir, in0, in1, out, diags); }
-                IRKind::LeftShift  => { let out = out_parm.to_i64_mut(); result &= self.do_i64_shl(ir, in0, in1, out, diags); }
-                IRKind::RightShift => { let out = out_parm.to_i64_mut(); result &= self.do_i64_shr(ir, in0, in1, out, diags); }
+                IRKind::LogicalAnd => {
+                    let out = out_parm.to_u64_mut();
+                    *out = ((in0 != 0) && (in1 != 0)) as u64
+                }
+                IRKind::LogicalOr => {
+                    let out = out_parm.to_u64_mut();
+                    *out = ((in0 != 0) || (in1 != 0)) as u64
+                }
+                IRKind::LEq => {
+                    let out = out_parm.to_u64_mut();
+                    *out = (in0 <= in1) as u64
+                }
+                IRKind::GEq => {
+                    let out = out_parm.to_u64_mut();
+                    *out = (in0 >= in1) as u64
+                }
+                IRKind::NEq => {
+                    let out = out_parm.to_u64_mut();
+                    *out = (in0 != in1) as u64
+                }
+                IRKind::DoubleEq => {
+                    let out = out_parm.to_u64_mut();
+                    *out = (in0 == in1) as u64
+                }
+
+                IRKind::BitOr => {
+                    let out = out_parm.to_i64_mut();
+                    *out = in0 | in1
+                }
+                IRKind::BitAnd => {
+                    let out = out_parm.to_i64_mut();
+                    *out = in0 & in1
+                }
+                IRKind::Add => {
+                    let out = out_parm.to_i64_mut();
+                    result &= self.do_i64_add(ir, in0, in1, out, diags);
+                }
+                IRKind::Subtract => {
+                    let out = out_parm.to_i64_mut();
+                    result &= self.do_i64_sub(ir, in0, in1, out, diags);
+                }
+                IRKind::Multiply => {
+                    let out = out_parm.to_i64_mut();
+                    result &= self.do_i64_mul(ir, in0, in1, out, diags);
+                }
+                IRKind::Divide => {
+                    let out = out_parm.to_i64_mut();
+                    result &= self.do_i64_div(ir, in0, in1, out, diags);
+                }
+                IRKind::Modulo => {
+                    let out = out_parm.to_i64_mut();
+                    result &= self.do_i64_mod(ir, in0, in1, out, diags);
+                }
+                IRKind::LeftShift => {
+                    let out = out_parm.to_i64_mut();
+                    result &= self.do_i64_shl(ir, in0, in1, out, diags);
+                }
+                IRKind::RightShift => {
+                    let out = out_parm.to_i64_mut();
+                    result &= self.do_i64_shr(ir, in0, in1, out, diags);
+                }
 
                 bad => panic!("Forgot to handle i64 {:?}", bad),
             }
@@ -600,17 +783,30 @@ impl Engine {
             let loc0 = irdb.parms[lhs_num].src_loc.clone();
             let loc1 = irdb.parms[rhs_num].src_loc.clone();
             // check above ensures the types are the same, whatever they are
-            let msg = format!("Unexpected input operand types '{:?}'  Expected I64 or U64.", lhs_dt);
-            diags.err2("EXEC_19", &msg, loc0, loc1 );
+            let msg = format!(
+                "Unexpected input operand types '{:?}'  Expected I64 or U64.",
+                lhs_dt
+            );
+            diags.err2("EXEC_19", &msg, loc0, loc1);
             return false;
         }
         result
     }
 
-    fn iterate_sizeof(&mut self, ir: &IR, irdb: &IRDb, diags: &mut Diags,
-                    current: &Location) -> bool {
-        self.trace(format!("Engine::iterate_sizeof: img {}, sec {}",
-                            current.img, current.sec).as_str());
+    fn iterate_sizeof(
+        &mut self,
+        ir: &IR,
+        irdb: &IRDb,
+        diags: &mut Diags,
+        current: &Location,
+    ) -> bool {
+        self.trace(
+            format!(
+                "Engine::iterate_sizeof: img {}, sec {}",
+                current.img, current.sec
+            )
+            .as_str(),
+        );
         // sizeof takes one input and produces one output
         // we've already discarded surrounding () on the operand
         assert!(ir.operands.len() == 2);
@@ -627,8 +823,10 @@ impl Engine {
         // then we won't find location info for it.
         let ir_rng = irdb.sized_locs.get(sec_name);
         if ir_rng.is_none() {
-            let msg = format!("Can't take sizeof() section '{}' not used in output.",
-                    sec_name);
+            let msg = format!(
+                "Can't take sizeof() section '{}' not used in output.",
+                sec_name
+            );
             diags.err1("EXEC_5", &msg, ir.src_loc.clone());
             return false;
         }
@@ -644,10 +842,14 @@ impl Engine {
             // this iteration, but not yet th end.  In this case, report a zero
             // size and wait for the next iteration where the ending offset will
             // be more accurate.
-            self.trace(format!("Starting img offset {} > ending img offset {} in {}",
-                       start_loc.img, end_loc.img, sec_name).as_str());
+            self.trace(
+                format!(
+                    "Starting img offset {} > ending img offset {} in {}",
+                    start_loc.img, end_loc.img, sec_name
+                )
+                .as_str(),
+            );
             *out = 0;
-
         } else {
             let sz = end_loc.img - start_loc.img;
             self.trace(format!("Sizeof {} is currently {}", sec_name, sz).as_str());
@@ -655,15 +857,20 @@ impl Engine {
             // usize to u64 fails instead of bad output binary.
             *out = sz.try_into().unwrap();
         }
-        
+
         true
     }
 
     /// Compute the transient current address.  This case is called when
     /// Abs/Img/Sec is called without an identifier.
     fn iterate_current_address(&mut self, ir: &IR, current: &Location) -> bool {
-        self.trace(format!("Engine::iterate_current_address: img {}, sec {}",
-                            current.img, current.sec).as_str());
+        self.trace(
+            format!(
+                "Engine::iterate_current_address: img {}, sec {}",
+                current.img, current.sec
+            )
+            .as_str(),
+        );
         assert!(ir.operands.len() == 1);
         let out_parm_num = ir.operands[0];
         let mut out_parm = self.parms[out_parm_num].borrow_mut();
@@ -672,28 +879,42 @@ impl Engine {
         // We'll at least panic at runtime if conversion from
         // usize to u64 fails instead of bad output binary.
         match ir.kind {
-            IRKind::Abs => { 
+            IRKind::Abs => {
                 // Will panic if usize does not fit in a u64
                 let img: u64 = current.img.try_into().unwrap();
                 *out = img + self.start_addr;
             }
-            IRKind::Img => { *out = current.img.try_into().unwrap(); }
-            IRKind::Sec => { *out = current.sec.try_into().unwrap(); }
+            IRKind::Img => {
+                *out = current.img.try_into().unwrap();
+            }
+            IRKind::Sec => {
+                *out = current.sec.try_into().unwrap();
+            }
             bad => {
                 panic!("Called iterate_current_address with bogus IR {:?}", bad);
             }
         }
-        
+
         true
     }
 
     /// Compute the required number of bytes to align the current absolute location.
     /// We don't actually align anything yet, since that happens in a subsequent
     /// wr8 instruction.
-    fn iterate_align(&mut self, ir: &IR, _irdb: &IRDb, _diags: &mut Diags,
-                        current: &Location) -> bool {
-        self.trace(format!("Engine::iterate_align: img {}, sec {}",
-                            current.img, current.sec).as_str());
+    fn iterate_align(
+        &mut self,
+        ir: &IR,
+        _irdb: &IRDb,
+        _diags: &mut Diags,
+        current: &Location,
+    ) -> bool {
+        self.trace(
+            format!(
+                "Engine::iterate_align: img {}, sec {}",
+                current.img, current.sec
+            )
+            .as_str(),
+        );
 
         let num_operands = ir.operands.len();
 
@@ -718,7 +939,7 @@ impl Engine {
 
         // We'll at least panic at runtime if conversion from
         // usize to u64 fails instead of bad output binary.
-        let img : u64 = current.img;
+        let img: u64 = current.img;
         let abs_val = img + self.start_addr;
 
         let remainder = abs_val.checked_rem(align_val).unwrap();
@@ -737,10 +958,20 @@ impl Engine {
     /// We don't actually pad anything yet, since that happens in a subsequent
     /// wr8 instruction.
     /// This function covers set_sec, set_img and set_abs.
-    fn iterate_set(&mut self, ir: &IR, _irdb: &IRDb, diags: &mut Diags,
-                        current: &Location) -> bool {
-        self.trace(format!("Engine::iterate_set: {:?}: img {}, sec {}", ir.kind,
-                                current.img, current.sec).as_str());
+    fn iterate_set(
+        &mut self,
+        ir: &IR,
+        _irdb: &IRDb,
+        diags: &mut Diags,
+        current: &Location,
+    ) -> bool {
+        self.trace(
+            format!(
+                "Engine::iterate_set: {:?}: img {}, sec {}",
+                ir.kind, current.img, current.sec
+            )
+            .as_str(),
+        );
 
         let num_operands = ir.operands.len();
 
@@ -772,8 +1003,10 @@ impl Engine {
 
         // The current location can never move backwards
         if set_val < loc {
-            let msg = format!("Set statement moves location counter backwards from {} to {}.",
-                    loc, set_val);
+            let msg = format!(
+                "Set statement moves location counter backwards from {} to {}.",
+                loc, set_val
+            );
             diags.err1("EXEC_22", &msg, ir.src_loc.clone());
             return false;
         }
@@ -786,10 +1019,20 @@ impl Engine {
 
     /// Compute the transient address of the identifier.  This case is called when
     /// Abs/Img/Sec is called with an identifier.
-    fn iterate_identifier_address(&mut self, ir: &IR, irdb: &IRDb, diags: &mut Diags,
-                    current: &Location) -> bool {
-        self.trace(format!("Engine::iterate_identifier_address: img {}, sec {}",
-                            current.img, current.sec).as_str());
+    fn iterate_identifier_address(
+        &mut self,
+        ir: &IR,
+        irdb: &IRDb,
+        diags: &mut Diags,
+        current: &Location,
+    ) -> bool {
+        self.trace(
+            format!(
+                "Engine::iterate_identifier_address: img {}, sec {}",
+                current.img, current.sec
+            )
+            .as_str(),
+        );
         // Abs/Img/Sec take one optional input and produce one output.
         // We've already discarded surrounding () on the operand.
         assert!(ir.operands.len() == 2);
@@ -806,8 +1049,10 @@ impl Engine {
         // then we won't find location info for it.
         let ir_num = irdb.addressed_locs.get(name);
         if ir_num.is_none() {
-            let msg = format!("Address of section or label '{}' not reachable in output.",
-                    name);
+            let msg = format!(
+                "Address of section or label '{}' not reachable in output.",
+                name
+            );
             diags.err1("EXEC_11", &msg, ir.src_loc.clone());
             return false;
         }
@@ -819,20 +1064,34 @@ impl Engine {
                 let img: u64 = start_loc.img.try_into().unwrap();
                 *out = img + self.start_addr;
             }
-            IRKind::Img => { *out = start_loc.img.try_into().unwrap(); }
-            IRKind::Sec => { *out = start_loc.sec.try_into().unwrap(); }
+            IRKind::Img => {
+                *out = start_loc.img.try_into().unwrap();
+            }
+            IRKind::Sec => {
+                *out = start_loc.sec.try_into().unwrap();
+            }
             bad => {
                 panic!("Called iterate_current_address with bogus IR {:?}", bad);
             }
         }
-        
+
         true
     }
 
-    fn iterate_address(&mut self, ir: &IR, irdb: &IRDb, diags: &mut Diags,
-                    current: &Location) -> bool {
-        self.trace(format!("Engine::iterate_address: img {}, sec {}",
-                            current.img, current.sec).as_str());
+    fn iterate_address(
+        &mut self,
+        ir: &IR,
+        irdb: &IRDb,
+        diags: &mut Diags,
+        current: &Location,
+    ) -> bool {
+        self.trace(
+            format!(
+                "Engine::iterate_address: img {}, sec {}",
+                current.img, current.sec
+            )
+            .as_str(),
+        );
         // Abs/Img/SEc take one optional input and produce one output.
         // We've already discarded surrounding () on the operand.
         let num_operands = ir.operands.len();
@@ -841,55 +1100,82 @@ impl Engine {
             2 => self.iterate_identifier_address(ir, irdb, diags, current),
             bad => panic!("Wrong number of IR operands = {}!", bad),
         };
-        
+
         result
     }
 
     /// At the start of a section, push the old section offset
     /// and reset the current section offset to zero.
-    fn iterate_section_start(&mut self, ir: &IR, irdb: &IRDb, _diags: &mut Diags,
-                             current: &mut Location) -> bool {
+    fn iterate_section_start(
+        &mut self,
+        ir: &IR,
+        irdb: &IRDb,
+        _diags: &mut Diags,
+        current: &mut Location,
+    ) -> bool {
         let sec_name = irdb.get_opnd_as_identifier(&ir, 0).to_string();
         // Track that's we've entered this new section
         self.sec_names.push(sec_name);
-        self.trace(format!("Engine::iterate_section_start: img {}, sec {}",
-                            current.img, current.sec).as_str());
+        self.trace(
+            format!(
+                "Engine::iterate_section_start: img {}, sec {}",
+                current.img, current.sec
+            )
+            .as_str(),
+        );
         self.sec_offsets.push(current.sec);
         current.sec = 0;
-        
+
         true
     }
 
     /// At the end of a section, pop the last section offset and add
     /// its value to the current section offset
-    fn iterate_section_end(&mut self, ir: &IR, irdb: &IRDb, _diags: &mut Diags,
-                            current: &mut Location) -> bool {
+    fn iterate_section_end(
+        &mut self,
+        ir: &IR,
+        irdb: &IRDb,
+        _diags: &mut Diags,
+        current: &mut Location,
+    ) -> bool {
         let sec_name = irdb.get_opnd_as_identifier(&ir, 0).to_string();
-        self.trace(format!("Engine::iterate_section_end: '{}', img {}, sec {}",
-                sec_name, current.img, current.sec).as_str());
+        self.trace(
+            format!(
+                "Engine::iterate_section_end: '{}', img {}, sec {}",
+                sec_name, current.img, current.sec
+            )
+            .as_str(),
+        );
         current.sec += self.sec_offsets.pop().unwrap();
         // Track that's we've exited this section
         self.sec_names.pop();
-        
+
         true
     }
 
     pub fn new(irdb: &IRDb, diags: &mut Diags, abs_start: usize) -> Option<Engine> {
         // The first iterate loop may access any IR location, so initialize all
-        // ir_locs locations to zero.  
-        let ir_locs = vec![Location {img: 0, sec: 0}; irdb.ir_vec.len()];
+        // ir_locs locations to zero.
+        let ir_locs = vec![Location { img: 0, sec: 0 }; irdb.ir_vec.len()];
 
-        let mut engine = Engine { parms: Vec::new(), ir_locs, sec_offsets: Vec::new(),
-                                         sec_names: Vec::new(), start_addr: irdb.start_addr };
+        let mut engine = Engine {
+            parms: Vec::new(),
+            ir_locs,
+            sec_offsets: Vec::new(),
+            sec_names: Vec::new(),
+            start_addr: irdb.start_addr,
+        };
         engine.trace("Engine::new:");
 
         // Initialize parameters from the IR operands.
         engine.parms.reserve(irdb.parms.len());
         for opnd in &irdb.parms {
-            let parm = Parameter { data_type: opnd.data_type, val: opnd.clone_val_box() };
+            let parm = Parameter {
+                data_type: opnd.data_type,
+                val: opnd.clone_val_box(),
+            };
             engine.parms.push(RefCell::new(parm));
         }
-
 
         let result = engine.iterate(&irdb, diags, abs_start);
         if !result {
@@ -901,7 +1187,7 @@ impl Engine {
     }
 
     pub fn dump_locations(&self) {
-        for (idx,loc) in self.ir_locs.iter().enumerate() {
+        for (idx, loc) in self.ir_locs.iter().enumerate() {
             debug!("{}: {:?}", idx, loc);
         }
     }
@@ -915,69 +1201,72 @@ impl Engine {
         while result && !stable {
             self.trace(format!("Engine::iterate: Iteration count {}", iter_count).as_str());
             iter_count += 1;
-            let mut current = Location{ img: 0, sec: 0 };
+            let mut current = Location { img: 0, sec: 0 };
 
             // make sure we exited as many sections as we entered on each iteration
             assert!(self.sec_offsets.len() == 0);
 
-            for (lid,ir) in irdb.ir_vec.iter().enumerate() {
-                debug!("Engine::iterate on lid {} at img offset {}", lid, current.img);
+            for (lid, ir) in irdb.ir_vec.iter().enumerate() {
+                debug!(
+                    "Engine::iterate on lid {} at img offset {}",
+                    lid, current.img
+                );
                 // record our location after each IR
                 self.ir_locs[lid] = current.clone();
                 let operation = ir.kind;
                 result &= match operation {
-
                     // Arithmetic with two operands in, one out
-                    IRKind::Add |
-                    IRKind::Subtract |
-                    IRKind::RightShift |
-                    IRKind::LeftShift |
-                    IRKind::BitAnd |
-                    IRKind::LogicalAnd |
-                    IRKind::BitOr |
-                    IRKind::LogicalOr |
-                    IRKind::Multiply |
-                    IRKind::Divide |
-                    IRKind::Modulo |
-                    IRKind::DoubleEq |
-                    IRKind::GEq |
-                    IRKind::LEq |
-                    IRKind::NEq =>    self.iterate_arithmetic(&ir, irdb, operation, &current, diags),
-                    IRKind::ToI64 |
-                    IRKind::ToU64 =>  self.iterate_type_conversion(&ir, irdb, operation, &current, diags),
+                    IRKind::Add
+                    | IRKind::Subtract
+                    | IRKind::RightShift
+                    | IRKind::LeftShift
+                    | IRKind::BitAnd
+                    | IRKind::LogicalAnd
+                    | IRKind::BitOr
+                    | IRKind::LogicalOr
+                    | IRKind::Multiply
+                    | IRKind::Divide
+                    | IRKind::Modulo
+                    | IRKind::DoubleEq
+                    | IRKind::GEq
+                    | IRKind::LEq
+                    | IRKind::NEq => self.iterate_arithmetic(&ir, irdb, operation, &current, diags),
+                    IRKind::ToI64 | IRKind::ToU64 => {
+                        self.iterate_type_conversion(&ir, irdb, operation, &current, diags)
+                    }
                     IRKind::Sizeof => self.iterate_sizeof(&ir, irdb, diags, &mut current),
 
                     // Unlike print, we have to iterate on the string write operation since
                     // the size of the string affects the size of the output image.
-                    IRKind::Abs |
-                    IRKind::Img |
-                    IRKind::Sec => self.iterate_address(ir, irdb, diags, &current),
+                    IRKind::Abs | IRKind::Img | IRKind::Sec => {
+                        self.iterate_address(ir, irdb, diags, &current)
+                    }
                     IRKind::Wrs => self.iterate_wrs(&ir, irdb, diags, &mut current),
-                    IRKind::SectionStart => self.iterate_section_start(ir, irdb, diags, &mut current),
-                    IRKind::SectionEnd =>   self.iterate_section_end(ir, irdb, diags, &mut current),
+                    IRKind::SectionStart => {
+                        self.iterate_section_start(ir, irdb, diags, &mut current)
+                    }
+                    IRKind::SectionEnd => self.iterate_section_end(ir, irdb, diags, &mut current),
 
-                    IRKind::Wr8  |
-                    IRKind::Wr16 |
-                    IRKind::Wr24 |
-                    IRKind::Wr32 |
-                    IRKind::Wr40 |
-                    IRKind::Wr48 |
-                    IRKind::Wr56 |
-                    IRKind::Wr64 => self.iterate_wrx(&ir, irdb, diags, &mut current),
+                    IRKind::Wr8
+                    | IRKind::Wr16
+                    | IRKind::Wr24
+                    | IRKind::Wr32
+                    | IRKind::Wr40
+                    | IRKind::Wr48
+                    | IRKind::Wr56
+                    | IRKind::Wr64 => self.iterate_wrx(&ir, irdb, diags, &mut current),
                     IRKind::Align => self.iterate_align(&ir, irdb, diags, &mut current),
-                    IRKind::SetSec |
-                    IRKind::SetImg |
-                    IRKind::SetAbs => self.iterate_set(&ir, irdb, diags, &mut current),
+                    IRKind::SetSec | IRKind::SetImg | IRKind::SetAbs => {
+                        self.iterate_set(&ir, irdb, diags, &mut current)
+                    }
 
                     IRKind::Wrf => self.iterate_wrf(&ir, irdb, diags, &mut current),
-                    
+
                     // The following IR types are evaluated only at execute time.
                     // Nothing to do during iteration.
-                    IRKind::Label |
-                    IRKind::Assert |
-                    IRKind::Print |
-                    IRKind::I64 |
-                    IRKind::U64 => { true }
+                    IRKind::Label | IRKind::Assert | IRKind::Print | IRKind::I64 | IRKind::U64 => {
+                        true
+                    }
                 }
             }
             if self.ir_locs == old_locations {
@@ -1027,8 +1316,7 @@ impl Engine {
         }
     }
 
-    fn execute_assert(&self, ir: &IR, irdb: &IRDb, diags: &mut Diags, _file: &File)
-                      -> Result<()> {
+    fn execute_assert(&self, ir: &IR, irdb: &IRDb, diags: &mut Diags, _file: &File) -> Result<()> {
         self.trace("Engine::execute_assert:");
         let mut result = Ok(());
         let opnd_num = ir.operands[0];
@@ -1046,14 +1334,13 @@ impl Engine {
             self.assert_info(src_lid, irdb, diags);
             result = Err(anyhow!("Assert failed"));
         }
-        
+
         result
     }
 
     /// Execute the print statement.
     /// If the diags noprint option is true, suppress printing.
-    fn execute_print(&self, ir: &IR, irdb: &IRDb, diags: &mut Diags, _file: &File)
-                      -> Result<()> {
+    fn execute_print(&self, ir: &IR, irdb: &IRDb, diags: &mut Diags, _file: &File) -> Result<()> {
         self.trace("Engine::execute_print:");
         if diags.noprint {
             debug!("Suppressing print statements.");
@@ -1072,8 +1359,7 @@ impl Engine {
         Ok(())
     }
 
-    fn execute_wrs(&self, ir: &IR, irdb: &IRDb, diags: &mut Diags, file: &mut File)
-                   -> Result<()> {
+    fn execute_wrs(&self, ir: &IR, irdb: &IRDb, diags: &mut Diags, file: &mut File) -> Result<()> {
         self.trace("Engine::execute_wrs:");
         let xstr_opt = self.evaluate_string_expr(ir, irdb, diags);
         if xstr_opt.is_none() {
@@ -1085,18 +1371,16 @@ impl Engine {
         let xstr = xstr_opt.unwrap();
         let bufs = xstr.as_bytes();
         // the map_error lambda just converts io::error to a std::error
-        let result = file.write_all(bufs)
-                                     .map_err(|err|err.into());
+        let result = file.write_all(bufs).map_err(|err| err.into());
         if result.is_err() {
             let msg = format!("Writing string failed");
             diags.err1("EXEC_3", &msg, ir.src_loc.clone());
         }
-        
+
         result
     }
 
-    fn execute_wrf(&self, ir: &IR, irdb: &IRDb, diags: &mut Diags, file: &mut File)
-                   -> Result<()> {
+    fn execute_wrf(&self, ir: &IR, irdb: &IRDb, diags: &mut Diags, file: &mut File) -> Result<()> {
         self.trace("Engine::execute_wrf:");
 
         let path_opnd = self.parms[ir.operands[0]].borrow();
@@ -1111,8 +1395,11 @@ impl Engine {
 
         if fh_result.is_err() {
             let fh_err = fh_result.err().unwrap();
-            let msg = format!("Opening file '{}' failed with OS error '{:?}'.",
-                            path, fh_err.raw_os_error());
+            let msg = format!(
+                "Opening file '{}' failed with OS error '{:?}'.",
+                path,
+                fh_err.raw_os_error()
+            );
             diags.err1("EXEC_33", &msg, ir.src_loc.clone());
             return Err(anyhow!(fh_err));
         }
@@ -1129,16 +1416,20 @@ impl Engine {
 
             if read_result.is_err() {
                 let read_err = read_result.err().unwrap();
-                let msg = format!("Reading file '{}' failed with OS error '{:?}'.",
-                                path, read_err.raw_os_error());
+                let msg = format!(
+                    "Reading file '{}' failed with OS error '{:?}'.",
+                    path,
+                    read_err.raw_os_error()
+                );
                 diags.err1("EXEC_34", &msg, ir.src_loc.clone());
                 return Err(anyhow!(read_err));
             }
 
             let bytes_read = read_result.unwrap();
             total_bytes += bytes_read;
-            let write_result = file.write_all(&buf[0..bytes_read])
-                                        .map_err(|err|err.into());
+            let write_result = file
+                .write_all(&buf[0..bytes_read])
+                .map_err(|err| err.into());
             if write_result.is_err() {
                 let msg = format!("Writing buffer failed");
                 diags.err1("EXEC_35", &msg, ir.src_loc.clone());
@@ -1152,13 +1443,11 @@ impl Engine {
 
         assert!(total_bytes as u64 == file_info.size);
 
-        
         Ok(())
     }
 
-    fn execute_wrx(&self, ir: &IR, _irdb: &IRDb, diags: &mut Diags, file: &mut File)
-                   -> Result<()> {
-        self.trace(format!("Engine::execute_wrx: {:?}", ir.kind ).as_str());
+    fn execute_wrx(&self, ir: &IR, _irdb: &IRDb, diags: &mut Diags, file: &mut File) -> Result<()> {
+        self.trace(format!("Engine::execute_wrx: {:?}", ir.kind).as_str());
         let byte_size = get_wrx_byte_width(ir);
 
         let opnd_num = ir.operands[0];
@@ -1169,8 +1458,7 @@ impl Engine {
         // bit the highest address location, which is wrong since we're writing
         // from the lowest address.
         let buf = match parm.data_type {
-            DataType::Integer |
-            DataType::I64 => {
+            DataType::Integer | DataType::I64 => {
                 let val = parm.to_i64();
                 val.to_le_bytes()
             }
@@ -1178,7 +1466,9 @@ impl Engine {
                 let val = parm.to_u64();
                 val.to_le_bytes()
             }
-            bad => { panic!("Unexpected parameter type {:?} in execute_wrx", bad); }
+            bad => {
+                panic!("Unexpected parameter type {:?} in execute_wrx", bad);
+            }
         };
 
         let mut repeat_count = 1;
@@ -1195,8 +1485,7 @@ impl Engine {
         // The map_error lambda just converts io::error to a std::error
         // Write only the number of bytes required for the width of the wrx
         while repeat_count > 0 {
-            let result = file.write_all(&buf[0..byte_size])
-                                        .map_err(|err|err.into());
+            let result = file.write_all(&buf[0..byte_size]).map_err(|err| err.into());
             if result.is_err() {
                 let msg = format!("{:?} failed", ir.kind);
                 diags.err1("EXEC_18", &msg, ir.src_loc.clone());
@@ -1208,66 +1497,66 @@ impl Engine {
         Ok(())
     }
 
-    pub fn execute(&self, irdb: &IRDb, diags: &mut Diags, file: &mut File)
-                   -> Result<()> {
+    pub fn execute(&self, irdb: &IRDb, diags: &mut Diags, file: &mut File) -> Result<()> {
         self.trace("Engine::execute:");
         let mut result;
         let mut error_count = 0;
         for ir in &irdb.ir_vec {
             result = match ir.kind {
-                IRKind::Wr8  |
-                IRKind::Wr16 |
-                IRKind::Wr24 |
-                IRKind::Wr32 |
-                IRKind::Wr40 |
-                IRKind::Wr48 |
-                IRKind::Wr56 |
-                IRKind::Wr64 => { self.execute_wrx(ir, irdb, diags, file) }
-                IRKind::Assert => { self.execute_assert(ir, irdb, diags, file) }
-                IRKind::Print => { self.execute_print(ir, irdb, diags, file) }
-                IRKind::Wrs => { self.execute_wrs(ir, irdb, diags, file) }
-                IRKind::Wrf => { self.execute_wrf(ir, irdb, diags, file) }
+                IRKind::Wr8
+                | IRKind::Wr16
+                | IRKind::Wr24
+                | IRKind::Wr32
+                | IRKind::Wr40
+                | IRKind::Wr48
+                | IRKind::Wr56
+                | IRKind::Wr64 => self.execute_wrx(ir, irdb, diags, file),
+                IRKind::Assert => self.execute_assert(ir, irdb, diags, file),
+                IRKind::Print => self.execute_print(ir, irdb, diags, file),
+                IRKind::Wrs => self.execute_wrs(ir, irdb, diags, file),
+                IRKind::Wrf => self.execute_wrf(ir, irdb, diags, file),
                 // the rest of these operations are computed during iteration
-                IRKind::SetSec |
-                IRKind::SetImg |
-                IRKind::SetAbs |
-                IRKind::Align |
-                IRKind::Abs |
-                IRKind::Img |
-                IRKind::Sec |
-                IRKind::Label |
-                IRKind::Sizeof |
-                IRKind::ToI64 |
-                IRKind::ToU64 |
-                IRKind::NEq |
-                IRKind::GEq |
-                IRKind::LEq |
-                IRKind::DoubleEq |
-                IRKind::I64 |
-                IRKind::U64 |
-                IRKind::BitAnd |
-                IRKind::LogicalAnd |
-                IRKind::BitOr |
-                IRKind::LogicalOr |
-                IRKind::Multiply |
-                IRKind::Modulo |
-                IRKind::Divide |
-                IRKind::Add |
-                IRKind::Subtract |
-                IRKind::SectionStart |
-                IRKind::SectionEnd |
-                IRKind::LeftShift |
-                IRKind::RightShift => { Ok(()) }
+                IRKind::SetSec
+                | IRKind::SetImg
+                | IRKind::SetAbs
+                | IRKind::Align
+                | IRKind::Abs
+                | IRKind::Img
+                | IRKind::Sec
+                | IRKind::Label
+                | IRKind::Sizeof
+                | IRKind::ToI64
+                | IRKind::ToU64
+                | IRKind::NEq
+                | IRKind::GEq
+                | IRKind::LEq
+                | IRKind::DoubleEq
+                | IRKind::I64
+                | IRKind::U64
+                | IRKind::BitAnd
+                | IRKind::LogicalAnd
+                | IRKind::BitOr
+                | IRKind::LogicalOr
+                | IRKind::Multiply
+                | IRKind::Modulo
+                | IRKind::Divide
+                | IRKind::Add
+                | IRKind::Subtract
+                | IRKind::SectionStart
+                | IRKind::SectionEnd
+                | IRKind::LeftShift
+                | IRKind::RightShift => Ok(()),
             };
 
             if result.is_err() {
                 error_count += 1;
-                if error_count > 10 { // todo parameterize max 10 errors
+                if error_count > 10 {
+                    // todo parameterize max 10 errors
                     break;
                 }
             }
         }
-        
+
         if error_count > 0 {
             return Err(anyhow!("Error detected"));
         }
