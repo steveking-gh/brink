@@ -133,7 +133,9 @@ pub struct Engine {
 }
 
 fn get_wrx_byte_width(ir: &IR) -> usize {
-    let width = match ir.kind {
+    
+
+    match ir.kind {
         IRKind::Wr8 => 1,
         IRKind::Wr16 => 2,
         IRKind::Wr24 => 3,
@@ -145,9 +147,7 @@ fn get_wrx_byte_width(ir: &IR) -> usize {
         bad => {
             panic!("Called get_wrx_byte_width with {:?}", bad);
         }
-    };
-
-    width
+    }
 }
 
 impl Engine {
@@ -643,11 +643,10 @@ impl Engine {
                 if [DataType::I64, DataType::U64, DataType::Integer].contains(&lhs_dt) {
                     dt_ok = true; // Integers work with s/u types
                 }
-            } else if lhs_dt == DataType::Integer {
-                if [DataType::I64, DataType::U64].contains(&rhs_dt) {
+            } else if lhs_dt == DataType::Integer
+                && [DataType::I64, DataType::U64].contains(&rhs_dt) {
                     dt_ok = true; // Integers work with s/u types
                 }
-            }
 
             if !dt_ok {
                 let loc0 = irdb.parms[lhs_num].src_loc.clone();
@@ -1095,13 +1094,13 @@ impl Engine {
         // Abs/Img/SEc take one optional input and produce one output.
         // We've already discarded surrounding () on the operand.
         let num_operands = ir.operands.len();
-        let result = match num_operands {
+        
+
+        match num_operands {
             1 => self.iterate_current_address(ir, current),
             2 => self.iterate_identifier_address(ir, irdb, diags, current),
             bad => panic!("Wrong number of IR operands = {}!", bad),
-        };
-
-        result
+        }
     }
 
     /// At the start of a section, push the old section offset
@@ -1113,7 +1112,7 @@ impl Engine {
         _diags: &mut Diags,
         current: &mut Location,
     ) -> bool {
-        let sec_name = irdb.get_opnd_as_identifier(&ir, 0).to_string();
+        let sec_name = irdb.get_opnd_as_identifier(ir, 0).to_string();
         // Track that's we've entered this new section
         self.sec_names.push(sec_name);
         self.trace(
@@ -1138,7 +1137,7 @@ impl Engine {
         _diags: &mut Diags,
         current: &mut Location,
     ) -> bool {
-        let sec_name = irdb.get_opnd_as_identifier(&ir, 0).to_string();
+        let sec_name = irdb.get_opnd_as_identifier(ir, 0).to_string();
         self.trace(
             format!(
                 "Engine::iterate_section_end: '{}', img {}, sec {}",
@@ -1177,7 +1176,7 @@ impl Engine {
             engine.parms.push(RefCell::new(parm));
         }
 
-        let result = engine.iterate(&irdb, diags, abs_start);
+        let result = engine.iterate(irdb, diags, abs_start);
         if !result {
             return None;
         }
@@ -1204,7 +1203,7 @@ impl Engine {
             let mut current = Location { img: 0, sec: 0 };
 
             // make sure we exited as many sections as we entered on each iteration
-            assert!(self.sec_offsets.len() == 0);
+            assert!(self.sec_offsets.is_empty());
 
             for (lid, ir) in irdb.ir_vec.iter().enumerate() {
                 debug!(
@@ -1230,18 +1229,18 @@ impl Engine {
                     | IRKind::DoubleEq
                     | IRKind::GEq
                     | IRKind::LEq
-                    | IRKind::NEq => self.iterate_arithmetic(&ir, irdb, operation, &current, diags),
+                    | IRKind::NEq => self.iterate_arithmetic(ir, irdb, operation, &current, diags),
                     IRKind::ToI64 | IRKind::ToU64 => {
-                        self.iterate_type_conversion(&ir, irdb, operation, &current, diags)
+                        self.iterate_type_conversion(ir, irdb, operation, &current, diags)
                     }
-                    IRKind::Sizeof => self.iterate_sizeof(&ir, irdb, diags, &mut current),
+                    IRKind::Sizeof => self.iterate_sizeof(ir, irdb, diags, &current),
 
                     // Unlike print, we have to iterate on the string write operation since
                     // the size of the string affects the size of the output image.
                     IRKind::Abs | IRKind::Img | IRKind::Sec => {
                         self.iterate_address(ir, irdb, diags, &current)
                     }
-                    IRKind::Wrs => self.iterate_wrs(&ir, irdb, diags, &mut current),
+                    IRKind::Wrs => self.iterate_wrs(ir, irdb, diags, &mut current),
                     IRKind::SectionStart => {
                         self.iterate_section_start(ir, irdb, diags, &mut current)
                     }
@@ -1254,13 +1253,13 @@ impl Engine {
                     | IRKind::Wr40
                     | IRKind::Wr48
                     | IRKind::Wr56
-                    | IRKind::Wr64 => self.iterate_wrx(&ir, irdb, diags, &mut current),
-                    IRKind::Align => self.iterate_align(&ir, irdb, diags, &mut current),
+                    | IRKind::Wr64 => self.iterate_wrx(ir, irdb, diags, &mut current),
+                    IRKind::Align => self.iterate_align(ir, irdb, diags, &current),
                     IRKind::SetSec | IRKind::SetImg | IRKind::SetAbs => {
-                        self.iterate_set(&ir, irdb, diags, &mut current)
+                        self.iterate_set(ir, irdb, diags, &current)
                     }
 
-                    IRKind::Wrf => self.iterate_wrf(&ir, irdb, diags, &mut current),
+                    IRKind::Wrf => self.iterate_wrf(ir, irdb, diags, &mut current),
 
                     // The following IR types are evaluated only at execute time.
                     // Nothing to do during iteration.
@@ -1285,14 +1284,11 @@ impl Engine {
     fn assert_info_operand(&self, opnd_num: usize, irdb: &IRDb, diags: &mut Diags) {
         let opnd = self.parms[opnd_num].borrow();
         let ir_opnd = &irdb.parms[opnd_num];
-        match opnd.data_type {
-            DataType::U64 => {
-                let val = opnd.to_u64();
-                let msg = format!("Operand has value {}", val);
-                let primary_code_ref = ir_opnd.src_loc.clone();
-                diags.note1("EXEC_8", &msg, primary_code_ref);
-            }
-            _ => {}
+        if opnd.data_type == DataType::U64 {
+            let val = opnd.to_u64();
+            let msg = format!("Operand has value {}", val);
+            let primary_code_ref = ir_opnd.src_loc.clone();
+            diags.note1("EXEC_8", &msg, primary_code_ref);
         }
     }
 
@@ -1322,9 +1318,9 @@ impl Engine {
         let opnd_num = ir.operands[0];
         self.trace(format!("engine::execute_assert: checking operand {}", opnd_num).as_str());
         let parm = self.parms[opnd_num].borrow();
-        if parm.to_bool() == false {
+        if !parm.to_bool() {
             // assert failed
-            let msg = format!("Assert expression failed");
+            let msg = "Assert expression failed".to_string();
             diags.err1("EXEC_2", &msg, ir.src_loc.clone());
 
             // If the boolean the assertion failed on is an output of an operation,
@@ -1349,7 +1345,7 @@ impl Engine {
 
         let xstr_opt = self.evaluate_string_expr(ir, irdb, diags);
         if xstr_opt.is_none() {
-            let msg = format!("Evaluating string expression failed.");
+            let msg = "Evaluating string expression failed.".to_string();
             diags.err1("EXEC_16", &msg, ir.src_loc.clone());
             return Err(anyhow!("Wrs failed"));
         }
@@ -1363,7 +1359,7 @@ impl Engine {
         self.trace("Engine::execute_wrs:");
         let xstr_opt = self.evaluate_string_expr(ir, irdb, diags);
         if xstr_opt.is_none() {
-            let msg = format!("Evaluating string expression failed.");
+            let msg = "Evaluating string expression failed.".to_string();
             diags.err1("EXEC_15", &msg, ir.src_loc.clone());
             return Err(anyhow!("Wrs failed"));
         }
@@ -1373,7 +1369,7 @@ impl Engine {
         // the map_error lambda just converts io::error to a std::error
         let result = file.write_all(bufs).map_err(|err| err.into());
         if result.is_err() {
-            let msg = format!("Writing string failed");
+            let msg = "Writing string failed".to_string();
             diags.err1("EXEC_3", &msg, ir.src_loc.clone());
         }
 
@@ -1431,7 +1427,7 @@ impl Engine {
                 .write_all(&buf[0..bytes_read])
                 .map_err(|err| err.into());
             if write_result.is_err() {
-                let msg = format!("Writing buffer failed");
+                let msg = "Writing buffer failed".to_string();
                 diags.err1("EXEC_35", &msg, ir.src_loc.clone());
                 return write_result;
             }
