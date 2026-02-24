@@ -141,12 +141,11 @@ impl IRDb {
                                     dt_ok = true; // Integers work with s/u types
                                     data_type = Some(lhs_dt);
                                 }
-                            } else if lhs_dt == DataType::Integer {
-                                if [DataType::I64, DataType::U64].contains(&rhs_dt) {
+                            } else if lhs_dt == DataType::Integer
+                                && [DataType::I64, DataType::U64].contains(&rhs_dt) {
                                     dt_ok = true; // Integers work with s/u types
                                     data_type = Some(rhs_dt);
                                 }
-                            }
 
                             if !dt_ok {
                                 let msg = format!(
@@ -404,7 +403,8 @@ impl IRDb {
     }
 
     fn validate_operands(&mut self, ir: &IR, diags: &mut Diags) -> bool {
-        let result = match ir.kind {
+        
+        match ir.kind {
             IRKind::Align
             | IRKind::SetSec
             | IRKind::SetImg
@@ -446,8 +446,7 @@ impl IRDb {
             | IRKind::Abs
             | IRKind::Img
             | IRKind::Sec => true,
-        };
-        result
+        }
     }
 
     /// Convert the linear IR to real IR.  Conversion from Linear IR to real IR can fail,
@@ -543,7 +542,7 @@ impl IRDb {
             for child in &ir.operands {
                 let operand = &self.parms[*child];
                 if !first {
-                    op.push_str(",");
+                    op.push(',');
                 } else {
                     first = false;
                 }
