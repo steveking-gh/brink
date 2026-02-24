@@ -92,7 +92,7 @@ impl IROperand {
     }
 
     pub fn is_output_of(&self) -> Option<usize> {
-        return self.ir_lid;
+        self.ir_lid
     }
 
     /// Converts the specified string into the specified type
@@ -123,7 +123,7 @@ impl IROperand {
                 if is_constant {
                     // Strip the trailing 'u' if any
                     let sval_no_u = sval.strip_suffix('u').unwrap_or(sval);
-                    let res = parse::<u64>(&sval_no_u);
+                    let res = parse::<u64>(sval_no_u);
                     if let Ok(v) = res {
                         return Some(Box::new(v));
                     } else {
@@ -183,9 +183,9 @@ impl IROperand {
 
     pub fn clone_val_box(&self) -> Box<dyn Any> {
         match self.data_type {
-            DataType::U64 => { Box::new(self.val.downcast_ref::<u64>().unwrap().clone()) },
+            DataType::U64 => { Box::new(*self.val.downcast_ref::<u64>().unwrap()) },
             DataType::Integer | // Integer stored as i64
-            DataType::I64 => { Box::new(self.val.downcast_ref::<i64>().unwrap().clone()) },
+            DataType::I64 => { Box::new(*self.val.downcast_ref::<i64>().unwrap()) },
             DataType::QuotedString |
             DataType::Identifier => {Box::new(self.val.downcast_ref::<String>().unwrap().clone())},
             DataType::Unknown => {Box::new(self.val.downcast_ref::<String>().unwrap().clone())},
