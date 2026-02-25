@@ -275,11 +275,11 @@ impl IRDb {
             // Canonicalizing a missing file doesn't work, so
             // just use the current directory.
             let pbuf_result = PathBuf::from("./").canonicalize();
-            let full_path = if pbuf_result.is_err() {
-                "!!Cannot determine full path!!".to_string()
-            } else {
+            let full_path = if let Ok(pbuf_result_unwrapped) = pbuf_result {
                 // Hmm... seems like a lot of work to get the string
-                pbuf_result.unwrap().to_str().unwrap().to_string()
+                pbuf_result_unwrapped.to_str().unwrap().to_string()
+            } else {
+                "!!Cannot determine full path!!".to_string()
             };
             let os_err = fm_result.err().unwrap().to_string();
             let m = format!(
