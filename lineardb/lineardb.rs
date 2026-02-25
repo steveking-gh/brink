@@ -21,7 +21,7 @@ pub struct LinOperand {
     pub sval: String,
 }
 
-impl<'toks> LinOperand {
+impl LinOperand {
     /// Create a new linear operand.  If the ir_lid exists, then this
     /// operand is the output of the specified lid.
     // pseudo functions like align.
