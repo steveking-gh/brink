@@ -891,16 +891,12 @@ impl IdentDb {
                 }
                 if self.is_valid_label_ref(lop) {
                     // labels have no size, so verify the linear operation is not a sizeof()
-                    match lir.op {
-                        IRKind::Sizeof => {
-                            let msg = "Sizeof cannot refer to a label name.  Labels have no size."
-                                .to_string();
-                            diags.err1("LINEAR_9", &msg, lop.src_loc.clone());
-                            // keep processing after error to report other problems
-                            result = false;
-                        }
-
-                        _ => {}
+                    if lir.op == IRKind::Sizeof {
+                        let msg = "Sizeof cannot refer to a label name.  Labels have no size."
+                            .to_string();
+                        diags.err1("LINEAR_9", &msg, lop.src_loc.clone());
+                        // keep processing after error to report other problems
+                        result = false;
                     }
                     continue;
                 }
