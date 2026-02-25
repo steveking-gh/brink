@@ -4,7 +4,7 @@ use ir::{DataType, IR, IRKind};
 use irdb::IRDb;
 use std::cell::RefCell;
 use std::fs::File;
-use std::{any::Any, convert::TryInto, io::Write};
+use std::{any::Any, io::Write};
 use std::{convert::TryFrom, io::Read};
 
 #[allow(unused_imports)]
@@ -804,8 +804,6 @@ impl Engine {
         } else {
             let sz: u64 = end_loc.img - start_loc.img;
             self.trace(format!("Sizeof {} is currently {}", sec_name, sz).as_str());
-            // We'll at least panic at runtime if conversion from
-            // usize to u64 fails instead of bad output binary.
             *out = sz;
         }
 
@@ -827,19 +825,15 @@ impl Engine {
         let mut out_parm = self.parms[out_parm_num].borrow_mut();
         let out = out_parm.val.downcast_mut::<u64>().unwrap();
 
-        // We'll at least panic at runtime if conversion from
-        // usize to u64 fails instead of bad output binary.
         match ir.kind {
             IRKind::Abs => {
-                // Will panic if usize does not fit in a u64
-                let img: u64 = current.img.try_into().unwrap();
-                *out = img + self.start_addr;
+                *out = current.img + self.start_addr;
             }
             IRKind::Img => {
-                *out = current.img.try_into().unwrap();
+                *out = current.img;
             }
             IRKind::Sec => {
-                *out = current.sec.try_into().unwrap();
+                *out = current.sec;
             }
             bad => {
                 panic!("Called iterate_current_address with bogus IR {:?}", bad);
@@ -1010,16 +1004,14 @@ impl Engine {
         let ir_num = ir_num.unwrap();
         let start_loc = &self.ir_locs[*ir_num];
         match ir.kind {
-            // Will panic if usize does not fit in a u64
             IRKind::Abs => {
-                let img: u64 = start_loc.img.try_into().unwrap();
-                *out = img + self.start_addr;
+                *out = start_loc.img + self.start_addr;
             }
             IRKind::Img => {
-                *out = start_loc.img.try_into().unwrap();
+                *out = start_loc.img;
             }
             IRKind::Sec => {
-                *out = start_loc.sec.try_into().unwrap();
+                *out = start_loc.sec;
             }
             bad => {
                 panic!("Called iterate_current_address with bogus IR {:?}", bad);
