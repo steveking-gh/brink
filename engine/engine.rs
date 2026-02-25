@@ -133,8 +133,6 @@ pub struct Engine {
 }
 
 fn get_wrx_byte_width(ir: &IR) -> usize {
-    
-
     match ir.kind {
         IRKind::Wr8 => 1,
         IRKind::Wr16 => 2,
@@ -336,199 +334,151 @@ impl Engine {
     }
 
     fn do_u64_add(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
-        let check = in0.checked_add(in1);
-        if check.is_none() {
-            let msg = format!("Add expression '{} + {}' will overflow type U64", in0, in1);
+        let Some(checked_result) = in0.checked_add(in1) else {
+            let msg = format!("Add expression '{in0} + {in1}' will overflow type U64");
             diags.err1("EXEC_1", &msg, ir.src_loc.clone());
-            false
-        } else {
-            *out = check.unwrap();
-            true
-        }
+            return false;
+        };
+        *out = checked_result;
+        true
     }
 
     fn do_i64_add(&self, ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
-        let check = in0.checked_add(in1);
-        if check.is_none() {
-            let msg = format!("Add expression '{} + {}' will overflow type I64", in0, in1);
+        let Some(checked_result) = in0.checked_add(in1) else {
+            let msg = format!("Add expression '{in0} + {in1}' will overflow type I64");
             diags.err1("EXEC_21", &msg, ir.src_loc.clone());
-            false
-        } else {
-            *out = check.unwrap();
-            true
-        }
+            return false;
+        };
+        *out = checked_result;
+        true
     }
 
     fn do_u64_sub(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
-        let check = in0.checked_sub(in1);
-        if check.is_none() {
-            let msg = format!(
-                "Subtract expression '{} - {}' will underflow type U64",
-                in0, in1
-            );
+        let Some(checked_result) = in0.checked_sub(in1) else {
+            let msg = format!("Subtract expression '{in0} - {in1}' will underflow type U64");
             diags.err1("EXEC_4", &msg, ir.src_loc.clone());
-            false
-        } else {
-            *out = check.unwrap();
-            true
-        }
+            return false;
+        };
+        *out = checked_result;
+        true
     }
 
     fn do_i64_sub(&self, ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
-        let check = in0.checked_sub(in1);
-        if check.is_none() {
-            let msg = format!(
-                "Subtract expression '{} - {}' will underflow type I64",
-                in0, in1
-            );
+        let Some(checked_result) = in0.checked_sub(in1) else {
+            let msg = format!("Subtract expression '{in0} - {in1}' will underflow type I64");
             diags.err1("EXEC_24", &msg, ir.src_loc.clone());
-            false
-        } else {
-            *out = check.unwrap();
-            true
-        }
+            return false;
+        };
+        *out = checked_result;
+        true
     }
 
     fn do_u64_mul(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
-        let check = in0.checked_mul(in1);
-        if check.is_none() {
-            let msg = format!(
-                "Multiply expression '{} * {}' will overflow type U64",
-                in0, in1
-            );
+        let Some(checked_result) = in0.checked_mul(in1) else {
+            let msg = format!("Multiply expression '{in0} * {in1}' will overflow type U64");
             diags.err1("EXEC_6", &msg, ir.src_loc.clone());
-            false
-        } else {
-            *out = check.unwrap();
-            true
-        }
+            return false;
+        };
+        *out = checked_result;
+        true
     }
 
     fn do_i64_mul(&self, ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
-        let check = in0.checked_mul(in1);
-        if check.is_none() {
-            let msg = format!(
-                "Multiply expression '{} * {}' will overflow data type I64",
-                in0, in1
-            );
+        let Some(checked_result) = in0.checked_mul(in1) else {
+            let msg = format!("Multiply expression '{in0} * {in1}' will overflow data type I64");
             diags.err1("EXEC_26", &msg, ir.src_loc.clone());
-            false
-        } else {
-            *out = check.unwrap();
-            true
-        }
+            return false;
+        };
+        *out = checked_result;
+        true
     }
 
     fn do_u64_div(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
-        let check = in0.checked_div(in1);
-        if check.is_none() {
-            let msg = format!("Exception in divide expression '{} / {}'", in0, in1);
+        let Some(checked_result) = in0.checked_div(in1) else {
+            let msg = format!("Exception in divide expression '{in0} / {in1}'");
             diags.err1("EXEC_7", &msg, ir.src_loc.clone());
-            false
-        } else {
-            *out = check.unwrap();
-            true
-        }
+            return false;
+        };
+        *out = checked_result;
+        true
     }
 
     fn do_u64_mod(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
-        let check = in0.checked_rem(in1);
-        if check.is_none() {
-            let msg = format!("Exception in modulo expression '{} % {}'", in0, in1);
+        let Some(checked_result) = in0.checked_rem(in1) else {
+            let msg = format!("Exception in modulo expression '{in0} % {in1}'");
             diags.err1("EXEC_28", &msg, ir.src_loc.clone());
-            false
-        } else {
-            *out = check.unwrap();
-            true
-        }
+            return false;
+        };
+        *out = checked_result;
+        true
     }
 
     fn do_i64_div(&self, ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
-        let check = in0.checked_div(in1);
-        if check.is_none() {
-            let msg = format!("Exception in divide expression '{} / {}'", in0, in1);
+        let Some(checked_result) = in0.checked_div(in1) else {
+            let msg = format!("Exception in divide expression '{in0} / {in1}'");
             diags.err1("EXEC_27", &msg, ir.src_loc.clone());
-            false
-        } else {
-            *out = check.unwrap();
-            true
-        }
+            return false;
+        };
+        *out = checked_result;
+        true
     }
 
     fn do_i64_mod(&self, ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
-        let check = in0.checked_rem(in1);
-        if check.is_none() {
-            let msg = format!("Exception in modulo expression '{} % {}'", in0, in1);
+        let Some(checked_result) = in0.checked_rem(in1) else {
+            let msg = format!("Exception in modulo expression '{in0} % {in1}'");
             diags.err1("EXEC_30", &msg, ir.src_loc.clone());
-            false
-        } else {
-            *out = check.unwrap();
-            true
-        }
+            return false;
+        };
+        *out = checked_result;
+        true
     }
 
     fn do_u64_shl(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
-        let mut result = true;
-        let shift_amount = u32::try_from(in1);
-        if shift_amount.is_err() {
+        let Ok(shift_amount) = u32::try_from(in1) else {
             let msg = format!(
-                "Shift amount {} is too large in Left Shift expression '{} << {}'",
-                in1, in0, in1
+                "Shift amount {in1} is too large in Left Shift expression '{in0} << {in1}'"
             );
             diags.err1("EXEC_9", &msg, ir.src_loc.clone());
-            result = false;
-        } else {
-            *out = in0.checked_shl(shift_amount.unwrap()).unwrap_or(0);
-        }
-        result
+            return false;
+        };
+        *out = in0.checked_shl(shift_amount).unwrap_or(0);
+        true
     }
 
     fn do_i64_shl(&self, ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
-        let mut result = true;
-        let shift_amount = u32::try_from(in1);
-        if shift_amount.is_err() {
+        let Ok(shift_amount) = u32::try_from(in1) else {
             let msg = format!(
-                "Shift amount {} is too large in Left Shift expression '{} << {}'",
-                in1, in0, in1
+                "Shift amount {in1} is too large in Left Shift expression '{in0} << {in1}'"
             );
             diags.err1("EXEC_29", &msg, ir.src_loc.clone());
-            result = false;
-        } else {
-            *out = in0.checked_shl(shift_amount.unwrap()).unwrap_or(0);
-        }
-        result
+            return false;
+        };
+        *out = in0.checked_shl(shift_amount).unwrap_or(0);
+        true
     }
 
     fn do_u64_shr(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
-        let mut result = true;
-        let shift_amount = u32::try_from(in1);
-        if shift_amount.is_err() {
+        let Ok(shift_amount) = u32::try_from(in1) else {
             let msg = format!(
-                "Shift amount {} is too large in Right Shift expression '{} >> {}'",
-                in1, in0, in1
+                "Shift amount {in1} is too large in Right Shift expression '{in0} >> {in1}'"
             );
             diags.err1("EXEC_10", &msg, ir.src_loc.clone());
-            result = false;
-        } else {
-            *out = in0.checked_shr(shift_amount.unwrap()).unwrap_or(0);
-        }
-        result
+            return false;
+        };
+        *out = in0.checked_shr(shift_amount).unwrap_or(0);
+        true
     }
 
     fn do_i64_shr(&self, ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
-        let mut result = true;
-        let shift_amount = u32::try_from(in1);
-        if shift_amount.is_err() {
+        let Ok(shift_amount) = u32::try_from(in1) else {
             let msg = format!(
-                "Shift amount {} is too large in Right Shift expression '{} >> {}'",
-                in1, in0, in1
+                "Shift amount {in1} is too large in Right Shift expression '{in0} >> {in1}'"
             );
             diags.err1("EXEC_20", &msg, ir.src_loc.clone());
-            result = false;
-        } else {
-            *out = in0.checked_shr(shift_amount.unwrap()).unwrap_or(0);
-        }
-        result
+            return false;
+        };
+        *out = in0.checked_shr(shift_amount).unwrap_or(0);
+        true
     }
 
     fn iterate_type_conversion(
@@ -555,7 +505,9 @@ impl Engine {
         let mut out_parm = self.parms[out_parm_num].borrow_mut();
         match operation {
             IRKind::ToU64 => {
-                let out = out_parm.val.downcast_mut::<u64>().unwrap();
+                let Some(out) = out_parm.val.downcast_mut::<u64>() else {
+                    panic!("Bad downcast conversion to &mut u64!");
+                };
                 match in_parm0.data_type {
                     DataType::U64 => {
                         // Trivial Integer or U64 to U64
@@ -569,14 +521,16 @@ impl Engine {
                     }
                     bad => {
                         let src_loc = irdb.parms[in_parm_num0].src_loc.clone();
-                        let msg = format!("Can't convert from {:?} to U64", bad);
+                        let msg = format!("Can't convert from {bad:?} to U64");
                         diags.err1("EXEC_17", &msg, src_loc);
                         result = false;
                     }
                 }
             }
             IRKind::ToI64 => {
-                let out = out_parm.val.downcast_mut::<i64>().unwrap();
+                let Some(out) = out_parm.val.downcast_mut::<i64>() else {
+                    panic!("Bad downcast conversion to &mut i64!");
+                };
                 match in_parm0.data_type {
                     DataType::U64 => {
                         // U64 to I64
@@ -590,7 +544,7 @@ impl Engine {
                     }
                     bad => {
                         let src_loc = irdb.parms[in_parm_num0].src_loc.clone();
-                        let msg = format!("Can't convert from {:?} to U64", bad);
+                        let msg = format!("Can't convert from {bad:?} to I64");
                         diags.err1("EXEC_12", &msg, src_loc);
                         result = false;
                     }
@@ -598,10 +552,7 @@ impl Engine {
             }
 
             bad => {
-                panic!(
-                    "Called iterate_type_conversion with bad IRKind operation {:?}",
-                    bad
-                );
+                panic!("Called iterate_type_conversion with bad IRKind operation {bad:?}");
             }
         }
         result
@@ -644,9 +595,10 @@ impl Engine {
                     dt_ok = true; // Integers work with s/u types
                 }
             } else if lhs_dt == DataType::Integer
-                && [DataType::I64, DataType::U64].contains(&rhs_dt) {
-                    dt_ok = true; // Integers work with s/u types
-                }
+                && [DataType::I64, DataType::U64].contains(&rhs_dt)
+            {
+                dt_ok = true; // Integers work with s/u types
+            }
 
             if !dt_ok {
                 let loc0 = irdb.parms[lhs_num].src_loc.clone();
@@ -850,11 +802,11 @@ impl Engine {
             );
             *out = 0;
         } else {
-            let sz = end_loc.img - start_loc.img;
+            let sz: u64 = end_loc.img - start_loc.img;
             self.trace(format!("Sizeof {} is currently {}", sec_name, sz).as_str());
             // We'll at least panic at runtime if conversion from
             // usize to u64 fails instead of bad output binary.
-            *out = sz.try_into().unwrap();
+            *out = sz;
         }
 
         true
@@ -1094,7 +1046,6 @@ impl Engine {
         // Abs/Img/SEc take one optional input and produce one output.
         // We've already discarded surrounding () on the operand.
         let num_operands = ir.operands.len();
-        
 
         match num_operands {
             1 => self.iterate_current_address(ir, current),
@@ -1386,21 +1337,17 @@ impl Engine {
         // so unwrap is ok.
         let file_info = irdb.files.get(path).unwrap();
 
-        // open the file, which may fail
-        let fh_result = File::open(path);
-
-        if fh_result.is_err() {
-            let fh_err = fh_result.err().unwrap();
-            let msg = format!(
-                "Opening file '{}' failed with OS error '{:?}'.",
-                path,
-                fh_err.raw_os_error()
-            );
-            diags.err1("EXEC_33", &msg, ir.src_loc.clone());
-            return Err(anyhow!(fh_err));
-        }
-
-        let mut source_file = fh_result.unwrap();
+        let mut source_file = match File::open(path) {
+            Ok(f) => f,
+            Err(err) => {
+                let msg = format!(
+                    "Opening file '{path}' failed with OS error '{:?}'.",
+                    err.raw_os_error()
+                );
+                diags.err1("EXEC_33", &msg, ir.src_loc.clone());
+                return Err(anyhow!(err));
+            }
+        };
 
         // read/write in 64K chunks
         // TODO don't hardcode this number
@@ -1408,20 +1355,18 @@ impl Engine {
         let mut total_bytes = 0;
         loop {
             // the map_error lambda just converts io::error to a std::error
-            let read_result = source_file.read(&mut buf);
+            let bytes_read = match source_file.read(&mut buf) {
+                Ok(bytes) => bytes,
+                Err(err) => {
+                    let msg = format!(
+                        "Reading file '{path}' failed with OS error '{:?}'.",
+                        err.raw_os_error()
+                    );
+                    diags.err1("EXEC_34", &msg, ir.src_loc.clone());
+                    return Err(anyhow!(err));
+                }
+            };
 
-            if read_result.is_err() {
-                let read_err = read_result.err().unwrap();
-                let msg = format!(
-                    "Reading file '{}' failed with OS error '{:?}'.",
-                    path,
-                    read_err.raw_os_error()
-                );
-                diags.err1("EXEC_34", &msg, ir.src_loc.clone());
-                return Err(anyhow!(read_err));
-            }
-
-            let bytes_read = read_result.unwrap();
             total_bytes += bytes_read;
             let write_result = file
                 .write_all(&buf[0..bytes_read])
