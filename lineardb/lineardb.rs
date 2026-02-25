@@ -615,7 +615,7 @@ impl<'toks> LinearDb {
             for child in &ir.operand_vec {
                 let operand = &self.operand_vec[*child];
                 if !first {
-                    op.push_str(",");
+                    op.push(',');
                 } else {
                     first = false;
                 }
