@@ -36,7 +36,7 @@ impl LinOperand {
     }
 
     pub fn is_output_of(&self) -> Option<usize> {
-        return self.ir_lid;
+        self.ir_lid
     }
 }
 
@@ -196,7 +196,7 @@ impl<'toks> LinearDb {
     fn operand_count_is_valid(
         &self,
         expected: usize,
-        lops: &Vec<usize>,
+        lops: &[usize],
         diags: &mut Diags,
         tinfo: &TokenInfo,
     ) -> bool {
@@ -515,7 +515,7 @@ impl<'toks> LinearDb {
             }
             LexToken::Unknown => {
                 let m = "Unexpected character.";
-                diags.err1("LINEAR_3", &m, tinfo.span());
+                diags.err1("LINEAR_3", m, tinfo.span());
                 result = false;
             }
             LexToken::Output => {
@@ -715,14 +715,14 @@ impl IdentDb {
     /// Call with the start_lid one past the nested section_start operation
     /// Returns the new final lid, which will be one past the section_end of
     /// the outermost nested section.
-    fn skip_nested_sections_r(&self, start_lid: usize, lindb: &LinearDb) -> usize {
+    fn skip_nested_sections_r(start_lid: usize, lindb: &LinearDb) -> usize {
         let mut lid = start_lid;
         loop {
             let lir = &lindb.ir_vec[lid];
             lid += 1;
             match lir.op {
                 IRKind::SectionStart => {
-                    lid = self.skip_nested_sections_r(lid, lindb);
+                    lid = Self::skip_nested_sections_r(lid, lindb);
                 }
                 IRKind::SectionEnd => break,
                 _ => {}
@@ -746,7 +746,7 @@ impl IdentDb {
                     result &= self.verify_operand_refs(lir, lindb, diags);
                 }
                 IRKind::SectionStart => {
-                    lid = self.skip_nested_sections_r(lid, lindb);
+                    lid = Self::skip_nested_sections_r(lid, lindb);
                 }
                 IRKind::SectionEnd => break,
                 _ => {}
@@ -822,7 +822,7 @@ impl IdentDb {
         }
 
         debug!("IdentDb::inventory_identifiers:");
-        for (name, _) in &self.label_idents {
+        for name in self.label_idents.keys() {
             debug!("    {}", name);
         }
 
@@ -893,9 +893,8 @@ impl IdentDb {
                     // labels have no size, so verify the linear operation is not a sizeof()
                     match lir.op {
                         IRKind::Sizeof => {
-                            let msg = format!(
-                                "Sizeof cannot refer to a label name.  Labels have no size."
-                            );
+                            let msg = "Sizeof cannot refer to a label name.  Labels have no size."
+                                .to_string();
                             diags.err1("LINEAR_9", &msg, lop.src_loc.clone());
                             // keep processing after error to report other problems
                             result = false;
