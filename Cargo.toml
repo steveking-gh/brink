@@ -9,6 +9,11 @@ members = [
     "diags",
 ]
 
+[workspace.package]
+version = "1.0.2"
+authors = ["Steve King <sk@metrokings.com>"]
+edition = "2024"
+
 [package]
 name = "brink"
 version = "1.0.2"
