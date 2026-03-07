@@ -3,3 +3,4 @@
 **/output.bin
 **/*.profraw
 ast/fuzz/cov
+engine/fix.py

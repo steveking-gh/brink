@@ -2,7 +2,6 @@ use anyhow::{Result, anyhow};
 use diags::Diags;
 use ir::{DataType, IR, IRKind, ParameterValue};
 use irdb::IRDb;
-use std::cell::RefCell;
 use std::fs::File;
 use std::io::Write;
 use std::{convert::TryFrom, io::Read};
@@ -17,7 +16,7 @@ pub struct Location {
 }
 
 pub struct Engine {
-    parms: Vec<RefCell<ParameterValue>>,
+    parms: Vec<ParameterValue>,
     ir_locs: Vec<Location>,
 
     /// Stack of section offsets.  Each time processing enters
@@ -118,7 +117,7 @@ impl Engine {
         if ir.operands.len() == 2 {
             // Yes, we have a repeat count
             // A repeat count of 0 is not an error.
-            let op = self.parms[ir.operands[1]].borrow();
+            let op = &self.parms[ir.operands[1]];
             match op.data_type() {
                 DataType::U64 => {
                     repeat_count = op.to_u64();
@@ -171,7 +170,7 @@ impl Engine {
         // The operand is a file path
         assert!(ir.operands.len() < 2);
 
-        let path_opnd = self.parms[ir.operands[0]].borrow();
+        let path_opnd = &self.parms[ir.operands[0]];
         let file_path = path_opnd.to_str();
 
         // we already verified this is a legit file path,
@@ -205,7 +204,7 @@ impl Engine {
         let mut xstr = String::new();
         for local_op_num in 0..num_ops {
             let op_num = ir.operands[local_op_num];
-            let op = self.parms[op_num].borrow();
+            let op = &self.parms[op_num];
             debug!(
                 "Processing string expr operand {} with data type {:?}",
                 local_op_num, op.data_type()
@@ -233,7 +232,7 @@ impl Engine {
         if result { Some(xstr) } else { None }
     }
 
-    fn do_u64_add(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
+    fn do_u64_add(ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
         let Some(checked_result) = in0.checked_add(in1) else {
             let msg = format!("Add expression '{in0} + {in1}' will overflow type U64");
             diags.err1("EXEC_1", &msg, ir.src_loc.clone());
@@ -243,7 +242,7 @@ impl Engine {
         true
     }
 
-    fn do_i64_add(&self, ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
+    fn do_i64_add(ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
         let Some(checked_result) = in0.checked_add(in1) else {
             let msg = format!("Add expression '{in0} + {in1}' will overflow type I64");
             diags.err1("EXEC_21", &msg, ir.src_loc.clone());
@@ -253,7 +252,7 @@ impl Engine {
         true
     }
 
-    fn do_u64_sub(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
+    fn do_u64_sub(ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
         let Some(checked_result) = in0.checked_sub(in1) else {
             let msg = format!("Subtract expression '{in0} - {in1}' will underflow type U64");
             diags.err1("EXEC_4", &msg, ir.src_loc.clone());
@@ -263,7 +262,7 @@ impl Engine {
         true
     }
 
-    fn do_i64_sub(&self, ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
+    fn do_i64_sub(ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
         let Some(checked_result) = in0.checked_sub(in1) else {
             let msg = format!("Subtract expression '{in0} - {in1}' will underflow type I64");
             diags.err1("EXEC_24", &msg, ir.src_loc.clone());
@@ -273,7 +272,7 @@ impl Engine {
         true
     }
 
-    fn do_u64_mul(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
+    fn do_u64_mul(ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
         let Some(checked_result) = in0.checked_mul(in1) else {
             let msg = format!("Multiply expression '{in0} * {in1}' will overflow type U64");
             diags.err1("EXEC_6", &msg, ir.src_loc.clone());
@@ -283,7 +282,7 @@ impl Engine {
         true
     }
 
-    fn do_i64_mul(&self, ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
+    fn do_i64_mul(ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
         let Some(checked_result) = in0.checked_mul(in1) else {
             let msg = format!("Multiply expression '{in0} * {in1}' will overflow data type I64");
             diags.err1("EXEC_26", &msg, ir.src_loc.clone());
@@ -293,7 +292,7 @@ impl Engine {
         true
     }
 
-    fn do_u64_div(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
+    fn do_u64_div(ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
         let Some(checked_result) = in0.checked_div(in1) else {
             let msg = format!("Exception in divide expression '{in0} / {in1}'");
             diags.err1("EXEC_7", &msg, ir.src_loc.clone());
@@ -303,7 +302,7 @@ impl Engine {
         true
     }
 
-    fn do_u64_mod(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
+    fn do_u64_mod(ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
         let Some(checked_result) = in0.checked_rem(in1) else {
             let msg = format!("Exception in modulo expression '{in0} % {in1}'");
             diags.err1("EXEC_28", &msg, ir.src_loc.clone());
@@ -313,7 +312,7 @@ impl Engine {
         true
     }
 
-    fn do_i64_div(&self, ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
+    fn do_i64_div(ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
         let Some(checked_result) = in0.checked_div(in1) else {
             let msg = format!("Exception in divide expression '{in0} / {in1}'");
             diags.err1("EXEC_27", &msg, ir.src_loc.clone());
@@ -323,7 +322,7 @@ impl Engine {
         true
     }
 
-    fn do_i64_mod(&self, ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
+    fn do_i64_mod(ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
         let Some(checked_result) = in0.checked_rem(in1) else {
             let msg = format!("Exception in modulo expression '{in0} % {in1}'");
             diags.err1("EXEC_30", &msg, ir.src_loc.clone());
@@ -333,7 +332,7 @@ impl Engine {
         true
     }
 
-    fn do_u64_shl(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
+    fn do_u64_shl(ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
         let Ok(shift_amount) = u32::try_from(in1) else {
             let msg = format!(
                 "Shift amount {in1} is too large in Left Shift expression '{in0} << {in1}'"
@@ -345,7 +344,7 @@ impl Engine {
         true
     }
 
-    fn do_i64_shl(&self, ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
+    fn do_i64_shl(ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
         let Ok(shift_amount) = u32::try_from(in1) else {
             let msg = format!(
                 "Shift amount {in1} is too large in Left Shift expression '{in0} << {in1}'"
@@ -357,7 +356,7 @@ impl Engine {
         true
     }
 
-    fn do_u64_shr(&self, ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
+    fn do_u64_shr(ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
         let Ok(shift_amount) = u32::try_from(in1) else {
             let msg = format!(
                 "Shift amount {in1} is too large in Right Shift expression '{in0} >> {in1}'"
@@ -369,7 +368,7 @@ impl Engine {
         true
     }
 
-    fn do_i64_shr(&self, ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
+    fn do_i64_shr(ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
         let Ok(shift_amount) = u32::try_from(in1) else {
             let msg = format!(
                 "Shift amount {in1} is too large in Right Shift expression '{in0} >> {in1}'"
@@ -401,8 +400,8 @@ impl Engine {
         assert!(ir.operands.len() == 2);
         let in_parm_num0 = ir.operands[0];
         let out_parm_num = ir.operands[1];
-        let in_parm0 = self.parms[in_parm_num0].borrow();
-        let mut out_parm = self.parms[out_parm_num].borrow_mut();
+        let in_parm0 = self.parms[in_parm_num0].clone();
+        let out_parm = &mut self.parms[out_parm_num];
         match operation {
             IRKind::ToU64 => {
                 let out = out_parm.to_u64_mut();
@@ -476,8 +475,8 @@ impl Engine {
         let lhs_num = ir.operands[0];
         let rhs_num = ir.operands[1];
         let out_num = ir.operands[2];
-        let lhs = self.parms[lhs_num].borrow();
-        let rhs = self.parms[rhs_num].borrow();
+        let lhs = &self.parms[lhs_num];
+        let rhs = &self.parms[rhs_num];
 
         let lhs_dt = lhs.data_type();
         let rhs_dt = rhs.data_type();
@@ -515,7 +514,7 @@ impl Engine {
         if (lhs_dt == DataType::U64) || (rhs_dt == DataType::U64) {
             let in0 = lhs.to_u64();
             let in1 = rhs.to_u64();
-            let mut out_parm = self.parms[out_num].borrow_mut();
+            let out_parm = &mut self.parms[out_num];
             let out = out_parm.to_u64_mut();
 
             match operation {
@@ -528,25 +527,25 @@ impl Engine {
                 IRKind::BitOr => *out = in0 | in1,
                 IRKind::LogicalOr => *out = ((in0 != 0) || (in1 != 0)) as u64,
                 IRKind::Add => {
-                    result &= self.do_u64_add(ir, in0, in1, out, diags);
+                    result &= Engine::do_u64_add(ir, in0, in1, out, diags);
                 }
                 IRKind::Subtract => {
-                    result &= self.do_u64_sub(ir, in0, in1, out, diags);
+                    result &= Engine::do_u64_sub(ir, in0, in1, out, diags);
                 }
                 IRKind::Multiply => {
-                    result &= self.do_u64_mul(ir, in0, in1, out, diags);
+                    result &= Engine::do_u64_mul(ir, in0, in1, out, diags);
                 }
                 IRKind::Divide => {
-                    result &= self.do_u64_div(ir, in0, in1, out, diags);
+                    result &= Engine::do_u64_div(ir, in0, in1, out, diags);
                 }
                 IRKind::Modulo => {
-                    result &= self.do_u64_mod(ir, in0, in1, out, diags);
+                    result &= Engine::do_u64_mod(ir, in0, in1, out, diags);
                 }
                 IRKind::LeftShift => {
-                    result &= self.do_u64_shl(ir, in0, in1, out, diags);
+                    result &= Engine::do_u64_shl(ir, in0, in1, out, diags);
                 }
                 IRKind::RightShift => {
-                    result &= self.do_u64_shr(ir, in0, in1, out, diags);
+                    result &= Engine::do_u64_shr(ir, in0, in1, out, diags);
                 }
                 bad => panic!("Forgot to handle u64 {:?}", bad),
             };
@@ -558,7 +557,7 @@ impl Engine {
             // If both sides are ambiguous integers then treat the whole expression as signed
             let in0 = lhs.to_i64();
             let in1 = rhs.to_i64();
-            let mut out_parm = self.parms[out_num].borrow_mut();
+            let out_parm = &mut self.parms[out_num];
 
             match operation {
                 // output of compare is u64 regardless of inputs
@@ -597,31 +596,31 @@ impl Engine {
                 }
                 IRKind::Add => {
                     let out = out_parm.to_i64_mut();
-                    result &= self.do_i64_add(ir, in0, in1, out, diags);
+                    result &= Engine::do_i64_add(ir, in0, in1, out, diags);
                 }
                 IRKind::Subtract => {
                     let out = out_parm.to_i64_mut();
-                    result &= self.do_i64_sub(ir, in0, in1, out, diags);
+                    result &= Engine::do_i64_sub(ir, in0, in1, out, diags);
                 }
                 IRKind::Multiply => {
                     let out = out_parm.to_i64_mut();
-                    result &= self.do_i64_mul(ir, in0, in1, out, diags);
+                    result &= Engine::do_i64_mul(ir, in0, in1, out, diags);
                 }
                 IRKind::Divide => {
                     let out = out_parm.to_i64_mut();
-                    result &= self.do_i64_div(ir, in0, in1, out, diags);
+                    result &= Engine::do_i64_div(ir, in0, in1, out, diags);
                 }
                 IRKind::Modulo => {
                     let out = out_parm.to_i64_mut();
-                    result &= self.do_i64_mod(ir, in0, in1, out, diags);
+                    result &= Engine::do_i64_mod(ir, in0, in1, out, diags);
                 }
                 IRKind::LeftShift => {
                     let out = out_parm.to_i64_mut();
-                    result &= self.do_i64_shl(ir, in0, in1, out, diags);
+                    result &= Engine::do_i64_shl(ir, in0, in1, out, diags);
                 }
                 IRKind::RightShift => {
                     let out = out_parm.to_i64_mut();
-                    result &= self.do_i64_shr(ir, in0, in1, out, diags);
+                    result &= Engine::do_i64_shr(ir, in0, in1, out, diags);
                 }
 
                 bad => panic!("Forgot to handle i64 {:?}", bad),
@@ -659,16 +658,16 @@ impl Engine {
         assert!(ir.operands.len() == 2);
         let in_parm_num0 = ir.operands[0]; // identifier
         let out_parm_num = ir.operands[1];
-        let in_parm0 = self.parms[in_parm_num0].borrow();
-        let mut out_parm = self.parms[out_parm_num].borrow_mut();
 
-        let sec_name = in_parm0.to_identifier();
+        let sec_name = self.parms[in_parm_num0].to_identifier().to_string();
+        let out_parm = &mut self.parms[out_parm_num];
+
         let out = out_parm.to_u64_mut();
 
         // We've already verified that the section identifier exists,
         // but unless the section actually got used in the output,
         // then we won't find location info for it.
-        let ir_rng = irdb.sized_locs.get(sec_name);
+        let ir_rng = irdb.sized_locs.get(&sec_name);
         if ir_rng.is_none() {
             let msg = format!(
                 "Can't take sizeof() section '{}' not used in output.",
@@ -696,11 +695,11 @@ impl Engine {
                 )
                 .as_str(),
             );
-            *out = 0;
+            *self.parms[out_parm_num].to_u64_mut() = 0;
         } else {
             let sz: u64 = end_loc.img - start_loc.img;
             self.trace(format!("Sizeof {} is currently {}", sec_name, sz).as_str());
-            *out = sz;
+            *self.parms[out_parm_num].to_u64_mut() = sz;
         }
 
         true
@@ -718,7 +717,7 @@ impl Engine {
         );
         assert!(ir.operands.len() == 1);
         let out_parm_num = ir.operands[0];
-        let mut out_parm = self.parms[out_parm_num].borrow_mut();
+        let out_parm = &mut self.parms[out_parm_num];
         let out = out_parm.to_u64_mut();
 
         match ir.kind {
@@ -771,12 +770,11 @@ impl Engine {
             ir.operands[2]
         };
 
-        let mut out_parm = self.parms[out_parm_num].borrow_mut();
-        let out = out_parm.to_u64_mut();
-
         let align_parm_num = ir.operands[0];
-        let align_parm = self.parms[align_parm_num].borrow();
-        let align_val = align_parm.to_u64();
+        let align_val = self.parms[align_parm_num].to_u64();
+
+        let out_parm = &mut self.parms[out_parm_num];
+        let out = out_parm.to_u64_mut();
 
         // We'll at least panic at runtime if conversion from
         // usize to u64 fails instead of bad output binary.
@@ -828,12 +826,11 @@ impl Engine {
             ir.operands[2]
         };
 
-        let mut out_parm = self.parms[out_parm_num].borrow_mut();
-        let out = out_parm.to_u64_mut();
-
         let set_parm_num = ir.operands[0];
-        let set_parm = self.parms[set_parm_num].borrow();
-        let set_val = set_parm.to_u64();
+        let set_val = self.parms[set_parm_num].to_u64();
+
+        let out_parm = &mut self.parms[out_parm_num];
+        let out = out_parm.to_u64_mut();
 
         let loc = match ir.kind {
             IRKind::SetAbs => current.img + self.start_addr,
@@ -879,16 +876,16 @@ impl Engine {
         assert!(ir.operands.len() == 2);
         let in_parm_num0 = ir.operands[0]; // identifier
         let out_parm_num = ir.operands[1];
-        let in_parm0 = self.parms[in_parm_num0].borrow();
-        let mut out_parm = self.parms[out_parm_num].borrow_mut();
 
-        let name = in_parm0.to_identifier();
+        let name = self.parms[in_parm_num0].to_identifier().to_string();
+
+        let out_parm = &mut self.parms[out_parm_num];
         let out = out_parm.to_u64_mut();
 
         // We've already verified that the section identifier exists,
         // but unless the section actually got used in the output,
         // then we won't find location info for it.
-        let ir_num = irdb.addressed_locs.get(name);
+        let ir_num = irdb.addressed_locs.get(&name);
         if ir_num.is_none() {
             let msg = format!(
                 "Address of section or label '{}' not reachable in output.",
@@ -1008,7 +1005,7 @@ impl Engine {
         // Initialize parameters from the IR operands.
         engine.parms.reserve(irdb.parms.len());
         for opnd in &irdb.parms {
-            engine.parms.push(RefCell::new(opnd.clone_val()));
+            engine.parms.push(opnd.clone_val());
         }
 
         let result = engine.iterate(irdb, diags, abs_start);
@@ -1117,7 +1114,7 @@ impl Engine {
     /// If the operand is a variable, show its value.
     /// Constant operands are presumed self-evident.
     fn assert_info_operand(&self, opnd_num: usize, irdb: &IRDb, diags: &mut Diags) {
-        let opnd = self.parms[opnd_num].borrow();
+        let opnd = &self.parms[opnd_num];
         let ir_opnd = &irdb.parms[opnd_num];
         if opnd.data_type() == DataType::U64 {
             let val = opnd.to_u64();
@@ -1152,7 +1149,7 @@ impl Engine {
         let mut result = Ok(());
         let opnd_num = ir.operands[0];
         self.trace(format!("engine::execute_assert: checking operand {}", opnd_num).as_str());
-        let parm = self.parms[opnd_num].borrow();
+        let parm = &self.parms[opnd_num];
         if !parm.to_bool() {
             // assert failed
             let msg = "Assert expression failed".to_string();
@@ -1190,7 +1187,13 @@ impl Engine {
         Ok(())
     }
 
-    fn execute_wrs(&self, ir: &IR, irdb: &IRDb, diags: &mut Diags, file: &mut File) -> Result<()> {
+    fn execute_wrs(
+        &self,
+        ir: &IR,
+        irdb: &IRDb,
+        diags: &mut Diags,
+        file: &mut File,
+    ) -> Result<()> {
         self.trace("Engine::execute_wrs:");
         let xstr_opt = self.evaluate_string_expr(ir, irdb, diags);
         if xstr_opt.is_none() {
@@ -1211,10 +1214,16 @@ impl Engine {
         result
     }
 
-    fn execute_wrf(&self, ir: &IR, irdb: &IRDb, diags: &mut Diags, file: &mut File) -> Result<()> {
+    fn execute_wrf(
+        &self,
+        ir: &IR,
+        irdb: &IRDb,
+        diags: &mut Diags,
+        file: &mut File,
+    ) -> Result<()> {
         self.trace("Engine::execute_wrf:");
 
-        let path_opnd = self.parms[ir.operands[0]].borrow();
+        let path_opnd = &self.parms[ir.operands[0]];
         let path = path_opnd.to_str();
 
         // we already verified this is a legit file path,
@@ -1277,7 +1286,7 @@ impl Engine {
 
         let opnd_num = ir.operands[0];
         self.trace(format!("engine::execute_wrx: checking operand {}", opnd_num).as_str());
-        let parm = self.parms[opnd_num].borrow();
+        let parm = &self.parms[opnd_num];
 
         // Extract bytes as little-endian.  One a big-endian machine, the LSB will
         // bit the highest address location, which is wrong since we're writing
@@ -1302,7 +1311,7 @@ impl Engine {
             // Yes, we have a repeat count
             // We already validated the operands in IRDB.
             let repeat_opnd_num = ir.operands[1];
-            let op = self.parms[repeat_opnd_num].borrow();
+            let op = &self.parms[repeat_opnd_num];
             repeat_count = op.to_u64();
         }
 
