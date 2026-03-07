@@ -15,66 +15,9 @@ pub struct Location {
     img: u64,
     sec: u64,
 }
-pub struct Parameter {
-    data_type: DataType,
-    val: ParameterValue,
-}
-
-impl Parameter {
-    fn to_bool(&self) -> bool {
-        match &self.val {
-            ParameterValue::I64(v) => (*v as u64) != 0,
-            ParameterValue::U64(v) => *v != 0,
-            bad => panic!("Bad conversion of {:?} to bool!", bad),
-        }
-    }
-
-    fn to_u64(&self) -> u64 {
-        match &self.val {
-            ParameterValue::I64(v) => *v as u64,
-            ParameterValue::U64(v) => *v,
-            bad => panic!("Bad conversion of {:?} to u64!", bad),
-        }
-    }
-
-    fn to_u64_mut(&mut self) -> &mut u64 {
-        match &mut self.val {
-            ParameterValue::U64(v) => v,
-            bad => panic!("Bad conversion of {:?} to &mut u64!", bad),
-        }
-    }
-
-    fn to_i64(&self) -> i64 {
-        match &self.val {
-            ParameterValue::I64(v) => *v,
-            bad => panic!("Bad conversion of {:?} to i64!", bad),
-        }
-    }
-
-    fn to_i64_mut(&mut self) -> &mut i64 {
-        match &mut self.val {
-            ParameterValue::I64(v) => v,
-            bad => panic!("Bad conversion of {:?} to &mut i64!", bad),
-        }
-    }
-
-    fn to_str(&self) -> &str {
-        match &self.val {
-            ParameterValue::String(s) => s,
-            bad => panic!("Bad conversion of {:?} to &str!", bad),
-        }
-    }
-
-    fn to_identifier(&self) -> &str {
-        match &self.val {
-            ParameterValue::String(s) => s,
-            bad => panic!("Bad conversion of {:?} to identifier!", bad),
-        }
-    }
-}
 
 pub struct Engine {
-    parms: Vec<RefCell<Parameter>>,
+    parms: Vec<RefCell<ParameterValue>>,
     ir_locs: Vec<Location>,
 
     /// Stack of section offsets.  Each time processing enters
@@ -176,7 +119,7 @@ impl Engine {
             // Yes, we have a repeat count
             // A repeat count of 0 is not an error.
             let op = self.parms[ir.operands[1]].borrow();
-            match op.data_type {
+            match op.data_type() {
                 DataType::U64 => {
                     repeat_count = op.to_u64();
                 }
@@ -265,9 +208,9 @@ impl Engine {
             let op = self.parms[op_num].borrow();
             debug!(
                 "Processing string expr operand {} with data type {:?}",
-                local_op_num, op.data_type
+                local_op_num, op.data_type()
             );
-            match op.data_type {
+            match op.data_type() {
                 DataType::QuotedString => {
                     xstr.push_str(op.to_str());
                 }
@@ -463,7 +406,7 @@ impl Engine {
         match operation {
             IRKind::ToU64 => {
                 let out = out_parm.to_u64_mut();
-                match in_parm0.data_type {
+                match in_parm0.data_type() {
                     DataType::U64 => {
                         // Trivial Integer or U64 to U64
                         let in0 = in_parm0.to_u64();
@@ -484,7 +427,7 @@ impl Engine {
             }
             IRKind::ToI64 => {
                 let out = out_parm.to_i64_mut();
-                match in_parm0.data_type {
+                match in_parm0.data_type() {
                     DataType::U64 => {
                         // U64 to I64
                         let in0 = in_parm0.to_u64();
@@ -536,8 +479,8 @@ impl Engine {
         let lhs = self.parms[lhs_num].borrow();
         let rhs = self.parms[rhs_num].borrow();
 
-        let lhs_dt = lhs.data_type;
-        let rhs_dt = rhs.data_type;
+        let lhs_dt = lhs.data_type();
+        let rhs_dt = rhs.data_type();
 
         if lhs_dt != rhs_dt {
             let mut dt_ok = false;
@@ -1065,11 +1008,7 @@ impl Engine {
         // Initialize parameters from the IR operands.
         engine.parms.reserve(irdb.parms.len());
         for opnd in &irdb.parms {
-            let parm = Parameter {
-                data_type: opnd.data_type,
-                val: opnd.clone_val(),
-            };
-            engine.parms.push(RefCell::new(parm));
+            engine.parms.push(RefCell::new(opnd.clone_val()));
         }
 
         let result = engine.iterate(irdb, diags, abs_start);
@@ -1180,7 +1119,7 @@ impl Engine {
     fn assert_info_operand(&self, opnd_num: usize, irdb: &IRDb, diags: &mut Diags) {
         let opnd = self.parms[opnd_num].borrow();
         let ir_opnd = &irdb.parms[opnd_num];
-        if opnd.data_type == DataType::U64 {
+        if opnd.data_type() == DataType::U64 {
             let val = opnd.to_u64();
             let msg = format!("Operand has value {}", val);
             let primary_code_ref = ir_opnd.src_loc.clone();
@@ -1343,7 +1282,7 @@ impl Engine {
         // Extract bytes as little-endian.  One a big-endian machine, the LSB will
         // bit the highest address location, which is wrong since we're writing
         // from the lowest address.
-        let buf = match parm.data_type {
+        let buf = match parm.data_type() {
             DataType::Integer | DataType::I64 => {
                 let val = parm.to_i64();
                 val.to_le_bytes()

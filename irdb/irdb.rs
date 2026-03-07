@@ -42,7 +42,7 @@ impl IRDb {
     pub fn get_opnd_as_identifier(&self, ir: &IR, opnd_num: usize) -> &str {
         let &op_num = ir.operands.get(opnd_num).unwrap();
         let opnd = self.parms.get(op_num).unwrap();
-        opnd.to_identifier()
+        opnd.val.to_identifier()
     }
 
     pub fn get_operand_ir_lid(&self, opnd_num: usize) -> Option<usize> {
@@ -251,17 +251,17 @@ impl IRDb {
         }
 
         let path_opnd = &self.parms[ir.operands[0]];
-        if path_opnd.data_type != DataType::QuotedString {
+        if path_opnd.val.data_type() != DataType::QuotedString {
             let m = format!(
                 "'{:?}' operand must be a file path in \
                     double-quotes, found '{:?}'.",
-                ir.kind, path_opnd.data_type
+                ir.kind, path_opnd.val.data_type()
             );
             diags.err2("IRDB_11", &m, ir.src_loc.clone(), path_opnd.src_loc.clone());
             return false;
         }
 
-        let path_str = path_opnd.to_str();
+        let path_str = path_opnd.val.to_str();
         let path = Path::new(path_str);
 
         // Determine if we already know about this file
@@ -324,10 +324,10 @@ impl IRDb {
             return false;
         }
         let opnd = &self.parms[ir.operands[0]];
-        if ![DataType::Integer, DataType::I64, DataType::U64].contains(&opnd.data_type) {
+        if ![DataType::Integer, DataType::I64, DataType::U64].contains(&opnd.val.data_type()) {
             let m = format!(
                 "'{:?}' expression requires an integer or boolean operand, found '{:?}'.",
-                ir.kind, opnd.data_type
+                ir.kind, opnd.val.data_type()
             );
             diags.err2("IRDB_5", &m, ir.src_loc.clone(), opnd.src_loc.clone());
             return false;
@@ -349,10 +349,10 @@ impl IRDb {
         }
         for op_num in 0..2 {
             let opnd = &self.parms[ir.operands[op_num]];
-            if ![DataType::Integer, DataType::I64, DataType::U64].contains(&opnd.data_type) {
+            if ![DataType::Integer, DataType::I64, DataType::U64].contains(&opnd.val.data_type()) {
                 let m = format!(
                     "'{:?}' expression requires an integer, found '{:?}'.",
-                    ir.kind, opnd.data_type
+                    ir.kind, opnd.val.data_type()
                 );
                 diags.err2("IRDB_7", &m, ir.src_loc.clone(), opnd.src_loc.clone());
                 return false;
@@ -376,11 +376,11 @@ impl IRDb {
 
         // First operand must be numeric
         let opnd = &self.parms[ir.operands[0]];
-        if ![DataType::Integer, DataType::I64, DataType::U64].contains(&opnd.data_type) {
+        if ![DataType::Integer, DataType::I64, DataType::U64].contains(&opnd.val.data_type()) {
             let m = format!(
                 "'{:?}' requires an integer for this operand, \
                                     found '{:?}'.",
-                ir.kind, opnd.data_type
+                ir.kind, opnd.val.data_type()
             );
             diags.err2("IRDB_9", &m, ir.src_loc.clone(), opnd.src_loc.clone());
             return false;
@@ -389,11 +389,11 @@ impl IRDb {
         // Second *optional* operand must be numeric
         if len == 2 {
             let opnd = &self.parms[ir.operands[1]];
-            if ![DataType::Integer, DataType::I64, DataType::U64].contains(&opnd.data_type) {
+            if ![DataType::Integer, DataType::I64, DataType::U64].contains(&opnd.val.data_type()) {
                 let m = format!(
                     "'{:?}' requires an integer for this operand, \
                                         found '{:?}'.",
-                    ir.kind, opnd.data_type
+                    ir.kind, opnd.val.data_type()
                 );
                 diags.err2("IRDB_9", &m, ir.src_loc.clone(), opnd.src_loc.clone());
                 return false;
@@ -538,8 +538,8 @@ impl IRDb {
             let mut op = format!("lid {}: is {:?}", idx, ir.kind);
             // display the operand for this LinIR
             let mut first = true;
-            for child in &ir.operands {
-                let operand = &self.parms[*child];
+            for child_idx in &ir.operands {
+                let operand = &self.parms[*child_idx];
                 if !first {
                     op.push(',');
                 } else {
@@ -548,23 +548,25 @@ impl IRDb {
                 if let Some(ir_lid) = operand.is_output_of() {
                     op.push_str(&format!(
                         " ({:?})tmp{}, output of lid {}",
-                        operand.data_type, *child, ir_lid
+                        operand.val.data_type(), *child_idx, ir_lid
                     ));
                 } else {
-                    match operand.data_type {
-                        DataType::U64 => {
-                            // Always display U64 as hex
-                            let v = operand.to_u64();
-                            op.push_str(&format!(" ({:?}){:#X}", operand.data_type, v));
+                    match operand.val.data_type() {
+                        DataType::U64 | DataType::Identifier => {
+                            let v = operand.val.to_u64();
+                            op.push_str(&format!(" ({:?}){:#X}", operand.val.data_type(), v));
                         }
-                        DataType::Integer | DataType::I64 => {
-                            let v = operand.to_i64();
-                            op.push_str(&format!(" ({:?}){}", operand.data_type, v));
+                        DataType::I64 | DataType::Integer => {
+                            let v = operand.val.to_i64();
+                            op.push_str(&format!(" ({:?}){}", operand.val.data_type(), v));
                         }
-                        // order matters, must be last
-                        _ => {
-                            let v = operand.to_str();
-                            op.push_str(&format!(" ({:?}){}", operand.data_type, v));
+                        DataType::QuotedString => {
+                            let v = operand.val.to_str();
+                            op.push_str(&format!(" ({:?}){}", operand.val.data_type(), v));
+                        }
+                        DataType::Unknown => {
+                            println!("Dump: Found unknown Data Type operand {:?}", operand);
+                            panic!();
                         }
                     }
                 }

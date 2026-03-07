@@ -61,8 +61,74 @@ pub enum IRKind {
 pub enum ParameterValue {
     U64(u64),
     I64(i64),
-    String(String),
-    None,
+    Integer(i64), // ambiguously U64 or I64, physically backed by i64
+    QuotedString(String),
+    Identifier(String),
+    Unknown,
+}
+
+impl ParameterValue {
+    pub fn data_type(&self) -> DataType {
+        match self {
+            ParameterValue::U64(_) => DataType::U64,
+            ParameterValue::I64(_) => DataType::I64,
+            ParameterValue::Integer(_) => DataType::Integer,
+            ParameterValue::QuotedString(_) => DataType::QuotedString,
+            ParameterValue::Identifier(_) => DataType::Identifier,
+            ParameterValue::Unknown => DataType::Unknown,
+        }
+    }
+
+    pub fn to_bool(&self) -> bool {
+        match self {
+            ParameterValue::I64(v) | ParameterValue::Integer(v) => (*v as u64) != 0,
+            ParameterValue::U64(v) => *v != 0,
+            _ => { panic!("Internal error: Invalid type conversion to bool"); },
+        }
+    }
+
+    pub fn to_u64(&self) -> u64 {
+        match self {
+            ParameterValue::I64(v) | ParameterValue::Integer(v) => *v as u64,
+            ParameterValue::U64(v) => *v,
+            _ => { panic!("Internal error: Invalid type conversion to u64"); }
+        }
+    }
+
+    pub fn to_u64_mut(&mut self) -> &mut u64 {
+        match self {
+            ParameterValue::U64(v) => v,
+            _ => { panic!("Internal error: Invalid type conversion to &mut u64"); }
+        }
+    }
+
+    pub fn to_i64(&self) -> i64 {
+        match self {
+            ParameterValue::I64(v) | ParameterValue::Integer(v) => *v,
+            _ => { panic!("Internal error: Invalid type conversion to i64"); }
+        }
+    }
+
+    pub fn to_i64_mut(&mut self) -> &mut i64 {
+        match self {
+            ParameterValue::I64(v) | ParameterValue::Integer(v) => v,
+            _ => { panic!("Internal error: Invalid type conversion to &mut i64"); }
+        }
+    }
+
+    pub fn to_str(&self) -> &str {
+        match self {
+            ParameterValue::QuotedString(s) => s,
+            _ => { panic!("Internal error: Invalid type conversion to str"); }
+        }
+    }
+
+    pub fn to_identifier(&self) -> &str {
+        match self {
+            ParameterValue::Identifier(s) => s,
+            _ => { panic!("Internal error: Invalid type conversion to identifier"); }
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -72,7 +138,6 @@ pub struct IROperand {
     pub ir_lid: Option<usize>,
     pub src_loc: Range<usize>,
     pub is_constant: bool,
-    pub data_type: DataType,
     pub val: ParameterValue,
 }
 
@@ -90,7 +155,6 @@ impl IROperand {
                 ir_lid,
                 src_loc: src_loc.clone(),
                 is_constant,
-                data_type,
                 val,
             });
         }
@@ -115,7 +179,7 @@ impl IROperand {
                 // Trim quotes and convert escape characters
                 // For trimming, don't use trim_matches since that
                 // will incorrectly strip trailing escaped quotes.
-                return Some(ParameterValue::String(
+                return Some(ParameterValue::QuotedString(
                     sval.strip_prefix('\"')
                         .unwrap()
                         .strip_suffix('\"')
@@ -166,23 +230,24 @@ impl IROperand {
                     // is least surprising since expectations like 1 - 2 == -1 hold.
                     let res = parse::<i64>(sval);
                     if let Ok(v) = res {
-                        return Some(ParameterValue::I64(v));
+                        return Some(ParameterValue::Integer(v));
                     } else {
                         let m = format!("Malformed integer operand {}", sval);
                         diags.err1("IR_3", &m, src_loc.clone());
                     }
                 } else {
                     // We don't know variable value, so initialize to zero
-                    return Some(ParameterValue::I64(0));
+                    return Some(ParameterValue::Integer(0));
                 }
             }
 
             DataType::Identifier => {
-                return Some(ParameterValue::String(sval.to_string()));
+                return Some(ParameterValue::Identifier(sval.to_string()));
             }
             DataType::Unknown => {
                 let m = format!("Conversion failed for unknown type {}.", sval);
                 diags.err1("IR_2", &m, src_loc.clone());
+                return Some(ParameterValue::Unknown);
             }
         };
         None
@@ -190,50 +255,6 @@ impl IROperand {
 
     pub fn clone_val(&self) -> ParameterValue {
         self.val.clone()
-    }
-
-    pub fn to_bool(&self) -> bool {
-        match self.val {
-            ParameterValue::I64(v) => (v as u64) != 0,
-            ParameterValue::U64(v) => v != 0,
-            _ => { panic!("Internal error: Invalid type conversion to bool"); },
-        }
-    }
-
-    pub fn to_u64(&self) -> u64 {
-        match self.val {
-            ParameterValue::I64(v) => v as u64,
-            ParameterValue::U64(v) => v,
-            _ => {
-                panic!("Internal error: Invalid type conversion to u64");
-            }
-        }
-    }
-
-    pub fn to_i64(&self) -> i64 {
-        match self.val {
-            ParameterValue::I64(v) => v,
-            _ => {
-                panic!("Internal error: Invalid type conversion to i64");
-            }
-        }
-    }
-
-    pub fn to_str(&self) -> &str {
-        match &self.val {
-            ParameterValue::String(s) => s,
-            _ => {
-                panic!("Internal error: Invalid type conversion to str");
-            }
-        }
-    }
-    pub fn to_identifier(&self) -> &str {
-        match &self.val {
-            ParameterValue::String(s) => s,
-            _ => {
-                panic!("Internal error: Invalid type conversion to identifier");
-            }
-        }
     }
 }
 
