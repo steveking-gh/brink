@@ -1,6 +1,5 @@
 use diags::Diags;
 use parse_int::parse;
-use std::any::Any;
 use std::ops::Range;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -191,15 +190,6 @@ impl IROperand {
 
     pub fn clone_val(&self) -> ParameterValue {
         self.val.clone()
-    }
-
-    pub fn clone_val_box(&self) -> Box<dyn Any> {
-        match &self.val {
-            ParameterValue::U64(v) => Box::new(*v),
-            ParameterValue::I64(v) => Box::new(*v),
-            ParameterValue::String(s) => Box::new(s.clone()),
-            ParameterValue::None => Box::new(0u64),
-        }
     }
 
     pub fn to_bool(&self) -> bool {
