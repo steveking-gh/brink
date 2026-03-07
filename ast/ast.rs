@@ -765,10 +765,10 @@ impl<'toks> Ast<'toks> {
                 break; // end of input.
             }
 
-            // Screen out disallowed operations
+            // Filter disallowed operations.
             let op_tinfo = op_tinfo.unwrap();
             match op_tinfo.tok {
-                // Comma, close paren and semi are terminating conditions
+                // Comma, close paren and semicolon are terminating conditions
                 // because some upper layer is specifically looking for them.
                 LexToken::Comma | LexToken::CloseParen | LexToken::Semicolon => {
                     break;

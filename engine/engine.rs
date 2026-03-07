@@ -660,9 +660,6 @@ impl Engine {
         let out_parm_num = ir.operands[1];
 
         let sec_name = self.parms[in_parm_num0].to_identifier().to_string();
-        let out_parm = &mut self.parms[out_parm_num];
-
-        let out = out_parm.to_u64_mut();
 
         // We've already verified that the section identifier exists,
         // but unless the section actually got used in the output,
