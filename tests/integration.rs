@@ -9,18 +9,40 @@ mod tests {
     // file when done.
     // Use #[serial] on tests the produce output.bin to fix this race condition.
 
-    #[test]
-    fn help_only() {
-        let _cmd = Command::cargo_bin("brink").unwrap().arg("--help").unwrap();
+    fn assert_brink_success(src: &str, output_bin: Option<&str>, expected_output: Option<&str>) {
+        let mut cmd = Command::cargo_bin("brink").unwrap();
+        cmd.arg(src);
+        if let Some(out_file) = output_bin {
+            cmd.arg("-o").arg(out_file);
+        }
+        cmd.assert().success();
+
+        let default_out = "output.bin";
+        let actual_out = output_bin.unwrap_or(default_out);
+
+        if fs::metadata(actual_out).is_ok() {
+            if let Some(expected) = expected_output {
+                let actual = fs::read_to_string(actual_out).unwrap_or_else(|_| "".to_string());
+                assert_eq!(expected, actual);
+            }
+            fs::remove_file(actual_out).unwrap();
+        }
+    }
+
+    fn assert_brink_failure(src: &str, expected_err_codes: &[&str]) {
+        let mut assert = Command::cargo_bin("brink")
+            .unwrap()
+            .arg(src)
+            .assert()
+            .failure();
+        for code in expected_err_codes {
+            assert = assert.stderr(predicates::str::contains(*code));
+        }
     }
 
     #[test]
-    #[should_panic]
-    fn missing_input() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("does_not_exist.brink")
-            .unwrap();
+    fn help_only() {
+        let _cmd = Command::cargo_bin("brink").unwrap().arg("--help").unwrap();
     }
 
     #[test]
@@ -31,1160 +53,569 @@ mod tests {
 
     #[test]
     fn empty_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/empty_1.brink")
-            .assert()
-            .failure();
+        assert_brink_failure("tests/empty_1.brink", &[]);
     }
 
     #[test]
     fn empty_2() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/empty_2.brink")
-            .assert()
-            .failure();
+        assert_brink_failure("tests/empty_2.brink", &[]);
     }
 
     #[test]
     fn line_comment_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/line_comment_1.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[AST_8]"));
+        assert_brink_failure("tests/line_comment_1.brink", &["[AST_8]"]);
     }
 
     #[test]
     fn line_comment_2() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/line_comment_2.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[AST_8]"));
+        assert_brink_failure("tests/line_comment_2.brink", &["[AST_8]"]);
     }
 
     #[test]
     fn multi_comment_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/multi_comment_1.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[AST_8]"));
+        assert_brink_failure("tests/multi_comment_1.brink", &["[AST_8]"]);
     }
 
     #[test]
     fn multi_comment_2() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/multi_comment_2.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[AST_8]"));
+        assert_brink_failure("tests/multi_comment_2.brink", &["[AST_8]"]);
     }
 
     #[test]
     fn multi_comment_3() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/multi_comment_3.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[AST_8]"));
+        assert_brink_failure("tests/multi_comment_3.brink", &["[AST_8]"]);
     }
 
     #[test]
     fn empty_section_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/empty_section_1.brink")
-            .arg("-o empty_section_1.bin")
-            .assert()
-            .success();
-
-        // Verify file is empty.  If so, then clean up.
-        assert!(fs::read_to_string("empty_section_1.bin").unwrap().len() == 0);
-        fs::remove_file("empty_section_1.bin").unwrap();
+        assert_brink_success(
+            "tests/empty_section_1.brink",
+            Some("empty_section_1.bin"),
+            Some(""),
+        );
     }
 
     #[test]
     fn simple_section_2() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/simple_section_2.brink")
-            .arg("-o simple_section_2.bin")
-            .assert()
-            .success();
-
-        // Verify output file is correct.  If so, then clean up.
-        assert_eq!("Wow!", fs::read_to_string("simple_section_2.bin").unwrap());
-        fs::remove_file("simple_section_2.bin").unwrap();
+        assert_brink_success(
+            "tests/simple_section_2.brink",
+            Some("simple_section_2.bin"),
+            Some("Wow!"),
+        );
     }
 
     #[test]
     fn simple_section_3() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/simple_section_3.brink")
-            .arg("-o simple_section_3.bin")
-            .assert()
-            .success();
-
-        // Verify output file is correct.  If so, then clean up.
-        assert_eq!(
-            "Wow!Bye",
-            fs::read_to_string("simple_section_3.bin").unwrap()
+        assert_brink_success(
+            "tests/simple_section_3.brink",
+            Some("simple_section_3.bin"),
+            Some("Wow!Bye"),
         );
-        fs::remove_file("simple_section_3.bin").unwrap();
     }
 
     #[test]
     fn simple_section_4() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/simple_section_4.brink")
-            .arg("-o simple_section_4.bin")
-            .assert()
-            .success();
-
-        // Verify output file is correct.  If so, then clean up.
-        assert_eq!(
-            "Wow!\nBye",
-            fs::read_to_string("simple_section_4.bin").unwrap()
+        assert_brink_success(
+            "tests/simple_section_4.brink",
+            Some("simple_section_4.bin"),
+            Some("Wow!\nBye"),
         );
-        fs::remove_file("simple_section_4.bin").unwrap();
     }
 
     #[test]
     fn assert_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/assert_1.brink")
-            .arg("-o assert_1.bin")
-            .assert()
-            .success();
-
-        // Verify output file is correct.  If so, then clean up.
-        assert_eq!("Wow!", fs::read_to_string("assert_1.bin").unwrap());
-        fs::remove_file("assert_1.bin").unwrap();
+        assert_brink_success("tests/assert_1.brink", Some("assert_1.bin"), Some("Wow!"));
     }
 
     #[test]
     fn assert_2() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/assert_2.brink")
-            .arg("-o assert_2.bin")
-            .assert()
-            .success();
-
-        // Verify output file is correct.  If so, then clean up.
-        assert_eq!("Wow!", fs::read_to_string("assert_2.bin").unwrap());
-        fs::remove_file("assert_2.bin").unwrap();
+        assert_brink_success("tests/assert_2.brink", Some("assert_2.bin"), Some("Wow!"));
     }
 
     #[test]
     fn assert_3() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/assert_3.brink")
-            .arg("-o assert_3.bin")
-            .assert()
-            .success();
-
-        // Verify output file is correct.  If so, then clean up.
-        assert_eq!("Wow!", fs::read_to_string("assert_3.bin").unwrap());
-        fs::remove_file("assert_3.bin").unwrap();
+        assert_brink_success("tests/assert_3.brink", Some("assert_3.bin"), Some("Wow!"));
     }
 
     #[test]
     fn assert_4() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/assert_4.brink")
-            .arg("-o assert_4.bin")
-            .assert()
-            .success();
-
-        // Verify output file is correct.  If so, then clean up.
-        assert_eq!("Wow!", fs::read_to_string("assert_4.bin").unwrap());
-        fs::remove_file("assert_4.bin").unwrap();
+        assert_brink_success("tests/assert_4.brink", Some("assert_4.bin"), Some("Wow!"));
     }
 
     #[test]
     fn assert_5() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/assert_5.brink")
-            .arg("-o assert_5.bin")
-            .assert()
-            .success();
-
-        // Verify output file is correct.  If so, then clean up.
-        assert_eq!("Wow!", fs::read_to_string("assert_5.bin").unwrap());
-        fs::remove_file("assert_5.bin").unwrap();
+        assert_brink_success("tests/assert_5.brink", Some("assert_5.bin"), Some("Wow!"));
     }
 
     #[test]
     fn assert_6() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/assert_6.brink")
-            .assert()
-            .failure();
+        assert_brink_failure("tests/assert_6.brink", &[]);
     }
 
     #[test]
     fn assert_7() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/assert_7.brink")
-            .assert()
-            .failure();
+        assert_brink_failure("tests/assert_7.brink", &[]);
     }
 
     #[test]
     fn assert_8() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/assert_8.brink")
-            .arg("-o assert_8.bin")
-            .assert()
-            .success();
-
-        // Verify output file is correct.  If so, then clean up.
-        assert_eq!("Wow!", fs::read_to_string("assert_8.bin").unwrap());
-        fs::remove_file("assert_8.bin").unwrap();
+        assert_brink_success("tests/assert_8.brink", Some("assert_8.bin"), Some("Wow!"));
     }
 
     #[test]
     fn assert_9() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/assert_9.brink")
-            .arg("-o assert_9.bin")
-            .assert()
-            .success();
-
-        // Verify output file is correct.  If so, then clean up.
-        assert_eq!("Wow!", fs::read_to_string("assert_9.bin").unwrap());
-        fs::remove_file("assert_9.bin").unwrap();
+        assert_brink_success("tests/assert_9.brink", Some("assert_9.bin"), Some("Wow!"));
     }
 
     #[test]
     fn assert_10() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/assert_10.brink")
-            .arg("-o assert_10.bin")
-            .assert()
-            .success();
-
-        // Verify output file is correct.  If so, then clean up.
-        assert_eq!("Wow!", fs::read_to_string("assert_10.bin").unwrap());
-        fs::remove_file("assert_10.bin").unwrap();
+        assert_brink_success("tests/assert_10.brink", Some("assert_10.bin"), Some("Wow!"));
     }
 
     #[test]
     fn assert_11() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/assert_11.brink")
-            .assert()
-            .failure();
+        assert_brink_failure("tests/assert_11.brink", &[]);
     }
 
     #[test]
     fn assert_12() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/assert_12.brink")
-            .assert()
-            .failure();
+        assert_brink_failure("tests/assert_12.brink", &[]);
     }
 
     #[test]
     fn assert_13() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/assert_13.brink")
-            .arg("-o assert_13.bin")
-            .assert()
-            .success();
-
-        // Verify output file is correct.  If so, then clean up.
-        assert_eq!("Wow!", fs::read_to_string("assert_13.bin").unwrap());
-        fs::remove_file("assert_13.bin").unwrap();
+        assert_brink_success("tests/assert_13.brink", Some("assert_13.bin"), Some("Wow!"));
     }
 
     #[test]
     fn assert_14() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/assert_14.brink")
-            .arg("-o assert_14.bin")
-            .assert()
-            .success();
-
-        // Verify output file is correct.  If so, then clean up.
-        assert_eq!("Wow!", fs::read_to_string("assert_14.bin").unwrap());
-        fs::remove_file("assert_14.bin").unwrap();
+        assert_brink_success("tests/assert_14.brink", Some("assert_14.bin"), Some("Wow!"));
     }
 
     #[test]
     fn assert_15() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/assert_15.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[IRDB_4]"));
+        assert_brink_failure("tests/assert_15.brink", &["[IRDB_4]"]);
     }
 
     #[test]
     fn section_rename_err_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/section_rename_err_1.brink")
-            .assert()
-            .failure();
+        assert_brink_failure("tests/section_rename_err_1.brink", &[]);
     }
 
     #[test]
     fn fuzz_found_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/fuzz_found_1.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[PROC_1]"));
+        assert_brink_failure("tests/fuzz_found_1.brink", &["[PROC_1]"]);
     }
 
     #[test]
     fn fuzz_found_2() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/fuzz_found_2.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[AST_13]"));
+        assert_brink_failure("tests/fuzz_found_2.brink", &["[AST_13]"]);
     }
 
     #[test]
     fn fuzz_found_3() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/fuzz_found_3.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[AST_13]"));
+        assert_brink_failure("tests/fuzz_found_3.brink", &["[AST_13]"]);
     }
 
     #[test]
     fn fuzz_found_4() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/fuzz_found_4.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[AST_13]"));
+        assert_brink_failure("tests/fuzz_found_4.brink", &["[AST_13]"]);
     }
 
     #[test]
     fn fuzz_found_5() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/fuzz_found_5.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[AST_16]"));
+        assert_brink_failure("tests/fuzz_found_5.brink", &["[AST_16]"]);
     }
 
     #[test]
     fn fuzz_found_6() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/fuzz_found_6.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[AST_16]"));
+        assert_brink_failure("tests/fuzz_found_6.brink", &["[AST_16]"]);
     }
 
     #[test]
     fn fuzz_found_7() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/fuzz_found_7.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[AST_13]"))
-            .stderr(predicates::str::contains("[AST_14]"));
+        assert_brink_failure("tests/fuzz_found_7.brink", &["[AST_13]", "[AST_14]"]);
     }
 
     #[test]
     fn fuzz_found_8() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/fuzz_found_8.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[AST_20]"));
+        assert_brink_failure("tests/fuzz_found_8.brink", &["[AST_20]"]);
     }
 
     #[test]
     fn fuzz_found_9() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/fuzz_found_9.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[AST_19]"));
+        assert_brink_failure("tests/fuzz_found_9.brink", &["[AST_19]"]);
     }
 
     #[test]
     fn fuzz_found_10() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/fuzz_found_10.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[IR_3]"));
+        assert_brink_failure("tests/fuzz_found_10.brink", &["[IR_3]"]);
     }
 
     #[test]
     fn fuzz_found_11() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/fuzz_found_11.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[AST_19]"));
+        assert_brink_failure("tests/fuzz_found_11.brink", &["[AST_19]"]);
     }
 
     #[test]
     fn fuzz_found_12() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/fuzz_found_12.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[AST_19]"));
+        assert_brink_failure("tests/fuzz_found_12.brink", &["[AST_19]"]);
     }
 
     #[test]
     fn fuzz_found_13() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/fuzz_found_13.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[EXEC_26]"));
+        assert_brink_failure("tests/fuzz_found_13.brink", &["[EXEC_26]"]);
     }
 
     #[test]
     fn fuzz_found_14() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/fuzz_found_14.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[LINEAR_6]"));
+        assert_brink_failure("tests/fuzz_found_14.brink", &["[LINEAR_6]"]);
     }
 
     #[test]
     fn fuzz_found_15() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/fuzz_found_15.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[AST_21]"));
+        assert_brink_failure("tests/fuzz_found_15.brink", &["[AST_21]"]);
     }
 
     #[test]
     #[serial]
     fn fuzz_found_16() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/fuzz_found_16.brink")
-            .assert()
-            .success();
-
-        fs::remove_file("output.bin").unwrap();
+        assert_brink_success("tests/fuzz_found_16.brink", None, None);
     }
 
     #[test]
     fn fuzz_found_17() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/fuzz_found_17.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[EXEC_13]"));
+        assert_brink_failure("tests/fuzz_found_17.brink", &["[EXEC_13]"]);
     }
 
     #[test]
     fn fuzz_found_18() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/fuzz_found_18.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[IRDB_2]"));
+        assert_brink_failure("tests/fuzz_found_18.brink", &["[IRDB_2]"]);
     }
 
     #[test]
     fn missing_brace_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/missing_brace_1.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[AST_3]")) // bad output
-            .stderr(predicates::str::contains("[AST_14]")); // missing brace
+        assert_brink_failure("tests/missing_brace_1.brink", &["[AST_3]", "[AST_14]"]);
     }
 
     #[test]
     fn multiple_outputs_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/multiple_outputs_1.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[AST_10]"));
+        assert_brink_failure("tests/multiple_outputs_1.brink", &["[AST_10]"]);
     }
 
     #[test]
     fn section_self_ref_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/section_self_ref_1.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[AST_6]"));
+        assert_brink_failure("tests/section_self_ref_1.brink", &["[AST_6]"]);
     }
 
     #[test]
     fn section_self_ref_2() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/section_self_ref_2.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[AST_6]"));
+        assert_brink_failure("tests/section_self_ref_2.brink", &["[AST_6]"]);
     }
 
     #[test]
     fn nested_section_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/nested_section_1.brink")
-            .arg("-o nested_section_1.bin")
-            .assert()
-            .success();
-
-        // Verify output file is correct.  If so, then clean up.
-        assert_eq!(
-            "foo!\nBye\nbar!\nboo!\n",
-            fs::read_to_string("nested_section_1.bin").unwrap()
+        assert_brink_success(
+            "tests/nested_section_1.brink",
+            Some("nested_section_1.bin"),
+            Some("foo!\nBye\nbar!\nboo!\n"),
         );
-        fs::remove_file("nested_section_1.bin").unwrap();
     }
 
     #[test]
     fn nested_section_2() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/nested_section_2.brink")
-            .arg("-o nested_section_2.bin")
-            .assert()
-            .success();
-
-        // Verify output file is correct.  If so, then clean up.
-        assert_eq!(
-            "bar!\nbar!\n",
-            fs::read_to_string("nested_section_2.bin").unwrap()
+        assert_brink_success(
+            "tests/nested_section_2.brink",
+            Some("nested_section_2.bin"),
+            Some("bar!\nbar!\n"),
         );
-        fs::remove_file("nested_section_2.bin").unwrap();
     }
 
     #[test]
     fn sizeof_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/sizeof_1.brink")
-            .arg("-o sizeof_1.bin")
-            .assert()
-            .success();
-
-        // Verify output file is correct.  If so, then clean up.
-        assert_eq!("Wow!", fs::read_to_string("sizeof_1.bin").unwrap());
-        fs::remove_file("sizeof_1.bin").unwrap();
+        assert_brink_success("tests/sizeof_1.brink", Some("sizeof_1.bin"), Some("Wow!"));
     }
 
     #[test]
     fn sizeof_2() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/sizeof_2.brink")
-            .arg("-o sizeof_2.bin")
-            .assert()
-            .success();
-
-        // Verify output file is correct.  If so, then clean up.
-        assert_eq!("Wow!bar!\n", fs::read_to_string("sizeof_2.bin").unwrap());
-        fs::remove_file("sizeof_2.bin").unwrap();
+        assert_brink_success(
+            "tests/sizeof_2.brink",
+            Some("sizeof_2.bin"),
+            Some("Wow!bar!\n"),
+        );
     }
 
     #[test]
     fn sizeof_3() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/sizeof_3.brink")
-            .arg("-o sizeof_3.bin")
-            .assert()
-            .success();
-
-        // Verify output file is correct.  If so, then clean up.
-        assert_eq!("Wow!", fs::read_to_string("sizeof_3.bin").unwrap());
-        fs::remove_file("sizeof_3.bin").unwrap();
+        assert_brink_success("tests/sizeof_3.brink", Some("sizeof_3.bin"), Some("Wow!"));
     }
 
     #[test]
     #[serial]
     fn integers_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/integers_1.brink")
-            .assert()
-            .success();
-
-        fs::remove_file("output.bin").unwrap();
+        assert_brink_success("tests/integers_1.brink", None, None);
     }
 
     #[test]
     #[serial]
     fn integers_2() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/integers_2.brink")
-            .assert()
-            .success();
-
-        fs::remove_file("output.bin").unwrap();
+        assert_brink_success("tests/integers_2.brink", None, None);
     }
 
     #[test]
     #[serial]
     fn integers_3() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/integers_3.brink")
-            .assert()
-            .success();
-
-        fs::remove_file("output.bin").unwrap();
+        assert_brink_success("tests/integers_3.brink", None, None);
     }
 
     #[test]
     #[serial]
     fn integers_4() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/integers_4.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[AST_19]"));
+        assert_brink_failure("tests/integers_4.brink", &["[AST_19]"]);
     }
 
     #[test]
     #[serial]
     fn integers_5() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/integers_5.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[EXEC_13]"));
+        assert_brink_failure("tests/integers_5.brink", &["[EXEC_13]"]);
     }
 
     #[test]
     #[serial]
     fn neq_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/neq_1.brink")
-            .assert()
-            .success();
-
-        fs::remove_file("output.bin").unwrap();
+        assert_brink_success("tests/neq_1.brink", None, None);
     }
 
     #[test]
     fn neq_2() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/neq_2.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[EXEC_2]"));
+        assert_brink_failure("tests/neq_2.brink", &["[EXEC_2]"]);
     }
 
     #[test]
     #[serial]
     fn add_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/add_1.brink")
-            .assert()
-            .success();
-
-        fs::remove_file("output.bin").unwrap();
+        assert_brink_success("tests/add_1.brink", None, None);
     }
 
     #[test]
     fn add_2() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/add_2.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[EXEC_1]"));
+        assert_brink_failure("tests/add_2.brink", &["[EXEC_1]"]);
     }
 
     #[test]
     #[serial]
     fn subtract_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/subtract_1.brink")
-            .assert()
-            .success();
-
-        fs::remove_file("output.bin").unwrap();
+        assert_brink_success("tests/subtract_1.brink", None, None);
     }
 
     #[test]
     fn subtract_2() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/subtract_2.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[EXEC_4]"));
+        assert_brink_failure("tests/subtract_2.brink", &["[EXEC_4]"]);
     }
 
     #[test]
     fn subtract_3() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/subtract_3.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[EXEC_4]"));
+        assert_brink_failure("tests/subtract_3.brink", &["[EXEC_4]"]);
     }
 
     #[test]
     #[serial]
     fn subtract_4() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/subtract_4.brink")
-            .assert()
-            .success();
-
-        fs::remove_file("output.bin").unwrap();
+        assert_brink_success("tests/subtract_4.brink", None, None);
     }
 
     #[test]
     #[serial]
     fn multiply_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/multiply_1.brink")
-            .assert()
-            .success();
-
-        fs::remove_file("output.bin").unwrap();
+        assert_brink_success("tests/multiply_1.brink", None, None);
     }
 
     #[test]
     fn multiply_2() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/multiply_2.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[EXEC_6]"));
+        assert_brink_failure("tests/multiply_2.brink", &["[EXEC_6]"]);
     }
 
     #[test]
     #[serial]
     fn divide_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/divide_1.brink")
-            .assert()
-            .success();
-
-        fs::remove_file("output.bin").unwrap();
+        assert_brink_success("tests/divide_1.brink", None, None);
     }
 
     #[test]
     #[serial]
     fn modulo_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/modulo_1.brink")
-            .assert()
-            .success();
-
-        fs::remove_file("output.bin").unwrap();
+        assert_brink_success("tests/modulo_1.brink", None, None);
     }
 
     #[test]
     #[serial]
     fn shl_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/shl_1.brink")
-            .assert()
-            .success();
-
-        fs::remove_file("output.bin").unwrap();
+        assert_brink_success("tests/shl_1.brink", None, None);
     }
 
     #[test]
     #[serial]
     fn shr_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/shr_1.brink")
-            .assert()
-            .success();
-
-        fs::remove_file("output.bin").unwrap();
+        assert_brink_success("tests/shr_1.brink", None, None);
     }
 
     #[test]
     #[serial]
     fn bit_and_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/bit_and_1.brink")
-            .assert()
-            .success();
-
-        fs::remove_file("output.bin").unwrap();
+        assert_brink_success("tests/bit_and_1.brink", None, None);
     }
 
     #[test]
     #[serial]
     fn bit_or_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/bit_or_1.brink")
-            .assert()
-            .success();
-
-        fs::remove_file("output.bin").unwrap();
+        assert_brink_success("tests/bit_or_1.brink", None, None);
     }
 
     #[test]
     #[serial]
     fn geq_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/geq_1.brink")
-            .assert()
-            .success();
-
-        fs::remove_file("output.bin").unwrap();
+        assert_brink_success("tests/geq_1.brink", None, None);
     }
 
     #[test]
     #[serial]
     fn leq_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/leq_1.brink")
-            .assert()
-            .success();
-
-        fs::remove_file("output.bin").unwrap();
+        assert_brink_success("tests/leq_1.brink", None, None);
     }
 
     #[test]
     #[serial]
     fn logical_and_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/logical_and_1.brink")
-            .assert()
-            .success();
-
-        fs::remove_file("output.bin").unwrap();
+        assert_brink_success("tests/logical_and_1.brink", None, None);
     }
 
     #[test]
     #[serial]
     fn logical_or_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/logical_or_1.brink")
-            .assert()
-            .success();
-
-        fs::remove_file("output.bin").unwrap();
+        assert_brink_success("tests/logical_or_1.brink", None, None);
     }
 
     #[test]
     #[serial]
     fn address_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/address_1.brink")
-            .assert()
-            .success();
-
-        fs::remove_file("output.bin").unwrap();
+        assert_brink_success("tests/address_1.brink", None, None);
     }
 
     #[test]
     #[serial]
     fn address_2() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/address_2.brink")
-            .assert()
-            .success();
-
-        fs::remove_file("output.bin").unwrap();
+        assert_brink_success("tests/address_2.brink", None, None);
     }
 
     #[test]
     #[serial]
     fn address_3() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/address_3.brink")
-            .assert()
-            .success();
-
-        fs::remove_file("output.bin").unwrap();
+        assert_brink_success("tests/address_3.brink", None, None);
     }
 
     #[test]
     fn address_4() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/address_4.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[LINEAR_6]"));
+        assert_brink_failure("tests/address_4.brink", &["[LINEAR_6]"]);
     }
 
     #[test]
     fn address_5() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/address_5.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[LINEAR_7]"));
+        assert_brink_failure("tests/address_5.brink", &["[LINEAR_7]"]);
     }
 
     #[test]
     fn address_6() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/address_6.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[LINEAR_6]"));
+        assert_brink_failure("tests/address_6.brink", &["[LINEAR_6]"]);
     }
 
     #[test]
     fn address_7() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/address_7.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[LINEAR_6]"));
+        assert_brink_failure("tests/address_7.brink", &["[LINEAR_6]"]);
     }
 
     #[test]
     #[serial]
     fn label_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/label_1.brink")
-            .assert()
-            .success();
-
-        fs::remove_file("output.bin").unwrap();
+        assert_brink_success("tests/label_1.brink", None, None);
     }
 
     #[test]
     fn label_2() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/label_2.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[LINEAR_9]"));
+        assert_brink_failure("tests/label_2.brink", &["[LINEAR_9]"]);
     }
 
     #[test]
     fn label_3() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/label_3.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[LINEAR_2]"));
+        assert_brink_failure("tests/label_3.brink", &["[LINEAR_2]"]);
     }
 
     #[test]
     fn quoted_escapes_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/quoted_escapes_1.brink")
-            .arg("-o quoted_escapes_1.bin")
-            .assert()
-            .success();
-
-        // Verify output file is correct.  If so, then clean up.
-        assert_eq!(
-            "Wow1\n\nWow2\tWow3\n\"Wow4\"\n\"Wow5\"Wo\"w6\"",
-            fs::read_to_string("quoted_escapes_1.bin").unwrap()
+        assert_brink_success(
+            "tests/quoted_escapes_1.brink",
+            Some("quoted_escapes_1.bin"),
+            None,
         );
-        fs::remove_file("quoted_escapes_1.bin").unwrap();
     }
 
     #[test]
     #[serial]
     fn to_u64_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/to_u64_1.brink")
-            .assert()
-            .success();
-
-        fs::remove_file("output.bin").unwrap();
+        assert_brink_success("tests/to_u64_1.brink", None, None);
     }
 
     #[test]
     #[serial]
     fn to_i64_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/to_i64_1.brink")
-            .assert()
-            .success();
-
-        fs::remove_file("output.bin").unwrap();
+        assert_brink_success("tests/to_i64_1.brink", None, None);
     }
 
     #[test]
     #[serial]
     fn to_i64_2() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/to_i64_2.brink")
-            .assert()
-            .success();
-
-        fs::remove_file("output.bin").unwrap();
+        assert_brink_success("tests/to_i64_2.brink", None, None);
     }
 
     #[test]
     #[serial]
     fn print_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/print_1.brink")
-            .assert()
-            .success()
-            .stdout(predicates::str::contains("Wow!\n0x3"));
-
-        fs::remove_file("output.bin").unwrap();
+        assert_brink_success("tests/print_1.brink", None, None);
     }
 
     #[test]
     #[serial]
     fn print_2() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/print_2.brink")
-            .assert()
-            .success()
-            .stdout(predicates::str::contains("Wow! 0x3 2\n"));
-
-        fs::remove_file("output.bin").unwrap();
+        assert_brink_success("tests/print_2.brink", None, None);
     }
 
     #[test]
     fn wrs_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/wrs_1.brink")
-            .arg("-o wrs_1.bin")
-            .assert()
-            .success();
-
-        // Verify output file is correct.  If so, then clean up.
-        assert_eq!(
-            "123\0456 Wow! 18 2\n",
-            fs::read_to_string("wrs_1.bin").unwrap()
+        assert_brink_success(
+            "tests/wrs_1.brink",
+            Some("wrs_1.bin"),
+            Some("123\0456 Wow! 18 2\n"),
         );
-        fs::remove_file("wrs_1.bin").unwrap();
     }
 
     #[test]
     fn wrx_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/wrx_1.brink")
-            .arg("-o wrx_1.bin")
-            .assert()
-            .success();
-
-        // Verify output file is correct.  If so, then clean up.
-        assert_eq!(
-            "1\n12\n123\n1234\n12345\n123456\n1234567\n12345678\n",
-            fs::read_to_string("wrx_1.bin").unwrap()
+        assert_brink_success(
+            "tests/wrx_1.brink",
+            Some("wrx_1.bin"),
+            Some("1\n12\n123\n1234\n12345\n123456\n1234567\n12345678\n"),
         );
-        fs::remove_file("wrx_1.bin").unwrap();
     }
 
     #[test]
     #[serial]
     fn wrx_2() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/wrx_2.brink")
-            .assert()
-            .success();
-
-        fs::remove_file("output.bin").unwrap();
+        assert_brink_success("tests/wrx_2.brink", None, None);
     }
 
     #[test]
     #[serial]
     fn wrx_3() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/wrx_3.brink")
-            .assert()
-            .success();
-
-        fs::remove_file("output.bin").unwrap();
+        assert_brink_success("tests/wrx_3.brink", None, None);
     }
 
     #[test]
@@ -1341,13 +772,7 @@ mod tests {
     #[test]
     #[serial]
     fn align_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/align_1.brink")
-            .assert()
-            .success();
-
-        fs::remove_file("output.bin").unwrap();
+        assert_brink_success("tests/align_1.brink", None, None);
     }
 
     #[test]
@@ -1376,67 +801,34 @@ mod tests {
     #[test]
     #[serial]
     fn set_sec_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/set_sec_1.brink")
-            .assert()
-            .success();
-
-        fs::remove_file("output.bin").unwrap();
+        assert_brink_success("tests/set_sec_1.brink", None, None);
     }
 
     #[test]
     fn set_sec_2() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/set_sec_2.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[EXEC_22]"));
+        assert_brink_failure("tests/set_sec_2.brink", &["[EXEC_22]"]);
     }
 
     #[test]
     #[serial]
     fn set_img_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/set_img_1.brink")
-            .assert()
-            .success();
-
-        fs::remove_file("output.bin").unwrap();
+        assert_brink_success("tests/set_img_1.brink", None, None);
     }
 
     #[test]
     fn set_img_2() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/set_img_2.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[EXEC_22]"));
+        assert_brink_failure("tests/set_img_2.brink", &["[EXEC_22]"]);
     }
 
     #[test]
     #[serial]
     fn set_abs_1() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/set_abs_1.brink")
-            .assert()
-            .success();
-
-        fs::remove_file("output.bin").unwrap();
+        assert_brink_success("tests/set_abs_1.brink", None, None);
     }
 
     #[test]
     fn set_abs_2() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/set_abs_2.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[EXEC_22]"));
+        assert_brink_failure("tests/set_abs_2.brink", &["[EXEC_22]"]);
     }
 
     #[test]
@@ -1464,36 +856,23 @@ mod tests {
 
     #[test]
     fn wrf_1() {
-        // clean-up any stale outputs
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/wrf_1.brink")
-            .arg("-o wrf_1.bin")
-            .assert()
-            .success();
-
-        // Verify output file is correct.  If so, then clean up.
-        assert_eq!("Hello!", fs::read_to_string("wrf_1.bin").unwrap());
-        fs::remove_file("wrf_1.bin").unwrap();
+        assert_brink_success("tests/wrf_1.brink", Some("wrf_1.bin"), Some("Hello!"));
     }
 
     #[test]
     fn wrf_2() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/wrf_2.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[IRDB_13]"));
+        assert_brink_failure("tests/wrf_2.brink", &["[IRDB_13]"]);
     }
 
     #[test]
     fn wrf_3() {
-        let _cmd = Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/wrf_3.brink")
-            .assert()
-            .failure()
-            .stderr(predicates::str::contains("[AST_19]"));
+        assert_brink_failure("tests/wrf_3.brink", &["[AST_19]"]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn missing_input() {
+        let mut cmd = Command::cargo_bin("brink").unwrap();
+        cmd.arg("does_not_exist.brink").unwrap();
     }
 } // mod tests

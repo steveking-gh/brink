@@ -207,7 +207,8 @@ impl Engine {
             let op = &self.parms[op_num];
             debug!(
                 "Processing string expr operand {} with data type {:?}",
-                local_op_num, op.data_type()
+                local_op_num,
+                op.data_type()
             );
             match op.data_type() {
                 DataType::QuotedString => {
@@ -1184,13 +1185,7 @@ impl Engine {
         Ok(())
     }
 
-    fn execute_wrs(
-        &self,
-        ir: &IR,
-        irdb: &IRDb,
-        diags: &mut Diags,
-        file: &mut File,
-    ) -> Result<()> {
+    fn execute_wrs(&self, ir: &IR, irdb: &IRDb, diags: &mut Diags, file: &mut File) -> Result<()> {
         self.trace("Engine::execute_wrs:");
         let xstr_opt = self.evaluate_string_expr(ir, irdb, diags);
         if xstr_opt.is_none() {
@@ -1211,13 +1206,7 @@ impl Engine {
         result
     }
 
-    fn execute_wrf(
-        &self,
-        ir: &IR,
-        irdb: &IRDb,
-        diags: &mut Diags,
-        file: &mut File,
-    ) -> Result<()> {
+    fn execute_wrf(&self, ir: &IR, irdb: &IRDb, diags: &mut Diags, file: &mut File) -> Result<()> {
         self.trace("Engine::execute_wrf:");
 
         let path_opnd = &self.parms[ir.operands[0]];

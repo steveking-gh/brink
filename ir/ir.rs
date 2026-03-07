@@ -83,7 +83,9 @@ impl ParameterValue {
         match self {
             ParameterValue::I64(v) | ParameterValue::Integer(v) => (*v as u64) != 0,
             ParameterValue::U64(v) => *v != 0,
-            _ => { panic!("Internal error: Invalid type conversion to bool"); },
+            _ => {
+                panic!("Internal error: Invalid type conversion to bool");
+            }
         }
     }
 
@@ -91,42 +93,54 @@ impl ParameterValue {
         match self {
             ParameterValue::I64(v) | ParameterValue::Integer(v) => *v as u64,
             ParameterValue::U64(v) => *v,
-            _ => { panic!("Internal error: Invalid type conversion to u64"); }
+            _ => {
+                panic!("Internal error: Invalid type conversion to u64");
+            }
         }
     }
 
     pub fn to_u64_mut(&mut self) -> &mut u64 {
         match self {
             ParameterValue::U64(v) => v,
-            _ => { panic!("Internal error: Invalid type conversion to &mut u64"); }
+            _ => {
+                panic!("Internal error: Invalid type conversion to &mut u64");
+            }
         }
     }
 
     pub fn to_i64(&self) -> i64 {
         match self {
             ParameterValue::I64(v) | ParameterValue::Integer(v) => *v,
-            _ => { panic!("Internal error: Invalid type conversion to i64"); }
+            _ => {
+                panic!("Internal error: Invalid type conversion to i64");
+            }
         }
     }
 
     pub fn to_i64_mut(&mut self) -> &mut i64 {
         match self {
             ParameterValue::I64(v) | ParameterValue::Integer(v) => v,
-            _ => { panic!("Internal error: Invalid type conversion to &mut i64"); }
+            _ => {
+                panic!("Internal error: Invalid type conversion to &mut i64");
+            }
         }
     }
 
     pub fn to_str(&self) -> &str {
         match self {
             ParameterValue::QuotedString(s) => s,
-            _ => { panic!("Internal error: Invalid type conversion to str"); }
+            _ => {
+                panic!("Internal error: Invalid type conversion to str");
+            }
         }
     }
 
     pub fn to_identifier(&self) -> &str {
         match self {
             ParameterValue::Identifier(s) => s,
-            _ => { panic!("Internal error: Invalid type conversion to identifier"); }
+            _ => {
+                panic!("Internal error: Invalid type conversion to identifier");
+            }
         }
     }
 }

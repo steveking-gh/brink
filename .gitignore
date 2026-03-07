@@ -4,3 +4,4 @@
 **/*.profraw
 ast/fuzz/cov
 engine/fix.py
+refactor.py

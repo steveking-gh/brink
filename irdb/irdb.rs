@@ -255,7 +255,8 @@ impl IRDb {
             let m = format!(
                 "'{:?}' operand must be a file path in \
                     double-quotes, found '{:?}'.",
-                ir.kind, path_opnd.val.data_type()
+                ir.kind,
+                path_opnd.val.data_type()
             );
             diags.err2("IRDB_11", &m, ir.src_loc.clone(), path_opnd.src_loc.clone());
             return false;
@@ -327,7 +328,8 @@ impl IRDb {
         if ![DataType::Integer, DataType::I64, DataType::U64].contains(&opnd.val.data_type()) {
             let m = format!(
                 "'{:?}' expression requires an integer or boolean operand, found '{:?}'.",
-                ir.kind, opnd.val.data_type()
+                ir.kind,
+                opnd.val.data_type()
             );
             diags.err2("IRDB_5", &m, ir.src_loc.clone(), opnd.src_loc.clone());
             return false;
@@ -352,7 +354,8 @@ impl IRDb {
             if ![DataType::Integer, DataType::I64, DataType::U64].contains(&opnd.val.data_type()) {
                 let m = format!(
                     "'{:?}' expression requires an integer, found '{:?}'.",
-                    ir.kind, opnd.val.data_type()
+                    ir.kind,
+                    opnd.val.data_type()
                 );
                 diags.err2("IRDB_7", &m, ir.src_loc.clone(), opnd.src_loc.clone());
                 return false;
@@ -380,7 +383,8 @@ impl IRDb {
             let m = format!(
                 "'{:?}' requires an integer for this operand, \
                                     found '{:?}'.",
-                ir.kind, opnd.val.data_type()
+                ir.kind,
+                opnd.val.data_type()
             );
             diags.err2("IRDB_9", &m, ir.src_loc.clone(), opnd.src_loc.clone());
             return false;
@@ -393,7 +397,8 @@ impl IRDb {
                 let m = format!(
                     "'{:?}' requires an integer for this operand, \
                                         found '{:?}'.",
-                    ir.kind, opnd.val.data_type()
+                    ir.kind,
+                    opnd.val.data_type()
                 );
                 diags.err2("IRDB_9", &m, ir.src_loc.clone(), opnd.src_loc.clone());
                 return false;
@@ -548,7 +553,9 @@ impl IRDb {
                 if let Some(ir_lid) = operand.is_output_of() {
                     op.push_str(&format!(
                         " ({:?})tmp{}, output of lid {}",
-                        operand.val.data_type(), *child_idx, ir_lid
+                        operand.val.data_type(),
+                        *child_idx,
+                        ir_lid
                     ));
                 } else {
                     match operand.val.data_type() {
