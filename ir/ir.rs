@@ -58,6 +58,14 @@ pub enum IRKind {
     Wrs,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum ParameterValue {
+    U64(u64),
+    I64(i64),
+    String(String),
+    None,
+}
+
 #[derive(Debug)]
 pub struct IROperand {
     /// Some(linear ID) of source operation if this operand is an output.
@@ -66,7 +74,7 @@ pub struct IROperand {
     pub src_loc: Range<usize>,
     pub is_constant: bool,
     pub data_type: DataType,
-    pub val: Box<dyn Any>,
+    pub val: ParameterValue,
 }
 
 impl IROperand {
@@ -102,13 +110,13 @@ impl IROperand {
         src_loc: &Range<usize>,
         is_constant: bool,
         diags: &mut Diags,
-    ) -> Option<Box<dyn Any>> {
+    ) -> Option<ParameterValue> {
         match data_type {
             DataType::QuotedString => {
                 // Trim quotes and convert escape characters
                 // For trimming, don't use trim_matches since that
                 // will incorrectly strip trailing escaped quotes.
-                return Some(Box::new(
+                return Some(ParameterValue::String(
                     sval.strip_prefix('\"')
                         .unwrap()
                         .strip_suffix('\"')
@@ -125,14 +133,14 @@ impl IROperand {
                     let sval_no_u = sval.strip_suffix('u').unwrap_or(sval);
                     let res = parse::<u64>(sval_no_u);
                     if let Ok(v) = res {
-                        return Some(Box::new(v));
+                        return Some(ParameterValue::U64(v));
                     } else {
                         let m = format!("Malformed integer operand {}", sval);
                         diags.err1("IR_1", &m, src_loc.clone());
                     }
                 } else {
                     // We don't know variable value, so initialize to zero
-                    return Some(Box::new(0u64));
+                    return Some(ParameterValue::U64(0));
                 }
             }
 
@@ -142,14 +150,14 @@ impl IROperand {
                     let sval_no_i = sval.strip_suffix('i').unwrap_or(sval);
                     let res = parse::<i64>(sval_no_i);
                     if let Ok(v) = res {
-                        return Some(Box::new(v));
+                        return Some(ParameterValue::I64(v));
                     } else {
                         let m = format!("Malformed integer operand {}", sval);
                         diags.err1("IR_3", &m, src_loc.clone());
                     }
                 } else {
                     // We don't know variable value, so initialize to zero
-                    return Some(Box::new(0i64));
+                    return Some(ParameterValue::I64(0));
                 }
             }
 
@@ -159,19 +167,19 @@ impl IROperand {
                     // is least surprising since expectations like 1 - 2 == -1 hold.
                     let res = parse::<i64>(sval);
                     if let Ok(v) = res {
-                        return Some(Box::new(v));
+                        return Some(ParameterValue::I64(v));
                     } else {
                         let m = format!("Malformed integer operand {}", sval);
                         diags.err1("IR_3", &m, src_loc.clone());
                     }
                 } else {
                     // We don't know variable value, so initialize to zero
-                    return Some(Box::new(0i64));
+                    return Some(ParameterValue::I64(0));
                 }
             }
 
             DataType::Identifier => {
-                return Some(Box::new(sval.to_string()));
+                return Some(ParameterValue::String(sval.to_string()));
             }
             DataType::Unknown => {
                 let m = format!("Conversion failed for unknown type {}.", sval);
@@ -181,30 +189,31 @@ impl IROperand {
         None
     }
 
+    pub fn clone_val(&self) -> ParameterValue {
+        self.val.clone()
+    }
+
     pub fn clone_val_box(&self) -> Box<dyn Any> {
-        match self.data_type {
-            DataType::U64 => { Box::new(*self.val.downcast_ref::<u64>().unwrap()) },
-            DataType::Integer | // Integer stored as i64
-            DataType::I64 => { Box::new(*self.val.downcast_ref::<i64>().unwrap()) },
-            DataType::QuotedString |
-            DataType::Identifier => {Box::new(self.val.downcast_ref::<String>().unwrap().clone())},
-            DataType::Unknown => {Box::new(self.val.downcast_ref::<String>().unwrap().clone())},
+        match &self.val {
+            ParameterValue::U64(v) => Box::new(*v),
+            ParameterValue::I64(v) => Box::new(*v),
+            ParameterValue::String(s) => Box::new(s.clone()),
+            ParameterValue::None => Box::new(0u64),
         }
     }
 
     pub fn to_bool(&self) -> bool {
-        match self.data_type {
-            DataType::Integer | // Integer stored as i64
-            DataType::I64 => { (*self.val.downcast_ref::<i64>().unwrap() as u64) != 0 },
-            DataType::U64 => { *self.val.downcast_ref::<u64>().unwrap() != 0 },
+        match self.val {
+            ParameterValue::I64(v) => (v as u64) != 0,
+            ParameterValue::U64(v) => v != 0,
             _ => { panic!("Internal error: Invalid type conversion to bool"); },
         }
     }
 
     pub fn to_u64(&self) -> u64 {
-        match self.data_type {
-            DataType::Integer => *self.val.downcast_ref::<i64>().unwrap() as u64,
-            DataType::U64 => *self.val.downcast_ref::<u64>().unwrap(),
+        match self.val {
+            ParameterValue::I64(v) => v as u64,
+            ParameterValue::U64(v) => v,
             _ => {
                 panic!("Internal error: Invalid type conversion to u64");
             }
@@ -212,8 +221,8 @@ impl IROperand {
     }
 
     pub fn to_i64(&self) -> i64 {
-        match self.data_type {
-            DataType::Integer | DataType::I64 => *self.val.downcast_ref::<i64>().unwrap(),
+        match self.val {
+            ParameterValue::I64(v) => v,
             _ => {
                 panic!("Internal error: Invalid type conversion to i64");
             }
@@ -221,16 +230,16 @@ impl IROperand {
     }
 
     pub fn to_str(&self) -> &str {
-        match self.data_type {
-            DataType::QuotedString => self.val.downcast_ref::<String>().unwrap(),
+        match &self.val {
+            ParameterValue::String(s) => s,
             _ => {
                 panic!("Internal error: Invalid type conversion to str");
             }
         }
     }
     pub fn to_identifier(&self) -> &str {
-        match self.data_type {
-            DataType::Identifier => self.val.downcast_ref::<String>().unwrap(),
+        match &self.val {
+            ParameterValue::String(s) => s,
             _ => {
                 panic!("Internal error: Invalid type conversion to identifier");
             }

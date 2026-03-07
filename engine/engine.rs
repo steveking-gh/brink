@@ -1,10 +1,10 @@
 use anyhow::{Result, anyhow};
 use diags::Diags;
-use ir::{DataType, IR, IRKind};
+use ir::{DataType, IR, IRKind, ParameterValue};
 use irdb::IRDb;
 use std::cell::RefCell;
 use std::fs::File;
-use std::{any::Any, io::Write};
+use std::io::Write;
 use std::{convert::TryFrom, io::Read};
 
 #[allow(unused_imports)]
@@ -17,101 +17,58 @@ pub struct Location {
 }
 pub struct Parameter {
     data_type: DataType,
-    val: Box<dyn Any>,
+    val: ParameterValue,
 }
 
 impl Parameter {
     fn to_bool(&self) -> bool {
-        match self.data_type {
-            // TODO make boolean natively i64
-            DataType::I64 | DataType::Integer => {
-                let Some(val) = self.val.downcast_ref::<i64>() else {
-                    panic!("Bad downcast conversion to bool!")
-                };
-                (*val as u64) != 0
-            }
-            DataType::U64 => {
-                let Some(val) = self.val.downcast_ref::<u64>() else {
-                    panic!("Bad downcast conversion to bool!")
-                };
-                *val != 0
-            }
-            bad => panic!("Bad downcast conversion of {:?} to bool!", bad),
+        match &self.val {
+            ParameterValue::I64(v) => (*v as u64) != 0,
+            ParameterValue::U64(v) => *v != 0,
+            bad => panic!("Bad conversion of {:?} to bool!", bad),
         }
     }
 
     fn to_u64(&self) -> u64 {
-        match self.data_type {
-            // Integers stored as i64
-            DataType::Integer => {
-                let Some(val) = self.val.downcast_ref::<i64>() else {
-                    panic!("Bad downcast conversion to u64!")
-                };
-                *val as u64
-            }
-            DataType::U64 => {
-                let Some(val) = self.val.downcast_ref::<u64>() else {
-                    panic!("Bad downcast conversion to u64!")
-                };
-                *val
-            }
-            bad => panic!("Bad downcast conversion of {:?} to u64!", bad),
+        match &self.val {
+            ParameterValue::I64(v) => *v as u64,
+            ParameterValue::U64(v) => *v,
+            bad => panic!("Bad conversion of {:?} to u64!", bad),
         }
     }
 
     fn to_u64_mut(&mut self) -> &mut u64 {
-        match self.data_type {
-            // Integers stored as i64
-            DataType::U64 => {
-                let Some(val) = self.val.downcast_mut::<u64>() else {
-                    panic!("Bad downcast conversion to &mut u64!")
-                };
-                val
-            }
-            bad => panic!("Bad downcast conversion of {:?} to &mut u64!", bad),
+        match &mut self.val {
+            ParameterValue::U64(v) => v,
+            bad => panic!("Bad conversion of {:?} to &mut u64!", bad),
         }
     }
 
     fn to_i64(&self) -> i64 {
-        match self.data_type {
-            DataType::Integer | DataType::I64 => {
-                let Some(val) = self.val.downcast_ref::<i64>() else {
-                    panic!("Bad downcast conversion to i64!")
-                };
-                *val
-            }
-            bad => panic!("Bad downcast conversion of {:?} to i64!", bad),
+        match &self.val {
+            ParameterValue::I64(v) => *v,
+            bad => panic!("Bad conversion of {:?} to i64!", bad),
         }
     }
 
     fn to_i64_mut(&mut self) -> &mut i64 {
-        match self.data_type {
-            DataType::Integer | DataType::I64 => {
-                let Some(val) = self.val.downcast_mut::<i64>() else {
-                    panic!("Bad downcast conversion to &mut i64!")
-                };
-                val
-            }
-            bad => panic!("Bad downcast conversion of {:?} to &mut i64!", bad),
+        match &mut self.val {
+            ParameterValue::I64(v) => v,
+            bad => panic!("Bad conversion of {:?} to &mut i64!", bad),
         }
     }
 
     fn to_str(&self) -> &str {
-        match self.data_type {
-            DataType::QuotedString => {
-                let Some(val) = self.val.downcast_ref::<String>() else {
-                    panic!("Bad downcast conversion to &str!")
-                };
-                val
-            }
-            bad => panic!("Bad downcast conversion of {:?} to &str!", bad),
+        match &self.val {
+            ParameterValue::String(s) => s,
+            bad => panic!("Bad conversion of {:?} to &str!", bad),
         }
     }
 
     fn to_identifier(&self) -> &str {
-        match self.data_type {
-            DataType::Identifier => self.val.downcast_ref::<String>().unwrap(),
-            bad => panic!("Bad downcast conversion of {:?} to identifier!", bad),
+        match &self.val {
+            ParameterValue::String(s) => s,
+            bad => panic!("Bad conversion of {:?} to identifier!", bad),
         }
     }
 }
@@ -505,9 +462,7 @@ impl Engine {
         let mut out_parm = self.parms[out_parm_num].borrow_mut();
         match operation {
             IRKind::ToU64 => {
-                let Some(out) = out_parm.val.downcast_mut::<u64>() else {
-                    panic!("Bad downcast conversion to &mut u64!");
-                };
+                let out = out_parm.to_u64_mut();
                 match in_parm0.data_type {
                     DataType::U64 => {
                         // Trivial Integer or U64 to U64
@@ -528,9 +483,7 @@ impl Engine {
                 }
             }
             IRKind::ToI64 => {
-                let Some(out) = out_parm.val.downcast_mut::<i64>() else {
-                    panic!("Bad downcast conversion to &mut i64!");
-                };
+                let out = out_parm.to_i64_mut();
                 match in_parm0.data_type {
                     DataType::U64 => {
                         // U64 to I64
@@ -620,7 +573,7 @@ impl Engine {
             let in0 = lhs.to_u64();
             let in1 = rhs.to_u64();
             let mut out_parm = self.parms[out_num].borrow_mut();
-            let out = out_parm.val.downcast_mut::<u64>().unwrap();
+            let out = out_parm.to_u64_mut();
 
             match operation {
                 IRKind::DoubleEq => *out = (in0 == in1) as u64,
@@ -823,7 +776,7 @@ impl Engine {
         assert!(ir.operands.len() == 1);
         let out_parm_num = ir.operands[0];
         let mut out_parm = self.parms[out_parm_num].borrow_mut();
-        let out = out_parm.val.downcast_mut::<u64>().unwrap();
+        let out = out_parm.to_u64_mut();
 
         match ir.kind {
             IRKind::Abs => {
@@ -987,7 +940,7 @@ impl Engine {
         let mut out_parm = self.parms[out_parm_num].borrow_mut();
 
         let name = in_parm0.to_identifier();
-        let out = out_parm.val.downcast_mut::<u64>().unwrap();
+        let out = out_parm.to_u64_mut();
 
         // We've already verified that the section identifier exists,
         // but unless the section actually got used in the output,
@@ -1114,7 +1067,7 @@ impl Engine {
         for opnd in &irdb.parms {
             let parm = Parameter {
                 data_type: opnd.data_type,
-                val: opnd.clone_val_box(),
+                val: opnd.clone_val(),
             };
             engine.parms.push(RefCell::new(parm));
         }

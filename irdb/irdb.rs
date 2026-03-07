@@ -554,16 +554,16 @@ impl IRDb {
                     match operand.data_type {
                         DataType::U64 => {
                             // Always display U64 as hex
-                            let v = operand.val.downcast_ref::<u64>().unwrap();
+                            let v = operand.to_u64();
                             op.push_str(&format!(" ({:?}){:#X}", operand.data_type, v));
                         }
                         DataType::Integer | DataType::I64 => {
-                            let v = operand.val.downcast_ref::<i64>().unwrap();
+                            let v = operand.to_i64();
                             op.push_str(&format!(" ({:?}){}", operand.data_type, v));
                         }
                         // order matters, must be last
                         _ => {
-                            let v = operand.val.downcast_ref::<String>().unwrap();
+                            let v = operand.to_str();
                             op.push_str(&format!(" ({:?}){}", operand.data_type, v));
                         }
                     }
