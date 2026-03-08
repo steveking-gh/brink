@@ -1,0 +1,4 @@
+output mysec;
+section mysec {
+    wr8 1, 2;
+}

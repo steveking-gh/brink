@@ -634,13 +634,14 @@ impl<'toks> Ast<'toks> {
     /// token is not a valid infix operator.
     fn get_infix_binding_power(tok: LexToken) -> Option<(u8, u8)> {
         match tok {
-            LexToken::Percent | LexToken::FSlash | LexToken::Asterisk => Some((13, 14)),
-            LexToken::Minus | LexToken::Plus => Some((11, 12)),
-            LexToken::Ampersand | LexToken::Pipe => Some((9, 10)),
-            LexToken::DoubleGreater | LexToken::DoubleLess => Some((7, 8)),
-            LexToken::DoubleEq | LexToken::NEq | LexToken::LEq | LexToken::GEq => Some((5, 6)),
-            LexToken::DoubleAmpersand => Some((3, 4)),
-            LexToken::DoublePipe => Some((1, 2)),
+            LexToken::Percent | LexToken::FSlash | LexToken::Asterisk => Some((19, 20)),
+            LexToken::Minus | LexToken::Plus => Some((17, 18)),
+            LexToken::DoubleLess | LexToken::DoubleGreater => Some((15, 16)),
+            LexToken::Ampersand => Some((13, 14)),
+            LexToken::Pipe => Some((11, 12)),
+            LexToken::DoubleEq | LexToken::NEq | LexToken::LEq | LexToken::GEq => Some((9, 10)),
+            LexToken::DoubleAmpersand => Some((7, 8)),
+            LexToken::DoublePipe => Some((5, 6)),
             _ => None,
         }
     }

@@ -62,6 +62,23 @@ mod tests {
     }
 
     #[test]
+    fn bitwise_precedence() {
+        assert_brink_success("tests/bitwise_precedence.brink", None, None);
+    }
+
+    #[test]
+    #[serial]
+    fn wr_multi() {
+        assert_brink_success("tests/wr_multi.brink", None, None);
+    }
+
+    #[test]
+    #[serial]
+    fn wr_single() {
+        assert_brink_success("tests/wr_single.brink", None, None);
+    }
+
+    #[test]
     fn empty_2() {
         assert_brink_failure("tests/empty_2.brink", &[]);
     }
