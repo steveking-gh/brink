@@ -1,6 +1,6 @@
 use anyhow::{Context, Result, anyhow};
 use std::fs::File;
-extern crate clap;
+
 
 // Local libraries
 use ast::{Ast, AstDb};
@@ -18,7 +18,7 @@ use log::{debug, error, info, trace, warn};
 pub fn process(
     name: &str,
     fstr: &str,
-    args: &clap::ArgMatches,
+    output_file: Option<&str>,
     verbosity: u64,
     noprint: bool,
 ) -> Result<()> {
@@ -70,7 +70,7 @@ pub fn process(
     // Determine if the user specified an output file on the command line
     // Trim whitespace
     let fname_str = String::from(
-        args.value_of("output")
+        output_file
             .unwrap_or("output.bin")
             .trim_matches(' '),
     );

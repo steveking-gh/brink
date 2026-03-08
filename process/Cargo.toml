@@ -11,7 +11,7 @@ path = "process.rs"
 [dependencies]
 log = "0.4.11"
 anyhow = "1.0.34"
-clap = "2.33.3"
+
 
 # local dependencies
 ast = { path = "../ast" }

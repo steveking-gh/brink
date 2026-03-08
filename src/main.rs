@@ -4,7 +4,7 @@
 #![warn(clippy::all, rust_2018_idioms)]
 
 use anyhow::{Context, Result};
-use clap::{App, Arg};
+use clap::Parser;
 use std::env;
 use std::{fs, io};
 
@@ -34,56 +34,47 @@ fn init_log(verbosity: u64) -> Result<(), fern::InitError> {
     Ok(())
 }
 
+#[derive(Parser, Debug)]
+#[command(version, author, about)]
+pub struct Cli {
+    /// The input source file.
+    #[arg(index = 1)]
+    pub input: String,
+
+    /// Sets the verbosity level. Use up to 4 times.
+    #[arg(short = 'v', long = "verbose", action = clap::ArgAction::Count)]
+    pub verbosity: u8,
+
+    /// Specifies output file name. Default is output.bin.
+    #[arg(short = 'o', long = "output", value_name = "output_file")]
+    pub output: Option<String>,
+
+    /// Suppresses console print statements in source code. Default is false.
+    #[arg(long = "noprint")]
+    pub noprint: bool,
+
+    /// Suppress console output, including error messages.
+    /// Useful for fuzz testing. Overrides -v.
+    #[arg(short = 'q', long = "quiet")]
+    pub quiet: bool,
+}
+
 fn main() -> Result<()> {
     // clap processes args
-    let args = App::new("brink")
-            // See Cargo.toml for env! CARGO strings.
-            .version(env!("CARGO_PKG_VERSION"))
-            .author(env!("CARGO_PKG_AUTHORS"))
-            .about(env!("CARGO_PKG_DESCRIPTION"))
-            .arg(Arg::with_name("INPUT")
-            .help("The input source file.")
-            .required(true)
-            .index(1))
-            .arg(Arg::with_name("verbosity")
-                .short("v")
-                .long("verbose")
-                .multiple(true)
-                .help("Sets the verbosity level. Use up to 4 times."))
-            .arg(Arg::with_name("output")
-                .short("o")
-                .long("output")
-                .value_name("output_file")
-                .takes_value(true)
-                .help("Specifies output file name.  Default is output.bin."))
-            .arg(Arg::with_name("noprint")
-                .long("noprint")
-                .value_name("noprint")
-                .takes_value(false)
-                .help("Suppresses console print statements in source code.  Default is false."))
-            .arg(Arg::with_name("quiet")
-                .short("q")
-                .long("quiet")
-                .help("Suppress console output, including error messages.  Useful for fuzz testing.  Overrides -v."))
-            .get_matches();
+    let cli = Cli::parse();
 
     // Default verbosity
-    let verbosity = if args.is_present("quiet") {
+    let verbosity = if cli.quiet {
         0
     } else {
-        1 + args.occurrences_of("verbosity")
+        1 + cli.verbosity as u64
     };
 
     init_log(verbosity).expect("Unknown error initializing logging.");
 
     info!("brink version {}", env!("CARGO_PKG_VERSION"));
 
-    // Read the brink file into a string and pass to parser.
-    // A bland error message here is fine since clap already
-    // provides nice error messages.
-    let in_file_name = args
-        .value_of("INPUT")
-        .context("Unknown input file argument error.")?;
+    let in_file_name = &cli.input;
 
     // remove carriage return from line endings for windows platforms
     let str_in = fs::read_to_string(in_file_name)
@@ -99,8 +90,8 @@ fn main() -> Result<()> {
     process(
         in_file_name,
         &str_in,
-        &args,
+        cli.output.as_deref(),
         verbosity,
-        args.is_present("noprint"),
+        cli.noprint,
     )
 }
