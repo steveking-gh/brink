@@ -1,0 +1,12 @@
+section padding {
+    set_img 0xFFFFFFFFFFFFFFFF;
+}
+section target {
+    wr8 1;
+}
+section main {
+    wr padding;
+    wr target;
+    print abs(target);
+}
+output main 0x5;

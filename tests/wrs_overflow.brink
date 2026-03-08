@@ -1,0 +1,5 @@
+section main {
+    set_img 0xFFFFFFFFFFFFFFFF;
+    wrs "123";
+}
+output main;

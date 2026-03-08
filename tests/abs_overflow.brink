@@ -1,0 +1,5 @@
+section main {
+    wr8 1;
+    print abs(); 
+}
+output main 0xFFFFFFFFFFFFFFFF;

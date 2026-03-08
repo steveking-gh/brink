@@ -534,6 +534,26 @@ mod tests {
     }
 
     #[test]
+    fn abs_overflow() {
+        assert_brink_failure("tests/abs_overflow.brink", &["[EXEC_39]"]);
+    }
+
+    #[test]
+    fn align_overflow() {
+        assert_brink_failure("tests/align_overflow.brink", &["[EXEC_42]"]);
+    }
+
+    #[test]
+    fn set_abs_overflow() {
+        assert_brink_failure("tests/set_abs_overflow.brink", &["[EXEC_43]"]);
+    }
+
+    #[test]
+    fn abs_identifier_overflow() {
+        assert_brink_failure("tests/abs_identifier_overflow.brink", &["[EXEC_44]"]);
+    }
+
+    #[test]
     #[serial]
     fn label_1() {
         assert_brink_success("tests/label_1.brink", None, None);
@@ -595,6 +615,11 @@ mod tests {
             Some("wrs_1.bin"),
             Some("123\0456 Wow! 18 2\n"),
         );
+    }
+
+    #[test]
+    fn wrs_overflow() {
+        assert_brink_failure("tests/wrs_overflow.brink", &["[EXEC_41]"]);
     }
 
     #[test]

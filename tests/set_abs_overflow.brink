@@ -1,0 +1,5 @@
+section main {
+    set_img 0xFFFFFFFFFFFFFFFE;
+    set_abs 0x10;
+}
+output main 0x0000000000000004;

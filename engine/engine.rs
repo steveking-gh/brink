@@ -83,8 +83,18 @@ impl Engine {
 
         // Will panic if usize does not fit in u64
         let sz = xstr.len() as u64;
-        current.img += sz;
-        current.sec += sz;
+
+        let Some(new_img) = current.img.checked_add(sz) else {
+            diags.err1(
+                "EXEC_41",
+                "Write operation causes location counter overflow",
+                ir.src_loc.clone(),
+            );
+            return false;
+        };
+
+        current.img = new_img;
+        current.sec = current.sec.checked_add(sz).unwrap_or(u64::MAX);
 
         true
     }
@@ -189,7 +199,7 @@ impl Engine {
         &mut self,
         ir: &IR,
         irdb: &IRDb,
-        _diags: &mut Diags,
+        diags: &mut Diags,
         current: &mut Location,
     ) -> bool {
         // The operand is a file path
@@ -213,8 +223,17 @@ impl Engine {
             .as_str(),
         );
 
-        current.img += byte_size;
-        current.sec += byte_size;
+        let Some(new_img) = current.img.checked_add(byte_size) else {
+            diags.err1(
+                "EXEC_40",
+                "Write operation causes location counter overflow",
+                ir.src_loc.clone(),
+            );
+            return false;
+        };
+
+        current.img = new_img;
+        current.sec = current.sec.checked_add(byte_size).unwrap_or(u64::MAX);
 
         true
     }
@@ -730,7 +749,7 @@ impl Engine {
 
     /// Compute the transient current address.  This case is called when
     /// Abs/Img/Sec is called without an identifier.
-    fn iterate_current_address(&mut self, ir: &IR, current: &Location) -> bool {
+    fn iterate_current_address(&mut self, ir: &IR, diags: &mut Diags, current: &Location) -> bool {
         self.trace(
             format!(
                 "Engine::iterate_current_address: img {}, sec {}",
@@ -745,7 +764,11 @@ impl Engine {
 
         match ir.kind {
             IRKind::Abs => {
-                *out = current.img + self.start_addr;
+                let Some(val) = current.img.checked_add(self.start_addr) else {
+                    diags.err1("EXEC_39", "Location counter and absolute starting address overflow", ir.src_loc.clone());
+                    return false;
+                };
+                *out = val;
             }
             IRKind::Img => {
                 *out = current.img;
@@ -809,7 +832,10 @@ impl Engine {
         // We'll at least panic at runtime if conversion from
         // usize to u64 fails instead of bad output binary.
         let img: u64 = current.img;
-        let abs_val = img + self.start_addr;
+        let Some(abs_val) = img.checked_add(self.start_addr) else {
+            diags.err1("EXEC_42", "Location counter and absolute starting address overflow", ir.src_loc.clone());
+            return false;
+        };
 
         let remainder = abs_val.checked_rem(align_val).unwrap();
 
@@ -863,7 +889,13 @@ impl Engine {
         let out = out_parm.to_u64_mut();
 
         let loc = match ir.kind {
-            IRKind::SetAbs => current.img + self.start_addr,
+            IRKind::SetAbs => {
+                let Some(val) = current.img.checked_add(self.start_addr) else {
+                    diags.err1("EXEC_43", "Location counter and absolute starting address overflow", ir.src_loc.clone());
+                    return false;
+                };
+                val
+            }
             IRKind::SetImg => current.img,
             IRKind::SetSec => current.sec,
             bad => panic!("called iterate_set for IR {:?}", bad),
@@ -928,7 +960,11 @@ impl Engine {
         let start_loc = &self.ir_locs[*ir_num];
         match ir.kind {
             IRKind::Abs => {
-                *out = start_loc.img + self.start_addr;
+                let Some(val) = start_loc.img.checked_add(self.start_addr) else {
+                    diags.err1("EXEC_44", "Location counter and absolute starting address overflow", ir.src_loc.clone());
+                    return false;
+                };
+                *out = val;
             }
             IRKind::Img => {
                 *out = start_loc.img;
@@ -963,7 +999,7 @@ impl Engine {
         let num_operands = ir.operands.len();
 
         match num_operands {
-            1 => self.iterate_current_address(ir, current),
+            1 => self.iterate_current_address(ir, diags, current),
             2 => self.iterate_identifier_address(ir, irdb, diags, current),
             bad => panic!("Wrong number of IR operands = {}!", bad),
         }
