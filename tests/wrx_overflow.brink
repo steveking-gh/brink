@@ -1,0 +1,5 @@
+section main {
+    // 8 bytes * 0x2000000000000000 = 0x10000000000000000 (overflows u64)
+    wr64 0, 0x2000000000000000;
+}
+output main;

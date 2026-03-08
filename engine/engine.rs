@@ -148,11 +148,36 @@ impl Engine {
         }
 
         // total size is the size of the wrx times the optional repeat count
-        let sz = byte_size * repeat_count;
+        let Some(sz) = byte_size.checked_mul(repeat_count) else {
+            let src_loc = irdb.parms[if ir.operands.len() == 2 {
+                ir.operands[1]
+            } else {
+                ir.operands[0]
+            }]
+            .src_loc
+            .clone();
+            diags.err1(
+                "EXEC_36",
+                "Write repeat count causes size overflow",
+                src_loc,
+            );
+            return false;
+        };
+
         self.trace(format!("Engine::iterate_wrx-{}: size is {}", byte_size * 8, sz).as_str());
-        // Will panic if usize does not fit in u64
-        current.img += sz;
-        current.sec += sz;
+
+        // Guard against overflow on the image location counter
+        let Some(new_img) = current.img.checked_add(sz) else {
+            diags.err1(
+                "EXEC_37",
+                "Write operation causes location counter overflow",
+                ir.src_loc.clone(),
+            );
+            return false;
+        };
+
+        current.img = new_img;
+        current.sec = current.sec.checked_add(sz).unwrap_or(u64::MAX);
 
         result
     }
@@ -742,8 +767,8 @@ impl Engine {
     fn iterate_align(
         &mut self,
         ir: &IR,
-        _irdb: &IRDb,
-        _diags: &mut Diags,
+        irdb: &IRDb,
+        diags: &mut Diags,
         current: &Location,
     ) -> bool {
         self.trace(
@@ -770,6 +795,13 @@ impl Engine {
 
         let align_parm_num = ir.operands[0];
         let align_val = self.parms[align_parm_num].to_u64();
+
+        if align_val == 0 {
+            // Align 0 causes division by zero at checked_rem.
+            let src_loc = irdb.parms[align_parm_num].src_loc.clone();
+            diags.err1("EXEC_38", "Alignment amount cannot be zero", src_loc);
+            return false;
+        }
 
         let out_parm = &mut self.parms[out_parm_num];
         let out = out_parm.to_u64_mut();

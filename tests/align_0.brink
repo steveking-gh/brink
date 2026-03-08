@@ -1,0 +1,4 @@
+section main {
+    align 0;
+}
+output main;

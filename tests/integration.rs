@@ -598,6 +598,11 @@ mod tests {
     }
 
     #[test]
+    fn wrx_overflow() {
+        assert_brink_failure("tests/wrx_overflow.brink", &["[EXEC_36]"]);
+    }
+
+    #[test]
     fn wrx_1() {
         assert_brink_success(
             "tests/wrx_1.brink",
@@ -767,6 +772,11 @@ mod tests {
         assert!(bytevec.len() == 6 + 12 + 18 + 24 + 30 + 36 + 42 + 48);
         assert!(bytevec == temp);
         fs::remove_file("wrx_6.bin").unwrap();
+    }
+
+    #[test]
+    fn align_0() {
+        assert_brink_failure("tests/align_0.brink", &["[EXEC_38]"]);
     }
 
     #[test]
