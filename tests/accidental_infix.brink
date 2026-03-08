@@ -1,0 +1,4 @@
+output mysec;
+section mysec {
+    assert(1 to_i64 0);
+}

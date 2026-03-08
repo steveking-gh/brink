@@ -57,6 +57,11 @@ mod tests {
     }
 
     #[test]
+    fn accidental_infix() {
+        assert_brink_failure("tests/accidental_infix.brink", &["AST_9"]);
+    }
+
+    #[test]
     fn empty_2() {
         assert_brink_failure("tests/empty_2.brink", &[]);
     }

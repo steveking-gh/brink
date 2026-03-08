@@ -629,20 +629,19 @@ impl<'toks> Ast<'toks> {
         self.dbg_exit("parse_wr", result)
     }
 
-    /// Returns the (lhs,rhs) binding power for any token
-    /// Higher numbers are stronger binding.
-    fn get_binding_power(tok: LexToken) -> (u8, u8) {
+    /// Returns the (lhs,rhs) binding power for any infix token.
+    /// Higher numbers are stronger binding. Returns None if the
+    /// token is not a valid infix operator.
+    fn get_infix_binding_power(tok: LexToken) -> Option<(u8, u8)> {
         match tok {
-            LexToken::Integer | LexToken::I64 | LexToken::U64 => (15, 16),
-            LexToken::Percent | LexToken::FSlash | LexToken::Asterisk => (13, 14),
-            LexToken::Minus | LexToken::Plus => (11, 12),
-            LexToken::Ampersand | LexToken::Pipe => (9, 10),
-            LexToken::DoubleGreater | LexToken::DoubleLess => (7, 8),
-            LexToken::DoubleEq | LexToken::NEq | LexToken::LEq | LexToken::GEq => (5, 6),
-            LexToken::DoubleAmpersand => (3, 4),
-            LexToken::DoublePipe => (1, 2),
-            // comma is one of the fall through cases with 0 precedence
-            _ => (0, 0),
+            LexToken::Percent | LexToken::FSlash | LexToken::Asterisk => Some((13, 14)),
+            LexToken::Minus | LexToken::Plus => Some((11, 12)),
+            LexToken::Ampersand | LexToken::Pipe => Some((9, 10)),
+            LexToken::DoubleGreater | LexToken::DoubleLess => Some((7, 8)),
+            LexToken::DoubleEq | LexToken::NEq | LexToken::LEq | LexToken::GEq => Some((5, 6)),
+            LexToken::DoubleAmpersand => Some((3, 4)),
+            LexToken::DoublePipe => Some((1, 2)),
+            _ => None,
         }
     }
 
@@ -767,37 +766,19 @@ impl<'toks> Ast<'toks> {
 
             // Filter disallowed operations.
             let op_tinfo = op_tinfo.unwrap();
-            match op_tinfo.tok {
-                // Comma, close paren and semicolon are terminating conditions
-                // because some upper layer is specifically looking for them.
-                LexToken::Comma | LexToken::CloseParen | LexToken::Semicolon => {
-                    break;
-                }
-                LexToken::ToI64
-                | LexToken::ToU64
-                | LexToken::NEq
-                | LexToken::DoubleEq
-                | LexToken::DoubleGreater
-                | LexToken::DoubleLess
-                | LexToken::Ampersand
-                | LexToken::Pipe
-                | LexToken::DoubleAmpersand
-                | LexToken::DoublePipe
-                | LexToken::GEq
-                | LexToken::LEq
-                | LexToken::Plus
-                | LexToken::Minus
-                | LexToken::Asterisk
-                | LexToken::Percent
-                | LexToken::FSlash => {}
-                _ => {
-                    let msg = format!("Invalid operation '{}'", op_tinfo.val);
-                    diags.err1("AST_9", &msg, op_tinfo.span());
-                    return self.dbg_exit_pratt("parse_pratt", &None, false);
-                }
+            let tok = op_tinfo.tok;
+
+            // Comma, close paren and semicolon are terminating conditions
+            // because some upper layer is specifically looking for them.
+            if matches!(tok, LexToken::Comma | LexToken::CloseParen | LexToken::Semicolon) {
+                break;
             }
 
-            let (lbp, rbp) = Ast::get_binding_power(op_tinfo.tok);
+            let Some((lbp, rbp)) = Ast::get_infix_binding_power(tok) else {
+                let msg = format!("Invalid operation '{}'", op_tinfo.val);
+                diags.err1("AST_9", &msg, op_tinfo.span());
+                return self.dbg_exit_pratt("parse_pratt", &None, false);
+            };
 
             debug!(
                 "Ast::parse_pratt: operation '{}' with (lbp,rbp) = ({},{})",
