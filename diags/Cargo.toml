@@ -10,5 +10,5 @@ edition.workspace = true
 path = "diags.rs"
 
 [dependencies]
-codespan-reporting = "0.9.5"
+ariadne = "0.4.1"
 

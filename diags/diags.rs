@@ -1,14 +1,9 @@
-// codespan crate provide error reporting help
-use codespan_reporting::diagnostic::{Diagnostic, Label};
-use codespan_reporting::files::SimpleFile;
-use codespan_reporting::term;
-use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
+use ariadne::{Color, Label, Report, ReportKind, Source};
 use std::ops::Range;
 
 pub struct Diags<'a> {
-    writer: StandardStream,
-    source_map: SimpleFile<&'a str, &'a str>,
-    config: codespan_reporting::term::Config,
+    name: &'a str,
+    fstr: &'a str,
     verbosity: u64,
     pub noprint: bool,
 }
@@ -16,117 +11,97 @@ pub struct Diags<'a> {
 impl<'a, 'msg> Diags<'a> {
     pub fn new(name: &'a str, fstr: &'a str, verbosity: u64, noprint: bool) -> Self {
         Self {
-            writer: StandardStream::stderr(ColorChoice::Always),
-            source_map: SimpleFile::new(name, fstr),
-            config: codespan_reporting::term::Config::default(),
+            name,
+            fstr,
             verbosity,
             noprint,
         }
     }
 
-    /// Writes the diagnostic to the terminal with primary
-    /// code location.
-    pub fn warn(&self, code: &str, msg: &'msg str) {
+    /// Helper to print ariadne reports
+    fn print_report(&self, report: Report<(&'a str, Range<usize>)>) {
         if self.verbosity == 0 {
             return;
         }
+        let _ = report.eprint((self.name, Source::from(self.fstr)));
+    }
 
-        let diag = Diagnostic::warning().with_code(code).with_message(msg);
-
-        let _ = term::emit(
-            &mut self.writer.lock(),
-            &self.config,
-            &self.source_map,
-            &diag,
-        );
+    /// Writes the diagnostic to the terminal with primary
+    /// code location.
+    pub fn warn(&self, code: &str, msg: &'msg str) {
+        if self.verbosity == 0 { return; }
+        
+        let report = Report::build(ReportKind::Warning, self.name, 0)
+            .with_code(code)
+            .with_message(msg)
+            .finish();
+        self.print_report(report);
     }
 
     /// Writes the diagnostic to the terminal with primary
     /// code location.
     pub fn err0(&self, code: &str, msg: &'msg str) {
-        if self.verbosity == 0 {
-            return;
-        }
+        if self.verbosity == 0 { return; }
 
-        let diag = Diagnostic::error().with_code(code).with_message(msg);
-        let _ = term::emit(
-            &mut self.writer.lock(),
-            &self.config,
-            &self.source_map,
-            &diag,
-        );
+        let report = Report::build(ReportKind::Error, self.name, 0)
+            .with_code(code)
+            .with_message(msg)
+            .finish();
+        self.print_report(report);
     }
 
     /// Writes the diagnostic to the terminal with primary
     /// code location.
     pub fn err1(&self, code: &str, msg: &'msg str, loc: Range<usize>) {
-        if self.verbosity == 0 {
-            return;
-        }
+        if self.verbosity == 0 { return; }
 
-        let diag = Diagnostic::error()
+        let start = loc.start;
+        let report = Report::build(ReportKind::Error, self.name, start)
             .with_code(code)
             .with_message(msg)
-            .with_labels(vec![Label::primary((), loc)]);
-        let _ = term::emit(
-            &mut self.writer.lock(),
-            &self.config,
-            &self.source_map,
-            &diag,
-        );
+            .with_label(Label::new((self.name, loc)).with_color(Color::Red))
+            .finish();
+        self.print_report(report);
     }
 
     /// Writes the diagnostic to the terminal with primary
     /// code location.
     pub fn note0(&self, code: &str, msg: &'msg str) {
-        if self.verbosity == 0 {
-            return;
-        }
-        let diag = Diagnostic::note().with_code(code).with_message(msg);
-        let _ = term::emit(
-            &mut self.writer.lock(),
-            &self.config,
-            &self.source_map,
-            &diag,
-        );
+        if self.verbosity == 0 { return; }
+
+        let report = Report::build(ReportKind::Custom("Note", Color::Blue), self.name, 0)
+            .with_code(code)
+            .with_message(msg)
+            .finish();
+        self.print_report(report);
     }
 
     /// Writes the diagnostic to the terminal with primary
     /// code location.
     pub fn note1(&self, code: &str, msg: &'msg str, loc: Range<usize>) {
-        if self.verbosity == 0 {
-            return;
-        }
+        if self.verbosity == 0 { return; }
 
-        let diag = Diagnostic::note()
+        let start = loc.start;
+        let report = Report::build(ReportKind::Custom("Note", Color::Blue), self.name, start)
             .with_code(code)
             .with_message(msg)
-            .with_labels(vec![Label::primary((), loc)]);
-        let _ = term::emit(
-            &mut self.writer.lock(),
-            &self.config,
-            &self.source_map,
-            &diag,
-        );
+            .with_label(Label::new((self.name, loc)).with_color(Color::Blue))
+            .finish();
+        self.print_report(report);
     }
 
     /// Writes the diagnostic to the terminal with primary
     /// and secondary code locations.
     pub fn err2(&self, code: &str, msg: &'msg str, loc1: Range<usize>, loc2: Range<usize>) {
-        if self.verbosity == 0 {
-            return;
-        }
+        if self.verbosity == 0 { return; }
 
-        let diag = Diagnostic::error()
+        let start = loc1.start;
+        let report = Report::build(ReportKind::Error, self.name, start)
             .with_code(code)
             .with_message(msg)
-            .with_labels(vec![Label::primary((), loc1), Label::secondary((), loc2)]);
-
-        let _ = term::emit(
-            &mut self.writer.lock(),
-            &self.config,
-            &self.source_map,
-            &diag,
-        );
+            .with_label(Label::new((self.name, loc1)).with_color(Color::Red))
+            .with_label(Label::new((self.name, loc2)).with_color(Color::Yellow))
+            .finish();
+        self.print_report(report);
     }
 }
