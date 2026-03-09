@@ -288,11 +288,12 @@ Otherwise the types used in an expression must match.  For example:
 
 Produces an error message:
 
-    error[EXEC_13]: Input operand types do not match.  Left is 'U64', right is 'I64'
-      ┌─ tests/integers_5.brink:2:12
-      │
-    2 │     assert 42u == 42i; // mix unsigned and signed
-      │            ^^^    ---
+    [EXEC_13] Error: Input operand types do not match.  Left is 'U64', right is 'I64'
+       ╭─[tests/integers_5.brink:2:12]
+       │
+     2 │     assert 42u == 42i; // mix unsigned and signed
+       ·            ^^^    ^^^
+    ───╯
 
 Users can explicitly cast a number literal or expression to the required signedness using the built-in `to_u64` to `to_i64` functions.  For example:
 
