@@ -658,6 +658,34 @@ Example:
 
 ---
 
+## `wr <section identifier>;`
+
+Writes the contents of another section into the current section. Brink evaluates the referenced section and seamlessly copies its final output into the current location counter.
+
+Using `wr`, you can build complex outputs by composing smaller, modular sections together.
+
+Example:
+
+    section header {
+        wrs "FILE";
+        wr8 0x01;
+    }
+
+    section data {
+        wrs "DATA";
+        wr8 0xFF, 4;
+    }
+
+    // Compose the top-level section
+    section img {
+        wr header;
+        wr data;
+    }
+
+    output img;
+
+---
+
 ## `wr8 <expression> [, <expression>];`
 ## `wr16 <expression> [, <expression>];`
 ## `wr24 <expression> [, <expression>];`
