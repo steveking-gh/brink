@@ -29,8 +29,10 @@ impl<'a, 'msg> Diags<'a> {
     /// Writes the diagnostic to the terminal with primary
     /// code location.
     pub fn warn(&self, code: &str, msg: &'msg str) {
-        if self.verbosity == 0 { return; }
-        
+        if self.verbosity == 0 {
+            return;
+        }
+
         let report = Report::build(ReportKind::Warning, self.name, 0)
             .with_code(code)
             .with_message(msg)
@@ -41,7 +43,9 @@ impl<'a, 'msg> Diags<'a> {
     /// Writes the diagnostic to the terminal with primary
     /// code location.
     pub fn err0(&self, code: &str, msg: &'msg str) {
-        if self.verbosity == 0 { return; }
+        if self.verbosity == 0 {
+            return;
+        }
 
         let report = Report::build(ReportKind::Error, self.name, 0)
             .with_code(code)
@@ -53,7 +57,9 @@ impl<'a, 'msg> Diags<'a> {
     /// Writes the diagnostic to the terminal with primary
     /// code location.
     pub fn err1(&self, code: &str, msg: &'msg str, loc: Range<usize>) {
-        if self.verbosity == 0 { return; }
+        if self.verbosity == 0 {
+            return;
+        }
 
         let start = loc.start;
         let report = Report::build(ReportKind::Error, self.name, start)
@@ -67,7 +73,9 @@ impl<'a, 'msg> Diags<'a> {
     /// Writes the diagnostic to the terminal with primary
     /// code location.
     pub fn note0(&self, code: &str, msg: &'msg str) {
-        if self.verbosity == 0 { return; }
+        if self.verbosity == 0 {
+            return;
+        }
 
         let report = Report::build(ReportKind::Custom("Note", Color::Blue), self.name, 0)
             .with_code(code)
@@ -79,7 +87,9 @@ impl<'a, 'msg> Diags<'a> {
     /// Writes the diagnostic to the terminal with primary
     /// code location.
     pub fn note1(&self, code: &str, msg: &'msg str, loc: Range<usize>) {
-        if self.verbosity == 0 { return; }
+        if self.verbosity == 0 {
+            return;
+        }
 
         let start = loc.start;
         let report = Report::build(ReportKind::Custom("Note", Color::Blue), self.name, start)
@@ -93,7 +103,9 @@ impl<'a, 'msg> Diags<'a> {
     /// Writes the diagnostic to the terminal with primary
     /// and secondary code locations.
     pub fn err2(&self, code: &str, msg: &'msg str, loc1: Range<usize>, loc2: Range<usize>) {
-        if self.verbosity == 0 { return; }
+        if self.verbosity == 0 {
+            return;
+        }
 
         let start = loc1.start;
         let report = Report::build(ReportKind::Error, self.name, start)

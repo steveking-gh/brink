@@ -10,13 +10,13 @@ members = [
 ]
 
 [workspace.package]
-version = "1.2.1"
+version = "1.2.2"
 authors = ["Steve King <sk@metrokings.com>"]
 edition = "2024"
 
 [package]
 name = "brink"
-version = "1.2.1"
+version = "1.2.2"
 license-file = "LICENSE.txt"
 readme = "README.md"
 homepage = "https://github.com/steveking-gh/brink"
@@ -46,10 +46,10 @@ rpath = false
 [dependencies]
 indextree = "4.3.1"
 clap = { version = "4.5", features = ["derive"] }
-fern = "0.6.0"
-log = "0.4.11"
 anyhow = "1.0.34"
 process = { path = "./process" }
+tracing = "0.1.44"
+tracing-subscriber = "0.3.22"
 
 [dev-dependencies]
 assert_cmd = "1.0.1"

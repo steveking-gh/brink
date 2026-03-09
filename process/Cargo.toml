@@ -9,7 +9,6 @@ edition.workspace = true
 path = "process.rs"
 
 [dependencies]
-log = "0.4.11"
 anyhow = "1.0.34"
 
 
@@ -19,3 +18,4 @@ diags = { path = "../diags" }
 lineardb = { path = "../lineardb" }
 irdb = { path = "../irdb" }
 engine = { path = "../engine" }
+tracing = "0.1.44"

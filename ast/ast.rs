@@ -11,7 +11,7 @@ use std::{
 };
 
 #[allow(unused_imports)]
-use log::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 
 /// All tokens in brink created with the logos macro.
 /// Keep this simple and do not be tempted to attach
@@ -771,7 +771,10 @@ impl<'toks> Ast<'toks> {
 
             // Comma, close paren and semicolon are terminating conditions
             // because some upper layer is specifically looking for them.
-            if matches!(tok, LexToken::Comma | LexToken::CloseParen | LexToken::Semicolon) {
+            if matches!(
+                tok,
+                LexToken::Comma | LexToken::CloseParen | LexToken::Semicolon
+            ) {
                 break;
             }
 

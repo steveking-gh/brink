@@ -1,7 +1,6 @@
 use anyhow::{Context, Result, anyhow};
 use std::fs::File;
 
-
 // Local libraries
 use ast::{Ast, AstDb};
 use diags::Diags;
@@ -10,7 +9,7 @@ use irdb::IRDb;
 use lineardb::LinearDb;
 
 #[allow(unused_imports)]
-use log::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 
 /// Entry point for all processing on the input source file
 /// name: The name of the file
@@ -69,11 +68,7 @@ pub fn process(
     }
     // Determine if the user specified an output file on the command line
     // Trim whitespace
-    let fname_str = String::from(
-        output_file
-            .unwrap_or("output.bin")
-            .trim_matches(' '),
-    );
+    let fname_str = String::from(output_file.unwrap_or("output.bin").trim_matches(' '));
     debug!("process: output file name is {}", fname_str);
 
     let mut file =

@@ -3,7 +3,7 @@ use diags::Diags;
 use lineardb::LinearDb;
 
 #[allow(unused_imports)]
-use log::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 
 use ir::{DataType, IR, IRKind, IROperand};
 use parse_int::parse;

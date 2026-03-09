@@ -11,3 +11,4 @@ path = "ir.rs"
 [dependencies]
 diags = { path = "../diags" }
 parse_int = "0.5.0"
+tracing = "0.1.44"

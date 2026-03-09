@@ -7,7 +7,7 @@ use std::io::Write;
 use std::{convert::TryFrom, io::Read};
 
 #[allow(unused_imports)]
-use log::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Location {
@@ -765,7 +765,11 @@ impl Engine {
         match ir.kind {
             IRKind::Abs => {
                 let Some(val) = current.img.checked_add(self.start_addr) else {
-                    diags.err1("EXEC_39", "Location counter and absolute starting address overflow", ir.src_loc.clone());
+                    diags.err1(
+                        "EXEC_39",
+                        "Location counter and absolute starting address overflow",
+                        ir.src_loc.clone(),
+                    );
                     return false;
                 };
                 *out = val;
@@ -833,7 +837,11 @@ impl Engine {
         // usize to u64 fails instead of bad output binary.
         let img: u64 = current.img;
         let Some(abs_val) = img.checked_add(self.start_addr) else {
-            diags.err1("EXEC_42", "Location counter and absolute starting address overflow", ir.src_loc.clone());
+            diags.err1(
+                "EXEC_42",
+                "Location counter and absolute starting address overflow",
+                ir.src_loc.clone(),
+            );
             return false;
         };
 
@@ -891,7 +899,11 @@ impl Engine {
         let loc = match ir.kind {
             IRKind::SetAbs => {
                 let Some(val) = current.img.checked_add(self.start_addr) else {
-                    diags.err1("EXEC_43", "Location counter and absolute starting address overflow", ir.src_loc.clone());
+                    diags.err1(
+                        "EXEC_43",
+                        "Location counter and absolute starting address overflow",
+                        ir.src_loc.clone(),
+                    );
                     return false;
                 };
                 val
@@ -961,7 +973,11 @@ impl Engine {
         match ir.kind {
             IRKind::Abs => {
                 let Some(val) = start_loc.img.checked_add(self.start_addr) else {
-                    diags.err1("EXEC_44", "Location counter and absolute starting address overflow", ir.src_loc.clone());
+                    diags.err1(
+                        "EXEC_44",
+                        "Location counter and absolute starting address overflow",
+                        ir.src_loc.clone(),
+                    );
                     return false;
                 };
                 *out = val;

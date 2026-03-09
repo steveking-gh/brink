@@ -3,7 +3,7 @@ pub type Span = std::ops::Range<usize>;
 use diags::Diags;
 
 #[allow(unused_imports)]
-use log::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 
 use ast::{Ast, AstDb, LexToken, TokenInfo};
 use ir::IRKind;

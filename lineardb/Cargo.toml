@@ -11,9 +11,9 @@ path = "lineardb.rs"
 [dependencies]
 indextree = "4.3.1"
 codespan-reporting = "0.9.5"
-log = "0.4.11"
 anyhow = "1.0.34"
 
 diags = { path = "../diags" }
 ast = { path = "../ast" }
 ir = { path = "../ir" }
+tracing = "0.1.44"

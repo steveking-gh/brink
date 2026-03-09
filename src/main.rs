@@ -6,31 +6,32 @@
 use anyhow::{Context, Result};
 use clap::Parser;
 use std::env;
-use std::{fs, io};
+use std::fs;
 
 // Local libraries
 use process::process;
 
 // Logging
-#[allow(unused_imports)]
-use log::{debug, error, info, trace, warn};
+use tracing::{Level, info, warn};
+use tracing_subscriber::FmtSubscriber;
 
-fn init_log(verbosity: u64) -> Result<(), fern::InitError> {
-    let mut base_cfg = fern::Dispatch::new();
-
-    base_cfg = match verbosity {
-        0 => base_cfg.level(log::LevelFilter::Error), // Quiet
-        1 => base_cfg.level(log::LevelFilter::Warn),  // Default
-        2 => base_cfg.level(log::LevelFilter::Info),  // -v
-        3 => base_cfg.level(log::LevelFilter::Debug), // -v -v
-        _4_or_more => base_cfg.level(log::LevelFilter::Trace), // -v -v -v
+fn init_log(verbosity: u64) -> Result<()> {
+    let level = match verbosity {
+        0 => Level::ERROR, // Quiet
+        1 => Level::WARN,  // Default
+        2 => Level::INFO,  // -v
+        3 => Level::DEBUG, // -v -v
+        _ => Level::TRACE, // -v -v -v
     };
 
-    let stdout_cfg = fern::Dispatch::new()
-        .format(|out, message, record| out.finish(format_args!("[{}] {}", record.level(), message)))
-        .chain(io::stdout());
+    let subscriber = FmtSubscriber::builder()
+        .with_max_level(level)
+        .with_target(false)
+        .finish();
 
-    base_cfg.chain(stdout_cfg).apply()?;
+    tracing::subscriber::set_global_default(subscriber)
+        .map_err(|e| anyhow::anyhow!("Failed to set subscriber: {}", e))?;
+
     Ok(())
 }
 
