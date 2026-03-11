@@ -1,2 +1,0 @@
-output mysec;
-section mysec { assert 1 == 0; }
