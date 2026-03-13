@@ -932,4 +932,68 @@ mod tests {
         let mut cmd = Command::cargo_bin("brink").unwrap();
         cmd.arg("does_not_exist.brink").unwrap();
     }
+
+    /// Assert that every error/warning/note code string passed to the diags API
+    /// is unique across the entire source base.  A duplicated code would mean
+    /// that `grep "SOME_CODE"` hits two unrelated call sites, defeating the
+    /// searchability goal.
+    #[test]
+    fn error_codes_are_unique() {
+        use std::collections::HashMap;
+
+        let source_files = &[
+            "ast/ast.rs",
+            "lineardb/lineardb.rs",
+            "irdb/irdb.rs",
+            "engine/engine.rs",
+            "process/process.rs",
+            "src/main.rs",
+        ];
+
+        // Maps error code -> list of "file:line" locations where it appears.
+        let mut code_locations: HashMap<String, Vec<String>> = HashMap::new();
+
+        let prefixes = [
+            "diags.err0(\"",
+            "diags.err1(\"",
+            "diags.err2(\"",
+            "diags.warn(\"",
+            "diags.note0(\"",
+            "diags.note1(\"",
+        ];
+
+        for path in source_files {
+            let contents = fs::read_to_string(path)
+                .unwrap_or_else(|e| panic!("Failed to read {}: {}", path, e));
+            for (line_num, line) in contents.lines().enumerate() {
+                for prefix in &prefixes {
+                    if let Some(offset) = line.find(prefix) {
+                        let after = &line[offset + prefix.len()..];
+                        if let Some(end) = after.find('"') {
+                            let code = after[..end].to_string();
+                            let location = format!("{}:{}", path, line_num + 1);
+                            code_locations.entry(code).or_default().push(location);
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut duplicates: Vec<(String, Vec<String>)> = code_locations
+            .into_iter()
+            .filter(|(_, locs)| locs.len() > 1)
+            .collect();
+        duplicates.sort_by_key(|(code, _)| code.clone());
+
+        if !duplicates.is_empty() {
+            let mut msg = String::from("Duplicate error codes found:\n");
+            for (code, locs) in &duplicates {
+                msg.push_str(&format!("  \"{}\" appears at:\n", code));
+                for loc in locs {
+                    msg.push_str(&format!("    {}\n", loc));
+                }
+            }
+            panic!("{}", msg);
+        }
+    }
 } // mod tests

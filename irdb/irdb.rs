@@ -400,7 +400,7 @@ impl IRDb {
                     ir.kind,
                     opnd.val.data_type()
                 );
-                diags.err2("IRDB_9", &m, ir.src_loc.clone(), opnd.src_loc.clone());
+                diags.err2("IRDB_15", &m, ir.src_loc.clone(), opnd.src_loc.clone());
                 return false;
             }
         }

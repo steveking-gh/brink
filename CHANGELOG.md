@@ -3,6 +3,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.5] - 2026-03-12
+- Added `error_codes_are_unique` test that scans all source files and asserts no diagnostic error code string appears at more than one call site.
+- Fixed pre-existing duplicate: `IRDB_9` was used at two sites in `irdb/irdb.rs`; the second site is now `IRDB_15`.
+
 # [1.2.4] - 2026-03-12
 - Pipeline stage constructors (`Ast::new`, `LinearDb::new`, `IRDb::new`, `Engine::new`) now return `Result<T, ()>` instead of `Option<T>`, enabling idiomatic `?`-based error propagation.
 
