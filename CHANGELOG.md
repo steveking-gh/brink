@@ -3,6 +3,9 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.7] - 2026-03-12
+- Alphabetize lexer tokens.
+
 ## [1.2.6] - 2026-03-12
 - Extended `error_codes_are_unique` scanner to include `ir/ir.rs`.
 - Renamed duplicate error code `IR_3` (ambiguous-integer overflow) to `IR_4`; updated `fuzz_found_10` test accordingly.
