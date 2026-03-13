@@ -1063,7 +1063,7 @@ impl Engine {
         true
     }
 
-    pub fn new(irdb: &IRDb, diags: &mut Diags, abs_start: usize) -> Option<Engine> {
+    pub fn new(irdb: &IRDb, diags: &mut Diags, abs_start: usize) -> Result<Engine, ()> {
         // The first iterate loop may access any IR location, so initialize all
         // ir_locs locations to zero.
         let ir_locs = vec![Location { img: 0, sec: 0 }; irdb.ir_vec.len()];
@@ -1085,11 +1085,11 @@ impl Engine {
 
         let result = engine.iterate(irdb, diags, abs_start);
         if !result {
-            return None;
+            return Err(());
         }
 
         engine.trace("Engine::new: EXIT");
-        Some(engine)
+        Ok(engine)
     }
 
     pub fn dump_locations(&self) {

@@ -203,7 +203,7 @@ impl<'toks> Ast<'toks> {
     }
 
     /// Create a new abstract syntax tree.
-    pub fn new(fstr: &'toks str, diags: &mut Diags) -> Option<Self> {
+    pub fn new(fstr: &'toks str, diags: &mut Diags) -> Result<Self, ()> {
         let mut arena = Arena::new();
         let root = arena.new_node(usize::MAX);
         let mut tv = Vec::new();
@@ -225,10 +225,10 @@ impl<'toks> Ast<'toks> {
         if !ast.parse(diags) {
             // ast construction failed.  Let the caller report
             // this in whatever way they want.
-            return None;
+            return Err(());
         }
 
-        Some(ast)
+        Ok(ast)
     }
 
     // Boilerplate entry for recursive descent parsing functions.

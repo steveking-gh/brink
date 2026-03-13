@@ -494,7 +494,7 @@ impl IRDb {
         result
     }
 
-    pub fn new(lin_db: &LinearDb, diags: &mut Diags) -> Option<IRDb> {
+    pub fn new(lin_db: &LinearDb, diags: &mut Diags) -> Result<IRDb, ()> {
         // If the user specified a starting address in the output statement
         // then convert to a real number
         let mut start_addr = 0;
@@ -506,7 +506,7 @@ impl IRDb {
                 let m = format!("Malformed integer operand {}", addr_str);
                 let primary_code_ref = lin_db.output_addr_loc.as_ref().unwrap();
                 diags.err1("IRDB_3", &m, primary_code_ref.clone());
-                return None;
+                return Err(());
             }
         }
 
@@ -520,15 +520,15 @@ impl IRDb {
         };
 
         if !ir_db.process_lin_operands(lin_db, diags) {
-            return None;
+            return Err(());
         }
 
         // To avoid panic, don't proceed into IR if the operands are bad.
         if !ir_db.process_linear_ir(lin_db, diags) {
-            return None;
+            return Err(());
         }
 
-        Some(ir_db)
+        Ok(ir_db)
     }
 
     pub fn dump(&self) {

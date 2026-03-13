@@ -26,43 +26,30 @@ pub fn process(
 
     let mut diags = Diags::new(name, fstr, verbosity, noprint);
 
-    let ast = Ast::new(fstr, &mut diags);
-    if ast.is_none() {
-        return Err(anyhow!("[PROC_1]: Error detected, halting."));
-    }
-
-    let ast = ast.unwrap();
+    let ast = Ast::new(fstr, &mut diags)
+        .map_err(|_| anyhow!("[PROC_1]: Error detected, halting."))?;
 
     if verbosity > 2 {
         ast.dump("ast.dot")?;
     }
 
     let ast_db = AstDb::new(&mut diags, &ast)?;
-    let linear_db = LinearDb::new(&mut diags, &ast, &ast_db);
-    if linear_db.is_none() {
-        return Err(anyhow!("[PROC_2]: Error detected, halting."));
-    }
-    let linear_db = linear_db.unwrap();
+    let linear_db = LinearDb::new(&mut diags, &ast, &ast_db)
+        .map_err(|_| anyhow!("[PROC_2]: Error detected, halting."))?;
     if verbosity > 2 {
         linear_db.dump();
     }
-    let ir_db = IRDb::new(&linear_db, &mut diags);
-    if ir_db.is_none() {
-        return Err(anyhow!("[PROC_3]: Error detected, halting."));
-    }
-    let ir_db = ir_db.unwrap();
+
+    let ir_db = IRDb::new(&linear_db, &mut diags)
+        .map_err(|_| anyhow!("[PROC_3]: Error detected, halting."))?;
 
     debug!("Dumping ir_db");
     if verbosity > 2 {
         ir_db.dump();
     }
 
-    let engine = Engine::new(&ir_db, &mut diags, 0);
-    if engine.is_none() {
-        return Err(anyhow!("[PROC_5]: Error detected, halting."));
-    }
-
-    let engine = engine.unwrap();
+    let engine = Engine::new(&ir_db, &mut diags, 0)
+        .map_err(|_| anyhow!("[PROC_5]: Error detected, halting."))?;
     if verbosity > 2 {
         engine.dump_locations();
     }

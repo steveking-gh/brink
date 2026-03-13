@@ -535,7 +535,7 @@ impl<'toks> LinearDb {
     /// The LinearDb object must start with an output statement.
     /// If the output doesn't exist, then return None.  The linear_db
     /// records only elements with size > 0.
-    pub fn new(diags: &mut Diags, ast: &'toks Ast, ast_db: &'toks AstDb) -> Option<LinearDb> {
+    pub fn new(diags: &mut Diags, ast: &'toks Ast, ast_db: &'toks AstDb) -> Result<LinearDb, ()> {
         debug!("LinearDb::new: ENTER");
 
         // AstDb already validated output exists
@@ -589,22 +589,22 @@ impl<'toks> LinearDb {
 
         // If an error occurs, result gets stuck at false.
         if !linear_db.record_r(1, sec_nid, &mut lops, diags, ast, ast_db) {
-            return None;
+            return Err(());
         }
 
         // debug
         linear_db.dump();
 
         if !IdentDb::check_globals(&linear_db, diags) {
-            return None;
+            return Err(());
         }
 
         if !IdentDb::check_locals(&linear_db, diags) {
-            return None;
+            return Err(());
         }
 
         debug!("LinearDb::new: EXIT for nid: {}", output_nid);
-        Some(linear_db)
+        Ok(linear_db)
     }
 
     pub fn dump(&self) {
