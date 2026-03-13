@@ -70,14 +70,14 @@ impl<'toks> LinIR {
 
 fn tok_to_irkind(tok: LexToken) -> IRKind {
     match tok {
-        LexToken::Wr8 => IRKind::Wr8,
-        LexToken::Wr16 => IRKind::Wr16,
-        LexToken::Wr24 => IRKind::Wr24,
-        LexToken::Wr32 => IRKind::Wr32,
-        LexToken::Wr40 => IRKind::Wr40,
-        LexToken::Wr48 => IRKind::Wr48,
-        LexToken::Wr56 => IRKind::Wr56,
-        LexToken::Wr64 => IRKind::Wr64,
+        LexToken::Wr8 => IRKind::Wr(1),
+        LexToken::Wr16 => IRKind::Wr(2),
+        LexToken::Wr24 => IRKind::Wr(3),
+        LexToken::Wr32 => IRKind::Wr(4),
+        LexToken::Wr40 => IRKind::Wr(5),
+        LexToken::Wr48 => IRKind::Wr(6),
+        LexToken::Wr56 => IRKind::Wr(7),
+        LexToken::Wr64 => IRKind::Wr(8),
         LexToken::Assert => IRKind::Assert,
         LexToken::Align => IRKind::Align,
         LexToken::SetSec => IRKind::SetSec,

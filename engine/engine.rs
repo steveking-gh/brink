@@ -33,14 +33,7 @@ pub struct Engine {
 
 fn get_wrx_byte_width(ir: &IR) -> usize {
     match ir.kind {
-        IRKind::Wr8 => 1,
-        IRKind::Wr16 => 2,
-        IRKind::Wr24 => 3,
-        IRKind::Wr32 => 4,
-        IRKind::Wr40 => 5,
-        IRKind::Wr48 => 6,
-        IRKind::Wr56 => 7,
-        IRKind::Wr64 => 8,
+        IRKind::Wr(w) => w as usize,
         bad => {
             panic!("Called get_wrx_byte_width with {:?}", bad);
         }
@@ -1160,14 +1153,7 @@ impl Engine {
                     }
                     IRKind::SectionEnd => self.iterate_section_end(ir, irdb, diags, &mut current),
 
-                    IRKind::Wr8
-                    | IRKind::Wr16
-                    | IRKind::Wr24
-                    | IRKind::Wr32
-                    | IRKind::Wr40
-                    | IRKind::Wr48
-                    | IRKind::Wr56
-                    | IRKind::Wr64 => self.iterate_wrx(ir, irdb, diags, &mut current),
+                    IRKind::Wr(_) => self.iterate_wrx(ir, irdb, diags, &mut current),
                     IRKind::Align => self.iterate_align(ir, irdb, diags, &current),
                     IRKind::SetSec | IRKind::SetImg | IRKind::SetAbs => {
                         self.iterate_set(ir, irdb, diags, &current)
@@ -1407,14 +1393,7 @@ impl Engine {
         let mut error_count = 0;
         for ir in &irdb.ir_vec {
             result = match ir.kind {
-                IRKind::Wr8
-                | IRKind::Wr16
-                | IRKind::Wr24
-                | IRKind::Wr32
-                | IRKind::Wr40
-                | IRKind::Wr48
-                | IRKind::Wr56
-                | IRKind::Wr64 => self.execute_wrx(ir, irdb, diags, file),
+                IRKind::Wr(_) => self.execute_wrx(ir, irdb, diags, file),
                 IRKind::Assert => self.execute_assert(ir, irdb, diags, file),
                 IRKind::Print => self.execute_print(ir, irdb, diags, file),
                 IRKind::Wrs => self.execute_wrs(ir, irdb, diags, file),

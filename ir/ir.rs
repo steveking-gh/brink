@@ -45,14 +45,8 @@ pub enum IRKind {
     ToI64,
     ToU64,
     U64,
-    Wr8,
-    Wr16,
-    Wr24,
-    Wr32,
-    Wr40,
-    Wr48,
-    Wr56,
-    Wr64,
+    /// Write N bytes (little-endian). N is the byte width: 1..=8.
+    Wr(u8),
     Wrf,
     Wrs,
 }

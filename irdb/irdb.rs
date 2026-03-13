@@ -413,14 +413,7 @@ impl IRDb {
             | IRKind::SetSec
             | IRKind::SetImg
             | IRKind::SetAbs
-            | IRKind::Wr8
-            | IRKind::Wr16
-            | IRKind::Wr24
-            | IRKind::Wr32
-            | IRKind::Wr40
-            | IRKind::Wr48
-            | IRKind::Wr56
-            | IRKind::Wr64 => self.validate_numeric_1_or_2(ir, diags),
+            | IRKind::Wr(_) => self.validate_numeric_1_or_2(ir, diags),
             IRKind::Assert => self.validate_numeric_1(ir, diags),
             IRKind::Wrf => self.validate_wrf_operands(ir, diags),
             IRKind::Wrs | IRKind::Print => self.validate_string_expr_operands(ir, diags),
