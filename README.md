@@ -30,7 +30,7 @@ All tests should should pass, 0 tests should fail.
 
 ### Step 4: Install Brink
 
-The previous build step created the brink binary as `./target/release/brink`.  You can install the brink binary anywhere on your system.  As a convenience, cargo provides a per-user installation as `$HOME/.cargo/bin/brink`.  
+The previous build step created the brink binary as `./target/release/brink`.  You can install the brink binary anywhere on your system.  As a convenience, cargo provides a per-user installation as `$HOME/.cargo/bin/brink`.
 
     $ cargo install --path ./
 
@@ -310,7 +310,15 @@ Brink considers a zero value false and all non-zero values true.
 
 ### Quoted Strings
 
-Brink allows utf-8 quoted strings with escape characters quote (\\\") tab (\t) and newline (\n).  Newlines are Linux style, so "A\n" is a two byte string on all platforms.
+Brink allows utf-8 quoted strings with the following escape characters:
+| Escape Character | UTF-8 Value | Name           |
+|------------------|-------------|----------------|
+| \\0              | 0x00        | Null           |
+| \\t              | 0x09        | Horizontal Tab |
+| \\n              | 0x0A        | Linefeed       |
+| \\"              | 0x22        | Quotation Mark |
+
+Newlines are Linux style, so "A\n" is a two byte string on all platforms.
 
 ## Arithmetic Operators
 
@@ -347,7 +355,7 @@ Example:
         assert abs() == 0x1009;
         assert abs(foo) == 0x1000;
     }
-    
+
     section bar {
         assert abs() == 0x1003;
         wrs "bar";
@@ -355,7 +363,7 @@ Example:
         wr fiz;
         assert abs() == 0x1009;
     }
-    
+
     // top level section
     section foo {
         assert abs() == 0x1000;
@@ -366,7 +374,7 @@ Example:
         assert abs() == 0x1009;
         assert abs(bar) == 0x1003;
     }
-    
+
     output foo 0x1000;  // starting absolute address is 0x1000
 
 ---
@@ -383,7 +391,7 @@ Example:
         assert sizeof(foo) == 32;
         assert abs() == 32;
     }
-    
+
     output foo;
 
 ---
@@ -416,7 +424,7 @@ Example:
         assert img() == 9;
         assert img(foo) == 0;
     }
-    
+
     section bar {
         assert img() == 3;
         wrs "bar";
@@ -424,7 +432,7 @@ Example:
         wr fiz;
         assert img() == 9;
     }
-    
+
     // top level section
     section foo {
         assert img() == 0;
@@ -435,7 +443,7 @@ Example:
         assert img() == 9;
         assert img(bar) == 3;
     }
-    
+
     output foo 0x1000;  // starting absolute address is 0x1000
 
 ---
@@ -489,7 +497,7 @@ Example:
         print "Section 'bar' starts at ", abs(), "\n";
         wrs "bar";
     }
-    
+
     // top level section
     section foo {
         print "Output spans address range ", abs(foo), "-", abs(foo) + sizeof(foo),
@@ -499,7 +507,7 @@ Example:
         wr bar;
         wr bar;
     }
-    
+
     output foo 0x1000;  // starting absolute address is 0x1000
 
 Will result in the following console output:
@@ -522,7 +530,7 @@ Example:
         wrs "fiz";
         assert sec() == 3;
     }
-    
+
     section bar {
         assert sec() == 0;
         wrs "bar";
@@ -531,7 +539,7 @@ Example:
         assert sec() == 6;
         assert sec(fiz) == 3;
     }
-    
+
     // top level section
     section foo {
         assert sec() == 0;
@@ -540,7 +548,7 @@ Example:
         wr bar;
         assert sec() == 9;
     }
-    
+
     output foo 0x1000;  // starting absolute address is 0x1000
 
 When a section offset specifies an identifier, the identifier must be in the scope of the current section.  For example:
@@ -621,7 +629,7 @@ Example:
         assert sizeof(empty_one) == 0;
         assert sizeof(foo) == 4;
     }
-    
+
     output foo;
 ---
 
@@ -654,7 +662,7 @@ Example:
         assert to_u64(42i) == 42u;
         assert to_u64(42) == 42u;
     }
-    
+
     output foo;
 
 ---
@@ -712,7 +720,7 @@ Example:
         wr64 (1 + 2) + img() + abs(foo) + sizeof(foo); // 3 + 28 + 10 + 36 = 77 00 00 00 00 00 00 00
         assert sizeof(foo) == 36;
     }
-    
+
     output foo 10;
 
 Another example using the optional repetition expression.
@@ -747,6 +755,6 @@ The following program simply copies these 6 UTF-8 characters to the output file.
 
 Evaluates the comma separated list of expressions and writes the resulting string to the output file.  Wrs accepts the same expressions and operates similarly to the print statement.  For more information, see [print](#print-expression--expression-).
 
-The wrs statement does not write a terminating 0 byte after the string.  Users creating null terminated (C style) strings in an output file should add an explicit \0.
+The wrs statement does not implicitly write a terminating 0 byte after the string.  Users creating null terminated (C style) strings in an output file should add an explicit \0.
 
     wrs "my null terminated string\0";
