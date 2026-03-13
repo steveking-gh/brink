@@ -253,7 +253,7 @@ impl<'toks> LinearDb {
 
     /// Recursively record information about the children of an AST object. The
     /// main purpose of this function is to flatten the AST into linear form.
-    /// Type and and operand checking is minimal to reduce complexity during
+    /// Type and operand checking is minimal to reduce complexity during
     /// this stage.
     ///
     /// Sets result true on success, false on failure.
