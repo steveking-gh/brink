@@ -271,7 +271,7 @@ mod tests {
 
     #[test]
     fn fuzz_found_10() {
-        assert_brink_failure("tests/fuzz_found_10.brink", &["[IR_3]"]);
+        assert_brink_failure("tests/fuzz_found_10.brink", &["[IR_4]"]);
     }
 
     #[test]
@@ -943,6 +943,7 @@ mod tests {
 
         let source_files = &[
             "ast/ast.rs",
+            "ir/ir.rs",
             "lineardb/lineardb.rs",
             "irdb/irdb.rs",
             "engine/engine.rs",
@@ -995,5 +996,18 @@ mod tests {
             }
             panic!("{}", msg);
         }
+    }
+
+    /// A decimal integer literal that exceeds i64::MAX cannot be stored
+    /// as the ambiguous-integer type and produces IR_4.
+    #[test]
+    fn integer_overflow_i64() {
+        assert_brink_failure("tests/integer_overflow_i64.brink", &["[IR_4]"]);
+    }
+
+    /// A hex integer literal with a 'u' suffix that exceeds u64::MAX produces IR_1.
+    #[test]
+    fn integer_overflow_u64() {
+        assert_brink_failure("tests/integer_overflow_u64.brink", &["[IR_1]"]);
     }
 } // mod tests

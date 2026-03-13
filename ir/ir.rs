@@ -241,7 +241,7 @@ impl IROperand {
                         return Some(ParameterValue::Integer(v));
                     } else {
                         let m = format!("Malformed integer operand {}", sval);
-                        diags.err1("IR_3", &m, src_loc.clone());
+                        diags.err1("IR_4", &m, src_loc.clone());
                     }
                 } else {
                     // We don't know variable value, so initialize to zero
