@@ -758,3 +758,15 @@ Evaluates the comma separated list of expressions and writes the resulting strin
 The wrs statement does not implicitly write a terminating 0 byte after the string.  Users creating null terminated (C style) strings in an output file should add an explicit \0.
 
     wrs "my null terminated string\0";
+
+# Source Code Overview
+
+| File                 | Stage         | Summary in header                                                                     |
+|----------------------|---------------|---------------------------------------------------------------------------------------|
+| diags/diags.rs       | Cross-cutting | Ariadne-backed diagnostic output channel used by every stage                          |
+| ast/ast.rs           | Stage 1       | Logos lexer → token stream → arena AST → AstDb validation                             |
+| ir/ir.rs             | Shared types  | IRKind, ParameterValue, IROperand, IR — the data flowing between stages 2–4           |
+| lineardb/lineardb.rs | Stage 2       | AST flattening into parallel LinIR / LinOperand vectors; values still as strings      |
+| irdb/irdb.rs         | Stage 3       | String-to-typed-value conversion, DataType resolution, operand and file validation    |
+| engine/engine.rs     | Stage 4       | Iterate loop to stabilize location counters, then execute pass to write binary output |
+| process/process.rs   | Orchestrator  | Sequences all four stages, converts Err(()) to anyhow errors, opens the output file   |
