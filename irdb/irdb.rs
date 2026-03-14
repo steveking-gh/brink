@@ -122,7 +122,7 @@ impl IRDb {
                 let lin_ir = &lin_db.ir_vec[lin_ir_lid];
                 // We expect 2 input and 1 output operand.
                 assert!(lin_ir.operand_vec.len() == 3);
-                // The lop this this function was called with *is* the output operand
+                // The lop this function was called with *is* the output operand
                 assert!(lin_ir.operand_vec[2] == lop_num);
                 let lhs_num = lin_ir.operand_vec[0];
                 let rhs_num = lin_ir.operand_vec[1];
@@ -171,6 +171,38 @@ impl IRDb {
                     }
                 }
             }
+
+            // Eq is always the datatype of its rhs operand.
+            // For example: `const x = 1;` which gives 'x' the same type as '1' (Integer in this case).
+            ast::LexToken::Eq => {
+                if lop.ir_lid.is_none() {
+                    panic!("Output operand '{:?}' does not have a source lid", lop.tok);
+                }
+
+                let lin_ir_lid = lop.ir_lid.unwrap();
+                let lin_ir = &lin_db.ir_vec[lin_ir_lid];
+                // We expect 1 identifier input operand and 1 value input operand and 1 output operand.
+                assert!(lin_ir.operand_vec.len() == 3);
+                // The lop this function was called with *is* the output operand
+                assert!(lin_ir.operand_vec[2] == lop_num);
+                let lhs_num = lin_ir.operand_vec[0]; // identifier operand
+                let rhs_num = lin_ir.operand_vec[1]; // value operand
+
+                let lhs_opt = Self::get_operand_data_type_r(depth + 1, lhs_num, lin_db, diags);
+                if let Some(lhs_dt) = lhs_opt {
+                    if lhs_dt != DataType::Identifier {
+                        let msg = format!(
+                            "Error, found data type '{:?}' for left-hand side of '=', but expected an identifier.",
+                            lhs_dt
+                        );
+                        diags.err1("IRDB_12", &msg, lin_ir.src_loc.clone());
+                        return None;
+                    }
+                    // Just return the data type of the rhs.
+                    data_type = Self::get_operand_data_type_r(depth + 1, rhs_num, lin_db, diags);
+                }
+            }
+
             ast::LexToken::Wr8
             | ast::LexToken::Wr16
             | ast::LexToken::Wr24
@@ -180,6 +212,7 @@ impl IRDb {
             | ast::LexToken::Wr56
             | ast::LexToken::Wr64
             | ast::LexToken::Assert
+            | ast::LexToken::Const
             | ast::LexToken::Print
             | ast::LexToken::Section
             | ast::LexToken::OpenBrace
@@ -248,6 +281,34 @@ impl IRDb {
     // Print accepts most expressions without side effects
     // TODO add the restrictions that do exist, e.g. no identifiers
     fn validate_string_expr_operands(&self, _ir: &IR, _diags: &mut Diags) -> bool {
+        true
+    }
+
+    fn validate_assignment_operands(&self, ir: &IR, diags: &mut Diags) -> bool {
+        let len = ir.operands.len();
+        if len != 2 {
+            let m = format!(
+                "'{:?}' expressions must have 2 operands (identifier, value), but found {}.",
+                ir.kind, len
+            );
+            diags.err1("IRDB_16", &m, ir.src_loc.clone());
+            return false;
+        }
+        let identifier_opnd = &self.parms[ir.operands[0]];
+        if identifier_opnd.val.data_type() != DataType::Identifier {
+            let m = format!(
+                "'{:?}' assignment operand must be an identifier, found '{:?}'.",
+                ir.kind,
+                identifier_opnd.val.data_type()
+            );
+            diags.err2(
+                "IRDB_17",
+                &m,
+                ir.src_loc.clone(),
+                identifier_opnd.src_loc.clone(),
+            );
+            return false;
+        }
         true
     }
 
@@ -428,6 +489,7 @@ impl IRDb {
             IRKind::Assert => self.validate_numeric_1(ir, diags),
             IRKind::Wrf => self.validate_wrf_operands(ir, diags),
             IRKind::Wrs | IRKind::Print => self.validate_string_expr_operands(ir, diags),
+            IRKind::Eq => self.validate_assignment_operands(ir, diags),
             IRKind::NEq
             | IRKind::LEq
             | IRKind::GEq

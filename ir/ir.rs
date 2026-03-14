@@ -36,6 +36,7 @@ pub enum IRKind {
     BitOr,
     Divide,
     DoubleEq,
+    Eq,
     GEq,
     I64,
     Img,

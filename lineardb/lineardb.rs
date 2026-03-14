@@ -94,6 +94,7 @@ fn tok_to_irkind(tok: LexToken) -> IRKind {
         LexToken::DoubleGreater => IRKind::RightShift,
         LexToken::DoubleLess => IRKind::LeftShift,
         LexToken::DoublePipe => IRKind::LogicalOr,
+        LexToken::Eq => IRKind::Eq,
         LexToken::FSlash => IRKind::Divide,
         LexToken::GEq => IRKind::GEq,
         LexToken::Img => IRKind::Img,
@@ -128,11 +129,27 @@ fn tok_to_irkind(tok: LexToken) -> IRKind {
 }
 
 pub struct LinearDb {
+    /// Flat, ordered sequence of all IR instructions produced from the AST.
+    /// Downstream stages (IRDb, Engine) iterate this vector in order.
     pub ir_vec: Vec<LinIR>,
+
+    /// Vector of all operands referenced by instructions in `ir_vec`.
+    /// Instructions index into this vector rather than owning their operands directly.
     pub operand_vec: Vec<LinOperand>,
+
+    // Hash mapping const identifier names to their operand_vec indices.
+    pub const_map: HashMap<String, usize>,
+
+    /// Name of the section specified by the `output` statement.
     pub output_sec_str: String,
+
+    /// Source location of the section name token in the `output` statement.
     pub output_sec_loc: Range<usize>,
+
+    /// Optional absolute base address supplied in the `output` statement.
     pub output_addr_str: Option<String>,
+
+    /// Source location of the address token in the `output` statement, if present.
     pub output_addr_loc: Option<Range<usize>>,
 }
 
@@ -265,9 +282,9 @@ impl<'toks> LinearDb {
         self.process_operands(expected, lops, ir_lid, diags, tinfo)
     }
 
-    /// Recursively record information about the children of an AST object. The
-    /// main purpose of this function is to flatten the AST into linear form.
-    /// Type and operand checking is minimal to reduce complexity during
+    /// Recursively record information about the children of an AST object.
+    /// This function flattens the AST into linear form.
+    /// We defer most type and operand checking to reduce complexity during
     /// this stage.
     ///
     /// Sets result true on success, false on failure.
@@ -293,6 +310,13 @@ impl<'toks> LinearDb {
         let tok = tinfo.tok;
         let mut result = true;
         match tok {
+            LexToken::Const => {
+                // A const expression.
+                // Add const to the main operand vector and return it as a local operand.
+                let idx = self.operand_vec.len();
+                self.operand_vec.push(LinOperand::new(None, tinfo));
+                returned_operands.push(idx);
+            }
             LexToken::Wr => {
                 // A vector to track the operands of this expression.
                 let mut lops = Vec::new();
@@ -455,7 +479,8 @@ impl<'toks> LinearDb {
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);
             }
-            LexToken::NEq
+            LexToken::Eq
+            | LexToken::NEq
             | LexToken::LEq
             | LexToken::GEq
             | LexToken::DoubleEq
@@ -581,6 +606,7 @@ impl<'toks> LinearDb {
         let mut linear_db = LinearDb {
             ir_vec: Vec::new(),
             operand_vec: Vec::new(),
+            const_map: HashMap::new(),
             output_sec_str,
             output_sec_loc,
             output_addr_str,

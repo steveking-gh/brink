@@ -1112,6 +1112,15 @@ impl Engine {
         }
     }
 
+    /// Repeatedly executes the IR until all location-dependent values
+    /// (addresses, alignments, section sizes) stabilize.  Each pass walks the
+    /// full `irdb.ir_vec` in order, updating `self.ir_locs` with the image and
+    /// section offset recorded after each instruction.  Because an alignment or
+    /// `sizeof` expression may change the size of an earlier region on a later
+    /// pass, iteration continues until two consecutive passes produce identical
+    /// location vectors.  `abs_start` sets the base image address for the first
+    /// section.  Returns `false` and emits diagnostics if any instruction fails
+    /// validation or execution during the loop.
     pub fn iterate(&mut self, irdb: &IRDb, diags: &mut Diags, abs_start: usize) -> bool {
         self.trace(format!("Engine::iterate: abs_start = {}", abs_start).as_str());
         let mut result = true;
@@ -1177,9 +1186,12 @@ impl Engine {
 
                     // The following IR types are evaluated only at execute time.
                     // Nothing to do during iteration.
-                    IRKind::Label | IRKind::Assert | IRKind::Print | IRKind::I64 | IRKind::U64 => {
-                        true
-                    }
+                    IRKind::Eq
+                    | IRKind::Label
+                    | IRKind::Assert
+                    | IRKind::Print
+                    | IRKind::I64
+                    | IRKind::U64 => true,
                 }
             }
             if self.ir_locs == old_locations {
@@ -1401,6 +1413,13 @@ impl Engine {
         Ok(())
     }
 
+    /// Performs a single, final pass over the IR to write the output image.
+    /// Called once after `iterate` reached a stable location assignment.
+    /// Only instructions that produce output bytes (`Wr`, `Wrs`, `Wrf`) or
+    /// observable side-effects (`Assert`, `Print`) are dispatched here.
+    /// Address-arithmetic and layout instructions are no-ops because their
+    /// values were already committed to `self.ir_locs` during iteration.
+    /// Returns `Err` and emits diagnostics if any write or assertion fails.
     pub fn execute(&self, irdb: &IRDb, diags: &mut Diags, file: &mut File) -> Result<()> {
         self.trace("Engine::execute:");
         let mut result;
@@ -1424,6 +1443,7 @@ impl Engine {
                 | IRKind::Sizeof
                 | IRKind::ToI64
                 | IRKind::ToU64
+                | IRKind::Eq
                 | IRKind::NEq
                 | IRKind::GEq
                 | IRKind::LEq

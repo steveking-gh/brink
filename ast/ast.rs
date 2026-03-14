@@ -32,6 +32,8 @@ use tracing::{debug, error, info, trace, warn};
 /// unstructured values these enum.
 #[derive(Logos, Debug, Clone, Copy, PartialEq)]
 pub enum LexToken {
+    #[token("const")]
+    Const,
     #[token("section")]
     Section,
     #[token("align")]
@@ -90,6 +92,10 @@ pub enum LexToken {
     GEq,
     #[token("<=")]
     LEq,
+    // Single '=' must be lexed after all the multi-character operators
+    // that start with '=' to avoid ambiguity.
+    #[token("=")]
+    Eq,
     #[token("&&")]
     DoubleAmpersand,
     #[token("||")]
@@ -322,6 +328,7 @@ impl<'toks> Ast<'toks> {
             result &= match tinfo.tok {
                 LexToken::Section => self.parse_section(self.root, diags),
                 LexToken::Output => self.parse_output(self.root, diags),
+                LexToken::Const => self.parse_const(self.root, diags),
 
                 // Unrecognized top level token.  Report the error, but keep going
                 // to try to give the user more errors in batches.
@@ -912,6 +919,30 @@ impl<'toks> Ast<'toks> {
         self.dbg_exit("parse_output", result)
     }
 
+    fn parse_const(&mut self, parent: NodeId, diags: &mut Diags) -> bool {
+        self.dbg_enter("parse_const");
+        let mut result = false;
+        // Add the const keyword as a child of the parent and advance
+        let const_nid = self.add_to_parent_and_advance(parent);
+
+        // After 'const' an identifier is expected
+        if self.expect_leaf(
+            diags,
+            const_nid,
+            LexToken::Identifier,
+            "AST_8",
+            "Expected an identifier after 'const'",
+        ) {
+            // After the identifier, an equals sign is expected
+            if self.expect_token(LexToken::Eq, diags, const_nid) {
+                // After the equals sign, a literal or literal expression is expected.
+                // The literal expression can be literals combined with other consts.
+                result = self.expect_expr(const_nid, diags);
+            }
+        }
+        self.dbg_exit("parse_const", result)
+    }
+
     /// Adds the current token as a child of the parent and advances
     /// the token index.  The current token MUST BE VALID!
     fn parse_leaf(&mut self, parent: NodeId) {
@@ -1080,6 +1111,7 @@ impl<'toks> Output<'toks> {
 pub struct AstDb<'toks> {
     pub sections: HashMap<&'toks str, Section<'toks>>,
     pub labels: HashMap<&'toks str, Label>,
+    pub consts: HashMap<&'toks str, TokenInfo<'toks>>,
     pub output: Output<'toks>,
     //pub properties: HashMap<NodeId, NodeProperty>
 }
@@ -1304,6 +1336,7 @@ impl<'toks> AstDb<'toks> {
         let mut ast_db = AstDb {
             sections,
             labels: HashMap::new(),
+            consts: HashMap::new(),
             output: output.unwrap(),
         };
 

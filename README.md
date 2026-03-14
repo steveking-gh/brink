@@ -412,6 +412,38 @@ Example:
 
 ---
 
+## `const <identifier> = <expr>;`
+
+A const expression creates an immutable user defined identifier for a value.  The value can consist of a number or string literal, or an expression composed of other constants and literals.  Const identifiers have global scope and must be globally unique.
+
+Example:
+    const RAM_BASE = 0x8000_0000u;  // User defined unsigned constant.
+
+    section foo {
+        wr64 RAM_BASE;
+        print "RAM base address is ", RAM_BASE, "\n";
+    }
+
+    output foo RAM_BASE;
+
+
+A const value expression cannot depend on sizes or locations in the output file.  In other words, the brink compiler resolves all const values before constructing the output image.  For example:
+
+    const RAM_BASE = 0x8000_0000u;        // OK, just a 64b unsigned literal.
+    const RAM_SIZE = 32768;               // OK, just a 64b integer literal.
+    const RAM_END = RAM_BASE + RAM_SIZE;  // OK, const composed of other consts.
+
+    section foo {
+        wrs "Hello\n";
+    }
+
+    const RAM_USED = sizeof(foo);         // ERROR!  Const cannot depend on section properties.
+    const FOO_START = abs(foo);           // ERROR!  Const cannot depend on section properties.
+
+    output foo RAM_BASE;
+
+---
+
 ## `img( [identifier] ) -> U64`
 
 When called with an identifier, returns the byte offset as a U64 of the identifier from the start of the output image.  When called without an identifier, returns the current image offset.
@@ -759,7 +791,7 @@ The wrs statement does not implicitly write a terminating 0 byte after the strin
 
     wrs "my null terminated string\0";
 
-# Source Code Overview
+# Brink Source Code Overview
 
 | File                 | Stage         | Summary in header                                                                     |
 |----------------------|---------------|---------------------------------------------------------------------------------------|
