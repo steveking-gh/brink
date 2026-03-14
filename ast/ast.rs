@@ -1,3 +1,17 @@
+// Lexer, parser and abstract syntax tree (AST) for brink.
+//
+// This is the first stage of the compiler pipeline.  The logos-generated
+// lexer converts the raw source text into a flat token stream (LexToken).
+// The recursive-descent / Pratt-expression parser then consumes that stream
+// and builds an indextree arena-based AST, where each node holds a TokenInfo
+// that records the token kind, its string value, and its byte-offset span in
+// the source file.  A second pass, AstDb, validates global constraints such as
+// unique section names and resolves cross-section references.
+//
+// Order of operations: ast runs immediately after the source file is read.
+// Its output — an Ast and an AstDb — is consumed by lineardb in the next
+// stage.
+
 use indextree::{Arena, NodeId};
 use logos::Logos;
 pub type Span = std::ops::Range<usize>;

@@ -1,3 +1,15 @@
+// Top-level pipeline orchestrator for brink.
+//
+// The process function is the single entry point that drives the entire
+// compiler pipeline.  It sequences the four stages in order — Ast, LinearDb,
+// IRDb and Engine — passing each stage's output as input to the next, and
+// converting any stage-level Err(()) result into an anyhow error so that the
+// caller receives a descriptive failure message.  It also handles the output
+// file name, creating the file before handing it to Engine for writing.
+//
+// Order of operations: process.rs sits above all four pipeline stages.
+// main.rs calls process() once per invocation after reading the source file.
+
 use anyhow::{Context, Result, anyhow};
 use std::fs::File;
 
@@ -26,8 +38,8 @@ pub fn process(
 
     let mut diags = Diags::new(name, fstr, verbosity, noprint);
 
-    let ast = Ast::new(fstr, &mut diags)
-        .map_err(|_| anyhow!("[PROC_1]: Error detected, halting."))?;
+    let ast =
+        Ast::new(fstr, &mut diags).map_err(|_| anyhow!("[PROC_1]: Error detected, halting."))?;
 
     if verbosity > 2 {
         ast.dump("ast.dot")?;

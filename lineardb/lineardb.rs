@@ -1,3 +1,17 @@
+// AST to linear IR lowering for brink.
+//
+// LinearDb is the second stage of the compiler pipeline.  It walks the AST
+// produced by the ast stage and flattens the tree into two parallel vectors:
+// a sequence of LinIR instruction records and a sequence of LinOperand operand
+// records.  During this pass, section nesting and expression structure are
+// resolved into a linear order, operand indices are assigned, and basic
+// structural constraints (operand counts, recursion depth) are checked.
+// Values are still stored as raw strings at this point; type conversion
+// happens in the next stage.
+//
+// Order of operations: lineardb runs after ast.  Its output — a LinearDb
+// containing ir_vec and operand_vec — is consumed by irdb.
+
 use indextree::NodeId;
 pub type Span = std::ops::Range<usize>;
 use diags::Diags;

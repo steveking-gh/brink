@@ -1,3 +1,18 @@
+// Shared intermediate representation (IR) types for brink.
+//
+// This crate defines the data types that flow between the lineardb, irdb and
+// engine pipeline stages.  IRKind enumerates every operation the compiler
+// understands.  ParameterValue holds a typed runtime value (U64, I64, Integer,
+// QuotedString, or Identifier) for each operand.  IROperand pairs a
+// ParameterValue with its source location and its optional back-reference to
+// the IR instruction that produced it.  IR bundles a kind, a source location,
+// and a list of operand indices into a single instruction record.
+//
+// Order of operations: ir.rs is a shared library with no pipeline logic of
+// its own.  lineardb populates LinIR records, irdb converts them into typed IR
+// and IROperand values, and engine reads those values during iteration and
+// execution.
+
 use diags::Diags;
 use parse_int::parse;
 use std::ops::Range;

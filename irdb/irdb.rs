@@ -1,3 +1,16 @@
+// Typed IR construction and validation for brink.
+//
+// IRDb is the third stage of the compiler pipeline.  It consumes the flat
+// LinIR and LinOperand records from LinearDb and converts them into fully
+// typed IR and IROperand values.  String operand values are parsed into their
+// native Rust types (u64, i64, etc.) and each operand's DataType is resolved
+// by recursively inspecting the expression tree.  IRDb also validates operand
+// counts, type compatibility, and file-path operands (checking that referenced
+// files exist and are readable), reporting any errors through Diags.
+//
+// Order of operations: irdb runs after lineardb.  Its output — an IRDb
+// containing ir_vec, parms and file metadata — is consumed by engine.
+
 pub type Span = std::ops::Range<usize>;
 use diags::Diags;
 use lineardb::LinearDb;
@@ -409,11 +422,9 @@ impl IRDb {
 
     fn validate_operands(&mut self, ir: &IR, diags: &mut Diags) -> bool {
         match ir.kind {
-            IRKind::Align
-            | IRKind::SetSec
-            | IRKind::SetImg
-            | IRKind::SetAbs
-            | IRKind::Wr(_) => self.validate_numeric_1_or_2(ir, diags),
+            IRKind::Align | IRKind::SetSec | IRKind::SetImg | IRKind::SetAbs | IRKind::Wr(_) => {
+                self.validate_numeric_1_or_2(ir, diags)
+            }
             IRKind::Assert => self.validate_numeric_1(ir, diags),
             IRKind::Wrf => self.validate_wrf_operands(ir, diags),
             IRKind::Wrs | IRKind::Print => self.validate_string_expr_operands(ir, diags),

@@ -1,3 +1,17 @@
+// Iterative evaluator and binary executor for brink.
+//
+// Engine is the fourth and final stage of the compiler pipeline.  Because
+// sections can reference the sizes and addresses of other sections that appear
+// later in the output, a single linear pass is not enough to resolve all
+// values.  Engine therefore runs an iterate loop, re-evaluating every IR
+// instruction until all location-counter values stabilize.  Once stable,
+// Engine runs an execute pass that writes the actual binary output — padding
+// bytes, inline data, and the contents of referenced files — to the output
+// file.  Errors detected during either pass are reported through Diags.
+//
+// Order of operations: engine runs last, after irdb has produced a fully
+// typed and validated IRDb.  Its output is the finished binary output file.
+
 use anyhow::{Result, anyhow};
 use diags::Diags;
 use ir::{DataType, IR, IRKind, ParameterValue};
