@@ -418,6 +418,7 @@ A const expression creates an immutable user defined identifier for a value.  Th
 any other global identifiers such as section names.
 
 Example:
+
     const RAM_BASE = 0x8000_0000u;  // User defined unsigned constant.
 
     section foo {

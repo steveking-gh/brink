@@ -1,0 +1,7 @@
+// Two const declarations with the same name.  Expected: LINEAR_10.
+const FOO = 1;
+const FOO = 2;
+section bar {
+    wr8 FOO;
+}
+output bar;

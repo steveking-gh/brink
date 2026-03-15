@@ -1,0 +1,10 @@
+// Const expression depends on sizeof, which requires engine-time layout.
+// Const values must be resolvable before the engine runs.  Expected: IRDB_19.
+section foo {
+    wr8 1;
+}
+const SZ = sizeof(foo);
+section bar {
+    wr64 SZ;
+}
+output bar;

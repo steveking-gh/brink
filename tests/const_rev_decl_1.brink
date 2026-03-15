@@ -1,0 +1,9 @@
+// Const ADDR is declared before the consts it depends on (BASE and OFFSET).
+// Resolution must be order-independent since consts have global scope.
+const ADDR = BASE + OFFSET;
+const BASE = 0x100u;
+const OFFSET = 0x10u;
+section foo {
+    wr64 ADDR;
+}
+output foo;

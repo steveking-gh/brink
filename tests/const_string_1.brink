@@ -1,0 +1,6 @@
+// String const used as a wrs operand.
+const GREETING = "Hello!\n";
+section foo {
+    wrs GREETING;
+}
+output foo;

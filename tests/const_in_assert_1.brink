@@ -1,0 +1,8 @@
+// Const used as one operand of an assert expression.
+// sizeof(foo) is 4 (one wr32), and EXPECTED is 4, so the assert must pass.
+const EXPECTED = 4;
+section foo {
+    wr32 0xDEADBEEF;
+    assert sizeof(foo) == EXPECTED;
+}
+output foo;

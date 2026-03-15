@@ -1,0 +1,7 @@
+// Two consts that mutually depend on each other.  Expected: IRDB_18.
+const A = B + 1;
+const B = A + 1;
+section foo {
+    wr8 1;
+}
+output foo;

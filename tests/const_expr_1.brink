@@ -1,0 +1,8 @@
+// Const whose value is an expression composed of two other consts.
+const BASE = 0x100u;
+const OFFSET = 0x10u;
+const ADDR = BASE + OFFSET;
+section foo {
+    wr64 ADDR;
+}
+output foo;

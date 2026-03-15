@@ -1,0 +1,6 @@
+// Const name is the same as an existing section name.  Expected: LINEAR_11.
+section foo {
+    wr8 1;
+}
+const foo = 42;
+output foo;
