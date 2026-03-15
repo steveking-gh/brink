@@ -1153,6 +1153,24 @@ impl<'toks> Section<'toks> {
 }
 
 /*******************************
+ * Const
+ ******************************/
+#[derive(Debug)]
+pub struct Const<'toks> {
+    pub tinfo: &'toks TokenInfo<'toks>,
+    pub nid: NodeId,
+}
+
+impl<'toks> Const<'toks> {
+    pub fn new(ast: &'toks Ast, nid: NodeId) -> Const<'toks> {
+        Const {
+            tinfo: ast.get_tinfo(nid),
+            nid,
+        }
+    }
+}
+
+/*******************************
  * Label
  ******************************/
 #[derive(Debug)]
@@ -1238,6 +1256,33 @@ impl<'toks> AstDb<'toks> {
         true
     }
 
+    /// Processes a const in the AST
+    fn record_const(
+        diags: &mut Diags,
+        sec_nid: NodeId,
+        ast: &'toks Ast,
+        consts: &mut HashMap<&'toks str, Const<'toks>>,
+    ) -> bool {
+        debug!("AstDb::record_const: NodeId {}", sec_nid);
+
+        let mut children = sec_nid.children(&ast.arena);
+        let sec_name_nid = children.next().unwrap();
+        let sec_tinfo = ast.get_tinfo(sec_name_nid);
+        let sec_str = sec_tinfo.val;
+        if consts.contains_key(sec_str) {
+            // error, duplicate const names
+            // We know the const exists, so unwrap is fine.
+            let orig_const = consts.get(sec_str).unwrap();
+            let orig_tinfo = orig_const.tinfo;
+            let m = format!("Duplicate const name '{}'", sec_str);
+            diags.err2("AST_30", &m, sec_tinfo.span(), orig_tinfo.span());
+            return false;
+        }
+        consts.insert(sec_str, Const::new(ast, sec_nid));
+        true
+    }
+
+
     /// Returns true if the specified child of the specified node is a section
     /// name that exists.  Otherwise, prints a diagnostic and returns false.
     fn validate_section_name(
@@ -1308,7 +1353,6 @@ impl<'toks> AstDb<'toks> {
     /// Recursively validate the basic hierarchy of the AST object.
     /// Nested sections tracks the current hierarchy of section writes so we
     /// catch cycles.
-    // TODO - After we validate nesting, we should create an iterator over the AST
     fn validate_nesting_r(
         &mut self,
         rdepth: usize,
@@ -1392,6 +1436,7 @@ impl<'toks> AstDb<'toks> {
 
         let mut sections: HashMap<&'toks str, Section<'toks>> = HashMap::new();
         let mut output: Option<Output<'toks>> = None;
+        let mut consts: HashMap<&'toks str, Const<'toks>> = HashMap::new();
 
         // First phase, record all sections, files, and the output.
         // These are defined only at top level so no need for recursion.
@@ -1401,6 +1446,7 @@ impl<'toks> AstDb<'toks> {
                 && match tinfo.tok {
                     LexToken::Section => Self::record_section(diags, nid, ast, &mut sections),
                     LexToken::Output => Self::record_output(diags, nid, ast, &mut output),
+                    LexToken::Const => Self::record_const(diags, nid, ast, &mut consts),
                     _ => {
                         let msg = format!("Invalid top-level expression {}", tinfo.val);
                         diags.err1("AST_24", &msg, tinfo.span().clone());

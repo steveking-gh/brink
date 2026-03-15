@@ -1,13 +1,13 @@
 // AST to linear IR lowering for brink.
 //
 // LinearDb is the second stage of the compiler pipeline.  It walks the AST
-// produced by the ast stage and flattens the tree into two parallel vectors:
+// produced by the AST stage and flattens the tree into two parallel vectors:
 // a sequence of LinIR instruction records and a sequence of LinOperand operand
 // records.  During this pass, section nesting and expression structure are
 // resolved into a linear order, operand indices are assigned, and basic
 // structural constraints (operand counts, recursion depth) are checked.
 // Values are still stored as raw strings at this point; type conversion
-// happens in the next stage.
+// and expression evaluation happens in the next stage.
 //
 // Order of operations: lineardb runs after ast.  Its output — a LinearDb
 // containing ir_vec and operand_vec — is consumed by irdb.
@@ -676,6 +676,7 @@ impl<'toks> LinearDb {
 struct IdentDb {
     label_idents: HashMap<String, Range<usize>>,
     section_count: HashMap<String, usize>,
+    const_count: HashMap<String, usize>,
 }
 
 impl IdentDb {
@@ -683,6 +684,7 @@ impl IdentDb {
         IdentDb {
             label_idents: HashMap::new(),
             section_count: HashMap::new(),
+            const_count: HashMap::new(),
         }
     }
 
@@ -840,11 +842,8 @@ impl IdentDb {
             name
         );
 
-        if let Some(count) = self.section_count.get_mut(name) {
-            *count += 1;
-        } else {
-            self.section_count.insert(name.to_string(), 1);
-        }
+        // Increment existing section name count or insert new entry with count = 1.
+        *self.section_count.entry(name.to_string()).or_insert(0) += 1;
         trace!("IdentDb::inventory_section_identifiers: EXIT");
     }
 
@@ -859,11 +858,8 @@ impl IdentDb {
             name
         );
 
-        if let Some(count) = self.section_count.get_mut(name) {
-            *count += 1;
-        } else {
-            self.section_count.insert(name.to_string(), 1);
-        }
+        // Increment existing const name count or insert new entry with count = 1.
+        *self.const_count.entry(name.to_string()).or_insert(0) += 1;
         trace!("IdentDb::inventory_const_identifiers: EXIT");
     }
     /// Build a hash of all valid global identifier names: labels, sections, consts, etc
