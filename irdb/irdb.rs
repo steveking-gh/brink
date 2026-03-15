@@ -284,7 +284,7 @@ impl IRDb {
         true
     }
 
-    fn validate_assignment_operands(&self, ir: &IR, diags: &mut Diags) -> bool {
+    fn validate_const_operands(&self, ir: &IR, diags: &mut Diags) -> bool {
         let len = ir.operands.len();
         if len != 2 {
             let m = format!(
@@ -297,7 +297,7 @@ impl IRDb {
         let identifier_opnd = &self.parms[ir.operands[0]];
         if identifier_opnd.val.data_type() != DataType::Identifier {
             let m = format!(
-                "'{:?}' assignment operand must be an identifier, found '{:?}'.",
+                "'{:?}' First const operand must be an identifier, found '{:?}'.",
                 ir.kind,
                 identifier_opnd.val.data_type()
             );
@@ -489,7 +489,7 @@ impl IRDb {
             IRKind::Assert => self.validate_numeric_1(ir, diags),
             IRKind::Wrf => self.validate_wrf_operands(ir, diags),
             IRKind::Wrs | IRKind::Print => self.validate_string_expr_operands(ir, diags),
-            IRKind::Eq => self.validate_assignment_operands(ir, diags),
+            IRKind::Const => self.validate_const_operands(ir, diags),
             IRKind::NEq
             | IRKind::LEq
             | IRKind::GEq
@@ -515,6 +515,7 @@ impl IRDb {
             | IRKind::Label
             | IRKind::Abs
             | IRKind::Img
+            | IRKind::Eq
             | IRKind::Sec => true,
         }
     }

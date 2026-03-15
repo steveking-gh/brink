@@ -89,6 +89,7 @@ fn tok_to_irkind(tok: LexToken) -> IRKind {
         LexToken::Ampersand => IRKind::BitAnd,
         LexToken::Assert => IRKind::Assert,
         LexToken::Asterisk => IRKind::Multiply,
+        LexToken::Const => IRKind::Const,
         LexToken::DoubleAmpersand => IRKind::LogicalAnd,
         LexToken::DoubleEq => IRKind::DoubleEq,
         LexToken::DoubleGreater => IRKind::RightShift,
@@ -613,7 +614,7 @@ impl<'toks> LinearDb {
             output_addr_loc,
         };
 
-        // Using the name of the section, use the AST database to get a reference
+        // Using the name of the output section, use the AST database to get a reference
         // to the section object.  ast_db processing has already guaranteed
         // that the section name is legitimate, so unwrap().
         let section = ast_db
@@ -622,9 +623,10 @@ impl<'toks> LinearDb {
             .unwrap();
         let sec_nid = section.nid;
 
-        // To start recursion, rdepth = 1.  The ONLY thing happening
-        // here is a flattening of the AST into the logical order
-        // of instructions.  We're not calculating sizes and addresses yet.
+        // To start recursion, set rdepth = 1.  The ONLY goal here
+        // is a flattening of the AST into the logical order
+        // of instructions.  We're not calculating sizes and addresses yet and
+        // we defer a lot of error cases for later.
         let mut lops = Vec::new();
 
         // If an error occurs, result gets stuck at false.
@@ -687,7 +689,7 @@ impl IdentDb {
     /// Verify all global identifier references
     pub fn check_globals(lindb: &LinearDb, diags: &mut Diags) -> bool {
         let mut idb = IdentDb::new();
-        if !idb.inventory_global_idents(lindb, diags) {
+        if !idb.inventory_global_identifiers(lindb, diags) {
             return false;
         }
         if !idb.verify_global_refs(lindb, diags) {
@@ -730,11 +732,11 @@ impl IdentDb {
                 IRKind::SectionStart => {
                     // We found a section start.  Add the section name identifier
                     // to the local database and recurse.
-                    idb.inventory_section_ident(lir, lindb);
+                    idb.inventory_section_identifiers(lir, lindb);
                     result &= IdentDb::check_locals_r(lid, lindb, diags);
                 }
                 IRKind::Label => {
-                    idb.inventory_label_ident(0, lir, lindb, diags);
+                    idb.inventory_label_identifiers(0, lir, lindb, diags);
                 }
 
                 IRKind::SectionEnd => break, // Done with local section inventory
@@ -798,7 +800,7 @@ impl IdentDb {
 
     /// Adds a label identifier that is an operand to the inventory.
     /// This inventory contains only declarations of identifiers, not references.
-    fn inventory_label_ident(
+    fn inventory_label_identifiers(
         &mut self,
         op_num: usize,
         lir: &LinIR,
@@ -828,13 +830,13 @@ impl IdentDb {
     }
 
     /// Increment the number of occurrences of this section
-    fn inventory_section_ident(&mut self, lir: &LinIR, lindb: &LinearDb) {
-        trace!("IdentDb::inventory_section_ident: ENTER");
+    fn inventory_section_identifiers(&mut self, lir: &LinIR, lindb: &LinearDb) {
+        trace!("IdentDb::inventory_section_identifiers: ENTER");
         let name_operand_num = lir.operand_vec[0];
         let name_operand = lindb.operand_vec.get(name_operand_num).unwrap();
         let name = &name_operand.sval;
         debug!(
-            "IdentDb::inventory_section_ident: Adding section name {} to inventory.",
+            "IdentDb::inventory_section_identifiers: Adding section name {} to inventory.",
             name
         );
 
@@ -843,25 +845,47 @@ impl IdentDb {
         } else {
             self.section_count.insert(name.to_string(), 1);
         }
-        trace!("IdentDb::inventory_section_ident: EXIT");
+        trace!("IdentDb::inventory_section_identifiers: EXIT");
     }
 
-    /// Build a hash of all valid identifier names: labels, sections, etc
+    /// Increment the number of occurrences of this const
+    fn inventory_const_identifiers(&mut self, lir: &LinIR, lindb: &LinearDb) {
+        trace!("IdentDb::inventory_const_identifiers: ENTER");
+        let name_operand_num = lir.operand_vec[0];
+        let name_operand = lindb.operand_vec.get(name_operand_num).unwrap();
+        let name = &name_operand.sval;
+        debug!(
+            "IdentDb::inventory_const_identifiers: Adding const name {} to inventory.",
+            name
+        );
+
+        if let Some(count) = self.section_count.get_mut(name) {
+            *count += 1;
+        } else {
+            self.section_count.insert(name.to_string(), 1);
+        }
+        trace!("IdentDb::inventory_const_identifiers: EXIT");
+    }
+    /// Build a hash of all valid global identifier names: labels, sections, consts, etc
     /// Reports an error and returns false if duplicate labels exist.
-    fn inventory_global_idents(&mut self, lindb: &LinearDb, diags: &mut Diags) -> bool {
+    fn inventory_global_identifiers(&mut self, lindb: &LinearDb, diags: &mut Diags) -> bool {
         let mut result = true;
         for lir in &lindb.ir_vec {
             result &= match lir.op {
-                IRKind::Label => self.inventory_label_ident(0, lir, lindb, diags),
+                IRKind::Label => self.inventory_label_identifiers(0, lir, lindb, diags),
                 IRKind::SectionStart => {
-                    self.inventory_section_ident(lir, lindb);
+                    self.inventory_section_identifiers(lir, lindb);
+                    true
+                },
+                IRKind::Const => {
+                    self.inventory_const_identifiers(lir, lindb);
                     true
                 }
                 _ => true,
             }
         }
 
-        debug!("IdentDb::inventory_identifiers:");
+        debug!("IdentDb::inventory_global_identifiers:");
         for name in self.label_idents.keys() {
             debug!("    {}", name);
         }

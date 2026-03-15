@@ -517,7 +517,17 @@ impl<'toks> Ast<'toks> {
         false
     }
 
-    /// Parse a section definition.
+    /// Parses a `section` declaration and attaches it to the AST.
+    ///
+    /// ```text
+    /// section <name> { <statements> }
+    ///
+    ///   section              <- root node for a section declaration
+    ///   ├── <Identifier>     <- section name
+    ///   ├── {                <- syntactic delimiter, marks start of body
+    ///   ├── [statements...]  <- zero or more content nodes (see parse_section_contents)
+    ///   └── }                <- syntactic delimiter, marks end of body
+    /// ```
     fn parse_section(&mut self, parent: NodeId, diags: &mut Diags) -> bool {
         self.dbg_enter("parse_section");
         let mut result = false;
@@ -550,7 +560,21 @@ impl<'toks> Ast<'toks> {
         self.dbg_exit("parse_section", result)
     }
 
-    /// Parse all possible content within a section.
+    /// Parses the body of a section, appending statement nodes directly to the
+    /// parent section node.  Loops until a `}` is found or tokens are exhausted.
+    /// Each iteration dispatches to `parse_label`, `parse_wr`, or `parse_expr`
+    /// depending on the leading token; unrecognized tokens produce a diagnostic
+    /// and are skipped to the next `;` to allow recovery.
+    ///
+    /// ```text
+    /// wr8 1+2; assert x; }
+    ///
+    ///   section              <- parent node (owned by parse_section)
+    ///   ...
+    ///   ├── <statement>      <- one node per statement in the section body
+    ///   ├── <statement>
+    ///   └── }                <- close-brace leaf, signals end of body
+    /// ```
     fn parse_section_contents(
         &mut self,
         parent: NodeId,
@@ -629,7 +653,14 @@ impl<'toks> Ast<'toks> {
         self.dbg_exit("parse_section_contents", false)
     }
 
-    // Parser for writing a section
+    /// Parses a `wr` statement that copies a named section into the output.
+    ///
+    /// ```text
+    /// wr <name>;
+    ///
+    ///   wr               <- root node for a section-write statement
+    ///   └── <Identifier> <- name of the section to be written
+    /// ```
     fn parse_wr(&mut self, parent_nid: NodeId, diags: &mut Diags) -> bool {
         self.dbg_enter("parse_wr");
         let mut result = false;
@@ -650,7 +681,7 @@ impl<'toks> Ast<'toks> {
         self.dbg_exit("parse_wr", result)
     }
 
-    /// Returns the (lhs,rhs) binding power for any infix token.
+    /// Returns the (lhs, rhs) binding power for any infix token.
     /// Higher numbers are stronger binding. Returns None if the
     /// token is not a valid infix operator.
     fn get_infix_binding_power(tok: LexToken) -> Option<(u8, u8)> {
@@ -667,12 +698,31 @@ impl<'toks> Ast<'toks> {
         }
     }
 
-    /// Parse an expression with correct precedence up to the next semicolon.
-    /// This is a Pratt parser aka precedence climbing parser that returns the NodeID
-    /// at the top of the local AST, or None if the expression is complete.
-    /// See https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
-    /// for a nice explanation of Pratt parsers with Rust.
-    /// On successful return, the terminal semicolon will be the next unprocessed token.
+    /// Parses an expression with correct operator precedence using a Pratt
+    /// (precedence-climbing) algorithm.  Returns the root `NodeId` of the
+    /// sub-tree via `top`, or `None` if the expression is empty.  On success
+    /// the terminal `;`, `,`, or `)` remains as the next unprocessed token.
+    /// See <https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html>.
+    ///
+    /// ```text
+    /// 1 + 2 * 3
+    ///
+    ///   +                <- root is the lowest-precedence operator
+    ///   ├── 1            <- left atom
+    ///   └── *            <- higher-precedence sub-expression
+    ///       ├── 2
+    ///       └── 3
+    ///
+    /// sizeof(<name>)
+    ///
+    ///   sizeof
+    ///   └── <Identifier> <- mandatory section or label name
+    ///
+    /// abs([<name>])
+    ///
+    ///   abs
+    ///   └── [<Identifier>] <- optional section or label name
+    /// ```
     fn parse_pratt(&mut self, min_bp: u8, top: &mut Option<NodeId>, diags: &mut Diags) -> bool {
         self.dbg_enter("parse_pratt");
         debug!("Ast::parse_pratt: Min BP = {}", min_bp);
@@ -842,8 +892,17 @@ impl<'toks> Ast<'toks> {
         self.dbg_exit_pratt("parse_pratt", top, true)
     }
 
-    /// Parser for a statement with one or more comma separated expressions
-    /// For example: print <expr> [, <expr>] ;
+    /// Parses a keyword statement whose operands are one or more comma-separated
+    /// expressions.  Handles `wr8`..`wr64`, `wrs`, `wrf`, `assert`, `align`,
+    /// `set*`, and `print`.
+    ///
+    /// ```text
+    /// print <expr> [, <expr>] ;
+    ///
+    ///   <keyword>        <- root node (e.g. print, wr8, assert)
+    ///   ├── <expr>       <- first expression (sub-tree from parse_pratt)
+    ///   └── [<expr>...]  <- additional comma-separated expressions, if any
+    /// ```
     fn parse_expr(&mut self, parent: NodeId, diags: &mut Diags) -> bool {
         self.dbg_enter("parse_multi_expr");
         let mut result = true;
@@ -887,6 +946,15 @@ impl<'toks> Ast<'toks> {
         self.dbg_exit("parse_multi_expr", result)
     }
 
+    /// Parses a `label` statement.  Labels mark a named address within a section
+    /// body and produce no output bytes; they exist solely so other expressions
+    /// can reference the address via `abs()`, `img()`, or `sec()`.
+    ///
+    /// ```text
+    /// label <name>;
+    ///
+    ///   label            <- leaf node, value holds the label name
+    /// ```
     fn parse_label(&mut self, parent: NodeId, _diags: &mut Diags) -> bool {
         // Not much to do since labels just mark a place but
         // cause no actions.
@@ -895,6 +963,16 @@ impl<'toks> Ast<'toks> {
         self.dbg_exit("parse_assert", true)
     }
 
+    /// Parses the top-level `output` statement that designates which section
+    /// is written to the output file and an optional absolute base address.
+    ///
+    /// ```text
+    /// output <name> [<addr>];
+    ///
+    ///   output               <- root node for the output declaration
+    ///   ├── <Identifier>     <- name of the section to emit
+    ///   └── [<U64|Integer>]  <- optional absolute start address
+    /// ```
     fn parse_output(&mut self, parent: NodeId, diags: &mut Diags) -> bool {
         self.dbg_enter("parse_output");
         let mut result = false;
@@ -919,6 +997,19 @@ impl<'toks> Ast<'toks> {
         self.dbg_exit("parse_output", result)
     }
 
+    /// Parses a `const` declaration and attaches it to the AST.
+    ///
+    /// ```text
+    /// const <name> = <expr>;
+    ///
+    ///   const            <- root node for a const declaration
+    ///   ├── <Identifier> <- constant name
+    ///   ├── =            <- syntactic separator, not an operation
+    ///   └── <expr>       <- right-hand side (literal or expression)
+    /// ```
+    ///
+    /// The `=` node is retained as a child to preserve source location
+    /// information but carries no semantic meaning in later pipeline stages.
     fn parse_const(&mut self, parent: NodeId, diags: &mut Diags) -> bool {
         self.dbg_enter("parse_const");
         let mut result = false;

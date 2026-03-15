@@ -1186,7 +1186,8 @@ impl Engine {
 
                     // The following IR types are evaluated only at execute time.
                     // Nothing to do during iteration.
-                    IRKind::Eq
+                    IRKind::Const
+                    | IRKind::Eq
                     | IRKind::Label
                     | IRKind::Assert
                     | IRKind::Print
@@ -1437,6 +1438,7 @@ impl Engine {
                 | IRKind::SetAbs
                 | IRKind::Align
                 | IRKind::Abs
+                | IRKind::Const
                 | IRKind::Img
                 | IRKind::Sec
                 | IRKind::Label

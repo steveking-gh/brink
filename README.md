@@ -414,7 +414,8 @@ Example:
 
 ## `const <identifier> = <expr>;`
 
-A const expression creates an immutable user defined identifier for a value.  The value can consist of a number or string literal, or an expression composed of other constants and literals.  Const identifiers have global scope and must be globally unique.
+A const expression creates an immutable user defined identifier for a value.  The value can consist of a number or string literal, or an expression composed of other constants and literals.  Const identifiers have global scope and must be globally unique.  Const identifiers cannot conflict with
+any other global identifiers such as section names.
 
 Example:
     const RAM_BASE = 0x8000_0000u;  // User defined unsigned constant.

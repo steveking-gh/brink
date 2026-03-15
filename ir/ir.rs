@@ -34,6 +34,7 @@ pub enum IRKind {
     Assert,
     BitAnd,
     BitOr,
+    Const,
     Divide,
     DoubleEq,
     Eq,
