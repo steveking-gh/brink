@@ -1010,4 +1010,125 @@ mod tests {
     fn integer_overflow_u64() {
         assert_brink_failure("tests/integer_overflow_u64.brink", &["[IR_1]"]);
     }
+
+    // -------------------------------------------------------------------------
+    // const tests
+    // -------------------------------------------------------------------------
+
+    /// A basic integer const is defined and used as a wr8 operand.
+    #[test]
+    fn const_integer_1() {
+        assert_brink_success(
+            "tests/const_integer_1.brink",
+            Some("const_integer_1.bin"),
+            None,
+        );
+    }
+
+    /// A u64 const is defined and used as a wr64 operand.
+    #[test]
+    fn const_u64_1() {
+        assert_brink_success(
+            "tests/const_u64_1.brink",
+            Some("const_u64_1.bin"),
+            None,
+        );
+    }
+
+    /// A const is defined as an arithmetic expression composed of two other consts.
+    #[test]
+    fn const_expr_1() {
+        assert_brink_success(
+            "tests/const_expr_1.brink",
+            Some("const_expr_1.bin"),
+            None,
+        );
+    }
+
+    /// A const is declared before the consts it depends on in source order.
+    /// Resolution must be order-independent since consts have global scope.
+    #[test]
+    fn const_rev_decl_1() {
+        assert_brink_success(
+            "tests/const_rev_decl_1.brink",
+            Some("const_rev_decl_1.bin"),
+            None,
+        );
+    }
+
+    /// A const is used as one operand of an assert expression inside a section.
+    #[test]
+    fn const_in_assert_1() {
+        assert_brink_success(
+            "tests/const_in_assert_1.brink",
+            Some("const_in_assert_1.bin"),
+            None,
+        );
+    }
+
+    /// A string const is defined and used as a wrs operand.
+    #[test]
+    fn const_string_1() {
+        assert_brink_success(
+            "tests/const_string_1.brink",
+            Some("const_string_1.bin"),
+            None,
+        );
+    }
+
+    /// A const identifier is used as the base address in the output statement.
+    #[test]
+    fn const_as_output_addr_1() {
+        assert_brink_success(
+            "tests/const_as_output_addr_1.brink",
+            Some("const_as_output_addr_1.bin"),
+            None,
+        );
+    }
+
+    /// Two const declarations share the same name.  Expected: LINEAR_10.
+    #[test]
+    fn const_duplicate_1() {
+        assert_brink_failure("tests/const_duplicate_1.brink", &["[LINEAR_10]"]);
+    }
+
+    /// A const name collides with an existing section name.  Expected: LINEAR_11.
+    #[test]
+    fn const_name_conflict_1() {
+        assert_brink_failure("tests/const_name_conflict_1.brink", &["[LINEAR_11]"]);
+    }
+
+    /// Two consts mutually depend on each other, forming a cycle.  Expected: IRDB_18.
+    #[test]
+    fn const_circular_1() {
+        assert_brink_failure("tests/const_circular_1.brink", &["[IRDB_18]"]);
+    }
+
+    /// A const expression depends on sizeof(), which requires engine-time layout.
+    /// Consts must be resolvable before the engine runs.  Expected: IRDB_19.
+    #[test]
+    fn const_sizeof_1() {
+        assert_brink_failure("tests/const_sizeof_1.brink", &["[IRDB_19]"]);
+    }
+
+    /// A const expression depends on abs(), which requires engine-time addressing.
+    /// Consts must be resolvable before the engine runs.  Expected: IRDB_19.
+    #[test]
+    fn const_abs_1() {
+        assert_brink_failure("tests/const_abs_1.brink", &["[IRDB_19]"]);
+    }
+
+    /// A const expression references an identifier that is never defined.
+    /// Expected: IRDB_20.
+    #[test]
+    fn const_undefined_1() {
+        assert_brink_failure("tests/const_undefined_1.brink", &["[IRDB_20]"]);
+    }
+
+    /// A const expression applies arithmetic to a string-typed const.
+    /// Expected: IRDB_1.
+    #[test]
+    fn const_type_mismatch_1() {
+        assert_brink_failure("tests/const_type_mismatch_1.brink", &["[IRDB_1]"]);
+    }
 } // mod tests

@@ -1,0 +1,6 @@
+// Basic integer const used as a wr8 operand.
+const MAGIC = 42;
+section foo {
+    wr8 MAGIC;
+}
+output foo;

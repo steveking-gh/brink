@@ -18,7 +18,7 @@ use lineardb::LinearDb;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
 
-use ir::{DataType, IR, IRKind, IROperand};
+use ir::{DataType, IR, IRKind, IROperand, ParameterValue};
 use parse_int::parse;
 use std::{collections::HashMap, fs, ops::Range, path::Path, path::PathBuf};
 
@@ -43,9 +43,12 @@ pub struct IRDb {
     /// Used for items with a size (potentially zero) such as sections.
     pub sized_locs: HashMap<String, Range<usize>>,
 
-    /// Maps an identifier to the start indices in the ir_vec.
+    /// Maps an identifier to its starting index in the ir_vec.
     /// Used for items that are addressable, including sections and labels
     pub addressed_locs: HashMap<String, usize>,
+
+    /// Maps each const identifier to its resolved parameter value.
+    pub const_values: HashMap<String, ParameterValue>,
 }
 
 impl IRDb {
@@ -286,9 +289,9 @@ impl IRDb {
 
     fn validate_const_operands(&self, ir: &IR, diags: &mut Diags) -> bool {
         let len = ir.operands.len();
-        if len != 2 {
+        if len != 3 {
             let m = format!(
-                "'{:?}' expressions must have 2 operands (identifier, value), but found {}.",
+                "'{:?}' expressions must have 3 operands (identifier, =, value), but found {}.",
                 ir.kind, len
             );
             diags.err1("IRDB_16", &m, ir.src_loc.clone());
@@ -591,6 +594,7 @@ impl IRDb {
             addressed_locs: HashMap::new(),
             start_addr,
             files: HashMap::new(),
+            const_values: HashMap::new(),
         };
 
         if !ir_db.process_lin_operands(lin_db, diags) {

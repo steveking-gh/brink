@@ -1,0 +1,8 @@
+// Arithmetic on a string-typed const.
+// Adding 1 to a string is a type mismatch.  Expected: IRDB_1.
+const MSG = "hello";
+const BAD = MSG + 1;
+section foo {
+    wr8 BAD;
+}
+output foo;

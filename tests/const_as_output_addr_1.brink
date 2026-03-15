@@ -1,0 +1,6 @@
+// Const used as the base address in the output statement.
+const LOAD_ADDR = 0x8000_0000u;
+section foo {
+    wr8 1;
+}
+output foo LOAD_ADDR;

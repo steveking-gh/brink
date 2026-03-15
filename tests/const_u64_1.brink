@@ -1,0 +1,6 @@
+// U64 const used as a wr64 operand.
+const BASE = 0x0102030405060708u;
+section foo {
+    wr64 BASE;
+}
+output foo;
