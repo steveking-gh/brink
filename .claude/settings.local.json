@@ -4,7 +4,8 @@
       "Bash(cargo test:*)",
       "Bash(ls c:/Users/kings/Documents/projects/brink/tests/*.brink)",
       "Bash(xargs grep:*)",
-      "Bash(grep -l const c:/Users/kings/Documents/projects/brink/tests/*.brink)"
+      "Bash(grep -l const c:/Users/kings/Documents/projects/brink/tests/*.brink)",
+      "Bash(cargo build:*)"
     ]
   }
 }

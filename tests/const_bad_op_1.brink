@@ -1,0 +1,7 @@
+// Logical && is not supported in const expressions.
+// Expected: IRDB_21.
+const X = 1 && 1;
+section foo {
+    wr8 1;
+}
+output foo;

@@ -1,0 +1,12 @@
+// Three-deep const chain: C depends on B which depends on A.
+// A=1, B=A+1=2, C=B+1=3.
+const A = 1;
+const B = A + 1;
+const C = B + 1;
+section foo {
+    assert A == 1;
+    assert B == 2;
+    assert C == 3;
+    wr8 C;
+}
+output foo;

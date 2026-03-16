@@ -1,0 +1,9 @@
+// U64 const addition that overflows u64::MAX.
+// u64::MAX + 1 must produce IRDB_27.
+const A = 18446744073709551615u;
+const B = 1u;
+const C = A + B;
+section foo {
+    wr8 C;
+}
+output foo;

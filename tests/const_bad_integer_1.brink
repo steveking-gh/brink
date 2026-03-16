@@ -1,0 +1,7 @@
+// Integer literal that overflows i64 in a const expression.
+// 2^63 = 9223372036854775808, which exceeds i64::MAX.  Expected: IRDB_22.
+const X = 9223372036854775808;
+section foo {
+    wr8 1;
+}
+output foo;

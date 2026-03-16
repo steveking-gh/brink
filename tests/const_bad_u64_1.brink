@@ -1,0 +1,7 @@
+// U64 literal that overflows u64 in a const expression.
+// 2^64 = 18446744073709551616, which exceeds u64::MAX.  Expected: IRDB_23.
+const X = 18446744073709551616u;
+section foo {
+    wr8 1;
+}
+output foo;

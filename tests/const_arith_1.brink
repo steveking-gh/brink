@@ -1,0 +1,19 @@
+// Const expressions exercising subtract, multiply, divide, and modulo.
+// A=10, B=3: SUB=7, MUL=30, DIV=3, MOD=1.
+const A = 10;
+const B = 3;
+const SUB = A - B;
+const MUL = A * B;
+const DIV = A / B;
+const MOD = A % B;
+section foo {
+    assert SUB == 7;
+    assert MUL == 30;
+    assert DIV == 3;
+    assert MOD == 1;
+    wr8 SUB;
+    wr8 MUL;
+    wr8 DIV;
+    wr8 MOD;
+}
+output foo;

@@ -1,0 +1,19 @@
+// Const comparison operators: ==, !=, >=, <=.
+// EQ=1 (10==10), NE=1 (10!=9), GE=1 (10>=9), LE=0 (10<=9).
+const A = 10;
+const B = 9;
+const EQ = A == A;
+const NE = A != B;
+const GE = A >= B;
+const LE = A <= B;
+section foo {
+    assert EQ == 1;
+    assert NE == 1;
+    assert GE == 1;
+    assert LE == 0;
+    wr8 EQ;
+    wr8 NE;
+    wr8 GE;
+    wr8 LE;
+}
+output foo;

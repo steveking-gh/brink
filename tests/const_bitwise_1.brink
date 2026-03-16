@@ -1,0 +1,20 @@
+// Const expressions exercising bitwise and, or, left shift, and right shift.
+// A=12 (0b1100), B=10 (0b1010):
+//   AND=8 (0b1000), OR=14 (0b1110), LSH=40 (10<<2), RSH=3 (12>>2).
+const A = 12;
+const B = 10;
+const AND_VAL = A & B;
+const OR_VAL  = A | B;
+const LSH_VAL = B << 2;
+const RSH_VAL = A >> 2;
+section foo {
+    assert AND_VAL == 8;
+    assert OR_VAL  == 14;
+    assert LSH_VAL == 40;
+    assert RSH_VAL == 3;
+    wr8 AND_VAL;
+    wr8 OR_VAL;
+    wr8 LSH_VAL;
+    wr8 RSH_VAL;
+}
+output foo;

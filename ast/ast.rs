@@ -759,7 +759,11 @@ impl<'toks> Ast<'toks> {
             }
 
             // These simple atoms end up as leaf nodes in the AST
-            LexToken::QuotedString | LexToken::Integer | LexToken::I64 | LexToken::U64 => {
+            LexToken::QuotedString
+            | LexToken::Integer
+            | LexToken::I64
+            | LexToken::U64
+            | LexToken::Identifier => {
                 *top = Some(self.arena.new_node(self.tok_num));
                 self.tok_num += 1;
             }
@@ -988,7 +992,12 @@ impl<'toks> Ast<'toks> {
             "Expected a section name after output",
         ) {
             // After the section identifier, an optional absolute starting address
-            result = self.optional_token(&[LexToken::U64, LexToken::Integer], diags, output_nid);
+            // (which may be a literal or a const identifier)
+            result = self.optional_token(
+                &[LexToken::U64, LexToken::Integer, LexToken::Identifier],
+                diags,
+                output_nid,
+            );
 
             // finally a semicolon
             result &= self.expect_semi(diags, output_nid);
@@ -1028,7 +1037,9 @@ impl<'toks> Ast<'toks> {
             if self.expect_token(LexToken::Eq, diags, const_nid) {
                 // After the equals sign, a literal or literal expression is expected.
                 // The literal expression can be literals combined with other consts.
-                result = self.expect_expr(const_nid, diags);
+                if self.expect_expr(const_nid, diags) {
+                    result = self.expect_semi(diags, const_nid);
+                }
             }
         }
         self.dbg_exit("parse_const", result)
@@ -1220,7 +1231,7 @@ impl<'toks> Output<'toks> {
 pub struct AstDb<'toks> {
     pub sections: HashMap<&'toks str, Section<'toks>>,
     pub labels: HashMap<&'toks str, Label>,
-    pub consts: HashMap<&'toks str, TokenInfo<'toks>>,
+    pub consts: HashMap<&'toks str, Const<'toks>>,
     pub output: Output<'toks>,
     //pub properties: HashMap<NodeId, NodeProperty>
 }
@@ -1281,7 +1292,6 @@ impl<'toks> AstDb<'toks> {
         consts.insert(sec_str, Const::new(ast, sec_nid));
         true
     }
-
 
     /// Returns true if the specified child of the specified node is a section
     /// name that exists.  Otherwise, prints a diagnostic and returns false.
@@ -1469,11 +1479,24 @@ impl<'toks> AstDb<'toks> {
             bail!("AST construction failed");
         }
 
+        // Check for const names that conflict with section names.
+        for (name, const_item) in &consts {
+            if let Some(sec_item) = sections.get(name) {
+                let m = format!("Const name '{}' conflicts with a section name", name);
+                diags.err2("AST_31", &m, const_item.tinfo.span(), sec_item.tinfo.span());
+                result = false;
+            }
+        }
+
+        if !result {
+            bail!("AST construction failed");
+        }
+
         let output_nid = output.as_ref().unwrap().nid;
         let mut ast_db = AstDb {
             sections,
             labels: HashMap::new(),
-            consts: HashMap::new(),
+            consts,
             output: output.unwrap(),
         };
 

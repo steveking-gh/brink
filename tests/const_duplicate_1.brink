@@ -1,4 +1,4 @@
-// Two const declarations with the same name.  Expected: LINEAR_10.
+// Two const declarations with the same name.  Expected: AST_30.
 const FOO = 1;
 const FOO = 2;
 section bar {

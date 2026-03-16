@@ -266,7 +266,7 @@ mod tests {
 
     #[test]
     fn fuzz_found_9() {
-        assert_brink_failure("tests/fuzz_found_9.brink", &["[AST_19]"]);
+        assert_brink_failure("tests/fuzz_found_9.brink", &["[IRDB_5]"]);
     }
 
     #[test]
@@ -923,7 +923,7 @@ mod tests {
 
     #[test]
     fn wrf_3() {
-        assert_brink_failure("tests/wrf_3.brink", &["[AST_19]"]);
+        assert_brink_failure("tests/wrf_3.brink", &["[IRDB_11]"]);
     }
 
     #[test]
@@ -1028,21 +1028,19 @@ mod tests {
     /// A u64 const is defined and used as a wr64 operand.
     #[test]
     fn const_u64_1() {
-        assert_brink_success(
-            "tests/const_u64_1.brink",
-            Some("const_u64_1.bin"),
-            None,
-        );
+        assert_brink_success("tests/const_u64_1.brink", Some("const_u64_1.bin"), None);
     }
 
     /// A const is defined as an arithmetic expression composed of two other consts.
     #[test]
     fn const_expr_1() {
-        assert_brink_success(
-            "tests/const_expr_1.brink",
-            Some("const_expr_1.bin"),
-            None,
-        );
+        assert_brink_success("tests/const_expr_1.brink", Some("const_expr_1.bin"), None);
+    }
+
+    /// A three-deep const chain: C depends on B which depends on A.
+    #[test]
+    fn const_chain_1() {
+        assert_brink_success("tests/const_chain_1.brink", Some("const_chain_1.bin"), None);
     }
 
     /// A const is declared before the consts it depends on in source order.
@@ -1086,16 +1084,16 @@ mod tests {
         );
     }
 
-    /// Two const declarations share the same name.  Expected: LINEAR_10.
+    /// Two const declarations share the same name.  Expected: AST_30.
     #[test]
     fn const_duplicate_1() {
-        assert_brink_failure("tests/const_duplicate_1.brink", &["[LINEAR_10]"]);
+        assert_brink_failure("tests/const_duplicate_1.brink", &["[AST_30]"]);
     }
 
-    /// A const name collides with an existing section name.  Expected: LINEAR_11.
+    /// A const name collides with an existing section name.  Expected: AST_31.
     #[test]
     fn const_name_conflict_1() {
-        assert_brink_failure("tests/const_name_conflict_1.brink", &["[LINEAR_11]"]);
+        assert_brink_failure("tests/const_name_conflict_1.brink", &["[AST_31]"]);
     }
 
     /// Two consts mutually depend on each other, forming a cycle.  Expected: IRDB_18.
@@ -1126,9 +1124,86 @@ mod tests {
     }
 
     /// A const expression applies arithmetic to a string-typed const.
-    /// Expected: IRDB_1.
+    /// Expected: IRDB_25.
     #[test]
     fn const_type_mismatch_1() {
-        assert_brink_failure("tests/const_type_mismatch_1.brink", &["[IRDB_1]"]);
+        assert_brink_failure("tests/const_type_mismatch_1.brink", &["[IRDB_25]"]);
+    }
+
+    /// An I64 const is defined and used as a wr8 operand.
+    #[test]
+    fn const_i64_1() {
+        assert_brink_success("tests/const_i64_1.brink", Some("const_i64_1.bin"), None);
+    }
+
+    /// Const expressions exercising subtract, multiply, divide, and modulo.
+    #[test]
+    fn const_arith_1() {
+        assert_brink_success("tests/const_arith_1.brink", Some("const_arith_1.bin"), None);
+    }
+
+    /// Const expressions exercising bitwise and, or, left shift, and right shift.
+    #[test]
+    fn const_bitwise_1() {
+        assert_brink_success(
+            "tests/const_bitwise_1.brink",
+            Some("const_bitwise_1.bin"),
+            None,
+        );
+    }
+
+    /// A const expression uses == which is not supported at compile time.
+    /// Expected: IRDB_21.
+    #[test]
+    fn const_bad_op_1() {
+        assert_brink_failure("tests/const_bad_op_1.brink", &["[IRDB_21]"]);
+    }
+
+    /// A const integer literal overflows i64.
+    /// Expected: IRDB_22.
+    #[test]
+    fn const_bad_integer_1() {
+        assert_brink_failure("tests/const_bad_integer_1.brink", &["[IRDB_22]"]);
+    }
+
+    /// A const U64 literal overflows u64.
+    /// Expected: IRDB_23.
+    #[test]
+    fn const_bad_u64_1() {
+        assert_brink_failure("tests/const_bad_u64_1.brink", &["[IRDB_23]"]);
+    }
+
+    /// A const I64 literal overflows i64.
+    /// Expected: IRDB_24.
+    #[test]
+    fn const_bad_i64_1() {
+        assert_brink_failure("tests/const_bad_i64_1.brink", &["[IRDB_24]"]);
+    }
+
+    /// A const U64 addition overflows u64::MAX.
+    /// Expected: IRDB_27.
+    #[test]
+    fn const_overflow_1() {
+        assert_brink_failure("tests/const_overflow_1.brink", &["[IRDB_27]"]);
+    }
+
+    /// A const integer division by zero.
+    /// Expected: IRDB_28.
+    #[test]
+    fn const_divzero_1() {
+        assert_brink_failure("tests/const_divzero_1.brink", &["[IRDB_28]"]);
+    }
+
+    /// Const comparison operators ==, !=, >=, <= produce U64 0/1 results.
+    #[test]
+    fn const_cmp_1() {
+        assert_brink_success("tests/const_cmp_1.brink", Some("const_cmp_1.bin"), None);
+    }
+
+    /// Comparing a numeric const with a string const is a type error.
+    /// Expected: IRDB_29.
+    #[test]
+    fn const_cmp_mismatch_1() {
+        assert_brink_failure("tests/const_cmp_mismatch_1.brink", &["[IRDB_29]"]);
     }
 } // mod tests

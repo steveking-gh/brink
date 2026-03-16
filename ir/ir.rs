@@ -158,11 +158,21 @@ impl ParameterValue {
 
 #[derive(Debug)]
 pub struct IROperand {
-    /// Some(linear ID) of source operation if this operand is an output.
-    /// None for constants.
+    /// The linear ID of the IR instruction whose output this operand carries,
+    /// or None if this is an immediate (literal) operand with no producing
+    /// instruction.
     pub ir_lid: Option<usize>,
+    /// Byte range in the source file that produced this operand, used for
+    /// error reporting.
     pub src_loc: Range<usize>,
-    pub is_constant: bool,
+    /// True if this operand holds a literal value parsed directly from source
+    /// (e.g. a numeric constant or quoted string).  False if this is the
+    /// output placeholder of an IR instruction whose value is computed at
+    /// engine time.
+    pub is_immediate: bool,
+    /// The typed runtime value of this operand.  For immediate operands this
+    /// is parsed from the source literal; for output placeholders it is
+    /// initialized to a zero-equivalent and overwritten during execution.
     pub val: ParameterValue,
 }
 
@@ -172,14 +182,14 @@ impl IROperand {
         sval: &str,
         src_loc: &Range<usize>,
         data_type: DataType,
-        is_constant: bool,
+        is_immediate: bool,
         diags: &mut Diags,
     ) -> Option<IROperand> {
-        if let Some(val) = IROperand::convert_type(sval, data_type, src_loc, is_constant, diags) {
+        if let Some(val) = IROperand::convert_type(sval, data_type, src_loc, is_immediate, diags) {
             return Some(IROperand {
                 ir_lid,
                 src_loc: src_loc.clone(),
-                is_constant,
+                is_immediate,
                 val,
             });
         }
@@ -196,11 +206,17 @@ impl IROperand {
         sval: &str,
         data_type: DataType,
         src_loc: &Range<usize>,
-        is_constant: bool,
+        is_immediate: bool,
         diags: &mut Diags,
     ) -> Option<ParameterValue> {
         match data_type {
             DataType::QuotedString => {
+                if !is_immediate {
+                    // Output operand of a string-typed Const IR.  The resolved
+                    // value is stored in const_values and substituted before
+                    // this placeholder is ever read, so an empty string is fine.
+                    return Some(ParameterValue::QuotedString(String::new()));
+                }
                 // Trim quotes and convert escape characters
                 // For trimming, don't use trim_matches since that
                 // will incorrectly strip trailing escaped quotes.
@@ -216,7 +232,7 @@ impl IROperand {
                 ));
             }
             DataType::U64 => {
-                if is_constant {
+                if is_immediate {
                     // Strip the trailing 'u' if any
                     let sval_no_u = sval.strip_suffix('u').unwrap_or(sval);
                     let res = parse::<u64>(sval_no_u);
@@ -233,7 +249,7 @@ impl IROperand {
             }
 
             DataType::I64 => {
-                if is_constant {
+                if is_immediate {
                     // Strip the trailing 's' if any
                     let sval_no_i = sval.strip_suffix('i').unwrap_or(sval);
                     let res = parse::<i64>(sval_no_i);
@@ -250,7 +266,7 @@ impl IROperand {
             }
 
             DataType::Integer => {
-                if is_constant {
+                if is_immediate {
                     // We have to store Integer as a real Rust type.  Storing as i64
                     // is least surprising since expectations like 1 - 2 == -1 hold.
                     let res = parse::<i64>(sval);

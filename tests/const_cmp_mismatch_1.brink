@@ -1,0 +1,9 @@
+// Comparison between a numeric const and a string const is a type error.
+// Expected: IRDB_29.
+const N = 1;
+const S = "hello";
+const X = N == S;
+section foo {
+    wr8 1;
+}
+output foo;

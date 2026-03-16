@@ -1,0 +1,8 @@
+// Integer division by zero in a const expression must produce IRDB_28.
+const A = 10;
+const B = 0;
+const C = A / B;
+section foo {
+    wr8 C;
+}
+output foo;

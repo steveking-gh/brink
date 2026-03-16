@@ -1,0 +1,7 @@
+// I64 const used as a wr8 operand.
+const X = 100i;
+section foo {
+    assert X == 100;
+    wr8 X;
+}
+output foo;

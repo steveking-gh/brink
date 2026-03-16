@@ -63,6 +63,11 @@ pub struct LinIR {
     pub op: IRKind,
     // usize is the index into the operand vec
     pub operand_vec: Vec<usize>,
+    /// True if this IR was generated as part of a const expression sub-tree.
+    /// Such IRs are skipped by verify_global_refs; their identifiers are
+    /// validated later by the IRDb resolver.  This is somewhat of a workaround
+    /// since we really should do reference checking during IR generation.
+    pub in_const_expr: bool,
 }
 
 impl<'toks> LinIR {
@@ -74,6 +79,7 @@ impl<'toks> LinIR {
             src_loc,
             op,
             operand_vec: Vec::new(),
+            in_const_expr: false,
         }
     }
 
@@ -138,7 +144,7 @@ pub struct LinearDb {
     /// Instructions index into this vector rather than owning their operands directly.
     pub operand_vec: Vec<LinOperand>,
 
-    // Hash mapping const identifier names to their operand_vec indices.
+    /// Maps each const identifier name to the ir_vec index of its Const IR.
     pub const_map: HashMap<String, usize>,
 
     /// Name of the section specified by the `output` statement.
@@ -177,9 +183,11 @@ impl<'toks> LinearDb {
     }
 
     // returns the linear ID for the new LinIR
-    fn new_ir(&mut self, nid: NodeId, ast: &'toks Ast, op: IRKind) -> usize {
+    fn new_ir(&mut self, nid: NodeId, ast: &'toks Ast, op: IRKind, in_const_expr: bool) -> usize {
         let lid = self.ir_vec.len();
-        self.ir_vec.push(LinIR::new(nid, ast, op));
+        let mut lir = LinIR::new(nid, ast, op);
+        lir.in_const_expr = in_const_expr;
+        self.ir_vec.push(lir);
         lid
     }
 
@@ -214,13 +222,14 @@ impl<'toks> LinearDb {
         diags: &mut Diags,
         ast: &'toks Ast,
         ast_db: &AstDb,
+        in_const_expr: bool,
     ) -> bool {
         // Easy linearizing without dereferencing through a name.
         // When no children exist, this case terminates recursion.
         let children = ast.children(parent_nid);
         let mut result = true;
         for nid in children {
-            result &= self.record_r(rdepth, nid, lops, diags, ast, ast_db);
+            result &= self.record_r(rdepth, nid, lops, diags, ast, ast_db, in_const_expr);
         }
         result
     }
@@ -297,6 +306,7 @@ impl<'toks> LinearDb {
         diags: &mut Diags,
         ast: &'toks Ast,
         ast_db: &AstDb,
+        in_const_expr: bool,
     ) -> bool {
         debug!(
             "LinearDb::record_r: ENTER at depth {} for parent nid: {}",
@@ -335,8 +345,9 @@ impl<'toks> LinearDb {
                 let section = ast_db.sections.get(sec_name_str).unwrap();
                 let sec_nid = section.nid;
 
-                // Recurse into the referenced section.
-                result &= self.record_r(rdepth + 1, sec_nid, &mut lops, diags, ast, ast_db);
+                // Recurse into the referenced section.  Section content is never
+                // part of a const expression, so always pass false here.
+                result &= self.record_r(rdepth + 1, sec_nid, &mut lops, diags, ast, ast_db, false);
                 // The 'wr' expression does not produce an IR of its own,
                 // but inserts an entire section in-place.  So, we don't have a
                 // linear ID for the 'wr' and expect no operands.
@@ -346,10 +357,17 @@ impl<'toks> LinearDb {
                 // A vector to track the operands of this expression.
                 let mut lops = Vec::new();
                 // Get the size of the section.  Section name is an identifier operand.
-                let ir_lid = self.new_ir(parent_nid, ast, IRKind::Sizeof);
+                let ir_lid = self.new_ir(parent_nid, ast, IRKind::Sizeof, in_const_expr);
                 // There is child, which is the identifier
-                result &=
-                    self.record_children_r(rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
+                result &= self.record_children_r(
+                    rdepth + 1,
+                    parent_nid,
+                    &mut lops,
+                    diags,
+                    ast,
+                    ast_db,
+                    in_const_expr,
+                );
                 // 1 operand expected
                 result &= self.process_operands(1, &mut lops, ir_lid, diags, tinfo);
 
@@ -363,12 +381,19 @@ impl<'toks> LinearDb {
                 // A vector to track the operands of this expression.
                 let mut lops = Vec::new();
                 // Create the new IR
-                let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tinfo.tok));
+                let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tinfo.tok), in_const_expr);
                 // There is *optional* identifier child.
                 // If the child exists, we will get the address of the associated identifier
                 // otherwise, we get the current address
-                result &=
-                    self.record_children_r(rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
+                result &= self.record_children_r(
+                    rdepth + 1,
+                    parent_nid,
+                    &mut lops,
+                    diags,
+                    ast,
+                    ast_db,
+                    in_const_expr,
+                );
                 // 1 operand expected
                 result &= self.process_optional_operands(1, &mut lops, ir_lid, diags, tinfo);
 
@@ -396,9 +421,16 @@ impl<'toks> LinearDb {
                 // pad   val, fill_val; ==> pad   val, count; wr8 fill_val, count;
                 // A vector to track the operands of this expression.
                 let mut lops = Vec::new();
-                let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tinfo.tok));
-                result &=
-                    self.record_children_r(rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
+                let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tinfo.tok), in_const_expr);
+                result &= self.record_children_r(
+                    rdepth + 1,
+                    parent_nid,
+                    &mut lops,
+                    diags,
+                    ast,
+                    ast_db,
+                    in_const_expr,
+                );
 
                 // We expect 1 or 2 operands
                 // align value [, optional pad byte value];
@@ -424,7 +456,8 @@ impl<'toks> LinearDb {
                 // Create a wr8_tinfo copied from the align tinfo
                 let mut wr8_tinfo = tinfo.clone();
                 wr8_tinfo.tok = LexToken::Wr8;
-                let wr8_lid = self.new_ir(parent_nid, ast, tok_to_irkind(wr8_tinfo.tok));
+                let wr8_lid =
+                    self.new_ir(parent_nid, ast, tok_to_irkind(wr8_tinfo.tok), in_const_expr);
 
                 if lops.len() == 2 {
                     // The user specified a pad byte value.  This expression is the first operand
@@ -456,9 +489,16 @@ impl<'toks> LinearDb {
             | LexToken::Print => {
                 // A vector to track the operands of this expression.
                 let mut lops = Vec::new();
-                result &=
-                    self.record_children_r(rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
-                let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tinfo.tok));
+                result &= self.record_children_r(
+                    rdepth + 1,
+                    parent_nid,
+                    &mut lops,
+                    diags,
+                    ast,
+                    ast_db,
+                    in_const_expr,
+                );
+                let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tinfo.tok), in_const_expr);
 
                 // add the operands to this new IR.  These IRs are statements that do not
                 // return a value.
@@ -469,9 +509,16 @@ impl<'toks> LinearDb {
             LexToken::ToI64 | LexToken::ToU64 => {
                 // A vector to track the operands of this expression.
                 let mut lops = Vec::new();
-                result &=
-                    self.record_children_r(rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
-                let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tinfo.tok));
+                result &= self.record_children_r(
+                    rdepth + 1,
+                    parent_nid,
+                    &mut lops,
+                    diags,
+                    ast,
+                    ast_db,
+                    in_const_expr,
+                );
+                let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tinfo.tok), in_const_expr);
                 // 1 operand expected
                 result &= self.process_operands(1, &mut lops, ir_lid, diags, tinfo);
                 // Add a destination operand to the operation to hold the result
@@ -498,9 +545,16 @@ impl<'toks> LinearDb {
             | LexToken::Plus => {
                 // A vector to track the operands of this expression.
                 let mut lops = Vec::new();
-                result &=
-                    self.record_children_r(rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
-                let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tinfo.tok));
+                result &= self.record_children_r(
+                    rdepth + 1,
+                    parent_nid,
+                    &mut lops,
+                    diags,
+                    ast,
+                    ast_db,
+                    in_const_expr,
+                );
+                let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tinfo.tok), in_const_expr);
                 // 2 operands expected
                 result &= self.process_operands(2, &mut lops, ir_lid, diags, tinfo);
 
@@ -513,10 +567,17 @@ impl<'toks> LinearDb {
             LexToken::Section => {
                 // Record the linear start of this section.
                 let mut lops = Vec::new();
-                let start_lid = self.new_ir(parent_nid, ast, IRKind::SectionStart);
-                result &=
-                    self.record_children_r(rdepth + 1, parent_nid, &mut lops, diags, ast, ast_db);
-                let end_lid = self.new_ir(parent_nid, ast, IRKind::SectionEnd);
+                let start_lid = self.new_ir(parent_nid, ast, IRKind::SectionStart, in_const_expr);
+                result &= self.record_children_r(
+                    rdepth + 1,
+                    parent_nid,
+                    &mut lops,
+                    diags,
+                    ast,
+                    ast_db,
+                    in_const_expr,
+                );
+                let end_lid = self.new_ir(parent_nid, ast, IRKind::SectionEnd, in_const_expr);
                 // 1 operand expected, which is the name of the section.
                 if self.operand_count_is_valid(1, &lops, diags, tinfo) {
                     let sec_id_lid = lops.pop().unwrap();
@@ -530,7 +591,7 @@ impl<'toks> LinearDb {
                 // A label marking an addressable location in the output.
                 // Labels have no children in the AST since they are their own identifier.
                 // In the IR, the identifier becomes the only operand of the label operation.
-                let ir_lid = self.new_ir(parent_nid, ast, IRKind::Label);
+                let ir_lid = self.new_ir(parent_nid, ast, IRKind::Label, in_const_expr);
 
                 // Trim the trailing colon on the label.
                 let name_without_colon = tinfo.val[..tinfo.val.len() - 1].to_string();
@@ -572,6 +633,63 @@ impl<'toks> LinearDb {
         result
     }
 
+    /// Converts a top-level `const NAME = <expr>` declaration into linear IR.
+    ///
+    /// Produces one `IRKind::Const` entry in `ir_vec` with three operands:
+    ///  `[name_identifier, rhs_result, eq_output]`
+    /// and records the name → ir_lid mapping in `const_map`.
+    fn record_const_decl(
+        &mut self,
+        const_nid: NodeId,
+        diags: &mut Diags,
+        ast: &'toks Ast,
+        ast_db: &AstDb,
+    ) -> bool {
+        let ir_lid = self.new_ir(const_nid, ast, IRKind::Const, false);
+
+        let mut children = ast.children(const_nid);
+
+        // Child 0: const name (Identifier)
+        let name_nid = children.next().unwrap();
+        let name_tinfo = ast.get_tinfo(name_nid);
+        let name_idx = self.operand_vec.len();
+        self.operand_vec.push(LinOperand::new(None, name_tinfo));
+        self.add_existing_operand_to_ir(ir_lid, name_idx);
+
+        // Child 1: `=` sign — used only for its token info (src loc + Eq tok)
+        let eq_nid = children.next().unwrap();
+        let eq_tinfo = ast.get_tinfo(eq_nid);
+
+        // Child 2: RHS expression.  Pass in_const_expr=true so every IR
+        // created during this recursion is marked at creation time and will
+        // be skipped by verify_global_refs (IRDb handles their validation).
+        let rhs_nid = children.next().unwrap();
+        let mut rhs_lops = Vec::new();
+        if !self.record_r(1, rhs_nid, &mut rhs_lops, diags, ast, ast_db, true) {
+            return false;
+        }
+
+        if rhs_lops.len() != 1 {
+            let m = format!(
+                "Const expression RHS produced {} results, expected 1",
+                rhs_lops.len()
+            );
+            diags.err1("LINEAR_12", &m, name_tinfo.span());
+            return false;
+        }
+
+        // Second operand: the RHS result
+        self.add_existing_operand_to_ir(ir_lid, rhs_lops[0]);
+
+        // Third operand: the output slot of the const, using Eq tok for type inference
+        self.add_new_operand_to_ir(ir_lid, LinOperand::new(Some(ir_lid), eq_tinfo));
+
+        // Record name to the output ir_lid so the IRDb resolver can find it
+        self.const_map.insert(name_tinfo.val.to_string(), ir_lid);
+
+        true
+    }
+
     /// The LinearDb object must start with an output statement.
     /// If the output doesn't exist, then return None.  The linear_db
     /// records only elements with size > 0.
@@ -591,7 +709,9 @@ impl<'toks> LinearDb {
 
         if output_addr_nid.is_some() {
             let output_addr_tinfo = ast.get_tinfo(ast_db.output.addr_nid.unwrap());
-            if [LexToken::U64, LexToken::Integer].contains(&output_addr_tinfo.tok) {
+            if [LexToken::U64, LexToken::Integer, LexToken::Identifier]
+                .contains(&output_addr_tinfo.tok)
+            {
                 output_addr_str = Some(output_addr_tinfo.val.to_string());
                 output_addr_loc = Some(output_addr_tinfo.loc.clone());
                 debug!(
@@ -599,7 +719,7 @@ impl<'toks> LinearDb {
                     output_addr_str.as_ref().unwrap()
                 );
             } else {
-                // If not a u64, then trailing semicolon
+                // If not a numeric or identifier, then trailing semicolon
                 assert!(output_addr_tinfo.tok == LexToken::Semicolon);
             }
         }
@@ -630,8 +750,17 @@ impl<'toks> LinearDb {
         let mut lops = Vec::new();
 
         // If an error occurs, result gets stuck at false.
-        if !linear_db.record_r(1, sec_nid, &mut lops, diags, ast, ast_db) {
+        if !linear_db.record_r(1, sec_nid, &mut lops, diags, ast, ast_db, false) {
             return Err(());
+        }
+
+        // Linearize all top-level const declarations after the section.
+        // record_const_decl passes in_const_expr=true into record_r so every
+        // IR created for the RHS is flagged at creation time.
+        for (_, const_item) in &ast_db.consts {
+            if !linear_db.record_const_decl(const_item.nid, diags, ast, ast_db) {
+                return Err(());
+            }
         }
 
         // debug
@@ -872,7 +1001,7 @@ impl IdentDb {
                 IRKind::SectionStart => {
                     self.inventory_section_identifiers(lir, lindb);
                     true
-                },
+                }
                 IRKind::Const => {
                     self.inventory_const_identifiers(lir, lindb);
                     true
@@ -894,6 +1023,12 @@ impl IdentDb {
     fn verify_global_refs(&self, lindb: &LinearDb, diags: &mut Diags) -> bool {
         let mut result = true;
         for lir in &lindb.ir_vec {
+            // If this is a part of a const expression, then defer validation of global
+            // identifier references since we need the semantic information in the IRDB
+            // phase.
+            if lir.in_const_expr {
+                continue;
+            }
             result &= match lir.op {
                 IRKind::Abs | IRKind::Img | IRKind::Sizeof => {
                     self.verify_operand_refs(lir, lindb, diags)

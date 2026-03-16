@@ -20,7 +20,13 @@ use tracing::{debug, error, info, trace, warn};
 
 use ir::{DataType, IR, IRKind, IROperand, ParameterValue};
 use parse_int::parse;
-use std::{collections::HashMap, fs, ops::Range, path::Path, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    fs,
+    ops::Range,
+    path::Path,
+    path::PathBuf,
+};
 
 pub struct FileInfo {
     pub path: String,
@@ -51,6 +57,14 @@ pub struct IRDb {
     pub const_values: HashMap<String, ParameterValue>,
 }
 
+/// Error returned by `calc_u64_op` / `calc_i64_op` before a diagnostic is emitted.
+enum CalcErr {
+    /// Arithmetic overflow or underflow; carries a human-readable message.
+    Overflow(String),
+    /// Division or modulo by zero.
+    DivByZero,
+}
+
 impl IRDb {
     /// Returns the value of the specified operand for the specified IR.
     /// The operand number is for the *IR*, not the absolute operand
@@ -72,6 +86,7 @@ impl IRDb {
         depth: usize,
         lop_num: usize,
         lin_db: &LinearDb,
+        const_values: &HashMap<String, ParameterValue>,
         diags: &mut Diags,
     ) -> Option<DataType> {
         trace!(
@@ -103,7 +118,14 @@ impl IRDb {
             ast::LexToken::Integer => data_type = Some(DataType::Integer),
             ast::LexToken::QuotedString => data_type = Some(DataType::QuotedString),
             ast::LexToken::Label => data_type = Some(DataType::Identifier),
-            ast::LexToken::Identifier => data_type = Some(DataType::Identifier),
+            ast::LexToken::Identifier => {
+                // If this identifier is a resolved const, return the const's type.
+                if let Some(cv) = const_values.get(lop.sval.as_str()) {
+                    data_type = Some(cv.data_type());
+                } else {
+                    data_type = Some(DataType::Identifier);
+                }
+            }
 
             // The following produce an output type that depends on inputs
             ast::LexToken::DoubleLess
@@ -130,9 +152,16 @@ impl IRDb {
                 let lhs_num = lin_ir.operand_vec[0];
                 let rhs_num = lin_ir.operand_vec[1];
 
-                let lhs_opt = Self::get_operand_data_type_r(depth + 1, lhs_num, lin_db, diags);
+                let lhs_opt =
+                    Self::get_operand_data_type_r(depth + 1, lhs_num, lin_db, const_values, diags);
                 if let Some(lhs_dt) = lhs_opt {
-                    let rhs_opt = Self::get_operand_data_type_r(depth + 1, rhs_num, lin_db, diags);
+                    let rhs_opt = Self::get_operand_data_type_r(
+                        depth + 1,
+                        rhs_num,
+                        lin_db,
+                        const_values,
+                        diags,
+                    );
                     if let Some(rhs_dt) = rhs_opt {
                         // We now have both lhs and rhs data types
                         if lhs_dt == rhs_dt {
@@ -188,22 +217,23 @@ impl IRDb {
                 assert!(lin_ir.operand_vec.len() == 3);
                 // The lop this function was called with *is* the output operand
                 assert!(lin_ir.operand_vec[2] == lop_num);
-                let lhs_num = lin_ir.operand_vec[0]; // identifier operand
+                let lhs_num = lin_ir.operand_vec[0]; // identifier operand (const name)
                 let rhs_num = lin_ir.operand_vec[1]; // value operand
 
-                let lhs_opt = Self::get_operand_data_type_r(depth + 1, lhs_num, lin_db, diags);
-                if let Some(lhs_dt) = lhs_opt {
-                    if lhs_dt != DataType::Identifier {
-                        let msg = format!(
-                            "Error, found data type '{:?}' for left-hand side of '=', but expected an identifier.",
-                            lhs_dt
-                        );
-                        diags.err1("IRDB_12", &msg, lin_ir.src_loc.clone());
-                        return None;
-                    }
-                    // Just return the data type of the rhs.
-                    data_type = Self::get_operand_data_type_r(depth + 1, rhs_num, lin_db, diags);
+                // Verify the LHS is an identifier directly (don't substitute via const_values:
+                // the LHS of a const declaration is always the output name, not a reference).
+                let lhs_lop = &lin_db.operand_vec[lhs_num];
+                if lhs_lop.tok != ast::LexToken::Identifier {
+                    let msg = format!(
+                        "Error, LHS of '=' must be an identifier, found '{:?}'.",
+                        lhs_lop.tok
+                    );
+                    diags.err1("IRDB_12", &msg, lin_ir.src_loc.clone());
+                    return None;
                 }
+                // Just return the data type of the rhs.
+                data_type =
+                    Self::get_operand_data_type_r(depth + 1, rhs_num, lin_db, const_values, diags);
             }
 
             ast::LexToken::Wr8
@@ -244,20 +274,65 @@ impl IRDb {
     fn process_lin_operands(&mut self, lin_db: &LinearDb, diags: &mut Diags) -> bool {
         trace!("IRDb::process_lin_operands: Enter");
 
+        // Pre-compute the set of lop indices that are the NAME operand (LHS) of a Const IR.
+        // These must NOT be substituted with const values — they are definition targets.
+        let const_name_lop_indices: HashSet<usize> = lin_db
+            .ir_vec
+            .iter()
+            .filter(|ir| ir.op == IRKind::Const)
+            .map(|ir| ir.operand_vec[0])
+            .collect();
+
         let mut result = true;
         let len = lin_db.operand_vec.len();
         for lop_num in 0..len {
-            let dt_opt = Self::get_operand_data_type_r(0, lop_num, lin_db, diags);
+            let lop = &lin_db.operand_vec[lop_num];
+
+            // The NAME operand (LHS) of a Const IR must remain DataType::Identifier —
+            // it is the definition target, not a value reference.  Skip const_values
+            // lookup and type inference entirely for these operands.
+            if const_name_lop_indices.contains(&lop_num) {
+                let opnd = IROperand::new(
+                    None,
+                    &lop.sval,
+                    &lop.src_loc,
+                    DataType::Identifier,
+                    true,
+                    diags,
+                );
+                if let Some(opnd) = opnd {
+                    self.parms.push(opnd);
+                } else {
+                    result = false;
+                }
+                continue;
+            }
+
+            // If this identifier operand is a const reference, substitute the resolved
+            // const value directly instead of keeping it as a bare Identifier.
+            if lop.tok == ast::LexToken::Identifier {
+                if let Some(const_val) = self.const_values.get(lop.sval.as_str()).cloned() {
+                    self.parms.push(IROperand {
+                        ir_lid: None,
+                        src_loc: lop.src_loc.clone(),
+                        is_immediate: true,
+                        val: const_val,
+                    });
+                    continue;
+                }
+            }
+
+            let dt_opt =
+                Self::get_operand_data_type_r(0, lop_num, lin_db, &self.const_values, diags);
             if dt_opt.is_none() {
                 return false; // error case, just give up
             }
 
             let data_type = dt_opt.unwrap();
-            let lop = &lin_db.operand_vec[lop_num];
 
             // Determine if this operand is a constant value.  If so, operand construction
             // will convert the string representation to its native value.
-            let is_constant = lop.ir_lid.is_none();
+            let is_immediate = lop.ir_lid.is_none();
 
             // During construction of the IROperand, the string in the linear operand is converted
             // to an actual typed value, which can fail, e.g. integer out of range
@@ -266,7 +341,7 @@ impl IRDb {
                 &lop.sval,
                 &lop.src_loc,
                 data_type,
-                is_constant,
+                is_immediate,
                 diags,
             );
             if let Some(opnd) = opnd {
@@ -571,31 +646,397 @@ impl IRDb {
         result
     }
 
-    pub fn new(lin_db: &LinearDb, diags: &mut Diags) -> Result<IRDb, ()> {
-        // If the user specified a starting address in the output statement
-        // then convert to a real number
-        let mut start_addr = 0;
-
-        if let Some(addr_str) = lin_db.output_addr_str.as_ref() {
-            if let Ok(addr) = parse::<u64>(addr_str) {
-                start_addr = addr;
-            } else {
-                let m = format!("Malformed integer operand {}", addr_str);
-                let primary_code_ref = lin_db.output_addr_loc.as_ref().unwrap();
-                diags.err1("IRDB_3", &m, primary_code_ref.clone());
-                return Err(());
+    /// Resolve all const declarations in `lin_db.const_map`, storing each
+    /// resolved value in `self.const_values`.  Must be called before
+    /// `process_lin_operands` so that const references can be substituted.
+    fn resolve_all_consts(&mut self, lin_db: &LinearDb, diags: &mut Diags) -> bool {
+        let names: Vec<String> = lin_db.const_map.keys().cloned().collect();
+        let mut result = true;
+        for name in names {
+            let mut in_progress = HashSet::new();
+            if self
+                .resolve_const_by_name(&name, lin_db, &mut in_progress, diags)
+                .is_none()
+            {
+                result = false;
             }
         }
+        result
+    }
 
+    /// Resolve a single const by name, recursing into its dependencies.
+    /// `in_progress` tracks names currently being evaluated to detect cycles.
+    fn resolve_const_by_name(
+        &mut self,
+        name: &str,
+        lin_db: &LinearDb,
+        in_progress: &mut HashSet<String>,
+        diags: &mut Diags,
+    ) -> Option<ParameterValue> {
+        // Already resolved — return the cached value.
+        if let Some(val) = self.const_values.get(name) {
+            return Some(val.clone());
+        }
+
+        // Cycle detected.
+        if in_progress.contains(name) {
+            let ir_lid = lin_db.const_map[name];
+            let src_loc = lin_db.ir_vec[ir_lid].src_loc.clone();
+            let m = format!("Circular dependency detected for const '{}'", name);
+            diags.err1("IRDB_18", &m, src_loc);
+            return None;
+        }
+
+        let ir_lid = lin_db.const_map[name];
+        let src_loc = lin_db.ir_vec[ir_lid].src_loc.clone();
+        let rhs_lop_num = lin_db.ir_vec[ir_lid].operand_vec[1];
+
+        in_progress.insert(name.to_string());
+        let val = self.eval_lin_const_expr(rhs_lop_num, lin_db, in_progress, diags, &src_loc)?;
+        in_progress.remove(name);
+
+        self.const_values.insert(name.to_string(), val.clone());
+        Some(val)
+    }
+
+    /// Evaluate a const expression operand recursively.
+    /// Returns the computed `ParameterValue`, or `None` on error.
+    fn eval_lin_const_expr(
+        &mut self,
+        lop_num: usize,
+        lin_db: &LinearDb,
+        in_progress: &mut HashSet<String>,
+        diags: &mut Diags,
+        err_loc: &Range<usize>,
+    ) -> Option<ParameterValue> {
+        let tok = lin_db.operand_vec[lop_num].tok;
+        let sval = lin_db.operand_vec[lop_num].sval.clone();
+        let src_loc = lin_db.operand_vec[lop_num].src_loc.clone();
+        let ir_lid_opt = lin_db.operand_vec[lop_num].ir_lid;
+
+        match tok {
+            ast::LexToken::Integer => {
+                let v: i64 = parse(&sval).ok().or_else(|| {
+                    let m = format!("Malformed integer in const expression: {}", sval);
+                    diags.err1("IRDB_22", &m, src_loc);
+                    None
+                })?;
+                Some(ParameterValue::Integer(v))
+            }
+            ast::LexToken::U64 => {
+                let s = sval.strip_suffix('u').unwrap_or(&sval).to_string();
+                let v: u64 = parse(&s).ok().or_else(|| {
+                    let m = format!("Malformed U64 in const expression: {}", sval);
+                    diags.err1("IRDB_23", &m, src_loc);
+                    None
+                })?;
+                Some(ParameterValue::U64(v))
+            }
+            ast::LexToken::I64 => {
+                let s = sval.strip_suffix('i').unwrap_or(&sval).to_string();
+                let v: i64 = parse(&s).ok().or_else(|| {
+                    let m = format!("Malformed I64 in const expression: {}", sval);
+                    diags.err1("IRDB_24", &m, src_loc);
+                    None
+                })?;
+                Some(ParameterValue::I64(v))
+            }
+            ast::LexToken::QuotedString => {
+                let trimmed = sval
+                    .strip_prefix('"')
+                    .unwrap_or(&sval)
+                    .strip_suffix('"')
+                    .unwrap_or(&sval)
+                    .to_string();
+                Some(ParameterValue::QuotedString(trimmed))
+            }
+            ast::LexToken::Identifier => {
+                // Reference to another const.
+                if lin_db.const_map.contains_key(sval.as_str()) {
+                    self.resolve_const_by_name(&sval, lin_db, in_progress, diags)
+                } else {
+                    let m = format!(
+                        "Unknown identifier '{}' in const expression.  \
+                         Only const names may be referenced from const expressions.",
+                        sval
+                    );
+                    diags.err1("IRDB_20", &m, src_loc);
+                    None
+                }
+            }
+            ast::LexToken::Sizeof
+            | ast::LexToken::Abs
+            | ast::LexToken::Img
+            | ast::LexToken::Sec => {
+                let m = format!(
+                    "Operation '{:?}' cannot be used in a const expression \
+                     because it requires engine-time layout or addressing.",
+                    tok
+                );
+                diags.err1("IRDB_19", &m, src_loc);
+                None
+            }
+            ast::LexToken::Plus
+            | ast::LexToken::Minus
+            | ast::LexToken::Asterisk
+            | ast::LexToken::FSlash
+            | ast::LexToken::Percent
+            | ast::LexToken::Ampersand
+            | ast::LexToken::Pipe
+            | ast::LexToken::DoubleLess
+            | ast::LexToken::DoubleGreater => {
+                let ir_lid = ir_lid_opt.unwrap();
+                let lhs_lop = lin_db.ir_vec[ir_lid].operand_vec[0];
+                let rhs_lop = lin_db.ir_vec[ir_lid].operand_vec[1];
+                let op_loc = lin_db.ir_vec[ir_lid].src_loc.clone();
+                let lhs_val =
+                    self.eval_lin_const_expr(lhs_lop, lin_db, in_progress, diags, err_loc)?;
+                let rhs_val =
+                    self.eval_lin_const_expr(rhs_lop, lin_db, in_progress, diags, err_loc)?;
+                Self::apply_binary_op(tok, lhs_val, rhs_val, &op_loc, diags)
+            }
+            ast::LexToken::DoubleEq
+            | ast::LexToken::NEq
+            | ast::LexToken::GEq
+            | ast::LexToken::LEq => {
+                let ir_lid = ir_lid_opt.unwrap();
+                let lhs_lop = lin_db.ir_vec[ir_lid].operand_vec[0];
+                let rhs_lop = lin_db.ir_vec[ir_lid].operand_vec[1];
+                let op_loc = lin_db.ir_vec[ir_lid].src_loc.clone();
+                let lhs_val =
+                    self.eval_lin_const_expr(lhs_lop, lin_db, in_progress, diags, err_loc)?;
+                let rhs_val =
+                    self.eval_lin_const_expr(rhs_lop, lin_db, in_progress, diags, err_loc)?;
+                Self::apply_comparison_op(tok, lhs_val, rhs_val, &op_loc, diags)
+            }
+            _ => {
+                let m = format!(
+                    "Operation '{:?}' is not supported in a const expression.",
+                    tok
+                );
+                diags.err1("IRDB_21", &m, err_loc.clone());
+                None
+            }
+        }
+    }
+
+    /// Apply a binary arithmetic operator to two resolved const values.
+    /// Promotes `Integer` to match a `U64` or `I64` operand when needed.
+    fn apply_binary_op(
+        tok: ast::LexToken,
+        lhs: ParameterValue,
+        rhs: ParameterValue,
+        src_loc: &Range<usize>,
+        diags: &mut Diags,
+    ) -> Option<ParameterValue> {
+        use ParameterValue::*;
+        // Reconcile Integer with a typed value; reject all other mismatches.
+        let (lhs, rhs) = match (&lhs, &rhs) {
+            (U64(_), U64(_))
+            | (I64(_), I64(_))
+            | (Integer(_), Integer(_))
+            | (QuotedString(_), QuotedString(_)) => (lhs, rhs),
+            (U64(_), Integer(v)) => (lhs, U64(*v as u64)),
+            (Integer(v), U64(_)) => (U64(*v as u64), rhs),
+            (I64(_), Integer(v)) => (lhs, I64(*v)),
+            (Integer(v), I64(_)) => (I64(*v), rhs),
+            _ => {
+                let m = format!(
+                    "Type mismatch in const expression: {:?} and {:?}.",
+                    lhs.data_type(),
+                    rhs.data_type()
+                );
+                diags.err1("IRDB_25", &m, src_loc.clone());
+                return None;
+            }
+        };
+
+        // Helper to emit the right diagnostic for a CalcErr and return None.
+        let emit = |err: CalcErr, diags: &mut Diags| -> Option<ParameterValue> {
+            match err {
+                CalcErr::Overflow(msg) => {
+                    diags.err1("IRDB_27", &msg, src_loc.clone());
+                }
+                CalcErr::DivByZero => {
+                    diags.err1("IRDB_28", "Division by zero in const expression", src_loc.clone());
+                }
+            }
+            None
+        };
+
+        match lhs {
+            U64(a) => {
+                let b = rhs.to_u64();
+                match Self::calc_u64_op(tok, a, b) {
+                    Ok(r) => Some(U64(r)),
+                    Err(e) => emit(e, diags),
+                }
+            }
+            I64(a) => {
+                let b = rhs.to_i64();
+                match Self::calc_i64_op(tok, a, b) {
+                    Ok(r) => Some(I64(r)),
+                    Err(e) => emit(e, diags),
+                }
+            }
+            Integer(a) => {
+                let b = rhs.to_i64();
+                match Self::calc_i64_op(tok, a, b) {
+                    Ok(r) => Some(Integer(r)),
+                    Err(e) => emit(e, diags),
+                }
+            }
+            _ => {
+                let m = format!(
+                    "Non-numeric type {:?} in arithmetic const expression.",
+                    lhs.data_type()
+                );
+                diags.err1("IRDB_26", &m, src_loc.clone());
+                None
+            }
+        }
+    }
+
+    /// Apply a comparison operator (==, !=, >=, <=) to two resolved const values.
+    /// Returns U64(1) for true, U64(0) for false.
+    /// Promotes `Integer` to match a `U64` or `I64` operand when needed.
+    fn apply_comparison_op(
+        tok: ast::LexToken,
+        lhs: ParameterValue,
+        rhs: ParameterValue,
+        src_loc: &Range<usize>,
+        diags: &mut Diags,
+    ) -> Option<ParameterValue> {
+        use ParameterValue::*;
+        // Reconcile Integer with a typed value; reject non-numeric types.
+        let (lhs, rhs) = match (&lhs, &rhs) {
+            (U64(_), U64(_)) | (I64(_), I64(_)) | (Integer(_), Integer(_)) => (lhs, rhs),
+            (U64(_), Integer(v)) => (lhs, U64(*v as u64)),
+            (Integer(v), U64(_)) => (U64(*v as u64), rhs),
+            (I64(_), Integer(v)) => (lhs, I64(*v)),
+            (Integer(v), I64(_)) => (I64(*v), rhs),
+            _ => {
+                let m = format!(
+                    "Non-numeric or mismatched types in const comparison: {:?} and {:?}.",
+                    lhs.data_type(),
+                    rhs.data_type()
+                );
+                diags.err1("IRDB_29", &m, src_loc.clone());
+                return None;
+            }
+        };
+
+        let result = match lhs {
+            U64(a) => {
+                let b = rhs.to_u64();
+                match tok {
+                    ast::LexToken::DoubleEq => a == b,
+                    ast::LexToken::NEq => a != b,
+                    ast::LexToken::GEq => a >= b,
+                    ast::LexToken::LEq => a <= b,
+                    _ => unreachable!(),
+                }
+            }
+            I64(a) | Integer(a) => {
+                let b = rhs.to_i64();
+                match tok {
+                    ast::LexToken::DoubleEq => a == b,
+                    ast::LexToken::NEq => a != b,
+                    ast::LexToken::GEq => a >= b,
+                    ast::LexToken::LEq => a <= b,
+                    _ => unreachable!(),
+                }
+            }
+            _ => unreachable!(),
+        };
+
+        Some(U64(if result { 1 } else { 0 }))
+    }
+
+    fn calc_u64_op(tok: ast::LexToken, a: u64, b: u64) -> Result<u64, CalcErr> {
+        match tok {
+            ast::LexToken::Plus => a
+                .checked_add(b)
+                .ok_or_else(|| CalcErr::Overflow(format!("Add expression '{a} + {b}' will overflow type U64"))),
+            ast::LexToken::Minus => a
+                .checked_sub(b)
+                .ok_or_else(|| CalcErr::Overflow(format!("Subtract expression '{a} - {b}' will underflow type U64"))),
+            ast::LexToken::Asterisk => a
+                .checked_mul(b)
+                .ok_or_else(|| CalcErr::Overflow(format!("Multiply expression '{a} * {b}' will overflow type U64"))),
+            ast::LexToken::FSlash => {
+                if b == 0 { Err(CalcErr::DivByZero) } else { Ok(a / b) }
+            }
+            ast::LexToken::Percent => {
+                if b == 0 { Err(CalcErr::DivByZero) } else { Ok(a % b) }
+            }
+            ast::LexToken::Ampersand => Ok(a & b),
+            ast::LexToken::Pipe => Ok(a | b),
+            ast::LexToken::DoubleLess => Ok(a << (b & 63)),
+            ast::LexToken::DoubleGreater => Ok(a >> (b & 63)),
+            _ => Err(CalcErr::Overflow("Unknown operator in U64 const expression".to_string())),
+        }
+    }
+
+    fn calc_i64_op(tok: ast::LexToken, a: i64, b: i64) -> Result<i64, CalcErr> {
+        match tok {
+            ast::LexToken::Plus => a
+                .checked_add(b)
+                .ok_or_else(|| CalcErr::Overflow(format!("Add expression '{a} + {b}' will overflow type I64"))),
+            ast::LexToken::Minus => a
+                .checked_sub(b)
+                .ok_or_else(|| CalcErr::Overflow(format!("Subtract expression '{a} - {b}' will underflow type I64"))),
+            ast::LexToken::Asterisk => a
+                .checked_mul(b)
+                .ok_or_else(|| CalcErr::Overflow(format!("Multiply expression '{a} * {b}' will overflow type I64"))),
+            ast::LexToken::FSlash => {
+                if b == 0 { Err(CalcErr::DivByZero) } else { Ok(a / b) }
+            }
+            ast::LexToken::Percent => {
+                if b == 0 { Err(CalcErr::DivByZero) } else { Ok(a % b) }
+            }
+            ast::LexToken::Ampersand => Ok(a & b),
+            ast::LexToken::Pipe => Ok(a | b),
+            ast::LexToken::DoubleLess => Ok(a << (b & 63)),
+            ast::LexToken::DoubleGreater => Ok(a >> (b & 63)),
+            _ => Err(CalcErr::Overflow("Unknown operator in I64 const expression".to_string())),
+        }
+    }
+
+    pub fn new(lin_db: &LinearDb, diags: &mut Diags) -> Result<IRDb, ()> {
         let mut ir_db = IRDb {
             ir_vec: Vec::new(),
             parms: Vec::new(),
             sized_locs: HashMap::new(),
             addressed_locs: HashMap::new(),
-            start_addr,
+            start_addr: 0,
             files: HashMap::new(),
             const_values: HashMap::new(),
         };
+
+        // Resolve all const declarations before anything else so their values
+        // are available for substitution in operands and the output address.
+        if !ir_db.resolve_all_consts(lin_db, diags) {
+            return Err(());
+        }
+
+        // Parse the optional output starting address.  If it is a const name,
+        // look it up in the now-resolved const_values map.
+        let start_addr = if let Some(addr_str) = lin_db.output_addr_str.as_ref() {
+            if let Ok(addr) = parse::<u64>(addr_str) {
+                addr
+            } else if let Some(cv) = ir_db.const_values.get(addr_str.as_str()) {
+                cv.to_u64()
+            } else {
+                let m = format!("Malformed integer operand {}", addr_str);
+                let loc = lin_db.output_addr_loc.as_ref().unwrap();
+                diags.err1("IRDB_3", &m, loc.clone());
+                return Err(());
+            }
+        } else {
+            0
+        };
+        ir_db.start_addr = start_addr;
 
         if !ir_db.process_lin_operands(lin_db, diags) {
             return Err(());
