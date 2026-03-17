@@ -26,7 +26,7 @@ From a command prompt, clone brink and change directory to your clone.  For exam
 
     $ cargo test --release
 
-All tests should should pass, 0 tests should fail.
+All tests should pass, 0 tests should fail.
 
 ### Step 4: Install Brink
 
@@ -149,6 +149,7 @@ The following diagram shows the basic concepts.  Users specify the starting logi
 ![Location Counter and sec/img/abs offsets](./images/location_counter.svg)
 
 Programs can query the location counter using the [abs](#abs-identifier----u64), [img](#img-identifier----u64) and [sec](#sec-identifier----u64) statements.  Programs force the location counter forward to a specific offset or address using the [set_sec](#set_sec-expression--pad-byte-value), [set_img](#set_img-expression--pad-byte-value) and [set_abs](#set_abs-expression--pad-byte-value) statements.  Brink reports an error if any set operation would cause the location counter to move backwards.
+
 ## Unit Testing
 
 Brink supports unit tests.
@@ -333,8 +334,7 @@ Brink supports the following arithmetic operators with same relative precedence 
 |            | \|       | n/a                   | Bitwise-OR                                    |
 |            | <<  >>   | no                    | Bitwise shift up and down                     |
 |            | ==  !=   | n/a                   | Equals and non-equal                          |
-|            | =>       | n/a                   | Greater-than-or-equal (same precedence as ==) |
-|            | <=       | n/a                   | less-than-or-equalLTE (same precedence as ==) |
+|            | >=  <=   | n/a                   | Greater-than-or-equal and less-than-or-equal  |
 |            | &&       | n/a                   | Logical-AND                                   |
 | Lowest     | \|\|     | n/a                   | Logical-OR                                    |
 ---
@@ -349,33 +349,35 @@ When called with an identifier, returns the absolute byte address of the identif
 
 Example:
 
+    const BASE = 0x1000u;
+
     section fiz {
-        assert abs() == 0x1006;
+        assert abs() == BASE + 6;
         wrs "fiz";
-        assert abs() == 0x1009;
-        assert abs(foo) == 0x1000;
+        assert abs() == BASE + 9;
+        assert abs(foo) == BASE;
     }
 
     section bar {
-        assert abs() == 0x1003;
+        assert abs() == BASE + 3;
         wrs "bar";
-        assert abs() == 0x1006;
+        assert abs() == BASE + 6;
         wr fiz;
-        assert abs() == 0x1009;
+        assert abs() == BASE + 9;
     }
 
     // top level section
     section foo {
-        assert abs() == 0x1000;
+        assert abs() == BASE;
         wrs "foo";
-        assert abs() == 0x1003;
-        assert abs(fiz) == 0x1006;
+        assert abs() == BASE + 3;
+        assert abs(fiz) == BASE + 6;
         wr bar;
-        assert abs() == 0x1009;
-        assert abs(bar) == 0x1003;
+        assert abs() == BASE + 9;
+        assert abs(bar) == BASE + 3;
     }
 
-    output foo 0x1000;  // starting absolute address is 0x1000
+    output foo BASE;  // starting absolute address is BASE
 
 ---
 
@@ -429,6 +431,23 @@ Example:
     output foo RAM_BASE;
 
 
+Const expressions support the full set of arithmetic, bitwise and comparison operators.
+Comparison operators evaluate to 1 (true) or 0 (false) and are useful for expressing
+relationships between constants:
+
+    const FLASH_BASE = 0x0800_0000u;
+    const FLASH_SIZE = 0x0008_0000u;
+    const RAM_BASE   = 0x2000_0000u;
+
+    // Verify flash and RAM regions do not overlap
+    const NO_OVERLAP = (FLASH_BASE + FLASH_SIZE) <= RAM_BASE;
+
+    section foo {
+        assert NO_OVERLAP;
+    }
+
+    output foo;
+
 A const value expression cannot depend on sizes or locations in the output file.  In other words, the brink compiler resolves all const values before constructing the output image.  For example:
 
     const RAM_BASE = 0x8000_0000u;        // OK, just a 64b unsigned literal.
@@ -451,6 +470,8 @@ A const value expression cannot depend on sizes or locations in the output file.
 When called with an identifier, returns the byte offset as a U64 of the identifier from the start of the output image.  When called without an identifier, returns the current image offset.
 
 Example:
+
+    const BASE = 0x1000u;
 
     section fiz {
         assert img() == 6;
@@ -478,7 +499,7 @@ Example:
         assert img(bar) == 3;
     }
 
-    output foo 0x1000;  // starting absolute address is 0x1000
+    output foo BASE;  // starting absolute address is BASE
 
 ---
 
@@ -512,16 +533,7 @@ An output statement specifies the top section to write to the output file and an
 
 ---
 ## `print <expression> [, <expression>, ...];`
-The print statement evaluates the comma separated list of expressions and prints them to the console.  For expressions, print displays unsigned values in hex and signed values in decimal.  If needed, the `to_u64` and to `to_i64` functions can control the output style.
-
-Writes the specified quoted string to the output.  Brink supports utf-8 quoted strings with escape characters
-
-* quote (\\\")
-* tab (\t)
-* newline (\n)
-* null (\0)
-
-Newlines are Linux style, so "A\n" is a two byte string on all platforms.
+The print statement evaluates the comma separated list of expressions and prints them to the console.  For expressions, print displays unsigned values in hex and signed values in decimal.  If needed, the `to_u64` and `to_i64` functions can control the output style.
 
 Brink executes a given print statement for each instance found in the output file.  In other words, a print statement in a section written multiple times will execute multiple times in the order found.
 
@@ -574,6 +586,8 @@ Example:
         assert sec(fiz) == 3;
     }
 
+    const BASE = 0x1000u;
+
     // top level section
     section foo {
         assert sec() == 0;
@@ -583,7 +597,7 @@ Example:
         assert sec() == 9;
     }
 
-    output foo 0x1000;  // starting absolute address is 0x1000
+    output foo BASE;  // starting absolute address is BASE
 
 When a section offset specifies an identifier, the identifier must be in the scope of the current section.  For example:
 
@@ -778,7 +792,7 @@ The following program simply copies these 6 UTF-8 characters to the output file.
 
     section foo {
         wrf "test_source_1.txt"; // Hello!
-        assert(sizeof(foo) == 6);
+        assert sizeof(foo) == 6;
     }
 
     output foo;
