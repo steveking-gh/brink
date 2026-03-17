@@ -165,6 +165,30 @@ pub enum LexToken {
     Unknown,
 }
 
+/// Returns true if `name` is a reserved identifier that may not be used
+/// as a section name, const name, or label name.
+///
+/// Reserved prefixes (all variants are reserved):
+///   - "wr"    — write instructions (wr8, wr16, …, wrs, wrf, and future variants)
+///   - "set_"  — configuration directives (set_sec, set_img, set_abs, and future variants)
+///
+/// Reserved exact keywords (reserved for future language features):
+///   - "include" / "import" — file or module inclusion
+///   - "if" / "else"        — conditional section inclusion
+///   - "true" / "false"     — boolean literals
+///   - "extern"             — external section references
+///   - "let"                — future variable declarations
+///   - "fill"               — fill/pad byte ranges
+pub fn is_reserved_identifier(name: &str) -> bool {
+    if name.starts_with("wr") || name.starts_with("set_") {
+        return true;
+    }
+    matches!(
+        name,
+        "include" | "import" | "if" | "else" | "true" | "false" | "extern" | "let" | "fill"
+    )
+}
+
 /// The basic token info structure used everywhere.
 /// The AST constructs a vector of TokenInfos.
 #[derive(Debug, Clone, PartialEq)]
@@ -1254,6 +1278,11 @@ impl<'toks> AstDb<'toks> {
         let sec_name_nid = children.next().unwrap();
         let sec_tinfo = ast.get_tinfo(sec_name_nid);
         let sec_str = sec_tinfo.val;
+        if is_reserved_identifier(sec_str) {
+            let m = format!("'{}' is a reserved identifier and cannot be used as a section name", sec_str);
+            diags.err1("AST_32", &m, sec_tinfo.span());
+            return false;
+        }
         if sections.contains_key(sec_str) {
             // error, duplicate section names
             // We know the section exists, so unwrap is fine.
@@ -1280,6 +1309,11 @@ impl<'toks> AstDb<'toks> {
         let sec_name_nid = children.next().unwrap();
         let sec_tinfo = ast.get_tinfo(sec_name_nid);
         let sec_str = sec_tinfo.val;
+        if is_reserved_identifier(sec_str) {
+            let m = format!("'{}' is a reserved identifier and cannot be used as a const name", sec_str);
+            diags.err1("AST_33", &m, sec_tinfo.span());
+            return false;
+        }
         if consts.contains_key(sec_str) {
             // error, duplicate const names
             // We know the const exists, so unwrap is fine.

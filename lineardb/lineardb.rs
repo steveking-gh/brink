@@ -19,7 +19,7 @@ use diags::Diags;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
 
-use ast::{Ast, AstDb, LexToken, TokenInfo};
+use ast::{Ast, AstDb, LexToken, TokenInfo, is_reserved_identifier};
 use ir::IRKind;
 use std::{collections::HashMap, ops::Range};
 
@@ -989,6 +989,11 @@ impl IdentDb {
         let name_operand_num = lir.operand_vec[op_num];
         let name_operand = lindb.operand_vec.get(name_operand_num).unwrap();
         let name = &name_operand.sval;
+        if is_reserved_identifier(name) {
+            let m = format!("'{}' is a reserved identifier and cannot be used as a label name", name);
+            diags.err1("LINEAR_13", &m, name_operand.src_loc.clone());
+            return false;
+        }
         if self.label_idents.contains_key(name) {
             let orig_loc = self.label_idents.get(name).unwrap();
             let msg = format!("Duplicate label name {}", name);

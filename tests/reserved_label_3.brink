@@ -1,0 +1,7 @@
+// 'true' is a reserved identifier and may not be used as a label name.
+// Expected: LINEAR_13.
+section foo {
+    true:
+    wr8 1;
+}
+output foo;

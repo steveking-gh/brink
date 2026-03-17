@@ -1,0 +1,7 @@
+// Identifiers starting with 'wr' are reserved and may not be used as label names.
+// Expected: LINEAR_13.
+section foo {
+    wr_loop:
+    wr8 1;
+}
+output foo;

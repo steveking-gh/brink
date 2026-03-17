@@ -1,0 +1,6 @@
+// Identifiers starting with 'set_' are reserved and may not be used as section names.
+// Expected: AST_32.
+section set_custom {
+    wr8 1;
+}
+output set_custom;

@@ -1,0 +1,6 @@
+// Identifiers starting with 'wr' are reserved and may not be used as section names.
+// Expected: AST_32.
+section wr_custom {
+    wr8 1;
+}
+output wr_custom;

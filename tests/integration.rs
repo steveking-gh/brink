@@ -1206,4 +1206,58 @@ mod tests {
     fn const_cmp_mismatch_1() {
         assert_brink_failure("tests/const_cmp_mismatch_1.brink", &["[IRDB_29]"]);
     }
+
+    /// 'include' is reserved and cannot be used as a section name.
+    #[test]
+    fn reserved_section_1() {
+        assert_brink_failure("tests/reserved_section_1.brink", &["[AST_32]"]);
+    }
+
+    /// Identifiers starting with 'wr' are reserved as section names.
+    #[test]
+    fn reserved_section_2() {
+        assert_brink_failure("tests/reserved_section_2.brink", &["[AST_32]"]);
+    }
+
+    /// 'include' is reserved and cannot be used as a const name.
+    #[test]
+    fn reserved_const_1() {
+        assert_brink_failure("tests/reserved_const_1.brink", &["[AST_33]"]);
+    }
+
+    /// Identifiers starting with 'wr' are reserved as const names.
+    #[test]
+    fn reserved_const_2() {
+        assert_brink_failure("tests/reserved_const_2.brink", &["[AST_33]"]);
+    }
+
+    /// 'include' is reserved and cannot be used as a label name.
+    #[test]
+    fn reserved_label_1() {
+        assert_brink_failure("tests/reserved_label_1.brink", &["[LINEAR_13]"]);
+    }
+
+    /// Identifiers starting with 'wr' are reserved as label names.
+    #[test]
+    fn reserved_label_2() {
+        assert_brink_failure("tests/reserved_label_2.brink", &["[LINEAR_13]"]);
+    }
+
+    /// Identifiers starting with 'set_' are reserved as section names.
+    #[test]
+    fn reserved_section_3() {
+        assert_brink_failure("tests/reserved_section_3.brink", &["[AST_32]"]);
+    }
+
+    /// 'let' is reserved and cannot be used as a const name.
+    #[test]
+    fn reserved_const_3() {
+        assert_brink_failure("tests/reserved_const_3.brink", &["[AST_33]"]);
+    }
+
+    /// 'true' is reserved and cannot be used as a label name.
+    #[test]
+    fn reserved_label_3() {
+        assert_brink_failure("tests/reserved_label_3.brink", &["[LINEAR_13]"]);
+    }
 } // mod tests

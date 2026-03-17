@@ -1,0 +1,7 @@
+// 'include' is a reserved identifier and may not be used as a label name.
+// Expected: LINEAR_13.
+section foo {
+    include:
+    wr8 1;
+}
+output foo;

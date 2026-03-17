@@ -1,0 +1,6 @@
+// 'include' is a reserved identifier and may not be used as a section name.
+// Expected: AST_32.
+section include {
+    wr8 1;
+}
+output include;

@@ -247,6 +247,35 @@ Brink supports the following data types:
 * `QuotedString` - A UTF-8 string in double quotes
 * `Identifier` - Identifier names
 
+## Reserved Identifiers
+
+Brink reserves certain identifiers and rejects their use as section names, const names, or label names at compile time.
+
+Brink reserves two identifier *prefixes*.  Any identifier beginning with a reserved prefix triggers an error, regardless of the suffix:
+
+| Reserved Prefix | Reason                                                         |
+|-----------------|----------------------------------------------------------------|
+| `wr`            | Write instructions (`wr8`, `wr16`, `wrs`, `wrf`, and future variants) |
+| `set_`          | Configuration directives (`set_sec`, `set_img`, `set_abs`, and future variants) |
+
+Brink also reserves the following *exact* keywords for future language features:
+
+| Reserved Keyword | Possible future use               |
+|------------------|-----------------------------------|
+| `include`        | File inclusion                    |
+| `import`         | Module inclusion                  |
+| `if`             | Conditional section inclusion     |
+| `else`           | Conditional section inclusion     |
+| `true`           | Boolean literal                   |
+| `false`          | Boolean literal                   |
+| `extern`         | External section references       |
+| `let`            | Variable declarations             |
+| `fill`           | Fill / pad byte ranges            |
+
+Keyword reservation is case-sensitive.  `Include` and `INCLUDE` are valid identifiers; `include` is not.
+
+---
+
 ## Literals
 
 ### Number Literals

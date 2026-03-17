@@ -1,0 +1,7 @@
+// Identifiers starting with 'wr' are reserved and may not be used as const names.
+// Expected: AST_33.
+const wr_bits = 8;
+section foo {
+    wr8 1;
+}
+output foo;

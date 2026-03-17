@@ -1,0 +1,7 @@
+// 'let' is a reserved identifier and may not be used as a const name.
+// Expected: AST_33.
+const let = 1;
+section foo {
+    wr8 1;
+}
+output foo;
