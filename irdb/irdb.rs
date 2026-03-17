@@ -204,38 +204,6 @@ impl IRDb {
                 }
             }
 
-            // Eq is always the datatype of its rhs operand.
-            // For example: `const x = 1;` which gives 'x' the same type as '1' (Integer in this case).
-            ast::LexToken::Eq => {
-                if lop.ir_lid.is_none() {
-                    panic!("Output operand '{:?}' does not have a source lid", lop.tok);
-                }
-
-                let lin_ir_lid = lop.ir_lid.unwrap();
-                let lin_ir = &lin_db.ir_vec[lin_ir_lid];
-                // We expect 1 identifier input operand and 1 value input operand and 1 output operand.
-                assert!(lin_ir.operand_vec.len() == 3);
-                // The lop this function was called with *is* the output operand
-                assert!(lin_ir.operand_vec[2] == lop_num);
-                let lhs_num = lin_ir.operand_vec[0]; // identifier operand (const name)
-                let rhs_num = lin_ir.operand_vec[1]; // value operand
-
-                // Verify the LHS is an identifier directly (don't substitute via const_values:
-                // the LHS of a const declaration is always the output name, not a reference).
-                let lhs_lop = &lin_db.operand_vec[lhs_num];
-                if lhs_lop.tok != ast::LexToken::Identifier {
-                    let msg = format!(
-                        "Error, LHS of '=' must be an identifier, found '{:?}'.",
-                        lhs_lop.tok
-                    );
-                    diags.err1("IRDB_12", &msg, lin_ir.src_loc.clone());
-                    return None;
-                }
-                // Just return the data type of the rhs.
-                data_type =
-                    Self::get_operand_data_type_r(depth + 1, rhs_num, lin_db, const_values, diags);
-            }
-
             ast::LexToken::Wr8
             | ast::LexToken::Wr16
             | ast::LexToken::Wr24
@@ -258,6 +226,7 @@ impl IRDb {
             | ast::LexToken::Wr
             | ast::LexToken::Wrf
             | ast::LexToken::Output
+            | ast::LexToken::Eq
             | ast::LexToken::Unknown => {
                 panic!("Token '{:?}' has no associated data type.", lop.tok);
             }
@@ -274,39 +243,9 @@ impl IRDb {
     fn process_lin_operands(&mut self, lin_db: &LinearDb, diags: &mut Diags) -> bool {
         trace!("IRDb::process_lin_operands: Enter");
 
-        // Pre-compute the set of lop indices that are the NAME operand (LHS) of a Const IR.
-        // These must NOT be substituted with const values — they are definition targets.
-        let const_name_lop_indices: HashSet<usize> = lin_db
-            .ir_vec
-            .iter()
-            .filter(|ir| ir.op == IRKind::Const)
-            .map(|ir| ir.operand_vec[0])
-            .collect();
-
         let mut result = true;
-        let len = lin_db.operand_vec.len();
-        for lop_num in 0..len {
+        for lop_num in 0..lin_db.operand_vec.len() {
             let lop = &lin_db.operand_vec[lop_num];
-
-            // The NAME operand (LHS) of a Const IR must remain DataType::Identifier —
-            // it is the definition target, not a value reference.  Skip const_values
-            // lookup and type inference entirely for these operands.
-            if const_name_lop_indices.contains(&lop_num) {
-                let opnd = IROperand::new(
-                    None,
-                    &lop.sval,
-                    &lop.src_loc,
-                    DataType::Identifier,
-                    true,
-                    diags,
-                );
-                if let Some(opnd) = opnd {
-                    self.parms.push(opnd);
-                } else {
-                    result = false;
-                }
-                continue;
-            }
 
             // If this identifier operand is a const reference, substitute the resolved
             // const value directly instead of keeping it as a bare Identifier.
@@ -681,15 +620,15 @@ impl IRDb {
         // Cycle detected.
         if in_progress.contains(name) {
             let ir_lid = lin_db.const_map[name];
-            let src_loc = lin_db.ir_vec[ir_lid].src_loc.clone();
+            let src_loc = lin_db.const_ir_vec[ir_lid].src_loc.clone();
             let m = format!("Circular dependency detected for const '{}'", name);
             diags.err1("IRDB_18", &m, src_loc);
             return None;
         }
 
         let ir_lid = lin_db.const_map[name];
-        let src_loc = lin_db.ir_vec[ir_lid].src_loc.clone();
-        let rhs_lop_num = lin_db.ir_vec[ir_lid].operand_vec[1];
+        let src_loc = lin_db.const_ir_vec[ir_lid].src_loc.clone();
+        let rhs_lop_num = lin_db.const_ir_vec[ir_lid].operand_vec[1];
 
         in_progress.insert(name.to_string());
         let val = self.eval_lin_const_expr(rhs_lop_num, lin_db, in_progress, diags, &src_loc)?;
@@ -709,10 +648,10 @@ impl IRDb {
         diags: &mut Diags,
         err_loc: &Range<usize>,
     ) -> Option<ParameterValue> {
-        let tok = lin_db.operand_vec[lop_num].tok;
-        let sval = lin_db.operand_vec[lop_num].sval.clone();
-        let src_loc = lin_db.operand_vec[lop_num].src_loc.clone();
-        let ir_lid_opt = lin_db.operand_vec[lop_num].ir_lid;
+        let tok = lin_db.const_operand_vec[lop_num].tok;
+        let sval = lin_db.const_operand_vec[lop_num].sval.clone();
+        let src_loc = lin_db.const_operand_vec[lop_num].src_loc.clone();
+        let ir_lid_opt = lin_db.const_operand_vec[lop_num].ir_lid;
 
         match tok {
             ast::LexToken::Integer => {
@@ -786,9 +725,9 @@ impl IRDb {
             | ast::LexToken::DoubleLess
             | ast::LexToken::DoubleGreater => {
                 let ir_lid = ir_lid_opt.unwrap();
-                let lhs_lop = lin_db.ir_vec[ir_lid].operand_vec[0];
-                let rhs_lop = lin_db.ir_vec[ir_lid].operand_vec[1];
-                let op_loc = lin_db.ir_vec[ir_lid].src_loc.clone();
+                let lhs_lop = lin_db.const_ir_vec[ir_lid].operand_vec[0];
+                let rhs_lop = lin_db.const_ir_vec[ir_lid].operand_vec[1];
+                let op_loc = lin_db.const_ir_vec[ir_lid].src_loc.clone();
                 let lhs_val =
                     self.eval_lin_const_expr(lhs_lop, lin_db, in_progress, diags, err_loc)?;
                 let rhs_val =
@@ -800,9 +739,9 @@ impl IRDb {
             | ast::LexToken::GEq
             | ast::LexToken::LEq => {
                 let ir_lid = ir_lid_opt.unwrap();
-                let lhs_lop = lin_db.ir_vec[ir_lid].operand_vec[0];
-                let rhs_lop = lin_db.ir_vec[ir_lid].operand_vec[1];
-                let op_loc = lin_db.ir_vec[ir_lid].src_loc.clone();
+                let lhs_lop = lin_db.const_ir_vec[ir_lid].operand_vec[0];
+                let rhs_lop = lin_db.const_ir_vec[ir_lid].operand_vec[1];
+                let op_loc = lin_db.const_ir_vec[ir_lid].src_loc.clone();
                 let lhs_val =
                     self.eval_lin_const_expr(lhs_lop, lin_db, in_progress, diags, err_loc)?;
                 let rhs_val =

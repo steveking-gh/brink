@@ -10,7 +10,7 @@
 // and expression evaluation happens in the next stage.
 //
 // Order of operations: lineardb runs after ast.  Its output — a LinearDb
-// containing ir_vec and operand_vec — is consumed by irdb.
+// containing ir_vec, const_ir_vec, and operand_vec — is consumed by irdb.
 
 use indextree::NodeId;
 pub type Span = std::ops::Range<usize>;
@@ -63,11 +63,6 @@ pub struct LinIR {
     pub op: IRKind,
     // usize is the index into the operand vec
     pub operand_vec: Vec<usize>,
-    /// True if this IR was generated as part of a const expression sub-tree.
-    /// Such IRs are skipped by verify_global_refs; their identifiers are
-    /// validated later by the IRDb resolver.  This is somewhat of a workaround
-    /// since we really should do reference checking during IR generation.
-    pub in_const_expr: bool,
 }
 
 impl<'toks> LinIR {
@@ -79,7 +74,6 @@ impl<'toks> LinIR {
             src_loc,
             op,
             operand_vec: Vec::new(),
-            in_const_expr: false,
         }
     }
 
@@ -136,15 +130,26 @@ fn tok_to_irkind(tok: LexToken) -> IRKind {
 }
 
 pub struct LinearDb {
-    /// Flat, ordered sequence of all IR instructions produced from the AST.
-    /// Downstream stages (IRDb, Engine) iterate this vector in order.
+    /// Flat, ordered sequence of all IR instructions produced from the AST and
+    /// evaluated by the engine.  This vector contains all IR instruction except
+    /// those for const expressions.
     pub ir_vec: Vec<LinIR>,
+
+    /// Flat sequence of all IR instructions for const declaration expressions.
+    /// Being constants, we evaluate these expressions before engine execution.
+    /// This separate vector avoids contaminating the mutable IR vector.
+    pub const_ir_vec: Vec<LinIR>,
 
     /// Vector of all operands referenced by instructions in `ir_vec`.
     /// Instructions index into this vector rather than owning their operands directly.
     pub operand_vec: Vec<LinOperand>,
 
-    /// Maps each const identifier name to the ir_vec index of its Const IR.
+    /// Flat sequence of all operands referenced by instructions in `const_ir_vec`.
+    /// Kept separate from `operand_vec` so downstream stages can iterate section
+    /// operands without range-bounding.
+    pub const_operand_vec: Vec<LinOperand>,
+
+    /// Maps each const identifier name to the const_ir_vec index of its Const IR.
     pub const_map: HashMap<String, usize>,
 
     /// Name of the section specified by the `output` statement.
@@ -170,25 +175,41 @@ boxed info object.
 */
 impl<'toks> LinearDb {
     // Adds an existing operand by it's operand_vec index to the specified LinIR
-    pub fn add_existing_operand_to_ir(&mut self, ir_lid: usize, idx: usize) {
-        self.ir_vec[ir_lid].add_operand(idx);
+    pub fn add_existing_operand_to_ir(&mut self, ir_lid: usize, idx: usize, in_const: bool) {
+        if in_const {
+            self.const_ir_vec[ir_lid].add_operand(idx);
+        } else {
+            self.ir_vec[ir_lid].add_operand(idx);
+        }
     }
 
     // Returns the linear operand index occupied by the new operand
-    pub fn add_new_operand_to_ir(&mut self, ir_lid: usize, operand: LinOperand) -> usize {
-        let idx = self.operand_vec.len();
-        self.operand_vec.push(operand);
-        self.add_existing_operand_to_ir(ir_lid, idx);
-        idx
+    pub fn add_new_operand_to_ir(&mut self, ir_lid: usize, operand: LinOperand, in_const: bool) -> usize {
+        if in_const {
+            let idx = self.const_operand_vec.len();
+            self.const_operand_vec.push(operand);
+            self.add_existing_operand_to_ir(ir_lid, idx, in_const);
+            idx
+        } else {
+            let idx = self.operand_vec.len();
+            self.operand_vec.push(operand);
+            self.add_existing_operand_to_ir(ir_lid, idx, in_const);
+            idx
+        }
     }
 
     // returns the linear ID for the new LinIR
     fn new_ir(&mut self, nid: NodeId, ast: &'toks Ast, op: IRKind, in_const_expr: bool) -> usize {
-        let lid = self.ir_vec.len();
-        let mut lir = LinIR::new(nid, ast, op);
-        lir.in_const_expr = in_const_expr;
-        self.ir_vec.push(lir);
-        lid
+        let lir = LinIR::new(nid, ast, op);
+        if in_const_expr {
+            let lid = self.const_ir_vec.len();
+            self.const_ir_vec.push(lir);
+            lid
+        } else {
+            let lid = self.ir_vec.len();
+            self.ir_vec.push(lir);
+            lid
+        }
     }
 
     // Control recursion to some safe level.  100 is just a guesstimate.
@@ -261,13 +282,14 @@ impl<'toks> LinearDb {
         ir_lid: usize,
         diags: &mut Diags,
         tinfo: &TokenInfo,
+        in_const: bool,
     ) -> bool {
         // If we found the expected number of operands, then add them to the new IR
         // Otherwise, do nothing but indicate the error.
         if self.operand_count_is_valid(expected, lops, diags, tinfo) {
             // Preserve the order of the operands front to back.
             for idx in lops {
-                self.add_existing_operand_to_ir(ir_lid, *idx);
+                self.add_existing_operand_to_ir(ir_lid, *idx, in_const);
             }
         } else {
             return false;
@@ -284,12 +306,13 @@ impl<'toks> LinearDb {
         ir_lid: usize,
         diags: &mut Diags,
         tinfo: &TokenInfo,
+        in_const: bool,
     ) -> bool {
         if lops.is_empty() {
             return true;
         }
 
-        self.process_operands(expected, lops, ir_lid, diags, tinfo)
+        self.process_operands(expected, lops, ir_lid, diags, tinfo, in_const)
     }
 
     /// Recursively record information about the children of an AST object.
@@ -369,10 +392,10 @@ impl<'toks> LinearDb {
                     in_const_expr,
                 );
                 // 1 operand expected
-                result &= self.process_operands(1, &mut lops, ir_lid, diags, tinfo);
+                result &= self.process_operands(1, &mut lops, ir_lid, diags, tinfo, in_const_expr);
 
                 // Add a destination operand to the operation to hold the result
-                let idx = self.add_new_operand_to_ir(ir_lid, LinOperand::new(Some(ir_lid), tinfo));
+                let idx = self.add_new_operand_to_ir(ir_lid, LinOperand::new(Some(ir_lid), tinfo), in_const_expr);
                 // Also add the destination operand to the local operands
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);
@@ -395,10 +418,10 @@ impl<'toks> LinearDb {
                     in_const_expr,
                 );
                 // 1 operand expected
-                result &= self.process_optional_operands(1, &mut lops, ir_lid, diags, tinfo);
+                result &= self.process_optional_operands(1, &mut lops, ir_lid, diags, tinfo, in_const_expr);
 
                 // Add a destination operand to the operation to hold the result
-                let idx = self.add_new_operand_to_ir(ir_lid, LinOperand::new(Some(ir_lid), tinfo));
+                let idx = self.add_new_operand_to_ir(ir_lid, LinOperand::new(Some(ir_lid), tinfo), in_const_expr);
                 // Also add the destination operand to the local operands
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);
@@ -408,11 +431,18 @@ impl<'toks> LinearDb {
             | LexToken::I64
             | LexToken::Integer
             | LexToken::QuotedString => {
-                // These are immediate operands.  Add them to the main operand vector
-                // and return them as local operands.
+                // These are immediate operands.  Add them to the appropriate operand
+                // vector and return them as local operands.
                 // This case terminates recursion.
-                let idx = self.operand_vec.len();
-                self.operand_vec.push(LinOperand::new(None, tinfo));
+                let idx = if in_const_expr {
+                    let idx = self.const_operand_vec.len();
+                    self.const_operand_vec.push(LinOperand::new(None, tinfo));
+                    idx
+                } else {
+                    let idx = self.operand_vec.len();
+                    self.operand_vec.push(LinOperand::new(None, tinfo));
+                    idx
+                };
                 returned_operands.push(idx);
             }
             LexToken::SetSec | LexToken::SetImg | LexToken::SetAbs | LexToken::Align => {
@@ -447,11 +477,11 @@ impl<'toks> LinearDb {
                 }
 
                 // Add the user specified value to the IR
-                self.add_existing_operand_to_ir(ir_lid, lops[0]);
+                self.add_existing_operand_to_ir(ir_lid, lops[0], in_const_expr);
 
                 // Add the destination operand to store the calculated count
                 let count_output =
-                    self.add_new_operand_to_ir(ir_lid, LinOperand::new(Some(ir_lid), tinfo));
+                    self.add_new_operand_to_ir(ir_lid, LinOperand::new(Some(ir_lid), tinfo), in_const_expr);
 
                 // Create a wr8_tinfo copied from the align tinfo
                 let mut wr8_tinfo = tinfo.clone();
@@ -462,17 +492,17 @@ impl<'toks> LinearDb {
                 if lops.len() == 2 {
                     // The user specified a pad byte value.  This expression is the first operand
                     // of the wr8
-                    self.add_existing_operand_to_ir(wr8_lid, lops[1]);
+                    self.add_existing_operand_to_ir(wr8_lid, lops[1], in_const_expr);
                 } else {
                     // Add a default integer 0 operand
                     let mut pad_byte_tinfo = tinfo.clone();
                     pad_byte_tinfo.tok = LexToken::Integer;
                     pad_byte_tinfo.val = "0";
-                    self.add_new_operand_to_ir(wr8_lid, LinOperand::new(None, &pad_byte_tinfo));
+                    self.add_new_operand_to_ir(wr8_lid, LinOperand::new(None, &pad_byte_tinfo), in_const_expr);
                 }
 
                 // The align result as the number of bytes to write in wr8
-                self.add_existing_operand_to_ir(wr8_lid, count_output);
+                self.add_existing_operand_to_ir(wr8_lid, count_output, in_const_expr);
             }
 
             LexToken::Assert
@@ -503,7 +533,7 @@ impl<'toks> LinearDb {
                 // add the operands to this new IR.  These IRs are statements that do not
                 // return a value.
                 for idx in lops {
-                    self.add_existing_operand_to_ir(ir_lid, idx);
+                    self.add_existing_operand_to_ir(ir_lid, idx, in_const_expr);
                 }
             }
             LexToken::ToI64 | LexToken::ToU64 => {
@@ -520,9 +550,9 @@ impl<'toks> LinearDb {
                 );
                 let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tinfo.tok), in_const_expr);
                 // 1 operand expected
-                result &= self.process_operands(1, &mut lops, ir_lid, diags, tinfo);
+                result &= self.process_operands(1, &mut lops, ir_lid, diags, tinfo, in_const_expr);
                 // Add a destination operand to the operation to hold the result
-                let idx = self.add_new_operand_to_ir(ir_lid, LinOperand::new(Some(ir_lid), tinfo));
+                let idx = self.add_new_operand_to_ir(ir_lid, LinOperand::new(Some(ir_lid), tinfo), in_const_expr);
                 // Also add the destination operand to the local operands
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);
@@ -556,10 +586,10 @@ impl<'toks> LinearDb {
                 );
                 let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tinfo.tok), in_const_expr);
                 // 2 operands expected
-                result &= self.process_operands(2, &mut lops, ir_lid, diags, tinfo);
+                result &= self.process_operands(2, &mut lops, ir_lid, diags, tinfo, in_const_expr);
 
                 // Add a destination operand to the operation to hold the result
-                let idx = self.add_new_operand_to_ir(ir_lid, LinOperand::new(Some(ir_lid), tinfo));
+                let idx = self.add_new_operand_to_ir(ir_lid, LinOperand::new(Some(ir_lid), tinfo), in_const_expr);
                 // Also add the destination operand to the local operands
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);
@@ -581,8 +611,8 @@ impl<'toks> LinearDb {
                 // 1 operand expected, which is the name of the section.
                 if self.operand_count_is_valid(1, &lops, diags, tinfo) {
                     let sec_id_lid = lops.pop().unwrap();
-                    self.add_existing_operand_to_ir(start_lid, sec_id_lid);
-                    self.add_existing_operand_to_ir(end_lid, sec_id_lid);
+                    self.add_existing_operand_to_ir(start_lid, sec_id_lid, in_const_expr);
+                    self.add_existing_operand_to_ir(end_lid, sec_id_lid, in_const_expr);
                 } else {
                     result = false;
                 }
@@ -603,7 +633,7 @@ impl<'toks> LinearDb {
                     sval: name_without_colon,
                     tok,
                 };
-                self.add_new_operand_to_ir(ir_lid, operand);
+                self.add_new_operand_to_ir(ir_lid, operand, in_const_expr);
             }
 
             LexToken::Semicolon
@@ -635,9 +665,11 @@ impl<'toks> LinearDb {
 
     /// Converts a top-level `const NAME = <expr>` declaration into linear IR.
     ///
-    /// Produces one `IRKind::Const` entry in `ir_vec` with three operands:
+    /// Produces one `IRKind::Const` entry in `const_ir_vec` with three operands:
     ///  `[name_identifier, rhs_result, eq_output]`
-    /// and records the name → ir_lid mapping in `const_map`.
+    /// and records the name → const_ir_vec index mapping in `const_map`.
+    /// All IRs and operands created during this call go into const_ir_vec and
+    /// the const portion of operand_vec.
     fn record_const_decl(
         &mut self,
         const_nid: NodeId,
@@ -645,24 +677,23 @@ impl<'toks> LinearDb {
         ast: &'toks Ast,
         ast_db: &AstDb,
     ) -> bool {
-        let ir_lid = self.new_ir(const_nid, ast, IRKind::Const, false);
+        let ir_lid = self.new_ir(const_nid, ast, IRKind::Const, true);
 
         let mut children = ast.children(const_nid);
 
         // Child 0: const name (Identifier)
         let name_nid = children.next().unwrap();
         let name_tinfo = ast.get_tinfo(name_nid);
-        let name_idx = self.operand_vec.len();
-        self.operand_vec.push(LinOperand::new(None, name_tinfo));
-        self.add_existing_operand_to_ir(ir_lid, name_idx);
+        let name_idx = self.const_operand_vec.len();
+        self.const_operand_vec.push(LinOperand::new(None, name_tinfo));
+        self.add_existing_operand_to_ir(ir_lid, name_idx, true);
 
         // Child 1: `=` sign — used only for its token info (src loc + Eq tok)
         let eq_nid = children.next().unwrap();
         let eq_tinfo = ast.get_tinfo(eq_nid);
 
-        // Child 2: RHS expression.  Pass in_const_expr=true so every IR
-        // created during this recursion is marked at creation time and will
-        // be skipped by verify_global_refs (IRDb handles their validation).
+        // Child 2: RHS expression.  All IRs created during this recursion go
+        // into const_ir_vec (IRDb handles their validation).
         let rhs_nid = children.next().unwrap();
         let mut rhs_lops = Vec::new();
         if !self.record_r(1, rhs_nid, &mut rhs_lops, diags, ast, ast_db, true) {
@@ -679,12 +710,12 @@ impl<'toks> LinearDb {
         }
 
         // Second operand: the RHS result
-        self.add_existing_operand_to_ir(ir_lid, rhs_lops[0]);
+        self.add_existing_operand_to_ir(ir_lid, rhs_lops[0], true);
 
         // Third operand: the output slot of the const, using Eq tok for type inference
-        self.add_new_operand_to_ir(ir_lid, LinOperand::new(Some(ir_lid), eq_tinfo));
+        self.add_new_operand_to_ir(ir_lid, LinOperand::new(Some(ir_lid), eq_tinfo), true);
 
-        // Record name to the output ir_lid so the IRDb resolver can find it
+        // Record name to the const_ir_vec index so the IRDb resolver can find it
         self.const_map.insert(name_tinfo.val.to_string(), ir_lid);
 
         true
@@ -726,7 +757,9 @@ impl<'toks> LinearDb {
 
         let mut linear_db = LinearDb {
             ir_vec: Vec::new(),
+            const_ir_vec: Vec::new(),
             operand_vec: Vec::new(),
+            const_operand_vec: Vec::new(),
             const_map: HashMap::new(),
             output_sec_str,
             output_sec_loc,
@@ -754,9 +787,8 @@ impl<'toks> LinearDb {
             return Err(());
         }
 
-        // Linearize all top-level const declarations after the section.
-        // record_const_decl passes in_const_expr=true into record_r so every
-        // IR created for the RHS is flagged at creation time.
+        // Linearize all top-level const declarations. All IRs and operands
+        // created during this loop go into const_ir_vec and const_operand_vec.
         for (_, const_item) in &ast_db.consts {
             if !linear_db.record_const_decl(const_item.nid, diags, ast, ast_db) {
                 return Err(());
@@ -795,7 +827,24 @@ impl<'toks> LinearDb {
                 } else {
                     op.push_str(&format!(" {}", operand.sval));
                 }
-                //op.push_str(&format!(" temp_{}", operand.val));
+            }
+            debug!("LinearDb: {}", op);
+        }
+        for (idx, ir) in self.const_ir_vec.iter().enumerate() {
+            let mut op = format!("const lid {}: nid {} is {:?}", idx, ir.nid, ir.op);
+            let mut first = true;
+            for child in &ir.operand_vec {
+                let operand = &self.const_operand_vec[*child];
+                if !first {
+                    op.push(',');
+                } else {
+                    first = false;
+                }
+                if let Some(ir_lid) = operand.is_output_of() {
+                    op.push_str(&format!(" tmp{}, output of lid {}", *child, ir_lid));
+                } else {
+                    op.push_str(&format!(" {}", operand.sval));
+                }
             }
             debug!("LinearDb: {}", op);
         }
@@ -805,7 +854,6 @@ impl<'toks> LinearDb {
 struct IdentDb {
     label_idents: HashMap<String, Range<usize>>,
     section_count: HashMap<String, usize>,
-    const_count: HashMap<String, usize>,
 }
 
 impl IdentDb {
@@ -813,7 +861,6 @@ impl IdentDb {
         IdentDb {
             label_idents: HashMap::new(),
             section_count: HashMap::new(),
-            const_count: HashMap::new(),
         }
     }
 
@@ -976,21 +1023,6 @@ impl IdentDb {
         trace!("IdentDb::inventory_section_identifiers: EXIT");
     }
 
-    /// Increment the number of occurrences of this const
-    fn inventory_const_identifiers(&mut self, lir: &LinIR, lindb: &LinearDb) {
-        trace!("IdentDb::inventory_const_identifiers: ENTER");
-        let name_operand_num = lir.operand_vec[0];
-        let name_operand = lindb.operand_vec.get(name_operand_num).unwrap();
-        let name = &name_operand.sval;
-        debug!(
-            "IdentDb::inventory_const_identifiers: Adding const name {} to inventory.",
-            name
-        );
-
-        // Increment existing const name count or insert new entry with count = 1.
-        *self.const_count.entry(name.to_string()).or_insert(0) += 1;
-        trace!("IdentDb::inventory_const_identifiers: EXIT");
-    }
     /// Build a hash of all valid global identifier names: labels, sections, consts, etc
     /// Reports an error and returns false if duplicate labels exist.
     fn inventory_global_identifiers(&mut self, lindb: &LinearDb, diags: &mut Diags) -> bool {
@@ -1000,10 +1032,6 @@ impl IdentDb {
                 IRKind::Label => self.inventory_label_identifiers(0, lir, lindb, diags),
                 IRKind::SectionStart => {
                     self.inventory_section_identifiers(lir, lindb);
-                    true
-                }
-                IRKind::Const => {
-                    self.inventory_const_identifiers(lir, lindb);
                     true
                 }
                 _ => true,
@@ -1023,12 +1051,6 @@ impl IdentDb {
     fn verify_global_refs(&self, lindb: &LinearDb, diags: &mut Diags) -> bool {
         let mut result = true;
         for lir in &lindb.ir_vec {
-            // If this is a part of a const expression, then defer validation of global
-            // identifier references since we need the semantic information in the IRDB
-            // phase.
-            if lir.in_const_expr {
-                continue;
-            }
             result &= match lir.op {
                 IRKind::Abs | IRKind::Img | IRKind::Sizeof => {
                     self.verify_operand_refs(lir, lindb, diags)
