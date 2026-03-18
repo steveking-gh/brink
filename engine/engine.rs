@@ -29,6 +29,23 @@ pub struct Location {
     sec: u64,
 }
 
+/// Records one occurrence of a section write in the output image.
+/// A section written N times via `wr` produces N `WrDispatch` entries,
+/// each at a distinct `img_start` offset, in output order.
+#[derive(Clone, Debug)]
+pub struct WrDispatch {
+    pub name: String,
+    pub img_start: u64,
+    pub size: u64,
+}
+
+/// Records the output-image position of a label.
+#[derive(Clone, Debug)]
+pub struct LabelDispatch {
+    pub name: String,
+    pub img_offset: u64,
+}
+
 pub struct Engine {
     parms: Vec<ParameterValue>,
     ir_locs: Vec<Location>,
@@ -41,8 +58,16 @@ pub struct Engine {
     /// Stack of sections for debug use
     sec_names: Vec<String>,
 
-    /// Starting absolute address, just copied from irdb for convenience
-    start_addr: u64,
+    /// Starting absolute address, just copied from irdb for convenience.
+    pub start_addr: u64,
+
+    /// One entry per section write in output order, including repeated writes.
+    /// Populated by `build_dispatches` after iterate converges.
+    pub wr_dispatches: Vec<WrDispatch>,
+
+    /// One entry per label in output order.
+    /// Populated by `build_dispatches` after iterate converges.
+    pub label_dispatches: Vec<LabelDispatch>,
 }
 
 fn get_wrx_byte_width(ir: &IR) -> usize {
@@ -1088,6 +1113,8 @@ impl Engine {
             sec_offsets: Vec::new(),
             sec_names: Vec::new(),
             start_addr: irdb.start_addr,
+            wr_dispatches: Vec::new(),
+            label_dispatches: Vec::new(),
         };
         engine.trace("Engine::new:");
 
@@ -1102,8 +1129,47 @@ impl Engine {
             return Err(());
         }
 
+        engine.build_dispatches(irdb);
         engine.trace("Engine::new: EXIT");
         Ok(engine)
+    }
+
+    /// Scans `ir_vec` and the stable `ir_locs` to build `wr_dispatches` and
+    /// `label_dispatches`.  Called once after iterate converges.
+    ///
+    /// `ir_locs[i]` holds the image/section offset *before* IR `i` executes, so:
+    ///   - a `SectionStart` at index `i` begins at `ir_locs[i].img`
+    ///   - the matching `SectionEnd` at index `j` ends at `ir_locs[j].img`
+    ///   - section size = `ir_locs[j].img - ir_locs[i].img`
+    ///
+    /// A section written N times produces N `WrDispatch` entries in output order.
+    fn build_dispatches(&mut self, irdb: &IRDb) {
+        // Stack of (section_name, SectionStart IR index) for matching ends.
+        let mut stack: Vec<(String, usize)> = Vec::new();
+        for (i, ir) in irdb.ir_vec.iter().enumerate() {
+            match ir.kind {
+                IRKind::SectionStart => {
+                    let name = irdb.get_opnd_as_identifier(ir, 0).to_string();
+                    stack.push((name, i));
+                }
+                IRKind::SectionEnd => {
+                    let (name, start_idx) = stack.pop().expect("Unmatched SectionEnd in ir_vec");
+                    let img_start = self.ir_locs[start_idx].img;
+                    let img_end = self.ir_locs[i].img;
+                    self.wr_dispatches.push(WrDispatch {
+                        name,
+                        img_start,
+                        size: img_end - img_start,
+                    });
+                }
+                IRKind::Label => {
+                    let name = irdb.get_opnd_as_identifier(ir, 0).to_string();
+                    let img_offset = self.ir_locs[i].img;
+                    self.label_dispatches.push(LabelDispatch { name, img_offset });
+                }
+                _ => {}
+            }
+        }
     }
 
     pub fn dump_locations(&self) {
