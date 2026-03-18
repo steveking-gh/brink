@@ -1,0 +1,14 @@
+[package]
+name = "map"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[lib]
+path = "map.rs"
+
+[dependencies]
+engine = { path = "../engine" }
+irdb = { path = "../irdb" }
+ir = { path = "../ir" }
+tracing = "0.1.44"
