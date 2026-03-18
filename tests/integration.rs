@@ -1260,4 +1260,124 @@ mod tests {
     fn reserved_label_3() {
         assert_brink_failure("tests/reserved_label_3.brink", &["[LINEAR_13]"]);
     }
+
+    // ── Map file output tests ─────────────────────────────────────────────────
+
+    /// Runs brink with --map-hf=<map_file> and -o <bin_file>, reads the map,
+    /// asserts every string in `checks` appears in the map, then cleans up.
+    fn assert_map_hf(src: &str, bin_out: &str, map_out: &str, checks: &[&str]) {
+        let mut cmd = Command::cargo_bin("brink").unwrap();
+        cmd.arg(src)
+            .arg("-o").arg(bin_out)
+            .arg(format!("--map-hf={map_out}"));
+        cmd.assert().success();
+
+        let map = fs::read_to_string(map_out)
+            .unwrap_or_else(|_| panic!("map file not found: {map_out}"));
+        for check in checks {
+            assert!(map.contains(check), "map missing: {check:?}\n--- map ---\n{map}");
+        }
+
+        fs::remove_file(bin_out).ok();
+        fs::remove_file(map_out).ok();
+    }
+
+    /// Section names, absolute addresses, sizes, and const names/values all
+    /// appear in the map.  hdr=2 bytes at 0x2000, body=5 bytes at 0x2002.
+    #[test]
+    fn map_hf_sections_and_consts() {
+        assert_map_hf(
+            "tests/map_sections.brink",
+            "map_sections.bin",
+            "map_sections.map.txt",
+            &[
+                "hdr",
+                "body",
+                "top",
+                "0x0000000000002000",  // BASE / hdr abs_start
+                "0x0000000000002002",  // body abs_start
+                "2 bytes",             // hdr size
+                "5 bytes",             // body size
+                "BASE",                // const name
+                "COUNT",               // const name
+                "0x0000000000002000",  // BASE value (U64 hex)
+                "8",                   // COUNT value (Integer decimal)
+            ],
+        );
+    }
+
+    /// Label names and their absolute addresses appear in the map.
+    /// 'entry' is at 0x5000, 'done' is at 0x5003.
+    #[test]
+    fn map_hf_labels() {
+        assert_map_hf(
+            "tests/map_labels.brink",
+            "map_labels.bin",
+            "map_labels.map.txt",
+            &[
+                "entry",
+                "done",
+                "0x0000000000005000",  // entry abs_addr
+                "0x0000000000005003",  // done abs_addr
+            ],
+        );
+    }
+
+    /// A section written three times via wr produces three map entries.
+    #[test]
+    fn map_hf_repeated_section() {
+        assert_map_hf(
+            "tests/map_repeated.brink",
+            "map_repeated.bin",
+            "map_repeated.map.txt",
+            &["chunk"],
+        );
+        // Verify chunk appears three times by reading the map independently.
+        // (assert_map_hf already cleaned up, so re-run for the count check.)
+        let mut cmd = Command::cargo_bin("brink").unwrap();
+        cmd.arg("tests/map_repeated.brink")
+            .arg("-o").arg("map_repeated2.bin")
+            .arg("--map-hf=map_repeated2.map.txt");
+        cmd.assert().success();
+        let map = fs::read_to_string("map_repeated2.map.txt").unwrap();
+        assert!(map.matches("chunk").count() >= 3, "expected at least 3 'chunk' entries");
+        fs::remove_file("map_repeated2.bin").ok();
+        fs::remove_file("map_repeated2.map.txt").ok();
+    }
+
+    /// Omitting FILE from --map-hf creates <stem>.map.txt in the current directory.
+    #[test]
+    #[serial]
+    fn map_hf_default_filename() {
+        let mut cmd = Command::cargo_bin("brink").unwrap();
+        cmd.arg("tests/map_default.brink")
+            .arg("-o").arg("map_default.bin")
+            .arg("--map-hf");
+        cmd.assert().success();
+
+        let map = fs::read_to_string("map_default.map.txt")
+            .expect("default map file map_default.map.txt not created");
+        assert!(map.contains("foo"), "section 'foo' missing from default map");
+        assert!(map.contains("0x0000000000001000"), "base address missing from default map");
+
+        fs::remove_file("map_default.bin").ok();
+        fs::remove_file("map_default.map.txt").ok();
+    }
+
+    /// --map-hf=- writes map content to stdout.
+    #[test]
+    fn map_hf_stdout() {
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/map_sections.brink")
+            .arg("-o").arg("map_stdout.bin")
+            .arg("--map-hf=-")
+            .assert()
+            .success()
+            .stdout(predicates::str::contains("hdr"))
+            .stdout(predicates::str::contains("body"))
+            .stdout(predicates::str::contains("BASE"))
+            .stdout(predicates::str::contains("0x0000000000002000"));
+        fs::remove_file("map_stdout.bin").ok();
+    }
 } // mod tests

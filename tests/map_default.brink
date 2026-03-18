@@ -1,0 +1,7 @@
+// Integration test source for --map-hf default filename derivation.
+// When --map-hf is given without a filename, brink creates map_hf_default.map.txt.
+section foo {
+    wrs "map";
+}
+
+output foo 0x1000;

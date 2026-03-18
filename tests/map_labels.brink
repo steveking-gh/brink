@@ -1,0 +1,10 @@
+// Integration test source for --map-hf label output.
+// Labels 'entry' and 'done' have known addresses relative to base 0x5000.
+section foo {
+    entry: wr8 0x01;
+    wr8 0x02;
+    wr8 0x03;
+    done:
+}
+
+output foo 0x5000;

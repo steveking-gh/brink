@@ -1,0 +1,13 @@
+// Integration test source for --map-hf repeated-section output.
+// 'chunk' is written three times via wr, producing three map entries.
+section chunk {
+    wrs "AB";
+}
+
+section top {
+    wr chunk;
+    wr chunk;
+    wr chunk;
+}
+
+output top;
