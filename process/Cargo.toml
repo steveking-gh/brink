@@ -18,4 +18,5 @@ diags = { path = "../diags" }
 lineardb = { path = "../lineardb" }
 irdb = { path = "../irdb" }
 engine = { path = "../engine" }
+map = { path = "../map" }
 tracing = "0.1.44"

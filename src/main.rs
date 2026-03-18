@@ -7,6 +7,7 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use std::env;
 use std::fs;
+use std::path::Path;
 
 // Local libraries
 use process::process;
@@ -58,6 +59,11 @@ pub struct Cli {
     /// Useful for fuzz testing. Overrides -v.
     #[arg(short = 'q', long = "quiet")]
     pub quiet: bool,
+
+    /// Write a human-friendly map file.  Omit FILE to derive name from input
+    /// (e.g. firmware.brink -> firmware.map.txt).  Use FILE=- for stdout.
+    #[arg(long = "map-hf", value_name = "FILE", num_args(0..=1), default_missing_value = "", require_equals = true)]
+    pub map_hf: Option<String>,
 }
 
 fn main() -> Result<()> {
@@ -88,11 +94,26 @@ fn main() -> Result<()> {
         })?
         .replace("\r\n", "\n");
 
+    // Resolve --map-hf: "" sentinel -> derive basename from input + ".map.txt"
+    let map_hf_resolved;
+    let map_hf = match cli.map_hf.as_deref() {
+        Some("") => {
+            let stem = Path::new(in_file_name)
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("output");
+            map_hf_resolved = format!("{stem}.map.txt");
+            Some(map_hf_resolved.as_str())
+        }
+        other => other,
+    };
+
     process(
         in_file_name,
         &str_in,
         cli.output.as_deref(),
         verbosity,
         cli.noprint,
+        map_hf,
     )
 }

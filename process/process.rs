@@ -12,6 +12,7 @@
 
 use anyhow::{Context, Result, anyhow};
 use std::fs::File;
+use std::io::Write;
 
 // Local libraries
 use ast::{Ast, AstDb};
@@ -19,19 +20,26 @@ use diags::Diags;
 use engine::Engine;
 use irdb::IRDb;
 use lineardb::LinearDb;
+use map::{MapDb, format_human};
 
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
 
-/// Entry point for all processing on the input source file
-/// name: The name of the file
-/// fstr: A string containing the file
+/// Entry point for all processing on the input source file.
+/// `name`        — source file path
+/// `fstr`        — source file contents
+/// `output_file` — binary output path (default: "output.bin")
+/// `verbosity`   — log level (0 = quiet, 1 = default, 2+ = verbose)
+/// `noprint`     — suppress print statements in source
+/// `map_hf`      — human-friendly map destination: None = skip,
+///                 Some("-") = stdout, Some(path) = file
 pub fn process(
     name: &str,
     fstr: &str,
     output_file: Option<&str>,
     verbosity: u64,
     noprint: bool,
+    map_hf: Option<&str>,
 ) -> Result<()> {
     info!("Processing {}", name);
     debug!("File contains: {}", fstr);
@@ -75,6 +83,29 @@ pub fn process(
 
     if engine.execute(&ir_db, &mut diags, &mut file).is_err() {
         return Err(anyhow!("[PROC_4]: Error detected, halting."));
+    }
+
+    // Generate map output if requested.  MapDb derives all data from the
+    // post-iterate engine and irdb; no additional compiler passes run.
+    if map_hf.is_some() || false /* reserved for map_gnu / map_json */ {
+        let map_db = MapDb::new(&engine, &ir_db, &fname_str);
+        emit_map(map_hf, &format_human(&map_db))?;
+    }
+    Ok(())
+}
+
+/// Writes `content` to stdout when `dest` is `Some("-")`, or to the named
+/// file when `dest` is `Some(path)`.  Does nothing when `dest` is `None`.
+fn emit_map(dest: Option<&str>, content: &str) -> Result<()> {
+    match dest {
+        None => {}
+        Some("-") => print!("{content}"),
+        Some(path) => {
+            let mut f = File::create(path)
+                .context(format!("Unable to create map file {path}"))?;
+            f.write_all(content.as_bytes())
+                .context(format!("Unable to write map file {path}"))?;
+        }
     }
     Ok(())
 }

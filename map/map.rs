@@ -57,6 +57,119 @@ pub struct MapDb {
     pub consts: Vec<ConstEntry>,
 }
 
+// ── Private formatting helpers ───────────────────────────────────────────────
+
+/// Returns the minimum name-column width: at least 16, at least as wide as
+/// the longest name in `names`.
+fn name_col_width<'a>(names: impl Iterator<Item = &'a str>) -> usize {
+    names.map(str::len).max().unwrap_or(0).max(16)
+}
+
+/// Renders a `ParameterValue` as a human-readable string.
+///   U64      → 0x0000000000001000
+///   I64      → -42
+///   Integer  → 42
+///   String   → "hello"
+pub fn fmt_const_value(pv: &ParameterValue) -> String {
+    match pv {
+        ParameterValue::U64(v)          => format!("0x{v:016x}"),
+        ParameterValue::I64(v)          => format!("{v}"),
+        ParameterValue::Integer(v)      => format!("{v}"),
+        ParameterValue::QuotedString(s) => format!("\"{s}\""),
+        ParameterValue::Identifier(s)   => s.clone(),
+        ParameterValue::Unknown         => "(unknown)".to_string(),
+    }
+}
+
+// ── Human-friendly formatter ──────────────────────────────────────────────────
+
+/// Renders `map` as a human-friendly tabular map.
+///
+/// Format overview:
+/// ```text
+/// Brink Output Map
+/// ================
+/// Output:    output.bin
+/// Base addr: 0x0000000000001000
+/// Total:     0x0000000000000050 (80 bytes)
+///
+/// Constants
+/// Name,            Value,
+/// BASE,            0x0000000000001000,
+///
+/// Sections
+/// Name,            Address,             Img Offset,          Size (bytes),
+/// foo,             0x0000000000001000,  0x0000000000000000,  0x00000032 (50 bytes),
+///
+/// Labels
+/// Name,            Address,             Img Offset,
+/// lab1,            0x0000000000001004,  0x0000000000000004,
+/// ```
+pub fn format_human(map: &MapDb) -> String {
+    use std::fmt::Write;
+    let mut out = String::new();
+
+    // ── Header ────────────────────────────────────────────────────────────────
+    writeln!(out, "Brink Output Map").unwrap();
+    writeln!(out, "================").unwrap();
+    writeln!(out, "Output:    {}", map.output_file).unwrap();
+    writeln!(out, "Base addr: 0x{:016x}", map.base_addr).unwrap();
+    writeln!(out, "Total:     0x{:016x} ({} bytes)", map.total_size, map.total_size).unwrap();
+
+    // ── Constants ─────────────────────────────────────────────────────────────
+    writeln!(out).unwrap();
+    writeln!(out, "Constants").unwrap();
+    if map.consts.is_empty() {
+        writeln!(out, "  (none)").unwrap();
+    } else {
+        let name_w = name_col_width(map.consts.iter().map(|c| c.name.as_str()));
+        writeln!(out, "{:<name_w$},  Value,", "Name,").unwrap();
+        for c in &map.consts {
+            writeln!(out, "{:<name_w$},  {},", c.name, fmt_const_value(&c.value)).unwrap();
+        }
+    }
+
+    // ── Sections ──────────────────────────────────────────────────────────────
+    writeln!(out).unwrap();
+    writeln!(out, "Sections").unwrap();
+    if map.sections.is_empty() {
+        writeln!(out, "  (none)").unwrap();
+    } else {
+        let name_w = name_col_width(map.sections.iter().map(|s| s.name.as_str()));
+        writeln!(out, "{:<name_w$},  {:<19},  {:<19},  Size (bytes),", "Name,", "Address,", "Img Offset,").unwrap();
+        for s in &map.sections {
+            writeln!(
+                out,
+                "{:<name_w$},  0x{:016x},   0x{:016x},   0x{:08x} ({} bytes),",
+                s.name, s.abs_start, s.img_start, s.size, s.size
+            )
+            .unwrap();
+        }
+    }
+
+    // ── Labels ────────────────────────────────────────────────────────────────
+    writeln!(out).unwrap();
+    writeln!(out, "Labels").unwrap();
+    if map.labels.is_empty() {
+        writeln!(out, "  (none)").unwrap();
+    } else {
+        let name_w = name_col_width(map.labels.iter().map(|l| l.name.as_str()));
+        writeln!(out, "{:<name_w$},  {:<19},  Img Offset,", "Name,", "Address,").unwrap();
+        for l in &map.labels {
+            writeln!(
+                out,
+                "{:<name_w$},  0x{:016x},   0x{:016x},",
+                l.name, l.abs_addr, l.img_offset
+            )
+            .unwrap();
+        }
+    }
+
+    out
+}
+
+// ── MapDb construction ────────────────────────────────────────────────────────
+
 impl MapDb {
     /// Constructs a MapDb from the post-iterate engine and irdb.
     /// `output_file` is the path of the output binary, used for display only.
@@ -111,5 +224,154 @@ impl MapDb {
             labels,
             consts,
         }
+    }
+}
+
+// ── Unit tests ────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ir::ParameterValue;
+
+    fn make_map() -> MapDb {
+        MapDb {
+            output_file: "out.bin".to_string(),
+            base_addr: 0x1000,
+            total_size: 0x80,
+            sections: vec![
+                SectionEntry {
+                    name: "text".to_string(),
+                    img_start: 0x00,
+                    abs_start: 0x1000,
+                    size: 0x40,
+                },
+                SectionEntry {
+                    name: "data".to_string(),
+                    img_start: 0x40,
+                    abs_start: 0x1040,
+                    size: 0x40,
+                },
+            ],
+            labels: vec![
+                LabelEntry {
+                    name: "start".to_string(),
+                    img_offset: 0x00,
+                    abs_addr: 0x1000,
+                },
+                LabelEntry {
+                    name: "end_marker".to_string(),
+                    img_offset: 0x7f,
+                    abs_addr: 0x107f,
+                },
+            ],
+            consts: vec![
+                ConstEntry {
+                    name: "BASE".to_string(),
+                    value: ParameterValue::U64(0x1000),
+                },
+                ConstEntry {
+                    name: "COUNT".to_string(),
+                    value: ParameterValue::Integer(42),
+                },
+            ],
+        }
+    }
+
+    #[test]
+    fn header_contains_output_file_and_base_addr() {
+        let out = format_human(&make_map());
+        assert!(out.contains("out.bin"), "output file name missing");
+        assert!(out.contains("0x0000000000001000"), "base addr missing");
+    }
+
+    #[test]
+    fn header_contains_total_size() {
+        let out = format_human(&make_map());
+        assert!(out.contains("128 bytes"), "total size in bytes missing");
+    }
+
+    #[test]
+    fn sections_contain_names_and_addresses() {
+        let out = format_human(&make_map());
+        assert!(out.contains("text"), "section name 'text' missing");
+        assert!(out.contains("data"), "section name 'data' missing");
+        // abs_start of 'text' section
+        assert!(out.contains("0x0000000000001000"), "'text' abs_start missing");
+        // abs_start of 'data' section
+        assert!(out.contains("0x0000000000001040"), "'data' abs_start missing");
+    }
+
+    #[test]
+    fn sections_contain_sizes() {
+        let out = format_human(&make_map());
+        assert!(out.contains("64 bytes"), "section size '64 bytes' missing");
+    }
+
+    #[test]
+    fn labels_contain_names_and_addresses() {
+        let out = format_human(&make_map());
+        assert!(out.contains("start"), "label 'start' missing");
+        assert!(out.contains("end_marker"), "label 'end_marker' missing");
+        assert!(out.contains("0x000000000000107f"), "label 'end_marker' abs_addr missing");
+    }
+
+    #[test]
+    fn consts_appear_before_sections_in_output() {
+        let out = format_human(&make_map());
+        let const_pos = out.find("Constants").expect("Constants section missing");
+        let section_pos = out.find("Sections").expect("Sections section missing");
+        assert!(const_pos < section_pos, "Constants must appear before Sections");
+    }
+
+    #[test]
+    fn consts_contain_names_and_values() {
+        let out = format_human(&make_map());
+        assert!(out.contains("BASE"), "const name 'BASE' missing");
+        assert!(out.contains("COUNT"), "const name 'COUNT' missing");
+        // U64 renders as hex
+        assert!(out.contains("0x0000000000001000"), "const U64 hex value missing");
+        // Integer renders as decimal
+        assert!(out.contains("42"), "const Integer decimal value missing");
+    }
+
+    #[test]
+    fn empty_sections_shows_none() {
+        let map = MapDb {
+            output_file: "x.bin".to_string(),
+            base_addr: 0,
+            total_size: 0,
+            sections: vec![],
+            labels: vec![],
+            consts: vec![],
+        };
+        let out = format_human(&map);
+        // Each table should report (none) when empty
+        assert_eq!(out.matches("(none)").count(), 3, "expected (none) for each empty table");
+    }
+
+    #[test]
+    fn repeated_section_name_appears_multiple_times() {
+        let map = MapDb {
+            output_file: "y.bin".to_string(),
+            base_addr: 0,
+            total_size: 0x20,
+            sections: vec![
+                SectionEntry { name: "foo".to_string(), img_start: 0x00, abs_start: 0x00, size: 0x10 },
+                SectionEntry { name: "foo".to_string(), img_start: 0x10, abs_start: 0x10, size: 0x10 },
+            ],
+            labels: vec![],
+            consts: vec![],
+        };
+        let out = format_human(&map);
+        assert_eq!(out.matches("foo").count(), 2, "repeated section 'foo' should appear twice");
+    }
+
+    #[test]
+    fn fmt_const_value_variants() {
+        assert_eq!(fmt_const_value(&ParameterValue::U64(0x10)), "0x0000000000000010");
+        assert_eq!(fmt_const_value(&ParameterValue::I64(-7)), "-7");
+        assert_eq!(fmt_const_value(&ParameterValue::Integer(99)), "99");
+        assert_eq!(fmt_const_value(&ParameterValue::QuotedString("hi".to_string())), "\"hi\"");
     }
 }

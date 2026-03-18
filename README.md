@@ -34,6 +34,51 @@ The previous build step created the brink binary as `./target/release/brink`.  Y
 
     $ cargo install --path ./
 
+## Command Line Options
+
+    brink [OPTIONS] <input>
+
+| Option | Description |
+|--------|-------------|
+| `<input>` | Brink source file to compile (required). |
+| `-o <file>` | Output binary file name. Defaults to `output.bin`. |
+| `-v` | Increase verbosity. Repeat up to four times (`-v -v -v -v`). |
+| `-q`, `--quiet` | Suppress all console output, including errors. Overrides `-v`. Useful for fuzz testing. |
+| `--noprint` | Suppress `print` statement output from the source program. |
+| `--map-hf[=FILE]` | Write a human-friendly map file. See [Map File Output](#map-file-output) below. |
+
+## Map File Output
+
+The `--map-hf` option writes a comma-separated, fixed-column map listing all sections, labels, and constants with their addresses and sizes.  The output suits direct import into a spreadsheet.
+
+| Invocation | Result |
+|------------|--------|
+| `--map-hf` | Writes `<stem>.map.txt` in the current directory, where `<stem>` is the input filename without its extension (e.g. `firmware.brink` → `firmware.map.txt`). |
+| `--map-hf=<file>` | Writes the map to the specified file. |
+| `--map-hf=-` | Writes the map to stdout. |
+
+Brink writes map output to the current working directory when no path is given.
+
+Example map output:
+
+    Brink Output Map
+    ================
+    Output:    output.bin
+    Base addr: 0x0000000000001000
+    Total:     0x0000000000000050 (80 bytes)
+
+    Constants
+    Name,            Value,
+    BASE,            0x0000000000001000,
+
+    Sections
+    Name,            Address,             Img Offset,          Size (bytes),
+    text,            0x0000000000001000,  0x0000000000000000,  0x00000032 (50 bytes),
+
+    Labels
+    Name,            Address,             Img Offset,
+    start,           0x0000000000001000,  0x0000000000000000,
+
 ## What Can Brink Do?
 
 Brink can assemble any number of input files into a unified output.
@@ -847,3 +892,4 @@ The wrs statement does not implicitly write a terminating 0 byte after the strin
 | irdb/irdb.rs         | Stage 3       | String-to-typed-value conversion, DataType resolution, operand and file validation    |
 | engine/engine.rs     | Stage 4       | Iterate loop to stabilize location counters, then execute pass to write binary output |
 | process/process.rs   | Orchestrator  | Sequences all four stages, converts Err(()) to anyhow errors, opens the output file   |
+| map/map.rs           | Map output    | Constructs MapDb from post-iterate engine and irdb; renders human-friendly map text   |
