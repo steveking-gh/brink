@@ -1268,14 +1268,18 @@ mod tests {
     fn assert_map_hf(src: &str, bin_out: &str, map_out: &str, checks: &[&str]) {
         let mut cmd = Command::cargo_bin("brink").unwrap();
         cmd.arg(src)
-            .arg("-o").arg(bin_out)
+            .arg("-o")
+            .arg(bin_out)
             .arg(format!("--map-hf={map_out}"));
         cmd.assert().success();
 
-        let map = fs::read_to_string(map_out)
-            .unwrap_or_else(|_| panic!("map file not found: {map_out}"));
+        let map =
+            fs::read_to_string(map_out).unwrap_or_else(|_| panic!("map file not found: {map_out}"));
         for check in checks {
-            assert!(map.contains(check), "map missing: {check:?}\n--- map ---\n{map}");
+            assert!(
+                map.contains(check),
+                "map missing: {check:?}\n--- map ---\n{map}"
+            );
         }
 
         fs::remove_file(bin_out).ok();
@@ -1294,14 +1298,14 @@ mod tests {
                 "hdr",
                 "body",
                 "top",
-                "0x0000000000002000",  // BASE / hdr abs_start
-                "0x0000000000002002",  // body abs_start
-                "2 bytes",             // hdr size
-                "5 bytes",             // body size
-                "BASE",                // const name
-                "COUNT",               // const name
-                "0x0000000000002000",  // BASE value (U64 hex)
-                "8",                   // COUNT value (Integer decimal)
+                "0x0000000000002000", // BASE / hdr abs_start
+                "0x0000000000002002", // body abs_start
+                "0x00000002",         // hdr size
+                "0x00000005",         // body size
+                "BASE",               // const name
+                "COUNT",              // const name
+                "0x0000000000002000", // BASE value (U64 hex)
+                "8",                  // COUNT value (Integer decimal)
             ],
         );
     }
@@ -1317,8 +1321,8 @@ mod tests {
             &[
                 "entry",
                 "done",
-                "0x0000000000005000",  // entry abs_addr
-                "0x0000000000005003",  // done abs_addr
+                "0x0000000000005000", // entry abs_addr
+                "0x0000000000005003", // done abs_addr
             ],
         );
     }
@@ -1336,11 +1340,15 @@ mod tests {
         // (assert_map_hf already cleaned up, so re-run for the count check.)
         let mut cmd = Command::cargo_bin("brink").unwrap();
         cmd.arg("tests/map_repeated.brink")
-            .arg("-o").arg("map_repeated2.bin")
+            .arg("-o")
+            .arg("map_repeated2.bin")
             .arg("--map-hf=map_repeated2.map.txt");
         cmd.assert().success();
         let map = fs::read_to_string("map_repeated2.map.txt").unwrap();
-        assert!(map.matches("chunk").count() >= 3, "expected at least 3 'chunk' entries");
+        assert!(
+            map.matches("chunk").count() >= 3,
+            "expected at least 3 'chunk' entries"
+        );
         fs::remove_file("map_repeated2.bin").ok();
         fs::remove_file("map_repeated2.map.txt").ok();
     }
@@ -1351,14 +1359,21 @@ mod tests {
     fn map_hf_default_filename() {
         let mut cmd = Command::cargo_bin("brink").unwrap();
         cmd.arg("tests/map_default.brink")
-            .arg("-o").arg("map_default.bin")
+            .arg("-o")
+            .arg("map_default.bin")
             .arg("--map-hf");
         cmd.assert().success();
 
         let map = fs::read_to_string("map_default.map.txt")
             .expect("default map file map_default.map.txt not created");
-        assert!(map.contains("foo"), "section 'foo' missing from default map");
-        assert!(map.contains("0x0000000000001000"), "base address missing from default map");
+        assert!(
+            map.contains("foo"),
+            "section 'foo' missing from default map"
+        );
+        assert!(
+            map.contains("0x0000000000001000"),
+            "base address missing from default map"
+        );
 
         fs::remove_file("map_default.bin").ok();
         fs::remove_file("map_default.map.txt").ok();
@@ -1370,7 +1385,8 @@ mod tests {
         Command::cargo_bin("brink")
             .unwrap()
             .arg("tests/map_sections.brink")
-            .arg("-o").arg("map_stdout.bin")
+            .arg("-o")
+            .arg("map_stdout.bin")
             .arg("--map-hf=-")
             .assert()
             .success()
@@ -1379,5 +1395,142 @@ mod tests {
             .stdout(predicates::str::contains("BASE"))
             .stdout(predicates::str::contains("0x0000000000002000"));
         fs::remove_file("map_stdout.bin").ok();
+    }
+
+    // ── JSON map output tests ─────────────────────────────────────────────────
+
+    /// Runs brink with --map-json=<file>, parses the output as JSON, and
+    /// asserts that every (key, value) pair in `checks` is present at the
+    /// top level of every object in the named array field.
+    fn assert_map_json(src: &str, bin_out: &str, map_out: &str) -> serde_json::Value {
+        let mut cmd = Command::cargo_bin("brink").unwrap();
+        cmd.arg(src)
+            .arg("-o")
+            .arg(bin_out)
+            .arg(format!("--map-json={map_out}"));
+        cmd.assert().success();
+
+        let text = fs::read_to_string(map_out)
+            .unwrap_or_else(|_| panic!("JSON map file not found: {map_out}"));
+        let v: serde_json::Value = serde_json::from_str(&text)
+            .unwrap_or_else(|e| panic!("JSON map is not valid JSON: {e}\n{text}"));
+
+        fs::remove_file(bin_out).ok();
+        fs::remove_file(map_out).ok();
+        v
+    }
+
+    /// JSON output is valid and contains correct header fields.
+    #[test]
+    fn map_json_header() {
+        let v = assert_map_json(
+            "tests/map_sections.brink",
+            "map_json_header.bin",
+            "map_json_header.map.json",
+        );
+        assert_eq!(v["output_file"], "map_json_header.bin");
+        assert_eq!(v["base_addr"], "0x0000000000002000");
+        assert_eq!(v["total_size"], 7u64);
+    }
+
+    /// JSON sections array contains correct names, addresses, and sizes.
+    #[test]
+    fn map_json_sections() {
+        let v = assert_map_json(
+            "tests/map_sections.brink",
+            "map_json_sections.bin",
+            "map_json_sections.map.json",
+        );
+        let sections = v["sections"].as_array().unwrap();
+        let hdr = sections.iter().find(|s| s["name"] == "hdr").unwrap();
+        assert_eq!(hdr["address"], "0x0000000000002000");
+        assert_eq!(hdr["size"], 2u64);
+        let body = sections.iter().find(|s| s["name"] == "body").unwrap();
+        assert_eq!(body["address"], "0x0000000000002002");
+        assert_eq!(body["size"], 5u64);
+    }
+
+    /// JSON constants array contains correct names and values.
+    #[test]
+    fn map_json_consts() {
+        let v = assert_map_json(
+            "tests/map_sections.brink",
+            "map_json_consts.bin",
+            "map_json_consts.map.json",
+        );
+        let consts = v["constants"].as_array().unwrap();
+        let base = consts.iter().find(|c| c["name"] == "BASE").unwrap();
+        assert_eq!(base["value"], "0x0000000000002000");
+        let count = consts.iter().find(|c| c["name"] == "COUNT").unwrap();
+        assert_eq!(count["value"], "8");
+    }
+
+    /// JSON labels array contains correct names and addresses.
+    #[test]
+    fn map_json_labels() {
+        let v = assert_map_json(
+            "tests/map_labels.brink",
+            "map_json_labels.bin",
+            "map_json_labels.map.json",
+        );
+        let labels = v["labels"].as_array().unwrap();
+        let entry = labels.iter().find(|l| l["name"] == "entry").unwrap();
+        assert_eq!(entry["address"], "0x0000000000005000");
+        let done = labels.iter().find(|l| l["name"] == "done").unwrap();
+        assert_eq!(done["address"], "0x0000000000005003");
+    }
+
+    /// A section written three times produces three JSON section entries.
+    #[test]
+    fn map_json_repeated_section() {
+        let v = assert_map_json(
+            "tests/map_repeated.brink",
+            "map_json_repeated.bin",
+            "map_json_repeated.map.json",
+        );
+        let chunks: Vec<_> = v["sections"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|s| s["name"] == "chunk")
+            .collect();
+        assert_eq!(chunks.len(), 3, "expected 3 'chunk' entries");
+    }
+
+    /// Omitting FILE from --map-json creates <stem>.map.json in the current directory.
+    #[test]
+    #[serial]
+    fn map_json_default_filename() {
+        let mut cmd = Command::cargo_bin("brink").unwrap();
+        cmd.arg("tests/map_default.brink")
+            .arg("-o")
+            .arg("map_json_default.bin")
+            .arg("--map-json");
+        cmd.assert().success();
+
+        let text = fs::read_to_string("map_default.map.json")
+            .expect("default JSON map file map_default.map.json not created");
+        let v: serde_json::Value = serde_json::from_str(&text).expect("not valid JSON");
+        assert_eq!(v["base_addr"], "0x0000000000001000");
+
+        fs::remove_file("map_json_default.bin").ok();
+        fs::remove_file("map_default.map.json").ok();
+    }
+
+    /// --map-json=- writes JSON map content to stdout.
+    #[test]
+    fn map_json_stdout() {
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/map_sections.brink")
+            .arg("-o")
+            .arg("map_json_stdout.bin")
+            .arg("--map-json=-")
+            .assert()
+            .success()
+            .stdout(predicates::str::contains("\"hdr\""))
+            .stdout(predicates::str::contains("\"BASE\""))
+            .stdout(predicates::str::contains("0x0000000000002000"));
+        fs::remove_file("map_json_stdout.bin").ok();
     }
 } // mod tests

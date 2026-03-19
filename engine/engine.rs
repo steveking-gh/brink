@@ -1165,7 +1165,8 @@ impl Engine {
                 IRKind::Label => {
                     let name = irdb.get_opnd_as_identifier(ir, 0).to_string();
                     let img_offset = self.ir_locs[i].img;
-                    self.label_dispatches.push(LabelDispatch { name, img_offset });
+                    self.label_dispatches
+                        .push(LabelDispatch { name, img_offset });
                 }
                 _ => {}
             }

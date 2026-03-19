@@ -46,20 +46,28 @@ The previous build step created the brink binary as `./target/release/brink`.  Y
 | `-q`, `--quiet` | Suppress all console output, including errors. Overrides `-v`. Useful for fuzz testing. |
 | `--noprint` | Suppress `print` statement output from the source program. |
 | `--map-hf[=FILE]` | Write a human-friendly map file. See [Map File Output](#map-file-output) below. |
+| `--map-json[=FILE]` | Write a JSON map file. See [Map File Output](#map-file-output) below. |
 
 ## Map File Output
 
-The `--map-hf` option writes a comma-separated, fixed-column map listing all sections, labels, and constants with their addresses and sizes.  The output suits direct import into a spreadsheet.
+Both map options list every section, label, and constant with its address and size.  Both accept the same FILE argument forms:
 
 | Invocation | Result |
 |------------|--------|
-| `--map-hf` | Writes `<stem>.map.txt` in the current directory, where `<stem>` is the input filename without its extension (e.g. `firmware.brink` → `firmware.map.txt`). |
-| `--map-hf=<file>` | Writes the map to the specified file. |
-| `--map-hf=-` | Writes the map to stdout. |
+| `--map-hf` | Writes `<stem>.map.txt` to the current directory (e.g. `firmware.brink` → `firmware.map.txt`). |
+| `--map-json` | Writes `<stem>.map.json` to the current directory (e.g. `firmware.brink` → `firmware.map.json`). |
+| `--map-hf=<file>` | Writes the human-friendly map to the specified file. |
+| `--map-json=<file>` | Writes the JSON map to the specified file. |
+| `--map-hf=-` | Writes the human-friendly map to stdout. |
+| `--map-json=-` | Writes the JSON map to stdout. |
 
-Brink writes map output to the current working directory when no path is given.
+Brink writes map output to the current working directory when no path is given, keeping build artifacts out of source directories.  Both formats report the same semantic payload and both flags may be specified together.
 
-Example map output:
+### Human-Friendly Format (`--map-hf`)
+
+Produces a comma-separated, fixed-column text file that imports directly into a spreadsheet.
+
+Example:
 
     Brink Output Map
     ================
@@ -73,11 +81,34 @@ Example map output:
 
     Sections
     Name,            Address,             Img Offset,          Size (bytes),
-    text,            0x0000000000001000,  0x0000000000000000,  0x00000032 (50 bytes),
+    text,            0x0000000000001000,  0x0000000000000000,  0x00000032,
 
     Labels
     Name,            Address,             Img Offset,
     start,           0x0000000000001000,  0x0000000000000000,
+
+### JSON Format (`--map-json`)
+
+Produces a pretty-printed JSON file.  Addresses and offsets are hex strings; sizes are plain numbers.
+
+Example:
+
+    {
+      "output_file": "output.bin",
+      "base_addr": "0x0000000000001000",
+      "total_size": 80,
+      "constants": [
+        { "name": "BASE", "value": "0x0000000000001000" }
+      ],
+      "sections": [
+        { "name": "text", "address": "0x0000000000001000",
+          "img_offset": "0x0000000000000000", "size": 50 }
+      ],
+      "labels": [
+        { "name": "start", "address": "0x0000000000001000",
+          "img_offset": "0x0000000000000000" }
+      ]
+    }
 
 ## What Can Brink Do?
 

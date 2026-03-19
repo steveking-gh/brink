@@ -72,12 +72,12 @@ fn name_col_width<'a>(names: impl Iterator<Item = &'a str>) -> usize {
 ///   String   → "hello"
 pub fn fmt_const_value(pv: &ParameterValue) -> String {
     match pv {
-        ParameterValue::U64(v)          => format!("0x{v:016x}"),
-        ParameterValue::I64(v)          => format!("{v}"),
-        ParameterValue::Integer(v)      => format!("{v}"),
+        ParameterValue::U64(v) => format!("0x{v:016x}"),
+        ParameterValue::I64(v) => format!("{v}"),
+        ParameterValue::Integer(v) => format!("{v}"),
         ParameterValue::QuotedString(s) => format!("\"{s}\""),
-        ParameterValue::Identifier(s)   => s.clone(),
-        ParameterValue::Unknown         => "(unknown)".to_string(),
+        ParameterValue::Identifier(s) => s.clone(),
+        ParameterValue::Unknown => "(unknown)".to_string(),
     }
 }
 
@@ -99,7 +99,7 @@ pub fn fmt_const_value(pv: &ParameterValue) -> String {
 ///
 /// Sections
 /// Name,            Address,             Img Offset,          Size (bytes),
-/// foo,             0x0000000000001000,  0x0000000000000000,  0x00000032 (50 bytes),
+/// foo,             0x0000000000001000,  0x0000000000000000,  50,
 ///
 /// Labels
 /// Name,            Address,             Img Offset,
@@ -114,7 +114,12 @@ pub fn format_human(map: &MapDb) -> String {
     writeln!(out, "================").unwrap();
     writeln!(out, "Output:    {}", map.output_file).unwrap();
     writeln!(out, "Base addr: 0x{:016x}", map.base_addr).unwrap();
-    writeln!(out, "Total:     0x{:016x} ({} bytes)", map.total_size, map.total_size).unwrap();
+    writeln!(
+        out,
+        "Total:     0x{:016x} ({} bytes)",
+        map.total_size, map.total_size
+    )
+    .unwrap();
 
     // ── Constants ─────────────────────────────────────────────────────────────
     writeln!(out).unwrap();
@@ -136,12 +141,17 @@ pub fn format_human(map: &MapDb) -> String {
         writeln!(out, "  (none)").unwrap();
     } else {
         let name_w = name_col_width(map.sections.iter().map(|s| s.name.as_str()));
-        writeln!(out, "{:<name_w$},  {:<19},  {:<19},  Size (bytes),", "Name,", "Address,", "Img Offset,").unwrap();
+        writeln!(
+            out,
+            "{:<name_w$},  {:<19},  {:<19},  Size (bytes),",
+            "Name", "Address", "Img Offset"
+        )
+        .unwrap();
         for s in &map.sections {
             writeln!(
                 out,
-                "{:<name_w$},  0x{:016x},   0x{:016x},   0x{:08x} ({} bytes),",
-                s.name, s.abs_start, s.img_start, s.size, s.size
+                "{:<name_w$},  0x{:016x},   0x{:016x},   0x{:08x},",
+                s.name, s.abs_start, s.img_start, s.size
             )
             .unwrap();
         }
@@ -154,7 +164,12 @@ pub fn format_human(map: &MapDb) -> String {
         writeln!(out, "  (none)").unwrap();
     } else {
         let name_w = name_col_width(map.labels.iter().map(|l| l.name.as_str()));
-        writeln!(out, "{:<name_w$},  {:<19},  Img Offset,", "Name,", "Address,").unwrap();
+        writeln!(
+            out,
+            "{:<name_w$},  {:<19},  Img Offset,",
+            "Name,", "Address,"
+        )
+        .unwrap();
         for l in &map.labels {
             writeln!(
                 out,
@@ -166,6 +181,78 @@ pub fn format_human(map: &MapDb) -> String {
     }
 
     out
+}
+
+// ── JSON formatter ────────────────────────────────────────────────────────────
+
+/// Renders `map` as a pretty-printed JSON string.
+///
+/// Addresses and offsets are hex strings (`"0x..."`) for readability.
+/// Sizes and the total are plain JSON numbers.
+/// Const values use the same string representation as `format_human`.
+///
+/// ```json
+/// {
+///   "output_file": "output.bin",
+///   "base_addr": "0x0000000000001000",
+///   "total_size": 80,
+///   "constants": [
+///     { "name": "BASE", "value": "0x0000000000001000" }
+///   ],
+///   "sections": [
+///     { "name": "text", "address": "0x0000000000001000",
+///       "img_offset": "0x0000000000000000", "size": 50 }
+///   ],
+///   "labels": [
+///     { "name": "start", "address": "0x0000000000001000",
+///       "img_offset": "0x0000000000000000" }
+///   ]
+/// }
+/// ```
+pub fn format_json(map: &MapDb) -> String {
+    use serde_json::{Value, json};
+
+    let constants: Vec<Value> = map
+        .consts
+        .iter()
+        .map(|c| json!({ "name": c.name, "value": fmt_const_value(&c.value) }))
+        .collect();
+
+    let sections: Vec<Value> = map
+        .sections
+        .iter()
+        .map(|s| {
+            json!({
+                "name":       s.name,
+                "address":    format!("0x{:016x}", s.abs_start),
+                "img_offset": format!("0x{:016x}", s.img_start),
+                "size":       s.size,
+            })
+        })
+        .collect();
+
+    let labels: Vec<Value> = map
+        .labels
+        .iter()
+        .map(|l| {
+            json!({
+                "name":       l.name,
+                "address":    format!("0x{:016x}", l.abs_addr),
+                "img_offset": format!("0x{:016x}", l.img_offset),
+            })
+        })
+        .collect();
+
+    let root = json!({
+        "output_file": map.output_file,
+        "base_addr":   format!("0x{:016x}", map.base_addr),
+        "total_size":  map.total_size,
+        "constants":   constants,
+        "sections":    sections,
+        "labels":      labels,
+    });
+
+    serde_json::to_string_pretty(&root).expect("JSON serialization failed")
 }
 
 // ── MapDb construction ────────────────────────────────────────────────────────
@@ -297,15 +384,24 @@ mod tests {
         assert!(out.contains("text"), "section name 'text' missing");
         assert!(out.contains("data"), "section name 'data' missing");
         // abs_start of 'text' section
-        assert!(out.contains("0x0000000000001000"), "'text' abs_start missing");
+        assert!(
+            out.contains("0x0000000000001000"),
+            "'text' abs_start missing"
+        );
         // abs_start of 'data' section
-        assert!(out.contains("0x0000000000001040"), "'data' abs_start missing");
+        assert!(
+            out.contains("0x0000000000001040"),
+            "'data' abs_start missing"
+        );
     }
 
     #[test]
     fn sections_contain_sizes() {
         let out = format_human(&make_map());
-        assert!(out.contains("64 bytes"), "section size '64 bytes' missing");
+        assert!(
+            out.contains("0x00000040"),
+            "section size '0x00000040' missing"
+        );
     }
 
     #[test]
@@ -313,7 +409,10 @@ mod tests {
         let out = format_human(&make_map());
         assert!(out.contains("start"), "label 'start' missing");
         assert!(out.contains("end_marker"), "label 'end_marker' missing");
-        assert!(out.contains("0x000000000000107f"), "label 'end_marker' abs_addr missing");
+        assert!(
+            out.contains("0x000000000000107f"),
+            "label 'end_marker' abs_addr missing"
+        );
     }
 
     #[test]
@@ -321,7 +420,10 @@ mod tests {
         let out = format_human(&make_map());
         let const_pos = out.find("Constants").expect("Constants section missing");
         let section_pos = out.find("Sections").expect("Sections section missing");
-        assert!(const_pos < section_pos, "Constants must appear before Sections");
+        assert!(
+            const_pos < section_pos,
+            "Constants must appear before Sections"
+        );
     }
 
     #[test]
@@ -330,7 +432,10 @@ mod tests {
         assert!(out.contains("BASE"), "const name 'BASE' missing");
         assert!(out.contains("COUNT"), "const name 'COUNT' missing");
         // U64 renders as hex
-        assert!(out.contains("0x0000000000001000"), "const U64 hex value missing");
+        assert!(
+            out.contains("0x0000000000001000"),
+            "const U64 hex value missing"
+        );
         // Integer renders as decimal
         assert!(out.contains("42"), "const Integer decimal value missing");
     }
@@ -347,7 +452,11 @@ mod tests {
         };
         let out = format_human(&map);
         // Each table should report (none) when empty
-        assert_eq!(out.matches("(none)").count(), 3, "expected (none) for each empty table");
+        assert_eq!(
+            out.matches("(none)").count(),
+            3,
+            "expected (none) for each empty table"
+        );
     }
 
     #[test]
@@ -357,21 +466,142 @@ mod tests {
             base_addr: 0,
             total_size: 0x20,
             sections: vec![
-                SectionEntry { name: "foo".to_string(), img_start: 0x00, abs_start: 0x00, size: 0x10 },
-                SectionEntry { name: "foo".to_string(), img_start: 0x10, abs_start: 0x10, size: 0x10 },
+                SectionEntry {
+                    name: "foo".to_string(),
+                    img_start: 0x00,
+                    abs_start: 0x00,
+                    size: 0x10,
+                },
+                SectionEntry {
+                    name: "foo".to_string(),
+                    img_start: 0x10,
+                    abs_start: 0x10,
+                    size: 0x10,
+                },
             ],
             labels: vec![],
             consts: vec![],
         };
         let out = format_human(&map);
-        assert_eq!(out.matches("foo").count(), 2, "repeated section 'foo' should appear twice");
+        assert_eq!(
+            out.matches("foo").count(),
+            2,
+            "repeated section 'foo' should appear twice"
+        );
     }
 
     #[test]
     fn fmt_const_value_variants() {
-        assert_eq!(fmt_const_value(&ParameterValue::U64(0x10)), "0x0000000000000010");
+        assert_eq!(
+            fmt_const_value(&ParameterValue::U64(0x10)),
+            "0x0000000000000010"
+        );
         assert_eq!(fmt_const_value(&ParameterValue::I64(-7)), "-7");
         assert_eq!(fmt_const_value(&ParameterValue::Integer(99)), "99");
-        assert_eq!(fmt_const_value(&ParameterValue::QuotedString("hi".to_string())), "\"hi\"");
+        assert_eq!(
+            fmt_const_value(&ParameterValue::QuotedString("hi".to_string())),
+            "\"hi\""
+        );
+    }
+
+    // ── format_json tests ─────────────────────────────────────────────────────
+
+    #[test]
+    fn json_is_valid_and_contains_output_file() {
+        let out = format_json(&make_map());
+        let v: serde_json::Value = serde_json::from_str(&out).expect("output is not valid JSON");
+        assert_eq!(v["output_file"], "out.bin");
+    }
+
+    #[test]
+    fn json_header_fields() {
+        let out = format_json(&make_map());
+        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+        assert_eq!(v["base_addr"], "0x0000000000001000");
+        assert_eq!(v["total_size"], 0x80u64);
+    }
+
+    #[test]
+    fn json_sections_contain_names_and_addresses() {
+        let out = format_json(&make_map());
+        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+        let sections = v["sections"].as_array().unwrap();
+        let names: Vec<&str> = sections
+            .iter()
+            .map(|s| s["name"].as_str().unwrap())
+            .collect();
+        assert!(names.contains(&"text"), "section 'text' missing");
+        assert!(names.contains(&"data"), "section 'data' missing");
+        // text abs_start = base(0x1000) + img_start(0x00) = 0x1000
+        let text = sections.iter().find(|s| s["name"] == "text").unwrap();
+        assert_eq!(text["address"], "0x0000000000001000");
+        assert_eq!(text["size"], 0x40u64);
+    }
+
+    #[test]
+    fn json_labels_contain_names_and_addresses() {
+        let out = format_json(&make_map());
+        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+        let labels = v["labels"].as_array().unwrap();
+        let start = labels.iter().find(|l| l["name"] == "start").unwrap();
+        assert_eq!(start["address"], "0x0000000000001000");
+        let end_marker = labels.iter().find(|l| l["name"] == "end_marker").unwrap();
+        assert_eq!(end_marker["address"], "0x000000000000107f");
+    }
+
+    #[test]
+    fn json_consts_contain_names_and_values() {
+        let out = format_json(&make_map());
+        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+        let consts = v["constants"].as_array().unwrap();
+        let base = consts.iter().find(|c| c["name"] == "BASE").unwrap();
+        assert_eq!(base["value"], "0x0000000000001000");
+        let count = consts.iter().find(|c| c["name"] == "COUNT").unwrap();
+        assert_eq!(count["value"], "42");
+    }
+
+    #[test]
+    fn json_empty_tables_are_empty_arrays() {
+        let map = MapDb {
+            output_file: "x.bin".to_string(),
+            base_addr: 0,
+            total_size: 0,
+            sections: vec![],
+            labels: vec![],
+            consts: vec![],
+        };
+        let out = format_json(&map);
+        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+        assert_eq!(v["sections"].as_array().unwrap().len(), 0);
+        assert_eq!(v["labels"].as_array().unwrap().len(), 0);
+        assert_eq!(v["constants"].as_array().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn json_repeated_section_produces_multiple_entries() {
+        let map = MapDb {
+            output_file: "y.bin".to_string(),
+            base_addr: 0,
+            total_size: 0x20,
+            sections: vec![
+                SectionEntry {
+                    name: "foo".to_string(),
+                    img_start: 0x00,
+                    abs_start: 0x00,
+                    size: 0x10,
+                },
+                SectionEntry {
+                    name: "foo".to_string(),
+                    img_start: 0x10,
+                    abs_start: 0x10,
+                    size: 0x10,
+                },
+            ],
+            labels: vec![],
+            consts: vec![],
+        };
+        let out = format_json(&map);
+        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+        assert_eq!(v["sections"].as_array().unwrap().len(), 2);
     }
 }

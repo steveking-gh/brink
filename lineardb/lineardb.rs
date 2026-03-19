@@ -184,7 +184,12 @@ impl<'toks> LinearDb {
     }
 
     // Returns the linear operand index occupied by the new operand
-    pub fn add_new_operand_to_ir(&mut self, ir_lid: usize, operand: LinOperand, in_const: bool) -> usize {
+    pub fn add_new_operand_to_ir(
+        &mut self,
+        ir_lid: usize,
+        operand: LinOperand,
+        in_const: bool,
+    ) -> usize {
         if in_const {
             let idx = self.const_operand_vec.len();
             self.const_operand_vec.push(operand);
@@ -395,7 +400,11 @@ impl<'toks> LinearDb {
                 result &= self.process_operands(1, &mut lops, ir_lid, diags, tinfo, in_const_expr);
 
                 // Add a destination operand to the operation to hold the result
-                let idx = self.add_new_operand_to_ir(ir_lid, LinOperand::new(Some(ir_lid), tinfo), in_const_expr);
+                let idx = self.add_new_operand_to_ir(
+                    ir_lid,
+                    LinOperand::new(Some(ir_lid), tinfo),
+                    in_const_expr,
+                );
                 // Also add the destination operand to the local operands
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);
@@ -418,10 +427,21 @@ impl<'toks> LinearDb {
                     in_const_expr,
                 );
                 // 1 operand expected
-                result &= self.process_optional_operands(1, &mut lops, ir_lid, diags, tinfo, in_const_expr);
+                result &= self.process_optional_operands(
+                    1,
+                    &mut lops,
+                    ir_lid,
+                    diags,
+                    tinfo,
+                    in_const_expr,
+                );
 
                 // Add a destination operand to the operation to hold the result
-                let idx = self.add_new_operand_to_ir(ir_lid, LinOperand::new(Some(ir_lid), tinfo), in_const_expr);
+                let idx = self.add_new_operand_to_ir(
+                    ir_lid,
+                    LinOperand::new(Some(ir_lid), tinfo),
+                    in_const_expr,
+                );
                 // Also add the destination operand to the local operands
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);
@@ -480,8 +500,11 @@ impl<'toks> LinearDb {
                 self.add_existing_operand_to_ir(ir_lid, lops[0], in_const_expr);
 
                 // Add the destination operand to store the calculated count
-                let count_output =
-                    self.add_new_operand_to_ir(ir_lid, LinOperand::new(Some(ir_lid), tinfo), in_const_expr);
+                let count_output = self.add_new_operand_to_ir(
+                    ir_lid,
+                    LinOperand::new(Some(ir_lid), tinfo),
+                    in_const_expr,
+                );
 
                 // Create a wr8_tinfo copied from the align tinfo
                 let mut wr8_tinfo = tinfo.clone();
@@ -498,7 +521,11 @@ impl<'toks> LinearDb {
                     let mut pad_byte_tinfo = tinfo.clone();
                     pad_byte_tinfo.tok = LexToken::Integer;
                     pad_byte_tinfo.val = "0";
-                    self.add_new_operand_to_ir(wr8_lid, LinOperand::new(None, &pad_byte_tinfo), in_const_expr);
+                    self.add_new_operand_to_ir(
+                        wr8_lid,
+                        LinOperand::new(None, &pad_byte_tinfo),
+                        in_const_expr,
+                    );
                 }
 
                 // The align result as the number of bytes to write in wr8
@@ -552,7 +579,11 @@ impl<'toks> LinearDb {
                 // 1 operand expected
                 result &= self.process_operands(1, &mut lops, ir_lid, diags, tinfo, in_const_expr);
                 // Add a destination operand to the operation to hold the result
-                let idx = self.add_new_operand_to_ir(ir_lid, LinOperand::new(Some(ir_lid), tinfo), in_const_expr);
+                let idx = self.add_new_operand_to_ir(
+                    ir_lid,
+                    LinOperand::new(Some(ir_lid), tinfo),
+                    in_const_expr,
+                );
                 // Also add the destination operand to the local operands
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);
@@ -589,7 +620,11 @@ impl<'toks> LinearDb {
                 result &= self.process_operands(2, &mut lops, ir_lid, diags, tinfo, in_const_expr);
 
                 // Add a destination operand to the operation to hold the result
-                let idx = self.add_new_operand_to_ir(ir_lid, LinOperand::new(Some(ir_lid), tinfo), in_const_expr);
+                let idx = self.add_new_operand_to_ir(
+                    ir_lid,
+                    LinOperand::new(Some(ir_lid), tinfo),
+                    in_const_expr,
+                );
                 // Also add the destination operand to the local operands
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);
@@ -685,7 +720,8 @@ impl<'toks> LinearDb {
         let name_nid = children.next().unwrap();
         let name_tinfo = ast.get_tinfo(name_nid);
         let name_idx = self.const_operand_vec.len();
-        self.const_operand_vec.push(LinOperand::new(None, name_tinfo));
+        self.const_operand_vec
+            .push(LinOperand::new(None, name_tinfo));
         self.add_existing_operand_to_ir(ir_lid, name_idx, true);
 
         // Child 1: `=` sign — used only for its token info (src loc + Eq tok)
@@ -990,7 +1026,10 @@ impl IdentDb {
         let name_operand = lindb.operand_vec.get(name_operand_num).unwrap();
         let name = &name_operand.sval;
         if is_reserved_identifier(name) {
-            let m = format!("'{}' is a reserved identifier and cannot be used as a label name", name);
+            let m = format!(
+                "'{}' is a reserved identifier and cannot be used as a label name",
+                name
+            );
             diags.err1("LINEAR_13", &m, name_operand.src_loc.clone());
             return false;
         }

@@ -11,4 +11,5 @@ path = "map.rs"
 engine = { path = "../engine" }
 irdb = { path = "../irdb" }
 ir = { path = "../ir" }
+serde_json = "1"
 tracing = "0.1.44"

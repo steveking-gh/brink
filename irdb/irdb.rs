@@ -797,7 +797,11 @@ impl IRDb {
                     diags.err1("IRDB_27", &msg, src_loc.clone());
                 }
                 CalcErr::DivByZero => {
-                    diags.err1("IRDB_28", "Division by zero in const expression", src_loc.clone());
+                    diags.err1(
+                        "IRDB_28",
+                        "Division by zero in const expression",
+                        src_loc.clone(),
+                    );
                 }
             }
             None
@@ -894,51 +898,79 @@ impl IRDb {
 
     fn calc_u64_op(tok: ast::LexToken, a: u64, b: u64) -> Result<u64, CalcErr> {
         match tok {
-            ast::LexToken::Plus => a
-                .checked_add(b)
-                .ok_or_else(|| CalcErr::Overflow(format!("Add expression '{a} + {b}' will overflow type U64"))),
-            ast::LexToken::Minus => a
-                .checked_sub(b)
-                .ok_or_else(|| CalcErr::Overflow(format!("Subtract expression '{a} - {b}' will underflow type U64"))),
-            ast::LexToken::Asterisk => a
-                .checked_mul(b)
-                .ok_or_else(|| CalcErr::Overflow(format!("Multiply expression '{a} * {b}' will overflow type U64"))),
+            ast::LexToken::Plus => a.checked_add(b).ok_or_else(|| {
+                CalcErr::Overflow(format!("Add expression '{a} + {b}' will overflow type U64"))
+            }),
+            ast::LexToken::Minus => a.checked_sub(b).ok_or_else(|| {
+                CalcErr::Overflow(format!(
+                    "Subtract expression '{a} - {b}' will underflow type U64"
+                ))
+            }),
+            ast::LexToken::Asterisk => a.checked_mul(b).ok_or_else(|| {
+                CalcErr::Overflow(format!(
+                    "Multiply expression '{a} * {b}' will overflow type U64"
+                ))
+            }),
             ast::LexToken::FSlash => {
-                if b == 0 { Err(CalcErr::DivByZero) } else { Ok(a / b) }
+                if b == 0 {
+                    Err(CalcErr::DivByZero)
+                } else {
+                    Ok(a / b)
+                }
             }
             ast::LexToken::Percent => {
-                if b == 0 { Err(CalcErr::DivByZero) } else { Ok(a % b) }
+                if b == 0 {
+                    Err(CalcErr::DivByZero)
+                } else {
+                    Ok(a % b)
+                }
             }
             ast::LexToken::Ampersand => Ok(a & b),
             ast::LexToken::Pipe => Ok(a | b),
             ast::LexToken::DoubleLess => Ok(a << (b & 63)),
             ast::LexToken::DoubleGreater => Ok(a >> (b & 63)),
-            _ => Err(CalcErr::Overflow("Unknown operator in U64 const expression".to_string())),
+            _ => Err(CalcErr::Overflow(
+                "Unknown operator in U64 const expression".to_string(),
+            )),
         }
     }
 
     fn calc_i64_op(tok: ast::LexToken, a: i64, b: i64) -> Result<i64, CalcErr> {
         match tok {
-            ast::LexToken::Plus => a
-                .checked_add(b)
-                .ok_or_else(|| CalcErr::Overflow(format!("Add expression '{a} + {b}' will overflow type I64"))),
-            ast::LexToken::Minus => a
-                .checked_sub(b)
-                .ok_or_else(|| CalcErr::Overflow(format!("Subtract expression '{a} - {b}' will underflow type I64"))),
-            ast::LexToken::Asterisk => a
-                .checked_mul(b)
-                .ok_or_else(|| CalcErr::Overflow(format!("Multiply expression '{a} * {b}' will overflow type I64"))),
+            ast::LexToken::Plus => a.checked_add(b).ok_or_else(|| {
+                CalcErr::Overflow(format!("Add expression '{a} + {b}' will overflow type I64"))
+            }),
+            ast::LexToken::Minus => a.checked_sub(b).ok_or_else(|| {
+                CalcErr::Overflow(format!(
+                    "Subtract expression '{a} - {b}' will underflow type I64"
+                ))
+            }),
+            ast::LexToken::Asterisk => a.checked_mul(b).ok_or_else(|| {
+                CalcErr::Overflow(format!(
+                    "Multiply expression '{a} * {b}' will overflow type I64"
+                ))
+            }),
             ast::LexToken::FSlash => {
-                if b == 0 { Err(CalcErr::DivByZero) } else { Ok(a / b) }
+                if b == 0 {
+                    Err(CalcErr::DivByZero)
+                } else {
+                    Ok(a / b)
+                }
             }
             ast::LexToken::Percent => {
-                if b == 0 { Err(CalcErr::DivByZero) } else { Ok(a % b) }
+                if b == 0 {
+                    Err(CalcErr::DivByZero)
+                } else {
+                    Ok(a % b)
+                }
             }
             ast::LexToken::Ampersand => Ok(a & b),
             ast::LexToken::Pipe => Ok(a | b),
             ast::LexToken::DoubleLess => Ok(a << (b & 63)),
             ast::LexToken::DoubleGreater => Ok(a >> (b & 63)),
-            _ => Err(CalcErr::Overflow("Unknown operator in I64 const expression".to_string())),
+            _ => Err(CalcErr::Overflow(
+                "Unknown operator in I64 const expression".to_string(),
+            )),
         }
     }
 

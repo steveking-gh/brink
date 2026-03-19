@@ -20,7 +20,7 @@ use diags::Diags;
 use engine::Engine;
 use irdb::IRDb;
 use lineardb::LinearDb;
-use map::{MapDb, format_human};
+use map::{MapDb, format_human, format_json};
 
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
@@ -33,6 +33,8 @@ use tracing::{debug, error, info, trace, warn};
 /// `noprint`     — suppress print statements in source
 /// `map_hf`      — human-friendly map destination: None = skip,
 ///                 Some("-") = stdout, Some(path) = file
+/// `map_json`    — JSON map destination: None = skip,
+///                 Some("-") = stdout, Some(path) = file
 pub fn process(
     name: &str,
     fstr: &str,
@@ -40,6 +42,7 @@ pub fn process(
     verbosity: u64,
     noprint: bool,
     map_hf: Option<&str>,
+    map_json: Option<&str>,
 ) -> Result<()> {
     info!("Processing {}", name);
     debug!("File contains: {}", fstr);
@@ -87,9 +90,10 @@ pub fn process(
 
     // Generate map output if requested.  MapDb derives all data from the
     // post-iterate engine and irdb; no additional compiler passes run.
-    if map_hf.is_some() || false /* reserved for map_gnu / map_json */ {
+    if map_hf.is_some() || map_json.is_some() {
         let map_db = MapDb::new(&engine, &ir_db, &fname_str);
         emit_map(map_hf, &format_human(&map_db))?;
+        emit_map(map_json, &format_json(&map_db))?;
     }
     Ok(())
 }
@@ -101,8 +105,7 @@ fn emit_map(dest: Option<&str>, content: &str) -> Result<()> {
         None => {}
         Some("-") => print!("{content}"),
         Some(path) => {
-            let mut f = File::create(path)
-                .context(format!("Unable to create map file {path}"))?;
+            let mut f = File::create(path).context(format!("Unable to create map file {path}"))?;
             f.write_all(content.as_bytes())
                 .context(format!("Unable to write map file {path}"))?;
         }

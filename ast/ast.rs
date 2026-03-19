@@ -1279,7 +1279,10 @@ impl<'toks> AstDb<'toks> {
         let sec_tinfo = ast.get_tinfo(sec_name_nid);
         let sec_str = sec_tinfo.val;
         if is_reserved_identifier(sec_str) {
-            let m = format!("'{}' is a reserved identifier and cannot be used as a section name", sec_str);
+            let m = format!(
+                "'{}' is a reserved identifier and cannot be used as a section name",
+                sec_str
+            );
             diags.err1("AST_32", &m, sec_tinfo.span());
             return false;
         }
@@ -1310,7 +1313,10 @@ impl<'toks> AstDb<'toks> {
         let sec_tinfo = ast.get_tinfo(sec_name_nid);
         let sec_str = sec_tinfo.val;
         if is_reserved_identifier(sec_str) {
-            let m = format!("'{}' is a reserved identifier and cannot be used as a const name", sec_str);
+            let m = format!(
+                "'{}' is a reserved identifier and cannot be used as a const name",
+                sec_str
+            );
             diags.err1("AST_33", &m, sec_tinfo.span());
             return false;
         }
