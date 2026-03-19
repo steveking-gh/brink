@@ -974,7 +974,11 @@ impl IRDb {
         }
     }
 
-    pub fn new(lin_db: &LinearDb, diags: &mut Diags) -> Result<IRDb, ()> {
+    pub fn new(
+        lin_db: &LinearDb,
+        diags: &mut Diags,
+        defines: &HashMap<String, ParameterValue>,
+    ) -> Result<IRDb, ()> {
         let mut ir_db = IRDb {
             ir_vec: Vec::new(),
             parms: Vec::new(),
@@ -984,6 +988,12 @@ impl IRDb {
             files: HashMap::new(),
             const_values: HashMap::new(),
         };
+
+        // Pre-populate const_values with command-line defines so they are
+        // available to source const expressions and can override source consts.
+        for (name, value) in defines {
+            ir_db.const_values.insert(name.clone(), value.clone());
+        }
 
         // Resolve all const declarations before anything else so their values
         // are available for substitution in operands and the output address.

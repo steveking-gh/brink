@@ -55,6 +55,11 @@ pub struct Cli {
     #[arg(long = "noprint")]
     pub noprint: bool,
 
+    /// Define a const value, e.g. -DBASE=0x1000 or -DCOUNT=4.
+    /// May be repeated. Overrides any same-named const in the source.
+    #[arg(short = 'D', value_name = "NAME[=VALUE]", action = clap::ArgAction::Append)]
+    pub defines: Vec<String>,
+
     /// Suppress console output, including error messages.
     /// Useful for fuzz testing. Overrides -v.
     #[arg(short = 'q', long = "quiet")]
@@ -132,6 +137,7 @@ fn main() -> Result<()> {
         cli.output.as_deref(),
         verbosity,
         cli.noprint,
+        &cli.defines,
         map_hf,
         map_json,
     )

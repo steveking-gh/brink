@@ -45,6 +45,7 @@ The previous build step created the brink binary as `./target/release/brink`.  Y
 | `-v` | Increase verbosity. Repeat up to four times (`-v -v -v -v`). |
 | `-q`, `--quiet` | Suppress all console output, including errors. Overrides `-v`. Useful for fuzz testing. |
 | `--noprint` | Suppress `print` statement output from the source program. |
+| `-D<NAME>[=VALUE]` | Define a const value from the command line. May be repeated. See [Command-Line Const Defines](#command-line-const-defines) below. |
 | `--map-hf[=FILE]` | Write a human-friendly map file. See [Map File Output](#map-file-output) below. |
 | `--map-json[=FILE]` | Write a JSON map file. See [Map File Output](#map-file-output) below. |
 
@@ -109,6 +110,50 @@ Example:
           "img_offset": "0x0000000000000000" }
       ]
     }
+
+## Command-Line Const Defines
+
+The `-D` option injects a const into the program from the command line, matching the GCC `-D` preprocessor syntax.  Specify `-D` once per each const definition.
+
+    brink -DBASE=0x8000 -DCOUNT=16 firmware.brink
+
+Brink resolves a `-D` name everywhere a source `const` resolves — in expressions, `output` addresses, `assert` statements, and so on.  `-D` **overrides** any same-named `const` in the source.
+
+Both map formats (`--map-hf` and `--map-json`) list `-D` consts alongside source consts.
+
+### Syntax
+
+    -D<NAME>
+    -D<NAME>=<VALUE>
+
+`NAME` must be a valid brink identifier.  `VALUE` is optional; without a value, Brink sets the const to `Integer(1)`, following the GCC boolean-flag convention.
+
+### Value Type Inference
+
+Brink infers the type from the value string, matching source const rules.
+
+| Example | Value | Type | Description |
+|---------|-------|------|-------------|
+| `-DFLAG` | 1 | `Integer` | Defaults to true (1). |
+| `-DCOUNT=16` | 16 | `Integer` | Plain decimal → `Integer` |
+| `-DBASE=0x1000` | 0x1000 | `U64` | Hex/binary/octal without suffix → `U64` |
+| `-DBASE=0x1000u` | 0x1000 | `U64` | `u` suffix → `U64` (explicit) |
+| `-DOFFSET=0x40i` | 0x40 | `I64` | `i` suffix → `I64` |
+| `-DDELTA=-4` | -4 | `I64` | Negative decimal → `I64` |
+
+### Examples
+
+Define a base address and section count at the command line:
+
+    brink -DBASE=0x0800_0000 firmware.brink -o firmware.bin
+
+The source can reference `BASE` as an ordinary const:
+
+    section entry { wr8 0x01; }
+    section top   { wr entry; }
+    output top BASE;
+
+---
 
 ## What Can Brink Do?
 
@@ -922,5 +967,5 @@ The wrs statement does not implicitly write a terminating 0 byte after the strin
 | lineardb/lineardb.rs | Stage 2       | AST flattening into parallel LinIR / LinOperand vectors; values still as strings      |
 | irdb/irdb.rs         | Stage 3       | String-to-typed-value conversion, DataType resolution, operand and file validation    |
 | engine/engine.rs     | Stage 4       | Iterate loop to stabilize location counters, then execute pass to write binary output |
-| process/process.rs   | Orchestrator  | Sequences all four stages, converts Err(()) to anyhow errors, opens the output file   |
+| process/process.rs   | Orchestrator  | Sequences all four stages, parses `-D` defines, converts Err(()) to anyhow errors, opens the output file |
 | map/map.rs           | Map output    | Constructs MapDb from post-iterate engine and irdb; renders human-friendly map text   |

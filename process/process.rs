@@ -11,6 +11,8 @@
 // main.rs calls process() once per invocation after reading the source file.
 
 use anyhow::{Context, Result, anyhow};
+use parse_int::parse;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 
@@ -18,6 +20,7 @@ use std::io::Write;
 use ast::{Ast, AstDb};
 use diags::Diags;
 use engine::Engine;
+use ir::ParameterValue;
 use irdb::IRDb;
 use lineardb::LinearDb;
 use map::{MapDb, format_human, format_json};
@@ -25,12 +28,71 @@ use map::{MapDb, format_human, format_json};
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
 
+/// Parses a single `-D` define string of the form `NAME=value` or `NAME`
+/// into a `(name, ParameterValue)` pair.
+///
+/// Value type inference:
+/// - No `=`                          → `Integer(1)` (GCC convention for bare -DFLAG)
+/// - Ends with `u`                   → `U64`
+/// - Ends with `i`                   → `I64`
+/// - Starts with `"` / `'`          → `QuotedString` (strip surrounding quotes)
+/// - Starts with `-`                 → `I64`
+/// - Starts with `0x`/`0b`/`0o`     → `U64` (matches source const behaviour)
+/// - Otherwise                       → `Integer`
+fn parse_define(s: &str) -> Result<(String, ParameterValue)> {
+    let (name, val_str) = match s.find('=') {
+        None => return Ok((s.to_string(), ParameterValue::Integer(1))),
+        Some(pos) => (&s[..pos], &s[pos + 1..]),
+    };
+    if name.is_empty() {
+        return Err(anyhow!("Empty name in define '{}'", s));
+    }
+    let value = if val_str.starts_with('"') || val_str.starts_with('\'') {
+        let inner = val_str
+            .trim_start_matches('"')
+            .trim_start_matches('\'')
+            .trim_end_matches('"')
+            .trim_end_matches('\'');
+        ParameterValue::QuotedString(inner.to_string())
+    } else if val_str.ends_with('u') {
+        let stripped = &val_str[..val_str.len() - 1];
+        let v = parse::<u64>(stripped)
+            .map_err(|_| anyhow!("Invalid U64 value in define '{}': '{}'", s, stripped))?;
+        ParameterValue::U64(v)
+    } else if val_str.ends_with('i') {
+        let stripped = &val_str[..val_str.len() - 1];
+        let v = parse::<i64>(stripped)
+            .map_err(|_| anyhow!("Invalid I64 value in define '{}': '{}'", s, stripped))?;
+        ParameterValue::I64(v)
+    } else if val_str.starts_with('-') {
+        let v = parse::<i64>(val_str)
+            .map_err(|_| anyhow!("Invalid I64 value in define '{}': '{}'", s, val_str))?;
+        ParameterValue::I64(v)
+    } else if val_str.starts_with("0x")
+        || val_str.starts_with("0X")
+        || val_str.starts_with("0b")
+        || val_str.starts_with("0B")
+        || val_str.starts_with("0o")
+        || val_str.starts_with("0O")
+    {
+        let v = parse::<u64>(val_str)
+            .map_err(|_| anyhow!("Invalid U64 value in define '{}': '{}'", s, val_str))?;
+        ParameterValue::U64(v)
+    } else {
+        let v = parse::<i64>(val_str)
+            .map_err(|_| anyhow!("Invalid integer value in define '{}': '{}'", s, val_str))?;
+        ParameterValue::Integer(v)
+    };
+    Ok((name.to_string(), value))
+}
+
 /// Entry point for all processing on the input source file.
 /// `name`        — source file path
 /// `fstr`        — source file contents
 /// `output_file` — binary output path (default: "output.bin")
 /// `verbosity`   — log level (0 = quiet, 1 = default, 2+ = verbose)
 /// `noprint`     — suppress print statements in source
+/// `defines`     — command-line const defines, e.g. `["BASE=0x1000", "COUNT=4"]`
 /// `map_hf`      — human-friendly map destination: None = skip,
 ///                 Some("-") = stdout, Some(path) = file
 /// `map_json`    — JSON map destination: None = skip,
@@ -41,6 +103,7 @@ pub fn process(
     output_file: Option<&str>,
     verbosity: u64,
     noprint: bool,
+    defines: &[String],
     map_hf: Option<&str>,
     map_json: Option<&str>,
 ) -> Result<()> {
@@ -48,6 +111,13 @@ pub fn process(
     debug!("File contains: {}", fstr);
 
     let mut diags = Diags::new(name, fstr, verbosity, noprint);
+
+    // Parse -D defines into a map of pre-resolved const values.
+    let mut const_defines: HashMap<String, ParameterValue> = HashMap::new();
+    for d in defines {
+        let (n, v) = parse_define(d)?;
+        const_defines.insert(n, v);
+    }
 
     let ast =
         Ast::new(fstr, &mut diags).map_err(|_| anyhow!("[PROC_1]: Error detected, halting."))?;
@@ -63,7 +133,7 @@ pub fn process(
         linear_db.dump();
     }
 
-    let ir_db = IRDb::new(&linear_db, &mut diags)
+    let ir_db = IRDb::new(&linear_db, &mut diags, &const_defines)
         .map_err(|_| anyhow!("[PROC_3]: Error detected, halting."))?;
 
     debug!("Dumping ir_db");
@@ -96,6 +166,105 @@ pub fn process(
         emit_map(map_json, &format_json(&map_db))?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_define;
+    use ir::ParameterValue;
+
+    fn name_val(s: &str) -> (String, ParameterValue) {
+        parse_define(s).expect("parse_define failed")
+    }
+
+    // --- hex values ---
+
+    #[test]
+    fn hex_no_suffix_is_u64() {
+        let (n, v) = name_val("BASE=0x1000");
+        assert_eq!(n, "BASE");
+        assert_eq!(v, ParameterValue::U64(0x1000));
+    }
+
+    #[test]
+    fn hex_u_suffix_is_u64() {
+        let (n, v) = name_val("BASE=0x1000u");
+        assert_eq!(n, "BASE");
+        assert_eq!(v, ParameterValue::U64(0x1000));
+    }
+
+    #[test]
+    fn hex_i_suffix_is_i64() {
+        let (n, v) = name_val("OFFSET=0x40i");
+        assert_eq!(n, "OFFSET");
+        assert_eq!(v, ParameterValue::I64(0x40));
+    }
+
+    #[test]
+    fn hex_uppercase_digits() {
+        let (n, v) = name_val("MASK=0xFF");
+        assert_eq!(n, "MASK");
+        assert_eq!(v, ParameterValue::U64(0xFF));
+    }
+
+    #[test]
+    fn hex_large_u64() {
+        // 0xFFFFFFFF fits in both i64 and u64; with u suffix must be U64.
+        let (n, v) = name_val("LIMIT=0xFFFFFFFFu");
+        assert_eq!(n, "LIMIT");
+        assert_eq!(v, ParameterValue::U64(0xFFFF_FFFF));
+    }
+
+    #[test]
+    fn hex_u64_max() {
+        // u64::MAX requires u suffix; without it parse::<i64> would fail.
+        let (n, v) = name_val("TOP=0xFFFFFFFFFFFFFFFFu");
+        assert_eq!(n, "TOP");
+        assert_eq!(v, ParameterValue::U64(u64::MAX));
+    }
+
+    #[test]
+    fn hex_u64_max_no_suffix() {
+        // 0xFFFFFFFFFFFFFFFF is valid U64 without any suffix.
+        let (n, v) = name_val("TOP=0xFFFFFFFFFFFFFFFF");
+        assert_eq!(n, "TOP");
+        assert_eq!(v, ParameterValue::U64(u64::MAX));
+    }
+
+    // --- decimal and other cases (regression) ---
+
+    #[test]
+    fn decimal_no_suffix_is_integer() {
+        let (n, v) = name_val("COUNT=42");
+        assert_eq!(n, "COUNT");
+        assert_eq!(v, ParameterValue::Integer(42));
+    }
+
+    #[test]
+    fn decimal_u_suffix_is_u64() {
+        let (n, v) = name_val("SIZE=64u");
+        assert_eq!(n, "SIZE");
+        assert_eq!(v, ParameterValue::U64(64));
+    }
+
+    #[test]
+    fn decimal_negative_is_i64() {
+        let (n, v) = name_val("SHIFT=-4");
+        assert_eq!(n, "SHIFT");
+        assert_eq!(v, ParameterValue::I64(-4));
+    }
+
+    #[test]
+    fn bare_name_is_integer_one() {
+        let (n, v) = name_val("FLAG");
+        assert_eq!(n, "FLAG");
+        assert_eq!(v, ParameterValue::Integer(1));
+    }
+
+    #[test]
+    fn empty_name_is_error() {
+        assert!(parse_define("=42").is_err());
+    }
 }
 
 /// Writes `content` to stdout when `dest` is `Some("-")`, or to the named

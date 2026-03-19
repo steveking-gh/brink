@@ -10,11 +10,12 @@ path = "process.rs"
 
 [dependencies]
 anyhow = "1.0.34"
-
+parse_int = "0.5.0"
 
 # local dependencies
 ast = { path = "../ast" }
 diags = { path = "../diags" }
+ir = { path = "../ir" }
 lineardb = { path = "../lineardb" }
 irdb = { path = "../irdb" }
 engine = { path = "../engine" }

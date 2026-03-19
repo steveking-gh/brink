@@ -1,0 +1,17 @@
+// Integration test source for -D command-line const defines.
+// BASE and COUNT are not declared in source; they come from -D flags.
+section hdr {
+    wr8 0xAA;
+    wr8 0xBB;
+}
+
+section body {
+    wrs "Hello";
+}
+
+section top {
+    wr hdr;
+    wr body;
+}
+
+output top BASE;

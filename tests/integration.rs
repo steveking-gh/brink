@@ -1533,4 +1533,112 @@ mod tests {
             .stdout(predicates::str::contains("0x0000000000002000"));
         fs::remove_file("map_json_stdout.bin").ok();
     }
+
+    /// -DBASE=0x3000u places the output at 0x3000 and the const appears in the
+    /// human-friendly map; -DCOUNT=16 also appears as a const in the map.
+    #[test]
+    fn defines_appear_in_hf_map() {
+        let mut cmd = Command::cargo_bin("brink").unwrap();
+        cmd.arg("tests/map_defines.brink")
+            .arg("-o")
+            .arg("defines_hf.bin")
+            .arg("--map-hf=defines_hf.map.txt")
+            .arg("-DBASE=0x3000u")
+            .arg("-DCOUNT=16");
+        cmd.assert().success();
+
+        let map = fs::read_to_string("defines_hf.map.txt")
+            .unwrap_or_else(|_| panic!("map file not found"));
+        assert!(map.contains("0x0000000000003000"), "BASE address missing");
+        assert!(map.contains("BASE"), "BASE const name missing");
+        assert!(map.contains("COUNT"), "COUNT const name missing");
+        assert!(map.contains("16"), "COUNT value missing");
+
+        fs::remove_file("defines_hf.bin").ok();
+        fs::remove_file("defines_hf.map.txt").ok();
+    }
+
+    /// -D defines appear in JSON map output with correct types.
+    #[test]
+    fn defines_appear_in_json_map() {
+        let mut cmd = Command::cargo_bin("brink").unwrap();
+        cmd.arg("tests/map_defines.brink")
+            .arg("-o")
+            .arg("defines_json.bin")
+            .arg("--map-json=defines_json.map.json")
+            .arg("-DBASE=0x3000")
+            .arg("-DCOUNT=16");
+        cmd.assert().success();
+
+        let text = fs::read_to_string("defines_json.map.json")
+            .unwrap_or_else(|_| panic!("JSON map file not found"));
+        let v: serde_json::Value = serde_json::from_str(&text)
+            .unwrap_or_else(|e| panic!("JSON not valid: {e}\n{text}"));
+
+        assert_eq!(v["base_addr"], "0x0000000000003000");
+        let consts = v["constants"].as_array().unwrap();
+        let base = consts.iter().find(|c| c["name"] == "BASE").unwrap();
+        assert_eq!(base["value"], "0x0000000000003000");
+        let count = consts.iter().find(|c| c["name"] == "COUNT").unwrap();
+        assert_eq!(count["value"], "16");
+
+        fs::remove_file("defines_json.bin").ok();
+        fs::remove_file("defines_json.map.json").ok();
+    }
+
+    /// A -D define overrides a same-named const declared in the source.
+    #[test]
+    fn define_overrides_source_const() {
+        // map_sections.brink declares BASE = 0x2000u; override to 0x4000.
+        let mut cmd = Command::cargo_bin("brink").unwrap();
+        cmd.arg("tests/map_sections.brink")
+            .arg("-o")
+            .arg("define_override.bin")
+            .arg("--map-json=define_override.map.json")
+            .arg("-DBASE=0x4000");
+        cmd.assert().success();
+
+        let text = fs::read_to_string("define_override.map.json")
+            .unwrap_or_else(|_| panic!("JSON map file not found"));
+        let v: serde_json::Value = serde_json::from_str(&text)
+            .unwrap_or_else(|e| panic!("JSON not valid: {e}\n{text}"));
+
+        assert_eq!(v["base_addr"], "0x0000000000004000");
+
+        fs::remove_file("define_override.bin").ok();
+        fs::remove_file("define_override.map.json").ok();
+    }
+
+    /// A bare -DFLAG (no =value) resolves to Integer(1) per GCC convention.
+    #[test]
+    fn define_bare_flag_is_one() {
+        // Write a minimal source that uses FLAG as a const checked via assert.
+        let src = "tests/map_defines_flag.brink";
+        fs::write(
+            src,
+            "const FLAG = 0;\nsection s { wr8 0x01; }\noutput s 0x1000;\n",
+        )
+        .unwrap();
+
+        let mut cmd = Command::cargo_bin("brink").unwrap();
+        cmd.arg(src)
+            .arg("-o")
+            .arg("define_flag.bin")
+            .arg("--map-json=define_flag.map.json")
+            .arg("-DFLAG");
+        cmd.assert().success();
+
+        let text = fs::read_to_string("define_flag.map.json")
+            .unwrap_or_else(|_| panic!("JSON map file not found"));
+        let v: serde_json::Value = serde_json::from_str(&text)
+            .unwrap_or_else(|e| panic!("JSON not valid: {e}\n{text}"));
+
+        let consts = v["constants"].as_array().unwrap();
+        let flag = consts.iter().find(|c| c["name"] == "FLAG").unwrap();
+        assert_eq!(flag["value"], "1");
+
+        fs::remove_file(src).ok();
+        fs::remove_file("define_flag.bin").ok();
+        fs::remove_file("define_flag.map.json").ok();
+    }
 } // mod tests
