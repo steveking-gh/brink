@@ -1300,8 +1300,8 @@ mod tests {
                 "top",
                 "0x0000000000002000", // BASE / hdr abs_start
                 "0x0000000000002002", // body abs_start
-                "0x00000002",         // hdr size
-                "0x00000005",         // body size
+                "2,",                 // hdr size
+                "5,",                 // body size
                 "BASE",               // const name
                 "COUNT",              // const name
                 "0x0000000000002000", // BASE value (U64 hex)

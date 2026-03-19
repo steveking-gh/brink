@@ -81,11 +81,11 @@ Example:
     BASE,            0x0000000000001000,
 
     Sections
-    Name,            Address,             Img Offset,          Size (bytes),
+    Name,            Address,           Img Offset,        Size (bytes),
     text,            0x0000000000001000,  0x0000000000000000,  0x00000032,
 
     Labels
-    Name,            Address,             Img Offset,
+    Name,            Address,           Img Offset,
     start,           0x0000000000001000,  0x0000000000000000,
 
 ### JSON Format (`--map-json`)

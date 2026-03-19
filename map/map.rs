@@ -143,14 +143,14 @@ pub fn format_human(map: &MapDb) -> String {
         let name_w = name_col_width(map.sections.iter().map(|s| s.name.as_str()));
         writeln!(
             out,
-            "{:<name_w$},  {:<19},  {:<19},  Size (bytes),",
+            "{:<name_w$},  {:<18},  {:<18},  Size (bytes),",
             "Name", "Address", "Img Offset"
         )
         .unwrap();
         for s in &map.sections {
             writeln!(
                 out,
-                "{:<name_w$},  0x{:016x},   0x{:016x},   0x{:08x},",
+                "{:<name_w$},  0x{:016x},  0x{:016x},  {},",
                 s.name, s.abs_start, s.img_start, s.size
             )
             .unwrap();
@@ -166,14 +166,14 @@ pub fn format_human(map: &MapDb) -> String {
         let name_w = name_col_width(map.labels.iter().map(|l| l.name.as_str()));
         writeln!(
             out,
-            "{:<name_w$},  {:<19},  Img Offset,",
+            "{:<name_w$},  {:<18},  Img Offset,",
             "Name,", "Address,"
         )
         .unwrap();
         for l in &map.labels {
             writeln!(
                 out,
-                "{:<name_w$},  0x{:016x},   0x{:016x},",
+                "{:<name_w$},  0x{:016x},  0x{:016x},",
                 l.name, l.abs_addr, l.img_offset
             )
             .unwrap();
@@ -398,10 +398,7 @@ mod tests {
     #[test]
     fn sections_contain_sizes() {
         let out = format_human(&make_map());
-        assert!(
-            out.contains("0x00000040"),
-            "section size '0x00000040' missing"
-        );
+        assert!(out.contains("64,"), "section size '64' missing");
     }
 
     #[test]
