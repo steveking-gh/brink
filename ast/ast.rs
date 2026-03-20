@@ -247,7 +247,7 @@ impl<'toks> Ast<'toks> {
     }
 
     /// Create a new abstract syntax tree.
-    pub fn new(fstr: &'toks str, diags: &mut Diags) -> Result<Self, ()> {
+    pub fn new(fstr: &'toks str, diags: &mut Diags) -> anyhow::Result<Self> {
         let mut arena = Arena::new();
         let root = arena.new_node(usize::MAX);
         let mut tv = Vec::new();
@@ -269,13 +269,13 @@ impl<'toks> Ast<'toks> {
         if !ast.parse(diags) {
             // ast construction failed.  Let the caller report
             // this in whatever way they want.
-            return Err(());
+            anyhow::bail!("AST construction failed.");
         }
 
         Ok(ast)
     }
 
-    // Boilerplate entry for recursive descent parsing functions.
+    // Boilerplate entry debug tracing for recursive descent parsing functions.
     fn dbg_enter(&self, func_name: &str) {
         if let Some(tinfo) = self.peek() {
             trace!(
@@ -290,7 +290,7 @@ impl<'toks> Ast<'toks> {
         }
     }
 
-    /// Boilerplate exit for recursive descent parsing functions.
+    /// Boilerplate exit debug tracing for recursive descent parsing functions.
     /// This function returns the result and should be the last statement
     /// in each function
     fn dbg_exit(&self, func_name: &str, result: bool) -> bool {
@@ -298,7 +298,7 @@ impl<'toks> Ast<'toks> {
         result
     }
 
-    /// Boilerplate exit for recursive descent parsing functions.
+    /// Boilerplate exit debug tracing for pratt parsing functions.
     /// This function returns the result and should be the last statement
     /// in each function
     fn dbg_exit_pratt(&self, func_name: &str, top: &Option<NodeId>, result: bool) -> bool {

@@ -1572,8 +1572,8 @@ mod tests {
 
         let text = fs::read_to_string("defines_json.map.json")
             .unwrap_or_else(|_| panic!("JSON map file not found"));
-        let v: serde_json::Value = serde_json::from_str(&text)
-            .unwrap_or_else(|e| panic!("JSON not valid: {e}\n{text}"));
+        let v: serde_json::Value =
+            serde_json::from_str(&text).unwrap_or_else(|e| panic!("JSON not valid: {e}\n{text}"));
 
         assert_eq!(v["base_addr"], "0x0000000000003000");
         let consts = v["constants"].as_array().unwrap();
@@ -1600,8 +1600,8 @@ mod tests {
 
         let text = fs::read_to_string("define_override.map.json")
             .unwrap_or_else(|_| panic!("JSON map file not found"));
-        let v: serde_json::Value = serde_json::from_str(&text)
-            .unwrap_or_else(|e| panic!("JSON not valid: {e}\n{text}"));
+        let v: serde_json::Value =
+            serde_json::from_str(&text).unwrap_or_else(|e| panic!("JSON not valid: {e}\n{text}"));
 
         assert_eq!(v["base_addr"], "0x0000000000004000");
 
@@ -1630,8 +1630,8 @@ mod tests {
 
         let text = fs::read_to_string("define_flag.map.json")
             .unwrap_or_else(|_| panic!("JSON map file not found"));
-        let v: serde_json::Value = serde_json::from_str(&text)
-            .unwrap_or_else(|e| panic!("JSON not valid: {e}\n{text}"));
+        let v: serde_json::Value =
+            serde_json::from_str(&text).unwrap_or_else(|e| panic!("JSON not valid: {e}\n{text}"));
 
         let consts = v["constants"].as_array().unwrap();
         let flag = consts.iter().find(|c| c["name"] == "FLAG").unwrap();

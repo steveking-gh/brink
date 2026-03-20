@@ -244,11 +244,10 @@ impl IRDb {
         trace!("IRDb::process_lin_operands: Enter");
 
         let mut result = true;
-        for lop_num in 0..lin_db.operand_vec.len() {
-            let lop = &lin_db.operand_vec[lop_num];
-
+        for (lop_num, lop) in lin_db.operand_vec.iter().enumerate() {
             // If this identifier operand is a const reference, substitute the resolved
             // const value directly instead of keeping it as a bare Identifier.
+            #[allow(clippy::collapsible_if)]
             if lop.tok == ast::LexToken::Identifier {
                 if let Some(const_val) = self.const_values.get(lop.sval.as_str()).cloned() {
                     self.parms.push(IROperand {
@@ -363,7 +362,7 @@ impl IRDb {
 
         // open the file and determine the size
         let fm_result = fs::metadata(path);
-        if fm_result.is_err() {
+        if let Err(e) = fm_result {
             // Canonicalizing a missing file doesn't work, so
             // just use the current directory.
             let pbuf_result = PathBuf::from("./").canonicalize();
@@ -373,11 +372,11 @@ impl IRDb {
             } else {
                 "!!Cannot determine full path!!".to_string()
             };
-            let os_err = fm_result.err().unwrap().to_string();
+            let os_err = e.to_string();
             let m = format!(
                 "Error getting metadata for file '{}'\n\
                     OS error is '{}'\n\
-                    Looking in directory '{}",
+                    Looking in directory '{}'",
                 path_str, os_err, full_path
             );
             diags.err1("IRDB_13", &m, path_opnd.src_loc.clone());
@@ -543,13 +542,10 @@ impl IRDb {
         let mut result = true;
         for lir in &lin_db.ir_vec {
             let kind = lir.op;
-            // The operands are just indices into the operands array
-            let operands = lir.operand_vec.clone();
-            let src_loc = lir.src_loc.clone();
             let ir = IR {
                 kind,
-                operands,
-                src_loc,
+                operands: lir.operand_vec.clone(),
+                src_loc: lir.src_loc.clone(),
             };
             let ir_num = self.ir_vec.len();
             if self.validate_operands(&ir, diags) {
@@ -978,7 +974,7 @@ impl IRDb {
         lin_db: &LinearDb,
         diags: &mut Diags,
         defines: &HashMap<String, ParameterValue>,
-    ) -> Result<IRDb, ()> {
+    ) -> anyhow::Result<Self> {
         let mut ir_db = IRDb {
             ir_vec: Vec::new(),
             parms: Vec::new(),
@@ -998,7 +994,7 @@ impl IRDb {
         // Resolve all const declarations before anything else so their values
         // are available for substitution in operands and the output address.
         if !ir_db.resolve_all_consts(lin_db, diags) {
-            return Err(());
+            anyhow::bail!("IRDb construction failed.");
         }
 
         // Parse the optional output starting address.  If it is a const name,
@@ -1012,7 +1008,7 @@ impl IRDb {
                 let m = format!("Malformed integer operand {}", addr_str);
                 let loc = lin_db.output_addr_loc.as_ref().unwrap();
                 diags.err1("IRDB_3", &m, loc.clone());
-                return Err(());
+                anyhow::bail!("IRDb construction failed.");
             }
         } else {
             0
@@ -1020,12 +1016,12 @@ impl IRDb {
         ir_db.start_addr = start_addr;
 
         if !ir_db.process_lin_operands(lin_db, diags) {
-            return Err(());
+            anyhow::bail!("IRDb construction failed");
         }
 
         // To avoid panic, don't proceed into IR if the operands are bad.
         if !ir_db.process_linear_ir(lin_db, diags) {
-            return Err(());
+            anyhow::bail!("IRDb construction failed");
         }
 
         Ok(ir_db)

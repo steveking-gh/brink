@@ -48,19 +48,14 @@ fn parse_define(s: &str) -> Result<(String, ParameterValue)> {
         return Err(anyhow!("Empty name in define '{}'", s));
     }
     let value = if val_str.starts_with('"') || val_str.starts_with('\'') {
-        let inner = val_str
-            .trim_start_matches('"')
-            .trim_start_matches('\'')
-            .trim_end_matches('"')
-            .trim_end_matches('\'');
+        // trim_matches only removes prefixes and suffixes, not interior chars.
+        let inner = val_str.trim_matches(&['"', '\''][..]);
         ParameterValue::QuotedString(inner.to_string())
-    } else if val_str.ends_with('u') {
-        let stripped = &val_str[..val_str.len() - 1];
-        let v = parse::<u64>(stripped)
-            .map_err(|_| anyhow!("Invalid U64 value in define '{}': '{}'", s, stripped))?;
+    } else if let Some(stripped) = val_str.strip_suffix('u') {
+        let v =
+            parse::<u64>(stripped).map_err(|e| anyhow!("Error parsing define '{}': {}", s, e))?;
         ParameterValue::U64(v)
-    } else if val_str.ends_with('i') {
-        let stripped = &val_str[..val_str.len() - 1];
+    } else if let Some(stripped) = val_str.strip_suffix('i') {
         let v = parse::<i64>(stripped)
             .map_err(|_| anyhow!("Invalid I64 value in define '{}': '{}'", s, stripped))?;
         ParameterValue::I64(v)
@@ -97,6 +92,7 @@ fn parse_define(s: &str) -> Result<(String, ParameterValue)> {
 ///                 Some("-") = stdout, Some(path) = file
 /// `map_json`    — JSON map destination: None = skip,
 ///                 Some("-") = stdout, Some(path) = file
+#[allow(clippy::too_many_arguments)]
 pub fn process(
     name: &str,
     fstr: &str,
@@ -119,30 +115,29 @@ pub fn process(
         const_defines.insert(n, v);
     }
 
-    let ast =
-        Ast::new(fstr, &mut diags).map_err(|_| anyhow!("[PROC_1]: Error detected, halting."))?;
+    let ast = Ast::new(fstr, &mut diags).context("[PROC_1]: Error detected, halting.")?;
 
     if verbosity > 2 {
         ast.dump("ast.dot")?;
     }
 
     let ast_db = AstDb::new(&mut diags, &ast)?;
-    let linear_db = LinearDb::new(&mut diags, &ast, &ast_db)
-        .map_err(|_| anyhow!("[PROC_2]: Error detected, halting."))?;
+    let linear_db =
+        LinearDb::new(&mut diags, &ast, &ast_db).context("[PROC_2]: Error detected, halting.")?;
     if verbosity > 2 {
         linear_db.dump();
     }
 
     let ir_db = IRDb::new(&linear_db, &mut diags, &const_defines)
-        .map_err(|_| anyhow!("[PROC_3]: Error detected, halting."))?;
+        .context("[PROC_3]: Error detected, halting.")?;
 
     debug!("Dumping ir_db");
     if verbosity > 2 {
         ir_db.dump();
     }
 
-    let engine = Engine::new(&ir_db, &mut diags, 0)
-        .map_err(|_| anyhow!("[PROC_5]: Error detected, halting."))?;
+    let engine =
+        Engine::new(&ir_db, &mut diags, 0).context("[PROC_5]: Error detected, halting.")?;
     if verbosity > 2 {
         engine.dump_locations();
     }

@@ -240,6 +240,7 @@ impl<'toks> LinearDb {
         true
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn record_children_r(
         &mut self,
         rdepth: usize,
@@ -326,6 +327,7 @@ impl<'toks> LinearDb {
     /// this stage.
     ///
     /// Sets result true on success, false on failure.
+    #[allow(clippy::too_many_arguments)]
     fn record_r(
         &mut self,
         rdepth: usize,
@@ -760,7 +762,7 @@ impl<'toks> LinearDb {
     /// The LinearDb object must start with an output statement.
     /// If the output doesn't exist, then return None.  The linear_db
     /// records only elements with size > 0.
-    pub fn new(diags: &mut Diags, ast: &'toks Ast, ast_db: &'toks AstDb) -> Result<LinearDb, ()> {
+    pub fn new(diags: &mut Diags, ast: &'toks Ast, ast_db: &'toks AstDb) -> anyhow::Result<Self> {
         debug!("LinearDb::new: ENTER");
 
         // AstDb already validated output exists
@@ -820,14 +822,14 @@ impl<'toks> LinearDb {
 
         // If an error occurs, result gets stuck at false.
         if !linear_db.record_r(1, sec_nid, &mut lops, diags, ast, ast_db, false) {
-            return Err(());
+            anyhow::bail!("LinearDb construction failed.");
         }
 
         // Linearize all top-level const declarations. All IRs and operands
         // created during this loop go into const_ir_vec and const_operand_vec.
-        for (_, const_item) in &ast_db.consts {
+        for const_item in ast_db.consts.values() {
             if !linear_db.record_const_decl(const_item.nid, diags, ast, ast_db) {
-                return Err(());
+                anyhow::bail!("LinearDb construction failed.");
             }
         }
 
@@ -835,11 +837,11 @@ impl<'toks> LinearDb {
         linear_db.dump();
 
         if !IdentDb::check_globals(&linear_db, diags) {
-            return Err(());
+            anyhow::bail!("LinearDb construction failed.");
         }
 
         if !IdentDb::check_locals(&linear_db, diags) {
-            return Err(());
+            anyhow::bail!("LinearDb construction failed.");
         }
 
         debug!("LinearDb::new: EXIT for nid: {}", output_nid);

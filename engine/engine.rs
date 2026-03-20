@@ -126,7 +126,7 @@ impl Engine {
         };
 
         current.img = new_img;
-        current.sec = current.sec.checked_add(sz).unwrap_or(u64::MAX);
+        current.sec = current.sec.saturating_add(sz);
 
         true
     }
@@ -219,7 +219,7 @@ impl Engine {
         };
 
         current.img = new_img;
-        current.sec = current.sec.checked_add(sz).unwrap_or(u64::MAX);
+        current.sec = current.sec.saturating_add(sz);
 
         result
     }
@@ -265,7 +265,7 @@ impl Engine {
         };
 
         current.img = new_img;
-        current.sec = current.sec.checked_add(byte_size).unwrap_or(u64::MAX);
+        current.sec = current.sec.saturating_add(byte_size);
 
         true
     }
@@ -275,11 +275,9 @@ impl Engine {
     /// If the diags noprint option is true, suppress printing.
     /// Returns None of failure
     fn evaluate_string_expr(&self, ir: &IR, irdb: &IRDb, diags: &mut Diags) -> Option<String> {
-        let num_ops = ir.operands.len();
         let mut result = true;
         let mut xstr = String::new();
-        for local_op_num in 0..num_ops {
-            let op_num = ir.operands[local_op_num];
+        for (local_op_num, &op_num) in ir.operands.iter().enumerate() {
             let op = &self.parms[op_num];
             debug!(
                 "Processing string expr operand {} with data type {:?}",
@@ -1102,7 +1100,7 @@ impl Engine {
         true
     }
 
-    pub fn new(irdb: &IRDb, diags: &mut Diags, abs_start: usize) -> Result<Engine, ()> {
+    pub fn new(irdb: &IRDb, diags: &mut Diags, abs_start: usize) -> anyhow::Result<Self> {
         // The first iterate loop may access any IR location, so initialize all
         // ir_locs locations to zero.
         let ir_locs = vec![Location { img: 0, sec: 0 }; irdb.ir_vec.len()];
@@ -1126,7 +1124,7 @@ impl Engine {
 
         let result = engine.iterate(irdb, diags, abs_start);
         if !result {
-            return Err(());
+            anyhow::bail!("Engine construction failed.");
         }
 
         engine.build_dispatches(irdb);
