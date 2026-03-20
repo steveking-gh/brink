@@ -10,42 +10,59 @@
 // through every stage — ast, lineardb, irdb and engine — as the single
 // channel through which all diagnostics flow.
 
-use ariadne::{Color, Label, Report, ReportKind, Source};
+use ariadne::{Color, Label, Report, ReportKind, sources};
 use std::ops::Range;
 
-pub struct Diags<'a> {
-    name: &'a str,
-    fstr: &'a str,
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct SourceSpan {
+    pub file_id: usize,
+    pub range: Range<usize>,
+}
+
+pub struct Diags {
+    name: String,
+    pub files: Vec<(String, String)>,
     verbosity: u64,
     pub noprint: bool,
 }
 
-impl<'a, 'msg> Diags<'a> {
-    pub fn new(name: &'a str, fstr: &'a str, verbosity: u64, noprint: bool) -> Self {
+impl Diags {
+    pub fn new(name: &str, fstr: &str, verbosity: u64, noprint: bool) -> Self {
         Self {
-            name,
-            fstr,
+            name: name.to_string(),
+            files: vec![(name.to_string(), fstr.to_string())],
             verbosity,
             noprint,
         }
     }
 
+    /// Adds a new source file to the diagnostic reporting cache and returns
+    /// its assigned unique `file_id`. The returned ID is intended to be embedded
+    /// into `SourceSpan` objects, allowing error messages to print the correct
+    /// file context and code snippets natively using `ariadne`.
+    pub fn add_file(&mut self, name: &str, content: &str) -> usize {
+        let id = self.files.len();
+        self.files.push((name.to_string(), content.to_string()));
+        id
+    }
+
     /// Helper to print ariadne reports
-    fn print_report(&self, report: Report<(&'a str, Range<usize>)>) {
+    fn print_report(&self, report: Report<(String, Range<usize>)>) {
         if self.verbosity == 0 {
             return;
         }
-        let _ = report.eprint((self.name, Source::from(self.fstr)));
+        let cache = sources(self.files.clone());
+        let _ = report.eprint(cache);
     }
 
     /// Writes the diagnostic to the terminal with primary
     /// code location.
-    pub fn warn(&self, code: &str, msg: &'msg str) {
+    pub fn warn(&self, code: &str, msg: &str) {
         if self.verbosity == 0 {
             return;
         }
 
-        let report = Report::build(ReportKind::Warning, self.name, 0)
+        let report = Report::build(ReportKind::Warning, self.name.clone(), 0)
             .with_code(code)
             .with_message(msg)
             .finish();
@@ -54,12 +71,12 @@ impl<'a, 'msg> Diags<'a> {
 
     /// Writes the diagnostic to the terminal with primary
     /// code location.
-    pub fn err0(&self, code: &str, msg: &'msg str) {
+    pub fn err0(&self, code: &str, msg: &str) {
         if self.verbosity == 0 {
             return;
         }
 
-        let report = Report::build(ReportKind::Error, self.name, 0)
+        let report = Report::build(ReportKind::Error, self.name.clone(), 0)
             .with_code(code)
             .with_message(msg)
             .finish();
@@ -68,28 +85,29 @@ impl<'a, 'msg> Diags<'a> {
 
     /// Writes the diagnostic to the terminal with primary
     /// code location.
-    pub fn err1(&self, code: &str, msg: &'msg str, loc: Range<usize>) {
+    pub fn err1(&self, code: &str, msg: &str, loc: SourceSpan) {
         if self.verbosity == 0 {
             return;
         }
 
-        let start = loc.start;
-        let report = Report::build(ReportKind::Error, self.name, start)
+        let start = loc.range.start;
+        let id = self.files[loc.file_id].0.clone();
+        let report = Report::build(ReportKind::Error, id.clone(), start)
             .with_code(code)
             .with_message(msg)
-            .with_label(Label::new((self.name, loc)).with_color(Color::Red))
+            .with_label(Label::new((id, loc.range)).with_color(Color::Red))
             .finish();
         self.print_report(report);
     }
 
     /// Writes the diagnostic to the terminal with primary
     /// code location.
-    pub fn note0(&self, code: &str, msg: &'msg str) {
+    pub fn note0(&self, code: &str, msg: &str) {
         if self.verbosity == 0 {
             return;
         }
 
-        let report = Report::build(ReportKind::Custom("Note", Color::Blue), self.name, 0)
+        let report = Report::build(ReportKind::Custom("Note", Color::Blue), self.name.clone(), 0)
             .with_code(code)
             .with_message(msg)
             .finish();
@@ -98,33 +116,37 @@ impl<'a, 'msg> Diags<'a> {
 
     /// Writes the diagnostic to the terminal with primary
     /// code location.
-    pub fn note1(&self, code: &str, msg: &'msg str, loc: Range<usize>) {
+    pub fn note1(&self, code: &str, msg: &str, loc: SourceSpan) {
         if self.verbosity == 0 {
             return;
         }
 
-        let start = loc.start;
-        let report = Report::build(ReportKind::Custom("Note", Color::Blue), self.name, start)
+        let start = loc.range.start;
+        let id = self.files[loc.file_id].0.clone();
+        let report = Report::build(ReportKind::Custom("Note", Color::Blue), id.clone(), start)
             .with_code(code)
             .with_message(msg)
-            .with_label(Label::new((self.name, loc)).with_color(Color::Blue))
+            .with_label(Label::new((id, loc.range)).with_color(Color::Blue))
             .finish();
         self.print_report(report);
     }
 
     /// Writes the diagnostic to the terminal with primary
     /// and secondary code locations.
-    pub fn err2(&self, code: &str, msg: &'msg str, loc1: Range<usize>, loc2: Range<usize>) {
+    pub fn err2(&self, code: &str, msg: &str, loc1: SourceSpan, loc2: SourceSpan) {
         if self.verbosity == 0 {
             return;
         }
 
-        let start = loc1.start;
-        let report = Report::build(ReportKind::Error, self.name, start)
+        let start = loc1.range.start;
+        let id1 = self.files[loc1.file_id].0.clone();
+        let id2 = self.files[loc2.file_id].0.clone();
+
+        let report = Report::build(ReportKind::Error, id1.clone(), start)
             .with_code(code)
             .with_message(msg)
-            .with_label(Label::new((self.name, loc1)).with_color(Color::Red))
-            .with_label(Label::new((self.name, loc2)).with_color(Color::Yellow))
+            .with_label(Label::new((id1, loc1.range)).with_color(Color::Red))
+            .with_label(Label::new((id2, loc2.range)).with_color(Color::Yellow))
             .finish();
         self.print_report(report);
     }

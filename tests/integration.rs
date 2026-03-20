@@ -635,7 +635,7 @@ mod tests {
         assert_brink_success(
             "tests/wrs_1.brink",
             Some("wrs_1.bin"),
-            Some("123\0456 Wow! 18 2\n"),
+            Some("123\x00456 Wow! 18 2\n"),
         );
     }
 

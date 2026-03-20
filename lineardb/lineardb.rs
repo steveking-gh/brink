@@ -13,7 +13,7 @@
 // containing ir_vec, const_ir_vec, and operand_vec — is consumed by irdb.
 
 use indextree::NodeId;
-pub type Span = std::ops::Range<usize>;
+use diags::SourceSpan;
 use diags::Diags;
 
 #[allow(unused_imports)]
@@ -21,7 +21,7 @@ use tracing::{debug, error, info, trace, warn};
 
 use ast::{Ast, AstDb, LexToken, TokenInfo, is_reserved_identifier};
 use ir::IRKind;
-use std::{collections::HashMap, ops::Range};
+use std::collections::HashMap;
 
 /// The operand type for linear IRs.  This operand type is very similar to the
 /// IROperand type, with the critical distinction that LinOperand creation
@@ -30,7 +30,7 @@ use std::{collections::HashMap, ops::Range};
 pub struct LinOperand {
     /// linear ID of source operation if this operand is an output.
     pub ir_lid: Option<usize>,
-    pub src_loc: Range<usize>,
+    pub src_loc: SourceSpan,
     pub tok: LexToken,
     pub sval: String,
 }
@@ -59,7 +59,7 @@ impl LinOperand {
 /// simplification during the AST to Linear conversion process.
 pub struct LinIR {
     pub nid: NodeId,
-    pub src_loc: Range<usize>,
+    pub src_loc: SourceSpan,
     pub op: IRKind,
     // usize is the index into the operand vec
     pub operand_vec: Vec<usize>,
@@ -156,13 +156,13 @@ pub struct LinearDb {
     pub output_sec_str: String,
 
     /// Source location of the section name token in the `output` statement.
-    pub output_sec_loc: Range<usize>,
+    pub output_sec_loc: SourceSpan,
 
     /// Optional absolute base address supplied in the `output` statement.
     pub output_addr_str: Option<String>,
 
     /// Source location of the address token in the `output` statement, if present.
-    pub output_addr_loc: Option<Range<usize>>,
+    pub output_addr_loc: Option<SourceSpan>,
 }
 
 /**
@@ -890,7 +890,7 @@ impl<'toks> LinearDb {
 }
 
 struct IdentDb {
-    label_idents: HashMap<String, Range<usize>>,
+    label_idents: HashMap<String, SourceSpan>,
     section_count: HashMap<String, usize>,
 }
 

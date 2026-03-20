@@ -38,29 +38,29 @@ The previous build step created the brink binary as `./target/release/brink`.  Y
 
     brink [OPTIONS] <input>
 
-| Option | Description |
-|--------|-------------|
-| `<input>` | Brink source file to compile (required). |
-| `-o <file>` | Output binary file name. Defaults to `output.bin`. |
-| `-v` | Increase verbosity. Repeat up to four times (`-v -v -v -v`). |
-| `-q`, `--quiet` | Suppress all console output, including errors. Overrides `-v`. Useful for fuzz testing. |
-| `--noprint` | Suppress `print` statement output from the source program. |
-| `-D<NAME>[=VALUE]` | Define a const value from the command line. May be repeated. See [Command-Line Const Defines](#command-line-const-defines) below. |
-| `--map-hf[=FILE]` | Write a human-friendly map file. See [Map File Output](#map-file-output) below. |
-| `--map-json[=FILE]` | Write a JSON map file. See [Map File Output](#map-file-output) below. |
+| Option              | Description                                                                                                                       |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `<input>`           | Brink source file to compile (required).                                                                                          |
+| `-o <file>`         | Output binary file name. Defaults to `output.bin`.                                                                                |
+| `-v`                | Increase verbosity. Repeat up to four times (`-v -v -v -v`).                                                                      |
+| `-q`, `--quiet`     | Suppress all console output, including errors. Overrides `-v`. Useful for fuzz testing.                                           |
+| `--noprint`         | Suppress `print` statement output from the source program.                                                                        |
+| `-D<NAME>[=VALUE]`  | Define a const value from the command line. May be repeated. See [Command-Line Const Defines](#command-line-const-defines) below. |
+| `--map-hf[=FILE]`   | Write a human-friendly map file. See [Map File Output](#map-file-output) below.                                                   |
+| `--map-json[=FILE]` | Write a JSON map file. See [Map File Output](#map-file-output) below.                                                             |
 
 ## Map File Output
 
 Both map options list every section, label, and constant with its address and size.  Both accept the same FILE argument forms:
 
-| Invocation | Result |
-|------------|--------|
-| `--map-hf` | Writes `<stem>.map.txt` to the current directory (e.g. `firmware.brink` → `firmware.map.txt`). |
-| `--map-json` | Writes `<stem>.map.json` to the current directory (e.g. `firmware.brink` → `firmware.map.json`). |
-| `--map-hf=<file>` | Writes the human-friendly map to the specified file. |
-| `--map-json=<file>` | Writes the JSON map to the specified file. |
-| `--map-hf=-` | Writes the human-friendly map to stdout. |
-| `--map-json=-` | Writes the JSON map to stdout. |
+| Invocation          | Result                                                                                           |
+| ------------------- | ------------------------------------------------------------------------------------------------ |
+| `--map-hf`          | Writes `<stem>.map.txt` to the current directory (e.g. `firmware.brink` → `firmware.map.txt`).   |
+| `--map-json`        | Writes `<stem>.map.json` to the current directory (e.g. `firmware.brink` → `firmware.map.json`). |
+| `--map-hf=<file>`   | Writes the human-friendly map to the specified file.                                             |
+| `--map-json=<file>` | Writes the JSON map to the specified file.                                                       |
+| `--map-hf=-`        | Writes the human-friendly map to stdout.                                                         |
+| `--map-json=-`      | Writes the JSON map to stdout.                                                                   |
 
 Brink writes map output to the current working directory when no path is given, keeping build artifacts out of source directories.  Both formats report the same semantic payload and both flags may be specified together.
 
@@ -132,14 +132,14 @@ Both map formats (`--map-hf` and `--map-json`) list `-D` consts alongside source
 
 Brink infers the type from the value string, matching source const rules.
 
-| Example | Value | Type | Description |
-|---------|-------|------|-------------|
-| `-DFLAG` | 1 | `Integer` | Defaults to true (1). |
-| `-DCOUNT=16` | 16 | `Integer` | Plain decimal → `Integer` |
-| `-DBASE=0x1000` | 0x1000 | `U64` | Hex/binary/octal without suffix → `U64` |
-| `-DBASE=0x1000u` | 0x1000 | `U64` | `u` suffix → `U64` (explicit) |
-| `-DOFFSET=0x40i` | 0x40 | `I64` | `i` suffix → `I64` |
-| `-DDELTA=-4` | -4 | `I64` | Negative decimal → `I64` |
+| Example          | Value  | Type      | Description                             |
+| ---------------- | ------ | --------- | --------------------------------------- |
+| `-DFLAG`         | 1      | `Integer` | Defaults to true (1).                   |
+| `-DCOUNT=16`     | 16     | `Integer` | Plain decimal → `Integer`               |
+| `-DBASE=0x1000`  | 0x1000 | `U64`     | Hex/binary/octal without suffix → `U64` |
+| `-DBASE=0x1000u` | 0x1000 | `U64`     | `u` suffix → `U64` (explicit)           |
+| `-DOFFSET=0x40i` | 0x40   | `I64`     | `i` suffix → `I64`                      |
+| `-DDELTA=-4`     | -4     | `I64`     | Negative decimal → `I64`                |
 
 ### Examples
 
@@ -374,24 +374,24 @@ Brink reserves certain identifiers and rejects their use as section names, const
 
 Brink reserves two identifier *prefixes*.  Any identifier beginning with a reserved prefix triggers an error, regardless of the suffix:
 
-| Reserved Prefix | Reason                                                         |
-|-----------------|----------------------------------------------------------------|
-| `wr`            | Write instructions (`wr8`, `wr16`, `wrs`, `wrf`, and future variants) |
+| Reserved Prefix | Reason                                                                          |
+| --------------- | ------------------------------------------------------------------------------- |
+| `wr`            | Write instructions (`wr8`, `wr16`, `wrs`, `wrf`, and future variants)           |
 | `set_`          | Configuration directives (`set_sec`, `set_img`, `set_abs`, and future variants) |
 
 Brink also reserves the following *exact* keywords for future language features:
 
-| Reserved Keyword | Possible future use               |
-|------------------|-----------------------------------|
-| `include`        | File inclusion                    |
-| `import`         | Module inclusion                  |
-| `if`             | Conditional section inclusion     |
-| `else`           | Conditional section inclusion     |
-| `true`           | Boolean literal                   |
-| `false`          | Boolean literal                   |
-| `extern`         | External section references       |
-| `let`            | Variable declarations             |
-| `fill`           | Fill / pad byte ranges            |
+| Reserved Keyword | Possible future use           |
+| ---------------- | ----------------------------- |
+| `include`        | File inclusion                |
+| `import`         | Module inclusion              |
+| `if`             | Conditional section inclusion |
+| `else`           | Conditional section inclusion |
+| `true`           | Boolean literal               |
+| `false`          | Boolean literal               |
+| `extern`         | External section references   |
+| `let`            | Variable declarations         |
+| `fill`           | Fill / pad byte ranges        |
 
 Keyword reservation is case-sensitive.  `Include` and `INCLUDE` are valid identifiers; `include` is not.
 
@@ -419,7 +419,7 @@ Brink supports number literals in decimal, hex (0x) and binary (0b) forms.  Afte
 The following table summarizes how Brink determines the type of number literals.
 
 | Example | Type    | Description                                                        |
-|---------|---------|--------------------------------------------------------------------|
+| ------- | ------- | ------------------------------------------------------------------ |
 | 4       | Integer | Simple decimal numbers are `Integer` type with flexible signedness |
 | 4u      | U64     | Explicitly `U64`                                                   |
 | 4i      | I64     | Explicitly `I64`                                                   |
@@ -463,7 +463,7 @@ Brink considers a zero value false and all non-zero values true.
 
 Brink allows utf-8 quoted strings with the following escape characters:
 | Escape Character | UTF-8 Value | Name           |
-|------------------|-------------|----------------|
+| ---------------- | ----------- | -------------- |
 | \\0              | 0x00        | Null           |
 | \\t              | 0x09        | Horizontal Tab |
 | \\n              | 0x0A        | Linefeed       |
@@ -475,18 +475,18 @@ Newlines are Linux style, so "A\n" is a two byte string on all platforms.
 
 Brink supports the following arithmetic operators with same relative precedence as the Rust language.
 
-| Precedence | Operator | Under/Overflow Check? | Description                                   |
-|------------|----------|-----------------------|-----------------------------------------------|
-| Highest    | (   )    | n/a                   | Paren grouping                                |
-|            | *   /    | yes                   | Multiply and divide                           |
-|            | +   -    | yes                   | Add and subtract                              |
-|            | &        | n/a                   | Bitwise-AND                                   |
-|            | \|       | n/a                   | Bitwise-OR                                    |
-|            | <<  >>   | no                    | Bitwise shift up and down                     |
-|            | ==  !=   | n/a                   | Equals and non-equal                          |
-|            | >=  <=   | n/a                   | Greater-than-or-equal and less-than-or-equal  |
-|            | &&       | n/a                   | Logical-AND                                   |
-| Lowest     | \|\|     | n/a                   | Logical-OR                                    |
+| Precedence | Operator | Under/Overflow Check? | Description                                  |
+| ---------- | -------- | --------------------- | -------------------------------------------- |
+| Highest    | (   )    | n/a                   | Paren grouping                               |
+|            | *   /    | yes                   | Multiply and divide                          |
+|            | +   -    | yes                   | Add and subtract                             |
+|            | &        | n/a                   | Bitwise-AND                                  |
+|            | \|       | n/a                   | Bitwise-OR                                   |
+|            | <<  >>   | no                    | Bitwise shift up and down                    |
+|            | ==  !=   | n/a                   | Equals and non-equal                         |
+|            | >=  <=   | n/a                   | Greater-than-or-equal and less-than-or-equal |
+|            | &&       | n/a                   | Logical-AND                                  |
+| Lowest     | \|\|     | n/a                   | Logical-OR                                   |
 ---
 
 As shown in the table, Brink will check some operations for arithmetic under/overflow.
@@ -653,6 +653,36 @@ Example:
 
 ---
 
+## `include "<file>"`
+
+Includes another brink source file.  Brink processes the included file as if it were part of the current file.  For example, the included file can define sections, labels, constants and nested include files.
+
+An included file may contain an output statement.  Brink will enforce that the entire program after include file resolution contains only one output statement.  See the [`output` statement](#output-section-identifier-absolute-starting-address) for more information.
+
+The default path for an included file is the directory of the source file that contains the include statement.  For example, if `main.brink` is in `/home/user/project/` and contains `include "sections.brink"`, then brink will look for `/home/user/project/sections.brink`.
+
+Include files starting with a `/` are absolute paths.  Likewise, Brink supports relative paths such as `../`.
+
+All paths use Linux style forward slashes.
+
+Example:
+
+    // file: main.brink
+    include "../constants.brink";
+    include "sections.brink";
+
+    output main_rom 0x1000;
+
+    // file: ../constants.brink
+    const RAM_BASE = 0x8000_0000u;
+
+    // file: sections.brink
+    section main_rom {
+        wrs "Hello\n";
+    }
+
+---
+
 ## Labels
 Labels assign an identifier to a specific location in the output file.  Other source code can then refer to the location of the label by name.  Labels have global scope and label names must be globally unique.  Multiple different labels can refer to the same location.
 
@@ -680,6 +710,8 @@ For example:
 An output statement specifies the top section to write to the output file and an optional absolute starting address.  Without a starting address, `output` defaults to a starting address of 0.
 
 **A Brink program must have exactly one output statement.**
+
+An `include` file may contain an output statement.  Brink will enforce that the entire program after include file resolution contains only one output statement.
 
 ---
 ## `print <expression> [, <expression>, ...];`
@@ -779,7 +811,7 @@ The set_sec, set_img and set_abs statements pad the output until the respective 
 These statements may be used to pad sections or images to the specified length.
 
 | Statement | Description                                                  |
-|-----------|--------------------------------------------------------------|
+| --------- | ------------------------------------------------------------ |
 | set_sec   | Pads until the *section* offset reaches the specified value. |
 | set_img   | Likewise for the *image* offset.                             |
 | set_abs   | Likewise for the *absolute address*                          |
@@ -959,13 +991,13 @@ The wrs statement does not implicitly write a terminating 0 byte after the strin
 
 # Brink Source Code Overview
 
-| File                 | Stage         | Summary in header                                                                     |
-|----------------------|---------------|---------------------------------------------------------------------------------------|
-| diags/diags.rs       | Cross-cutting | Ariadne-backed diagnostic output channel used by every stage                          |
-| ast/ast.rs           | Stage 1       | Logos lexer → token stream → arena AST → AstDb validation                             |
-| ir/ir.rs             | Shared types  | IRKind, ParameterValue, IROperand, IR — the data flowing between stages 2–4           |
-| lineardb/lineardb.rs | Stage 2       | AST flattening into parallel LinIR / LinOperand vectors; values still as strings      |
-| irdb/irdb.rs         | Stage 3       | String-to-typed-value conversion, DataType resolution, operand and file validation    |
-| engine/engine.rs     | Stage 4       | Iterate loop to stabilize location counters, then execute pass to write binary output |
+| File                 | Stage         | Summary in header                                                                                        |
+| -------------------- | ------------- | -------------------------------------------------------------------------------------------------------- |
+| diags/diags.rs       | Cross-cutting | Ariadne-backed diagnostic output channel used by every stage                                             |
+| ast/ast.rs           | Stage 1       | Logos lexer → token stream → arena AST → AstDb validation                                                |
+| ir/ir.rs             | Shared types  | IRKind, ParameterValue, IROperand, IR — the data flowing between stages 2–4                              |
+| lineardb/lineardb.rs | Stage 2       | AST flattening into parallel LinIR / LinOperand vectors; values still as strings                         |
+| irdb/irdb.rs         | Stage 3       | String-to-typed-value conversion, DataType resolution, operand and file validation                       |
+| engine/engine.rs     | Stage 4       | Iterate loop to stabilize location counters, then execute pass to write binary output                    |
 | process/process.rs   | Orchestrator  | Sequences all four stages, parses `-D` defines, converts Err(()) to anyhow errors, opens the output file |
-| map/map.rs           | Map output    | Constructs MapDb from post-iterate engine and irdb; renders human-friendly map text   |
+| map/map.rs           | Map output    | Constructs MapDb from post-iterate engine and irdb; renders human-friendly map text                      |

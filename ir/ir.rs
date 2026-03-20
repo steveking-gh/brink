@@ -15,7 +15,7 @@
 
 use diags::Diags;
 use parse_int::parse;
-use std::ops::Range;
+use diags::SourceSpan;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DataType {
@@ -164,7 +164,7 @@ pub struct IROperand {
     pub ir_lid: Option<usize>,
     /// Byte range in the source file that produced this operand, used for
     /// error reporting.
-    pub src_loc: Range<usize>,
+    pub src_loc: SourceSpan,
     /// True if this operand holds a literal value parsed directly from source
     /// (e.g. a numeric constant or quoted string).  False if this is the
     /// output placeholder of an IR instruction whose value is computed at
@@ -180,7 +180,7 @@ impl IROperand {
     pub fn new(
         ir_lid: Option<usize>,
         sval: &str,
-        src_loc: &Range<usize>,
+        src_loc: &SourceSpan,
         data_type: DataType,
         is_immediate: bool,
         diags: &mut Diags,
@@ -205,7 +205,7 @@ impl IROperand {
     fn convert_type(
         sval: &str,
         data_type: DataType,
-        src_loc: &Range<usize>,
+        src_loc: &SourceSpan,
         is_immediate: bool,
         diags: &mut Diags,
     ) -> Option<ParameterValue> {
@@ -303,5 +303,5 @@ impl IROperand {
 pub struct IR {
     pub kind: IRKind,
     pub operands: Vec<usize>,
-    pub src_loc: Range<usize>,
+    pub src_loc: SourceSpan,
 }

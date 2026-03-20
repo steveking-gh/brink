@@ -14,14 +14,12 @@
 
 use indextree::{Arena, NodeId};
 use logos::Logos;
-pub type Span = std::ops::Range<usize>;
 use anyhow::{Context, bail};
-use diags::Diags;
+use diags::{Diags, SourceSpan};
 use std::fs::File;
 use std::io::prelude::*;
 use std::{
     collections::{HashMap, HashSet},
-    ops::Range,
 };
 
 #[allow(unused_imports)]
@@ -199,14 +197,14 @@ pub struct TokenInfo<'toks> {
     /// The range of bytes in the source file occupied
     /// by this token.  Diagnostics require this range
     /// when producing errors.
-    pub loc: Span,
+    pub loc: SourceSpan,
 
     /// The value of the token trimmed of whitespace
     pub val: &'toks str,
 }
 
 impl<'toks> TokenInfo<'toks> {
-    pub fn span(&self) -> Span {
+    pub fn span(&self) -> SourceSpan {
         self.loc.clone()
     }
 }
@@ -257,7 +255,7 @@ impl<'toks> Ast<'toks> {
             tv.push(TokenInfo {
                 tok,
                 val: lex.slice(),
-                loc: lex.span(),
+                loc: SourceSpan { file_id: 0, range: lex.span() },
             });
         }
         let mut ast = Self {
@@ -1213,7 +1211,7 @@ pub struct Label {
     pub nid: NodeId,
 
     /// Location in source code of the label
-    pub loc: Range<usize>,
+    pub loc: SourceSpan,
 }
 
 /*******************************

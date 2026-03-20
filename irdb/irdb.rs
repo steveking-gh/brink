@@ -11,7 +11,7 @@
 // Order of operations: irdb runs after lineardb.  Its output — an IRDb
 // containing ir_vec, parms and file metadata — is consumed by engine.
 
-pub type Span = std::ops::Range<usize>;
+use diags::SourceSpan;
 use diags::Diags;
 use lineardb::LinearDb;
 
@@ -31,7 +31,7 @@ use std::{
 pub struct FileInfo {
     pub path: String,
     pub size: u64,
-    pub src_loc: Range<usize>,
+    pub src_loc: SourceSpan,
 }
 
 pub struct IRDb {
@@ -47,7 +47,7 @@ pub struct IRDb {
 
     /// Maps an identifier to the (start,stop) indices in the ir_vec.
     /// Used for items with a size (potentially zero) such as sections.
-    pub sized_locs: HashMap<String, Range<usize>>,
+    pub sized_locs: HashMap<String, std::ops::Range<usize>>,
 
     /// Maps an identifier to its starting index in the ir_vec.
     /// Used for items that are addressable, including sections and labels
@@ -642,7 +642,7 @@ impl IRDb {
         lin_db: &LinearDb,
         in_progress: &mut HashSet<String>,
         diags: &mut Diags,
-        err_loc: &Range<usize>,
+        err_loc: &SourceSpan,
     ) -> Option<ParameterValue> {
         let tok = lin_db.const_operand_vec[lop_num].tok;
         let sval = lin_db.const_operand_vec[lop_num].sval.clone();
@@ -761,7 +761,7 @@ impl IRDb {
         tok: ast::LexToken,
         lhs: ParameterValue,
         rhs: ParameterValue,
-        src_loc: &Range<usize>,
+        src_loc: &SourceSpan,
         diags: &mut Diags,
     ) -> Option<ParameterValue> {
         use ParameterValue::*;
@@ -843,7 +843,7 @@ impl IRDb {
         tok: ast::LexToken,
         lhs: ParameterValue,
         rhs: ParameterValue,
-        src_loc: &Range<usize>,
+        src_loc: &SourceSpan,
         diags: &mut Diags,
     ) -> Option<ParameterValue> {
         use ParameterValue::*;
