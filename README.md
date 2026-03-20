@@ -392,7 +392,7 @@ Brink also reserves the following *exact* keywords for future language features:
 | `let`            | Variable declarations         |
 | `fill`           | Fill / pad byte ranges        |
 
-Keyword reservation is case-sensitive.  `Include` and `INCLUDE` are valid identifiers; `include` is not.
+Keyword reservation is case-sensitive.  `Fill` and `FILL` are valid identifiers; `fill` is not.
 
 ---
 
