@@ -11,13 +11,13 @@ members = [
 ]
 
 [workspace.package]
-version = "2.2.2"
+version = "2.3.0"
 authors = ["Steve King <sk@metrokings.com>"]
 edition = "2024"
 
 [package]
 name = "brink"
-version = "2.2.2"
+version = "2.3.0"
 license-file = "LICENSE.txt"
 readme = "README.md"
 homepage = "https://github.com/steveking-gh/brink"

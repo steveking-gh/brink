@@ -653,7 +653,7 @@ Example:
 
 ---
 
-## `include "<file>"`
+## `include "<file>";`
 
 Includes another brink source file.  Brink processes the included file as if it were part of the current file.  For example, the included file can define sections, labels, constants and nested include files.
 

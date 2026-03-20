@@ -1641,4 +1641,45 @@ mod tests {
         fs::remove_file("define_flag.bin").ok();
         fs::remove_file("define_flag.map.json").ok();
     }
+    // ── Include Directive tests ───────────────────────────────────────────────
+
+    #[test]
+    fn include_missing_string() {
+        assert_brink_failure("tests/include_missing_string.brink", &["[AST_34]"]);
+    }
+
+    #[test]
+    fn include_missing_semi() {
+        assert_brink_failure("tests/include_missing_semi.brink", &["[AST_35]"]);
+    }
+
+    #[test]
+    fn include_cycle() {
+        assert_brink_failure("tests/include_cycle.brink", &["[AST_36]"]);
+    }
+
+    #[test]
+    fn include_cycle_multi() {
+        assert_brink_failure("tests/include_cycle_a.brink", &["[AST_36]"]);
+    }
+
+    #[test]
+    fn include_missing_file() {
+        assert_brink_failure("tests/include_missing_file.brink", &["[AST_37]"]);
+    }
+
+    #[test]
+    #[serial]
+    fn include_success() {
+        let mut cmd = Command::cargo_bin("brink").unwrap();
+        cmd.arg("tests/include_success_main.brink")
+            .arg("-o")
+            .arg("include_success.bin");
+        cmd.assert().success();
+
+        let bytevec = fs::read("include_success.bin").unwrap();
+        let temp: Vec<u8> = vec![0xAA, 0xBB];
+        assert_eq!(bytevec, temp);
+        fs::remove_file("include_success.bin").ok();
+    }
 } // mod tests

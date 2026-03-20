@@ -12,15 +12,13 @@
 // Its output — an Ast and an AstDb — is consumed by lineardb in the next
 // stage.
 
-use indextree::{Arena, NodeId};
-use logos::Logos;
 use anyhow::{Context, bail};
 use diags::{Diags, SourceSpan};
+use indextree::{Arena, NodeId};
+use logos::Logos;
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::prelude::*;
-use std::{
-    collections::{HashMap, HashSet},
-};
 
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
@@ -244,20 +242,172 @@ impl<'toks> Ast<'toks> {
         tinfo
     }
 
-    /// Create a new abstract syntax tree.
-    pub fn new(fstr: &'toks str, diags: &mut Diags) -> anyhow::Result<Self> {
-        let mut arena = Arena::new();
-        let root = arena.new_node(usize::MAX);
-        let mut tv = Vec::new();
+    /// Recursively lexes the provided `fstr` source string, flattening the tokens directly
+    /// into the main `tv` stream. Encountering an `include "path";` sequence triggers
+    /// path resolution relative to the current file, reading the target contents,
+    /// registering the path with `diags` to claim a new `file_id`, and recursing
+    /// to insert the nested tokens into the stream.
+    ///
+    /// The `visited` hash map tracks canonical paths to prevent include cycles.
+    fn lex_file_r(
+        tv: &mut Vec<TokenInfo<'toks>>,
+        name: &str,
+        fstr: &'toks str,
+        file_id: usize,
+        diags: &mut Diags,
+        visited: &mut HashMap<String, SourceSpan>,
+    ) -> anyhow::Result<()> {
         let mut lex = LexToken::lexer(fstr);
         while let Some(tok) = lex.next() {
+            let val = lex.slice();
+            let span = lex.span();
+            if tok == LexToken::Identifier && val == "include" {
+                // Determine whether 'include' serves as a top-level directive
+                // rather than a misused reserved identifier (e.g., `const include = ...`).
+                // Checking whether 'include'appears immediately after a statement boundary (or at the
+                // start of the file) prevents eagerly intercepting valid parser-level error
+                // cases like AST_32 (Reserved section name) or AST_33 (Reserved const name).
+                let is_directive = tv.last().map_or(true, |t| {
+                    matches!(t.tok, LexToken::Semicolon | LexToken::CloseBrace)
+                });
+
+                if is_directive {
+                    let next_tok = lex.next();
+                    if next_tok != Some(LexToken::QuotedString) {
+                        diags.err1(
+                            "AST_34",
+                            "Expected quoted string after include",
+                            SourceSpan {
+                                file_id,
+                                range: span,
+                            },
+                        );
+                        anyhow::bail!("AST lexing failed");
+                    }
+                    let path_val = lex.slice();
+                    let path_span = lex.span();
+
+                    let semi_tok = lex.next();
+                    if semi_tok != Some(LexToken::Semicolon) {
+                        diags.err1(
+                            "AST_35",
+                            "Expected semicolon after include statement",
+                            SourceSpan {
+                                file_id,
+                                range: path_span,
+                            },
+                        );
+                        anyhow::bail!("AST lexing failed");
+                    }
+
+                    let raw_path = path_val
+                        .strip_prefix('"')
+                        .unwrap()
+                        .strip_suffix('"')
+                        .unwrap();
+                    let base_dir = std::path::Path::new(name)
+                        .parent()
+                        .unwrap_or(std::path::Path::new(""));
+                    let resolved_path = base_dir.join(raw_path);
+
+                    // Use a normalized string path for cycle detection
+                    let resolved_path_str = if let Ok(c) = resolved_path.canonicalize() {
+                        c.to_string_lossy().to_string()
+                    } else {
+                        // Fallback to basic string if it doesn't exist to generate good error
+                        resolved_path.to_string_lossy().to_string()
+                    };
+
+                    if let Some(orig_span) = visited.get(&resolved_path_str) {
+                        diags.err2(
+                            "AST_36",
+                            &format!("Include cycle detected: {}", resolved_path_str),
+                            SourceSpan {
+                                file_id,
+                                range: span.clone(),
+                            },
+                            orig_span.clone(),
+                        );
+                        anyhow::bail!("AST lexing failed");
+                    }
+                    visited.insert(
+                        resolved_path_str.clone(),
+                        SourceSpan {
+                            file_id,
+                            range: span.clone(),
+                        },
+                    );
+
+                    let content = match std::fs::read_to_string(&resolved_path) {
+                        Ok(c) => c,
+                        Err(e) => {
+                            diags.err1(
+                                "AST_37",
+                                &format!(
+                                    "Failed to read included file '{}': {}",
+                                    resolved_path_str, e
+                                ),
+                                SourceSpan {
+                                    file_id,
+                                    range: path_span,
+                                },
+                            );
+                            anyhow::bail!("AST lexing failed");
+                        }
+                    };
+
+                    let leaked_content: &'toks str = Box::leak(content.into_boxed_str());
+                    let inc_file_id = diags.add_file(&resolved_path_str, leaked_content);
+
+                    Self::lex_file_r(
+                        tv,
+                        &resolved_path_str,
+                        leaked_content,
+                        inc_file_id,
+                        diags,
+                        visited,
+                    )?;
+
+                    continue;
+                }
+            }
+
             debug!("ast::new: Token {} = {:?}", tv.len(), tok);
             tv.push(TokenInfo {
                 tok,
-                val: lex.slice(),
-                loc: SourceSpan { file_id: 0, range: lex.span() },
+                val,
+                loc: SourceSpan {
+                    file_id,
+                    range: span,
+                },
             });
         }
+        Ok(())
+    }
+
+    /// Create a new abstract syntax tree.
+    pub fn new(name: &str, fstr: &'toks str, diags: &mut Diags) -> anyhow::Result<Self> {
+        let mut arena = Arena::new();
+        let root = arena.new_node(usize::MAX);
+        let mut tv = Vec::new();
+        let mut visited = HashMap::new();
+
+        // In Phase 1, `process.rs` adds the main file to diags at id=0.
+        // We reuse that knowledge here.
+        let main_path = if let Ok(c) = std::path::Path::new(name).canonicalize() {
+            c.to_string_lossy().to_string()
+        } else {
+            name.to_string()
+        };
+        visited.insert(
+            main_path,
+            SourceSpan {
+                file_id: 0,
+                range: 0..0,
+            },
+        );
+
+        Self::lex_file_r(&mut tv, name, fstr, 0, diags, &mut visited)?;
         let mut ast = Self {
             arena,
             tv,

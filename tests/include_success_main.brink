@@ -1,0 +1,6 @@
+include "include_success_sub.brink";
+section main {
+    wr8 MY_VAL;
+    wr8 0xBB;
+}
+output main 0x1000;

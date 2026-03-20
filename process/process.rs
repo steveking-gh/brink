@@ -115,7 +115,7 @@ pub fn process(
         const_defines.insert(n, v);
     }
 
-    let ast = Ast::new(fstr, &mut diags).context("[PROC_1]: Error detected, halting.")?;
+    let ast = Ast::new(name, fstr, &mut diags).context("[PROC_1]: Error detected, halting.")?;
 
     if verbosity > 2 {
         ast.dump("ast.dot")?;
