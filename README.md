@@ -383,7 +383,6 @@ Brink also reserves the following *exact* keywords for future language features:
 
 | Reserved Keyword | Possible future use           |
 | ---------------- | ----------------------------- |
-| `include`        | File inclusion                |
 | `import`         | Module inclusion              |
 | `if`             | Conditional section inclusion |
 | `else`           | Conditional section inclusion |
