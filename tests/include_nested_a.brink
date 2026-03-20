@@ -1,0 +1,2 @@
+include "include_nested_b.brink";
+const MY_A_VAL = 0x11;

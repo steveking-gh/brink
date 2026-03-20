@@ -1,0 +1,6 @@
+include "include_nested_a.brink";
+section main {
+    wr8 MY_A_VAL;
+    wr8 MY_B_VAL;
+}
+output main 0x2000;

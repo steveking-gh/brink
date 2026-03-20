@@ -1682,4 +1682,19 @@ mod tests {
         assert_eq!(bytevec, temp);
         fs::remove_file("include_success.bin").ok();
     }
+
+    #[test]
+    #[serial]
+    fn include_nested_success() {
+        let mut cmd = Command::cargo_bin("brink").unwrap();
+        cmd.arg("tests/include_nested_main.brink")
+            .arg("-o")
+            .arg("include_nested.bin");
+        cmd.assert().success();
+
+        let bytevec = fs::read("include_nested.bin").unwrap();
+        let temp: Vec<u8> = vec![0x11, 0x22];
+        assert_eq!(bytevec, temp);
+        fs::remove_file("include_nested.bin").ok();
+    }
 } // mod tests
