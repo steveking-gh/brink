@@ -65,15 +65,20 @@ pub struct Cli {
     #[arg(short = 'q', long = "quiet")]
     pub quiet: bool,
 
-    /// Write a human-friendly map file.  Omit FILE to derive name from input
-    /// (e.g. firmware.brink -> firmware.map.txt).  Use FILE=- for stdout.
-    #[arg(long = "map-hf", value_name = "FILE", num_args(0..=1), default_missing_value = "", require_equals = true)]
-    pub map_hf: Option<String>,
+    /// Write a CSV map file.  Omit FILE to derive name from input
+    /// (e.g. firmware.brink -> firmware.map.csv).  Use FILE=- for stdout.
+    #[arg(long = "map-csv", value_name = "FILE", num_args(0..=1), default_missing_value = "", require_equals = true)]
+    pub map_csv: Option<String>,
 
     /// Write a JSON map file.  Omit FILE to derive name from input
     /// (e.g. firmware.brink -> firmware.map.json).  Use FILE=- for stdout.
     #[arg(long = "map-json", value_name = "FILE", num_args(0..=1), default_missing_value = "", require_equals = true)]
     pub map_json: Option<String>,
+
+    /// Write a C99 map file.  Omit FILE to derive name from input
+    /// (e.g. firmware.brink -> firmware.map.h).  Use FILE=- for stdout.
+    #[arg(long = "map-c99", value_name = "FILE", num_args(0..=1), default_missing_value = "", require_equals = true)]
+    pub map_c99: Option<String>,
 }
 
 fn main() -> Result<()> {
@@ -105,15 +110,15 @@ fn main() -> Result<()> {
         .replace("\r\n", "\n");
 
     // Resolve map flags: "" sentinel -> derive basename from input + extension.
-    let map_hf_resolved;
-    let map_hf = match cli.map_hf.as_deref() {
+    let map_csv_resolved;
+    let map_csv = match cli.map_csv.as_deref() {
         Some("") => {
             let stem = Path::new(in_file_name)
                 .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("output");
-            map_hf_resolved = format!("{stem}.map.txt");
-            Some(map_hf_resolved.as_str())
+            map_csv_resolved = format!("{stem}.map.csv");
+            Some(map_csv_resolved.as_str())
         }
         other => other,
     };
@@ -131,6 +136,19 @@ fn main() -> Result<()> {
         other => other,
     };
 
+    let map_c99_resolved;
+    let map_c99 = match cli.map_c99.as_deref() {
+        Some("") => {
+            let stem = Path::new(in_file_name)
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("output");
+            map_c99_resolved = format!("{stem}.map.h");
+            Some(map_c99_resolved.as_str())
+        }
+        other => other,
+    };
+
     process(
         in_file_name,
         &str_in,
@@ -138,7 +156,8 @@ fn main() -> Result<()> {
         verbosity,
         cli.noprint,
         &cli.defines,
-        map_hf,
+        map_csv,
         map_json,
+        map_c99,
     )
 }

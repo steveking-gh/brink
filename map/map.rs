@@ -105,21 +105,15 @@ pub fn fmt_const_value(pv: &ParameterValue) -> String {
 /// Name,            Address,             Img Offset,
 /// lab1,            0x0000000000001004,  0x0000000000000004,
 /// ```
-pub fn format_human(map: &MapDb) -> String {
+pub fn format_csv(map: &MapDb) -> String {
     use std::fmt::Write;
     let mut out = String::new();
 
     // ── Header ────────────────────────────────────────────────────────────────
-    writeln!(out, "Brink Output Map").unwrap();
-    writeln!(out, "================").unwrap();
-    writeln!(out, "Output:    {}", map.output_file).unwrap();
-    writeln!(out, "Base addr: 0x{:016x}", map.base_addr).unwrap();
-    writeln!(
-        out,
-        "Total:     0x{:016x} ({} bytes)",
-        map.total_size, map.total_size
-    )
-    .unwrap();
+    writeln!(out, "Output File, {}", map.output_file).unwrap();
+    writeln!(out, "Base Address, 0x{:016x}", map.base_addr).unwrap();
+    writeln!(out, "Total Size (hex), 0x{:016x}", map.total_size).unwrap();
+    writeln!(out, "Total Size (decimal), {}", map.total_size).unwrap();
 
     // ── Constants ─────────────────────────────────────────────────────────────
     writeln!(out).unwrap();
@@ -182,6 +176,53 @@ pub fn format_human(map: &MapDb) -> String {
 
     out
 }
+
+/// Produces a C99 preprocessor compatible `.h` header format output
+pub fn format_c99(map: &MapDb) -> String {
+    use std::fmt::Write;
+    let mut out = String::new();
+
+    let stem = std::path::Path::new(&map.output_file)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("OUTPUT")
+        .to_uppercase()
+        .replace(|c: char| !c.is_ascii_alphanumeric(), "_");
+
+    writeln!(out, "// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!").unwrap();
+    writeln!(out, "// Automatically generated file! Do not edit!").unwrap();
+    writeln!(out, "// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!").unwrap();
+    writeln!(out, "#ifndef {}_MAP_H", stem).unwrap();
+    writeln!(out, "#define {}_MAP_H\n", stem).unwrap();
+
+    writeln!(out, "#define {}_MAP_BASE_ADDR 0x{:016x}ULL", stem, map.base_addr).unwrap();
+    writeln!(out, "#define {}_MAP_TOTAL_SIZE {}ULL", stem, map.total_size).unwrap();
+
+    if !map.sections.is_empty() {
+        writeln!(out, "\n// Sections").unwrap();
+        for sec in &map.sections {
+            let sec_name = sec.name.replace(|c: char| !c.is_ascii_alphanumeric(), "_");
+            writeln!(out, "#define {}_MAP_{}_ADDR 0x{:016x}ULL", stem, sec_name, sec.abs_start).unwrap();
+            writeln!(out, "#define {}_MAP_{}_IMG_OFFSET 0x{:016x}ULL", stem, sec_name, sec.img_start).unwrap();
+            writeln!(out, "#define {}_MAP_{}_SIZE {}ULL", stem, sec_name, sec.size).unwrap();
+            writeln!(out).unwrap();
+        }
+    }
+
+    if !map.labels.is_empty() {
+        writeln!(out, "// Labels").unwrap();
+        for lab in &map.labels {
+            let lab_name = lab.name.replace(|c: char| !c.is_ascii_alphanumeric(), "_");
+            writeln!(out, "#define {}_MAP_{}_ADDR 0x{:016x}ULL", stem, lab_name, lab.abs_addr).unwrap();
+            writeln!(out, "#define {}_MAP_{}_IMG_OFFSET 0x{:016x}ULL", stem, lab_name, lab.img_offset).unwrap();
+            writeln!(out).unwrap();
+        }
+    }
+
+    writeln!(out, "\n#endif").unwrap();
+    out
+}
+
 
 // ── JSON formatter ────────────────────────────────────────────────────────────
 

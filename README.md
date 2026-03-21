@@ -34,7 +34,7 @@ The previous build step created the brink binary as `./target/release/brink`.  Y
 
     $ cargo install --path ./
 
-## Command Line Options
+# Command Line Options
 
     brink [OPTIONS] <input>
 
@@ -53,39 +53,41 @@ The previous build step created the brink binary as `./target/release/brink`.  Y
 
 Both map options list every section, label, and constant with its address and size.  Both accept the same FILE argument forms:
 
-| Invocation          | Result                                                                                           |
-| ------------------- | ------------------------------------------------------------------------------------------------ |
-| `--map-hf`          | Writes `<stem>.map.txt` to the current directory (e.g. `firmware.brink` → `firmware.map.txt`).   |
-| `--map-json`        | Writes `<stem>.map.json` to the current directory (e.g. `firmware.brink` → `firmware.map.json`). |
-| `--map-hf=<file>`   | Writes the human-friendly map to the specified file.                                             |
-| `--map-json=<file>` | Writes the JSON map to the specified file.                                                       |
-| `--map-hf=-`        | Writes the human-friendly map to stdout.                                                         |
-| `--map-json=-`      | Writes the JSON map to stdout.                                                                   |
+| Invocation          | Result                                                                                                                             |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `--map-csv`         | Writes a CSV format map file `<stem>.map.csv` to the current directory.<br>For example: `firmware.brink` → `firmware.map.csv`. |
+| `--map-csv=<file>`  | Writes a CSV map file to the specified file.                                                                            |
+| `--map-csv=-`       | Writes a CSV map file to stdout.                                                                                        |
+| `--map-c99`         | Writes a C99 header file `<stem>.map.h` to the current directory.<br>For example: `firmware.brink` → `firmware.map.h`.             |
+| `--map-c99=<file>`  | Writes a C99 header to the specified file.                                                                                         |
+| `--map-c99=-`       | Writes a C99 header to stdout.                                                                                                     |
+| `--map-json`        | Writes a JSON format map file `<stem>.map.json` to the current directory.<br>For example: `firmware.brink` → `firmware.map.json`.  |
+| `--map-json=<file>` | Writes a JSON map to the specified file.                                                                                           |
+| `--map-json=-`      | Writes a JSON map to stdout.                                                                                                       |
 
 Brink writes map output to the current working directory when no path is given, keeping build artifacts out of source directories.  Both formats report the same semantic payload and both flags may be specified together.
 
-### Human-Friendly Format (`--map-hf`)
+### CSV Format (`--map-csv`)
 
-Produces a comma-separated, fixed-column text file that imports directly into a spreadsheet.
+Produces a comma-separated, fixed-column CSV file that imports directly into a spreadsheet.
 
 Example:
 
-    Brink Output Map
-    ================
-    Output:    output.bin
-    Base addr: 0x0000000000001000
-    Total:     0x0000000000000050 (80 bytes)
+    Output File, output.bin
+    Base Address, 0x0000000000001000
+    Total Size (hex), 0x0000000000000050
+    Total Size (decimal), 80
 
     Constants
     Name,            Value,
     BASE,            0x0000000000001000,
 
     Sections
-    Name,            Address,           Img Offset,        Size (bytes),
+    Name,            Address,             Img Offset,          Size (bytes),
     text,            0x0000000000001000,  0x0000000000000000,  0x00000032,
 
     Labels
-    Name,            Address,           Img Offset,
+    Name,            Address,             Img Offset,
     start,           0x0000000000001000,  0x0000000000000000,
 
 ### JSON Format (`--map-json`)
@@ -110,6 +112,34 @@ Example:
           "img_offset": "0x0000000000000000" }
       ]
     }
+
+### C99 Header Format (`--map-c99`)
+
+Produces a C preprocessor (C99 compatible) header file.  The header file is named `<stem>.map.h` where `<stem>` is the stem of the input file name.
+
+Example:
+
+```c
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// Automatically generated file! Do not edit!
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#ifndef OUTPUT_MAP_H
+#define OUTPUT_MAP_H
+
+#define OUTPUT_MAP_BASE_ADDR 0x0000000000001000ULL
+#define OUTPUT_MAP_TOTAL_SIZE 80ULL
+
+// Sections
+#define OUTPUT_MAP_TEXT_ADDR 0x0000000000001000ULL
+#define OUTPUT_MAP_TEXT_IMG_OFFSET 0x0000000000000000ULL
+#define OUTPUT_MAP_TEXT_SIZE 50ULL
+
+// Labels
+#define OUTPUT_MAP_START_ADDR 0x0000000000001000ULL
+#define OUTPUT_MAP_START_IMG_OFFSET 0x0000000000000000ULL
+
+#endif
+```
 
 ## Command-Line Const Defines
 
@@ -155,7 +185,7 @@ The source can reference `BASE` as an ordinary const:
 
 ---
 
-## What Can Brink Do?
+# What Can Brink Do?
 
 Brink can assemble any number of input files into a unified output.
 
@@ -261,7 +291,7 @@ Prints the console message:
 
 In addition to writing to 'output.bin'.
 
-## The Location Counter
+# The Location Counter
 
 Like the [GNU linker 'ld'](https://ftp.gnu.org/old-gnu/Manuals/ld-2.9.1/html_mono/ld.html), brink uses the concept of a *location counter*.  The location counter is the current position in the output file, referenced from either the start of the current section, the start of the entire output file (or image) or the absolute logical address.  The location counter can only move forward.
 
@@ -307,7 +337,7 @@ For example, setting a smaller 5 second timeout for hangs and maximum input leng
 
     cargo +nightly fuzz run fuzz_target_1 -- -timeout=5 -max_len=256
 
-## Basic Structure of a Brink Program
+# Basic Structure of a Brink Program
 
 A brink source file consists of one or more section definitions and exactly one output statement.    Each section has a unique name.  The output statement specifies the name of the top level section.  Starting from the top section, Brink recursively evaluates each section and produces the output file.  For example, we can define a section with a write-string (wrs) expression:
 
@@ -344,6 +374,7 @@ Produces `output.bin`:
     I'm foo
 
 ---
+
 # Brink Language Reference
 
 ## Comments

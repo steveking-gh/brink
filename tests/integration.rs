@@ -1263,14 +1263,14 @@ mod tests {
 
     // ── Map file output tests ─────────────────────────────────────────────────
 
-    /// Runs brink with --map-hf=<map_file> and -o <bin_file>, reads the map,
+    /// Runs brink with --map-csv=<map_file> and -o <bin_file>, reads the map,
     /// asserts every string in `checks` appears in the map, then cleans up.
-    fn assert_map_hf(src: &str, bin_out: &str, map_out: &str, checks: &[&str]) {
+    fn assert_map_csv(src: &str, bin_out: &str, map_out: &str, checks: &[&str]) {
         let mut cmd = Command::cargo_bin("brink").unwrap();
         cmd.arg(src)
             .arg("-o")
             .arg(bin_out)
-            .arg(format!("--map-hf={map_out}"));
+            .arg(format!("--map-csv={map_out}"));
         cmd.assert().success();
 
         let map =
@@ -1289,11 +1289,11 @@ mod tests {
     /// Section names, absolute addresses, sizes, and const names/values all
     /// appear in the map.  hdr=2 bytes at 0x2000, body=5 bytes at 0x2002.
     #[test]
-    fn map_hf_sections_and_consts() {
-        assert_map_hf(
+    fn map_csv_sections_and_consts() {
+        assert_map_csv(
             "tests/map_sections.brink",
             "map_sections.bin",
-            "map_sections.map.txt",
+            "map_sections.map.csv",
             &[
                 "hdr",
                 "body",
@@ -1313,11 +1313,11 @@ mod tests {
     /// Label names and their absolute addresses appear in the map.
     /// 'entry' is at 0x5000, 'done' is at 0x5003.
     #[test]
-    fn map_hf_labels() {
-        assert_map_hf(
+    fn map_csv_labels() {
+        assert_map_csv(
             "tests/map_labels.brink",
             "map_labels.bin",
-            "map_labels.map.txt",
+            "map_labels.map.csv",
             &[
                 "entry",
                 "done",
@@ -1329,43 +1329,43 @@ mod tests {
 
     /// A section written three times via wr produces three map entries.
     #[test]
-    fn map_hf_repeated_section() {
-        assert_map_hf(
+    fn map_csv_repeated_section() {
+        assert_map_csv(
             "tests/map_repeated.brink",
             "map_repeated.bin",
-            "map_repeated.map.txt",
+            "map_repeated.map.csv",
             &["chunk"],
         );
         // Verify chunk appears three times by reading the map independently.
-        // (assert_map_hf already cleaned up, so re-run for the count check.)
+        // (assert_map_csv already cleaned up, so re-run for the count check.)
         let mut cmd = Command::cargo_bin("brink").unwrap();
         cmd.arg("tests/map_repeated.brink")
             .arg("-o")
             .arg("map_repeated2.bin")
-            .arg("--map-hf=map_repeated2.map.txt");
+            .arg("--map-csv=map_repeated2.map.csv");
         cmd.assert().success();
-        let map = fs::read_to_string("map_repeated2.map.txt").unwrap();
+        let map = fs::read_to_string("map_repeated2.map.csv").unwrap();
         assert!(
             map.matches("chunk").count() >= 3,
             "expected at least 3 'chunk' entries"
         );
         fs::remove_file("map_repeated2.bin").ok();
-        fs::remove_file("map_repeated2.map.txt").ok();
+        fs::remove_file("map_repeated2.map.csv").ok();
     }
 
-    /// Omitting FILE from --map-hf creates <stem>.map.txt in the current directory.
+    /// Omitting FILE from --map-csv creates <stem>.map.csv in the current directory.
     #[test]
     #[serial]
-    fn map_hf_default_filename() {
+    fn map_csv_default_filename() {
         let mut cmd = Command::cargo_bin("brink").unwrap();
         cmd.arg("tests/map_default.brink")
             .arg("-o")
             .arg("map_default.bin")
-            .arg("--map-hf");
+            .arg("--map-csv");
         cmd.assert().success();
 
-        let map = fs::read_to_string("map_default.map.txt")
-            .expect("default map file map_default.map.txt not created");
+        let map = fs::read_to_string("map_default.map.csv")
+            .expect("default map file map_default.map.csv not created");
         assert!(
             map.contains("foo"),
             "section 'foo' missing from default map"
@@ -1376,18 +1376,18 @@ mod tests {
         );
 
         fs::remove_file("map_default.bin").ok();
-        fs::remove_file("map_default.map.txt").ok();
+        fs::remove_file("map_default.map.csv").ok();
     }
 
-    /// --map-hf=- writes map content to stdout.
+    /// --map-csv=- writes map content to stdout.
     #[test]
-    fn map_hf_stdout() {
+    fn map_csv_stdout() {
         Command::cargo_bin("brink")
             .unwrap()
             .arg("tests/map_sections.brink")
             .arg("-o")
             .arg("map_stdout.bin")
-            .arg("--map-hf=-")
+            .arg("--map-csv=-")
             .assert()
             .success()
             .stdout(predicates::str::contains("hdr"))
@@ -1535,27 +1535,27 @@ mod tests {
     }
 
     /// -DBASE=0x3000u places the output at 0x3000 and the const appears in the
-    /// human-friendly map; -DCOUNT=16 also appears as a const in the map.
+    /// CSV map; -DCOUNT=16 also appears as a const in the map.
     #[test]
-    fn defines_appear_in_hf_map() {
+    fn defines_appear_in_csv_map() {
         let mut cmd = Command::cargo_bin("brink").unwrap();
         cmd.arg("tests/map_defines.brink")
             .arg("-o")
-            .arg("defines_hf.bin")
-            .arg("--map-hf=defines_hf.map.txt")
+            .arg("defines_csv.bin")
+            .arg("--map-csv=defines_csv.map.csv")
             .arg("-DBASE=0x3000u")
             .arg("-DCOUNT=16");
         cmd.assert().success();
 
-        let map = fs::read_to_string("defines_hf.map.txt")
+        let map = fs::read_to_string("defines_csv.map.csv")
             .unwrap_or_else(|_| panic!("map file not found"));
         assert!(map.contains("0x0000000000003000"), "BASE address missing");
         assert!(map.contains("BASE"), "BASE const name missing");
         assert!(map.contains("COUNT"), "COUNT const name missing");
         assert!(map.contains("16"), "COUNT value missing");
 
-        fs::remove_file("defines_hf.bin").ok();
-        fs::remove_file("defines_hf.map.txt").ok();
+        fs::remove_file("defines_csv.bin").ok();
+        fs::remove_file("defines_csv.map.csv").ok();
     }
 
     /// -D defines appear in JSON map output with correct types.
@@ -1696,5 +1696,63 @@ mod tests {
         let temp: Vec<u8> = vec![0x11, 0x22];
         assert_eq!(bytevec, temp);
         fs::remove_file("include_nested.bin").ok();
+    }
+
+    /// Omitting FILE from --map-c99 creates <stem>.map.h in the current directory.
+    #[test]
+    #[serial]
+    fn map_c99_default_filename() {
+        let mut cmd = Command::cargo_bin("brink").unwrap();
+        cmd.arg("tests/map_default.brink")
+            .arg("-o")
+            .arg("map_default.bin")
+            .arg("--map-c99");
+        cmd.assert().success();
+
+        let map = fs::read_to_string("map_default.map.h")
+            .expect("Failed to open expected default map file map_default.map.h");
+        
+        assert!(map.contains("#define MAP_DEFAULT_MAP_H"));
+        assert!(map.contains("MAP_DEFAULT_MAP_foo_ADDR"));
+        assert!(map.contains("MAP_DEFAULT_MAP_TOTAL_SIZE"));
+        assert!(map.contains("ULL"));
+
+        fs::remove_file("map_default.bin").ok();
+        fs::remove_file("map_default.map.h").ok();
+    }
+
+    /// --map-c99=- writes map content to stdout.
+    #[test]
+    fn map_c99_stdout() {
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/map_sections.brink")
+            .arg("-o")
+            .arg("map_stdout.bin")
+            .arg("--map-c99=-")
+            .assert()
+            .success()
+            .stdout(predicates::str::contains("MAP_STDOUT_MAP_hdr_ADDR"))
+            .stdout(predicates::str::contains("MAP_STDOUT_MAP_body_SIZE"))
+            .stdout(predicates::str::contains("0x0000000000002000ULL"));
+        fs::remove_file("map_stdout.bin").ok();
+    }
+
+    /// --map-c99=- correctly parses user-defined compilation labels.
+    #[test]
+    fn map_c99_labels() {
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/map_labels.brink")
+            .arg("-o")
+            .arg("map_labels.bin")
+            .arg("--map-c99=-")
+            .assert()
+            .success()
+            .stdout(predicates::str::contains("MAP_LABELS_MAP_entry_ADDR"))
+            .stdout(predicates::str::contains("MAP_LABELS_MAP_done_ADDR"))
+            .stdout(predicates::str::contains("0x0000000000005000ULL"))
+            .stdout(predicates::str::contains("0x0000000000005003ULL"));
+        fs::remove_file("map_labels.bin").ok();
     }
 } // mod tests
