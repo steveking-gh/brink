@@ -267,7 +267,7 @@ impl<'toks> Ast<'toks> {
                 // Checking whether 'include'appears immediately after a statement boundary (or at the
                 // start of the file) prevents eagerly intercepting valid parser-level error
                 // cases like AST_32 (Reserved section name) or AST_33 (Reserved const name).
-                let is_directive = tv.last().map_or(true, |t| {
+                let is_directive = tv.last().is_none_or(|t| {
                     matches!(t.tok, LexToken::Semicolon | LexToken::CloseBrace)
                 });
 
