@@ -81,17 +81,16 @@ pub fn fmt_const_value(pv: &ParameterValue) -> String {
     }
 }
 
-// ── Human-friendly formatter ──────────────────────────────────────────────────
+// ── CSV formatter ──────────────────────────────────────────────────
 
-/// Renders `map` as a human-friendly tabular map.
+/// Renders `map` as a CSV map.
 ///
 /// Format overview:
 /// ```text
-/// Brink Output Map
-/// ================
-/// Output:    output.bin
-/// Base addr: 0x0000000000001000
-/// Total:     0x0000000000000050 (80 bytes)
+/// Output File, output.bin
+/// Base Address, 0x0000000000001000
+/// Total Size (hex), 0x0000000000000050
+/// Total Size (decimal), 80
 ///
 /// Constants
 /// Name,            Value,
@@ -195,16 +194,36 @@ pub fn format_c99(map: &MapDb) -> String {
     writeln!(out, "#ifndef {}_MAP_H", stem).unwrap();
     writeln!(out, "#define {}_MAP_H\n", stem).unwrap();
 
-    writeln!(out, "#define {}_MAP_BASE_ADDR 0x{:016x}ULL", stem, map.base_addr).unwrap();
+    writeln!(
+        out,
+        "#define {}_MAP_BASE_ADDR 0x{:016x}ULL",
+        stem, map.base_addr
+    )
+    .unwrap();
     writeln!(out, "#define {}_MAP_TOTAL_SIZE {}ULL", stem, map.total_size).unwrap();
 
     if !map.sections.is_empty() {
         writeln!(out, "\n// Sections").unwrap();
         for sec in &map.sections {
             let sec_name = sec.name.replace(|c: char| !c.is_ascii_alphanumeric(), "_");
-            writeln!(out, "#define {}_MAP_{}_ADDR 0x{:016x}ULL", stem, sec_name, sec.abs_start).unwrap();
-            writeln!(out, "#define {}_MAP_{}_IMG_OFFSET 0x{:016x}ULL", stem, sec_name, sec.img_start).unwrap();
-            writeln!(out, "#define {}_MAP_{}_SIZE {}ULL", stem, sec_name, sec.size).unwrap();
+            writeln!(
+                out,
+                "#define {}_MAP_{}_ADDR 0x{:016x}ULL",
+                stem, sec_name, sec.abs_start
+            )
+            .unwrap();
+            writeln!(
+                out,
+                "#define {}_MAP_{}_IMG_OFFSET 0x{:016x}ULL",
+                stem, sec_name, sec.img_start
+            )
+            .unwrap();
+            writeln!(
+                out,
+                "#define {}_MAP_{}_SIZE {}ULL",
+                stem, sec_name, sec.size
+            )
+            .unwrap();
             writeln!(out).unwrap();
         }
     }
@@ -213,8 +232,18 @@ pub fn format_c99(map: &MapDb) -> String {
         writeln!(out, "// Labels").unwrap();
         for lab in &map.labels {
             let lab_name = lab.name.replace(|c: char| !c.is_ascii_alphanumeric(), "_");
-            writeln!(out, "#define {}_MAP_{}_ADDR 0x{:016x}ULL", stem, lab_name, lab.abs_addr).unwrap();
-            writeln!(out, "#define {}_MAP_{}_IMG_OFFSET 0x{:016x}ULL", stem, lab_name, lab.img_offset).unwrap();
+            writeln!(
+                out,
+                "#define {}_MAP_{}_ADDR 0x{:016x}ULL",
+                stem, lab_name, lab.abs_addr
+            )
+            .unwrap();
+            writeln!(
+                out,
+                "#define {}_MAP_{}_IMG_OFFSET 0x{:016x}ULL",
+                stem, lab_name, lab.img_offset
+            )
+            .unwrap();
             writeln!(out).unwrap();
         }
     }
@@ -222,7 +251,6 @@ pub fn format_c99(map: &MapDb) -> String {
     writeln!(out, "\n#endif").unwrap();
     out
 }
-
 
 // ── JSON formatter ────────────────────────────────────────────────────────────
 

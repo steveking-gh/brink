@@ -17,7 +17,7 @@ Brink is written in rust, which works on all major operating systems.  Installin
 
 ### Step 2: Clone Brink
 
-From a command prompt, clone brink and change directory to your clone.  For example:
+From a command prompt, clone Brink and change directory to your clone.  For example:
 
     $ git clone https://github.com/steveking-gh/brink.git
     $ cd brink
@@ -30,7 +30,7 @@ All tests should pass, 0 tests should fail.
 
 ### Step 4: Install Brink
 
-The previous build step created the brink binary as `./target/release/brink`.  You can install the brink binary anywhere on your system.  As a convenience, cargo provides a per-user installation as `$HOME/.cargo/bin/brink`.
+The previous build step created the Brink binary as `./target/release/brink`.  You can install the Brink binary anywhere on your system.  As a convenience, cargo provides a per-user installation as `$HOME/.cargo/bin/brink`.
 
     $ cargo install --path ./
 
@@ -53,17 +53,17 @@ The previous build step created the brink binary as `./target/release/brink`.  Y
 
 Both map options list every section, label, and constant with its address and size.  Both accept the same FILE argument forms:
 
-| Invocation          | Result                                                                                                                             |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `--map-csv`         | Writes a CSV format map file `<stem>.map.csv` to the current directory.<br>For example: `firmware.brink` → `firmware.map.csv`. |
-| `--map-csv=<file>`  | Writes a CSV map file to the specified file.                                                                            |
-| `--map-csv=-`       | Writes a CSV map file to stdout.                                                                                        |
-| `--map-c99`         | Writes a C99 header file `<stem>.map.h` to the current directory.<br>For example: `firmware.brink` → `firmware.map.h`.             |
-| `--map-c99=<file>`  | Writes a C99 header to the specified file.                                                                                         |
-| `--map-c99=-`       | Writes a C99 header to stdout.                                                                                                     |
-| `--map-json`        | Writes a JSON format map file `<stem>.map.json` to the current directory.<br>For example: `firmware.brink` → `firmware.map.json`.  |
-| `--map-json=<file>` | Writes a JSON map to the specified file.                                                                                           |
-| `--map-json=-`      | Writes a JSON map to stdout.                                                                                                       |
+| Invocation          | Result                                                                                                                            |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `--map-csv`         | Writes a CSV format map file `<stem>.map.csv` to the current directory.<br>For example: `firmware.brink` → `firmware.map.csv`.    |
+| `--map-csv=<file>`  | Writes a CSV map file to the specified file.                                                                                      |
+| `--map-csv=-`       | Writes a CSV map file to stdout.                                                                                                  |
+| `--map-c99`         | Writes a C99 header file `<stem>.map.h` to the current directory.<br>For example: `firmware.brink` → `firmware.map.h`.            |
+| `--map-c99=<file>`  | Writes a C99 header to the specified file.                                                                                        |
+| `--map-c99=-`       | Writes a C99 header to stdout.                                                                                                    |
+| `--map-json`        | Writes a JSON format map file `<stem>.map.json` to the current directory.<br>For example: `firmware.brink` → `firmware.map.json`. |
+| `--map-json=<file>` | Writes a JSON map to the specified file.                                                                                          |
+| `--map-json=-`      | Writes a JSON map to stdout.                                                                                                      |
 
 Brink writes map output to the current working directory when no path is given, keeping build artifacts out of source directories.  Both formats report the same semantic payload and both flags may be specified together.
 
@@ -156,7 +156,7 @@ Both map formats (`--map-hf` and `--map-json`) list `-D` consts alongside source
     -D<NAME>
     -D<NAME>=<VALUE>
 
-`NAME` must be a valid brink identifier.  `VALUE` is optional; without a value, Brink sets the const to `Integer(1)`, following the GCC boolean-flag convention.
+`NAME` must be a valid Brink identifier.  `VALUE` is optional; without a value, Brink sets the const to `Integer(1)`, following the GCC boolean-flag convention.
 
 ### Value Type Inference
 
@@ -211,7 +211,7 @@ Brink can add pad bytes to force parts of the file to start at an aligned bounda
 
 ---
 
-Brink can write your own strings and data defined within your brink source file.
+Brink can write your own strings and data defined within your Brink source file.
 
 <img src="./images/adhoc.svg" width="400">
 
@@ -238,7 +238,7 @@ For a source file called hello.brink:
     // An output statement outputs the section to a file
     output foo;
 
-Running brink on the file produces the expected message:
+Running Brink on the file produces the expected message:
 
     $ brink hello.brink
     Hello World!
@@ -293,7 +293,7 @@ In addition to writing to 'output.bin'.
 
 # The Location Counter
 
-Like the [GNU linker 'ld'](https://ftp.gnu.org/old-gnu/Manuals/ld-2.9.1/html_mono/ld.html), brink uses the concept of a *location counter*.  The location counter is the current position in the output file, referenced from either the start of the current section, the start of the entire output file (or image) or the absolute logical address.  The location counter can only move forward.
+Like the [GNU linker 'ld'](https://ftp.gnu.org/old-gnu/Manuals/ld-2.9.1/html_mono/ld.html), Brink uses the concept of a *location counter*.  The location counter is the current position in the output file, referenced from either the start of the current section, the start of the entire output file (or image) or the absolute logical address.  The location counter can only move forward.
 
 The following diagram shows the basic concepts.  Users specify the starting logical address using an [output](#output-section-identifier-absolute-starting-address) statement.
 
@@ -339,7 +339,7 @@ For example, setting a smaller 5 second timeout for hangs and maximum input leng
 
 # Basic Structure of a Brink Program
 
-A brink source file consists of one or more section definitions and exactly one output statement.    Each section has a unique name.  The output statement specifies the name of the top level section.  Starting from the top section, Brink recursively evaluates each section and produces the output file.  For example, we can define a section with a write-string (wrs) expression:
+A Brink source file consists of one or more section definitions and exactly one output statement.    Each section has a unique name.  The output statement specifies the name of the top level section.  Starting from the top section, Brink recursively evaluates each section and produces the output file.  For example, we can define a section with a write-string (wrs) expression:
 
     section foo {
         wrs "I'm foo";
@@ -628,7 +628,7 @@ relationships between constants:
 
     output foo;
 
-A const value expression cannot depend on sizes or locations in the output file.  In other words, the brink compiler resolves all const values before constructing the output image.  For example:
+A const value expression cannot depend on sizes or locations in the output file.  In other words, the Brink compiler resolves all const values before constructing the output image.  For example:
 
     const RAM_BASE = 0x8000_0000u;        // OK, just a 64b unsigned literal.
     const RAM_SIZE = 32768;               // OK, just a 64b integer literal.
@@ -685,11 +685,11 @@ Example:
 
 ## `include "<file>";`
 
-Includes another brink source file.  Brink processes the included file as if it were part of the current file.  For example, the included file can define sections, labels, constants and nested include files.
+Includes another Brink source file.  Brink processes the included file as if it were part of the current file.  For example, the included file can define sections, labels, constants and nested include files.
 
 An included file may contain an output statement.  Brink will enforce that the entire program after include file resolution contains only one output statement.  See the [`output` statement](#output-section-identifier-absolute-starting-address) for more information.
 
-The default path for an included file is the directory of the source file that contains the include statement.  For example, if `main.brink` is in `/home/user/project/` and contains `include "sections.brink"`, then brink will look for `/home/user/project/sections.brink`.
+The default path for an included file is the directory of the source file that contains the include statement.  For example, if `main.brink` is in `/home/user/project/` and contains `include "sections.brink"`, then Brink will look for `/home/user/project/sections.brink`.
 
 Include files starting with a `/` are absolute paths.  Likewise, Brink supports relative paths such as `../`.
 
@@ -846,7 +846,7 @@ These statements may be used to pad sections or images to the specified length.
 | set_img   | Likewise for the *image* offset.                             |
 | set_abs   | Likewise for the *absolute address*                          |
 
-Note that these statements cannot cause the current location counter to move backwards.  If the specified value is less the corresponding location, brink reports an error.
+Note that these statements cannot cause the current location counter to move backwards.  If the specified value is less the corresponding location, Brink reports an error.
 
 Example:
 
@@ -1019,15 +1019,72 @@ The wrs statement does not implicitly write a terminating 0 byte after the strin
 
     wrs "my null terminated string\0";
 
+---
+
+# Brink Extensions
+
+Brink supports compile time extensions to simplify the addition of new functionality.
+This extension capability enables user defined hashing, compression, validation and other binary data processing tasks.  The following sections describe how extensions work and how to create them.
+
+The command line option `--list-extensions` outputs the names of all available extensions as enabled by Cargo feature flags.
+
+---
+
+## How Extensions Execute During Image Creation
+
+To understand how extensions work, it helps to understand the Brink image creation phases.
+
+1. **Layout Phase**: First, Brink iteratively evaluates all expressions that affect image size and layout.  For example, Brink evaluates `align` expressions during this phase.  On the other hand, Brink mostly skips statements like `wr64`, since knowing the result is 64-bits long is sufficient to determine the layout.  This phase completes when successive layout iterations produce identical results.
+2. **Generate Phase**: Next, Brink executes statements that populate data values into the image.  Brink executes `wr` statements, including those that call extensions, during this phase.
+3. **Validation Phase**: Finally, Brink evaluates `assert` statements, including those that call extensions.  Note that Brink may take an early exit in any phase if an `assert` statement will unambiguously fail.
+
+---
+
+## Extensions Are A Compile-Time Feature
+
+Extensions build and link to Brink at compile time as controlled by Cargo feature flags.  Because Rust does not guarantee a stable ABI between versions, Brink requires compile time construction to eliminate ABI incompatibilities and enable the use of safe Rust.  The following bullets provide an overview of how extensions work:
+
+* Extensions interact with Brink through the `BrinkExtension` trait.
+
+* Extensions can read directly from Brink's image buffer via zero-copy and safe-memory slices (`&[u8]`).  Brink allows some syntactic sugar to simplify the call site, but will always translate the specified memory range into a slice for the extension.
+
+* In addition to image buffer access, extensions can have their own input parameters like a normal function call.
+
+* Extensions return a **fixed length** result by writing into a fixed length borrowed mutable slice (`&mut [u8]`).  This fixed length requirement enables Brink to deterministically complete the image layout phase.  This requirement also allows zero-copy access to the extension's return buffer.
+
+* Extensions are identified by a **name** in a **namespace**.  Brink reserves the namespaces `std` and `brink`.
+
+* Extensions register themselves at compile time in Brink's internal extension registry.
+
+* The `BrinkExtension` trait interface allows extensions to return logging and error diagnostics integrated with Brink's own diagnostic output.
+
+---
+
+## Invoking Extensions
+
+Users invoke extensions using function-style syntax.  For example, consider an extension named `crc` in a namespace called `custom`.  Our `crc` extension takes two labels to define the start/end of the data section to hash and returns a u32 CRC value.  The user would write the CRC value to the image using `wr32 custom::crc(start_label, end_label);`.
+
+## Execution Order
+
+During image generation, Brink executes operations in dependency order.  Brink determines dependencies by analyzing overlaps between one operation's read range and another's write range.  This enables later operations to use the output of earlier operations.  Brink checks for and returns an error if the sequence of operations contains a cycle.
+
+If no dependency exists between a given pair of operations, then Brink executes operations in location counter order from lowest to highest offset.  In other words, operations writing to the start of an image execute before operations writing to the end of the image.  Operations that use extensions do not change these ordering rules.
+
+Finally, Brink executes `assert` statements which can include extension calls.
+
+Extensions execute serially using the Brink engine thread.
+
+---
+
 # Brink Source Code Overview
 
 | File                 | Stage         | Summary in header                                                                                        |
 | -------------------- | ------------- | -------------------------------------------------------------------------------------------------------- |
-| diags/diags.rs       | Cross-cutting | Ariadne-backed diagnostic output channel used by every stage                                             |
 | ast/ast.rs           | Stage 1       | Logos lexer → token stream → arena AST → AstDb validation                                                |
-| ir/ir.rs             | Shared types  | IRKind, ParameterValue, IROperand, IR — the data flowing between stages 2–4                              |
-| lineardb/lineardb.rs | Stage 2       | AST flattening into parallel LinIR / LinOperand vectors; values still as strings                         |
-| irdb/irdb.rs         | Stage 3       | String-to-typed-value conversion, DataType resolution, operand and file validation                       |
+| diags/diags.rs       | Cross-cutting | Ariadne-backed diagnostic output channel used by every stage                                             |
 | engine/engine.rs     | Stage 4       | Iterate loop to stabilize location counters, then execute pass to write binary output                    |
-| process/process.rs   | Orchestrator  | Sequences all four stages, parses `-D` defines, converts Err(()) to anyhow errors, opens the output file |
+| ir/ir.rs             | Shared types  | IRKind, ParameterValue, IROperand, IR — the data flowing between stages 2–4                              |
+| irdb/irdb.rs         | Stage 3       | String-to-typed-value conversion, DataType resolution, operand and file validation                       |
+| lineardb/lineardb.rs | Stage 2       | AST flattening into parallel LinIR / LinOperand vectors; values still as strings                         |
 | map/map.rs           | Map output    | Constructs MapDb from post-iterate engine and irdb; renders human-friendly map text                      |
+| process/process.rs   | Orchestrator  | Sequences all four stages, parses `-D` defines, converts Err(()) to anyhow errors, opens the output file |
