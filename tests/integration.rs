@@ -1711,7 +1711,7 @@ mod tests {
 
         let map = fs::read_to_string("map_default.map.h")
             .expect("Failed to open expected default map file map_default.map.h");
-        
+
         assert!(map.contains("#define MAP_DEFAULT_MAP_H"));
         assert!(map.contains("MAP_DEFAULT_MAP_foo_ADDR"));
         assert!(map.contains("MAP_DEFAULT_MAP_TOTAL_SIZE"));

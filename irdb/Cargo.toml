@@ -19,4 +19,5 @@ diags = { path = "../diags" }
 ast = { path = "../ast" }
 ir = { path = "../ir" }
 lineardb = { path = "../lineardb" }
+ext = { path = "../ext" }
 tracing = "0.1.44"

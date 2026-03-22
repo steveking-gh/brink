@@ -14,8 +14,8 @@
 // execution.
 
 use diags::Diags;
-use parse_int::parse;
 use diags::SourceSpan;
+use parse_int::parse;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DataType {

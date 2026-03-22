@@ -12,9 +12,9 @@
 // Order of operations: lineardb runs after ast.  Its output — a LinearDb
 // containing ir_vec, const_ir_vec, and operand_vec — is consumed by irdb.
 
-use indextree::NodeId;
-use diags::SourceSpan;
 use diags::Diags;
+use diags::SourceSpan;
+use indextree::NodeId;
 
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
@@ -448,10 +448,7 @@ impl<'toks> LinearDb {
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);
             }
-            LexToken::U64
-            | LexToken::I64
-            | LexToken::Integer
-            | LexToken::QuotedString => {
+            LexToken::U64 | LexToken::I64 | LexToken::Integer | LexToken::QuotedString => {
                 // These are immediate operands.  Add them to the appropriate operand
                 // vector and return them as local operands.
                 // This case terminates recursion.

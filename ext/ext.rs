@@ -11,7 +11,7 @@ pub trait BrinkExtension {
     /// * `args` - An array of 64-bit integer values corresponding to the evaluated arguments.
     /// * `img_buffer` - A slice of the generated Brink image bytes up to this point.
     /// * `out_buffer` - A mutable slice where the extension should write its output.
-    ///                  The size typically corresponds to the WR statement width (e.g., 4 bytes for wr32).
+    ///   The size typically corresponds to the WR statement width (e.g., 4 bytes for wr32).
     fn execute(&self, args: &[u64], img_buffer: &[u8], out_buffer: &mut [u8])
     -> Result<(), String>;
 }
@@ -50,30 +50,12 @@ impl ExtensionRegistry {
     }
 }
 
+pub mod test_mocks;
+
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    struct MockCrc;
-
-    impl BrinkExtension for MockCrc {
-        fn name(&self) -> &str {
-            "brink::test_crc"
-        }
-
-        fn execute(&self, args: &[u64], _img: &[u8], out: &mut [u8]) -> Result<(), String> {
-            if args.len() != 1 {
-                return Err("Expected exactly 1 argument for CRC".to_string());
-            }
-            if out.len() != 4 {
-                return Err("Expected 4 bytes of output space".to_string());
-            }
-            // Mock behavior: write the isolated argument as a big-endian u32.
-            let val = args[0] as u32;
-            out.copy_from_slice(&val.to_be_bytes());
-            Ok(())
-        }
-    }
+    use test_mocks::*;
 
     #[test]
     fn test_registry_registration_and_lookup() {
@@ -140,8 +122,8 @@ mod tests {
 
     #[test]
     fn test_logging_and_error_reporting() {
-        use tracing_subscriber::fmt::MakeWriter;
         use std::sync::{Arc, Mutex};
+        use tracing_subscriber::fmt::MakeWriter;
 
         #[derive(Clone)]
         struct MockWriter {
@@ -175,23 +157,12 @@ mod tests {
             .with_max_level(tracing::Level::INFO)
             .try_init();
 
-        struct MockLogger;
-        impl BrinkExtension for MockLogger {
-            fn name(&self) -> &str {
-                "brink::test_logger"
-            }
-            fn execute(&self, _args: &[u64], _img: &[u8], _out: &mut [u8]) -> Result<(), String> {
-                tracing::info!("MockLogger executed successfully via tracing API");
-                Err("Intentional mock fallback error".to_string())
-            }
-        }
-
         let mut reg = ExtensionRegistry::new();
         reg.register(Box::new(MockLogger));
 
         let ext = reg.get("brink::test_logger").unwrap();
         let res = ext.execute(&[], &[], &mut []);
-        
+
         // Exercise the error reporting assertion
         assert!(res.is_err());
         assert_eq!(res.unwrap_err(), "Intentional mock fallback error");

@@ -11,13 +11,14 @@
 // Order of operations: irdb runs after lineardb.  Its output — an IRDb
 // containing ir_vec, parms and file metadata — is consumed by engine.
 
-use diags::SourceSpan;
 use diags::Diags;
+use diags::SourceSpan;
 use lineardb::LinearDb;
 
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
 
+use ext::ExtensionRegistry;
 use ir::{DataType, IR, IRKind, IROperand, ParameterValue};
 use parse_int::parse;
 use std::{
@@ -498,7 +499,12 @@ impl IRDb {
         true
     }
 
-    fn validate_operands(&mut self, ir: &IR, diags: &mut Diags) -> bool {
+    fn validate_operands(
+        &mut self,
+        ir: &IR,
+        diags: &mut Diags,
+        ext_registry: &ExtensionRegistry,
+    ) -> bool {
         match ir.kind {
             IRKind::Align | IRKind::SetSec | IRKind::SetImg | IRKind::SetAbs | IRKind::Wr(_) => {
                 self.validate_numeric_1_or_2(ir, diags)
@@ -509,13 +515,16 @@ impl IRDb {
             IRKind::Const => self.validate_const_operands(ir, diags),
             IRKind::ExtensionCall => {
                 let name = self.get_opnd_as_identifier(ir, 0);
-                let m = if let Some(idx) = name.find("::") {
-                    format!("Unknown namespace '{}'", &name[..idx])
-                } else {
-                    format!("Unknown function '{}'", name)
-                };
-                diags.err1("IRDB_40", &m, ir.src_loc.clone());
-                false
+                if ext_registry.get(name).is_none() {
+                    let m = if let Some(idx) = name.find("::") {
+                        format!("Unknown namespace '{}'", &name[..idx])
+                    } else {
+                        format!("Unknown function '{}'", name)
+                    };
+                    diags.err1("IRDB_40", &m, ir.src_loc.clone());
+                    return false;
+                }
+                true
             }
             IRKind::NEq
             | IRKind::LEq
@@ -549,7 +558,12 @@ impl IRDb {
 
     /// Convert the linear IR to real IR.  Conversion from Linear IR to real IR can fail,
     /// which is a hassle we don't want to deal with during linearization of the AST.
-    fn process_linear_ir(&mut self, lin_db: &LinearDb, diags: &mut Diags) -> bool {
+    fn process_linear_ir(
+        &mut self,
+        lin_db: &LinearDb,
+        diags: &mut Diags,
+        ext_registry: &ExtensionRegistry,
+    ) -> bool {
         let mut result = true;
         for lir in &lin_db.ir_vec {
             let kind = lir.op;
@@ -559,7 +573,7 @@ impl IRDb {
                 src_loc: lir.src_loc.clone(),
             };
             let ir_num = self.ir_vec.len();
-            if self.validate_operands(&ir, diags) {
+            if self.validate_operands(&ir, diags, ext_registry) {
                 match kind {
                     IRKind::Label => {
                         // create the addressable entry and set the IR number
@@ -985,6 +999,7 @@ impl IRDb {
         lin_db: &LinearDb,
         diags: &mut Diags,
         defines: &HashMap<String, ParameterValue>,
+        ext_registry: &ExtensionRegistry,
     ) -> anyhow::Result<Self> {
         let mut ir_db = IRDb {
             ir_vec: Vec::new(),
@@ -1031,7 +1046,7 @@ impl IRDb {
         }
 
         // To avoid panic, don't proceed into IR if the operands are bad.
-        if !ir_db.process_linear_ir(lin_db, diags) {
+        if !ir_db.process_linear_ir(lin_db, diags, ext_registry) {
             anyhow::bail!("IRDb construction failed");
         }
 

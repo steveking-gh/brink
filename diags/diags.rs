@@ -107,10 +107,14 @@ impl Diags {
             return;
         }
 
-        let report = Report::build(ReportKind::Custom("Note", Color::Blue), self.name.clone(), 0)
-            .with_code(code)
-            .with_message(msg)
-            .finish();
+        let report = Report::build(
+            ReportKind::Custom("Note", Color::Blue),
+            self.name.clone(),
+            0,
+        )
+        .with_code(code)
+        .with_message(msg)
+        .finish();
         self.print_report(report);
     }
 

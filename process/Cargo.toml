@@ -20,4 +20,5 @@ lineardb = { path = "../lineardb" }
 irdb = { path = "../irdb" }
 engine = { path = "../engine" }
 map = { path = "../map" }
+ext = { path = "../ext" }
 tracing = "0.1.44"

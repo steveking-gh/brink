@@ -20,10 +20,11 @@ use std::io::Write;
 use ast::{Ast, AstDb};
 use diags::Diags;
 use engine::Engine;
+use ext::{ExtensionRegistry, test_mocks::register_test_extensions};
 use ir::ParameterValue;
 use irdb::IRDb;
 use lineardb::LinearDb;
-use map::{MapDb, format_csv, format_json, format_c99};
+use map::{MapDb, format_c99, format_csv, format_json};
 
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
@@ -129,7 +130,10 @@ pub fn process(
         linear_db.dump();
     }
 
-    let ir_db = IRDb::new(&linear_db, &mut diags, &const_defines)
+    let mut ext_registry = ExtensionRegistry::new();
+    register_test_extensions(&mut ext_registry);
+
+    let ir_db = IRDb::new(&linear_db, &mut diags, &const_defines, &ext_registry)
         .context("[PROC_3]: Error detected, halting.")?;
 
     debug!("Dumping ir_db");
@@ -150,7 +154,10 @@ pub fn process(
     let mut file =
         File::create(&fname_str).context(format!("Unable to create output file {}", fname_str))?;
 
-    if engine.execute(&ir_db, &mut diags, &mut file).is_err() {
+    if engine
+        .execute(&ir_db, &mut diags, &mut file, &ext_registry)
+        .is_err()
+    {
         return Err(anyhow!("[PROC_4]: Error detected, halting."));
     }
 

@@ -14,6 +14,7 @@
 
 use anyhow::{Result, anyhow};
 use diags::Diags;
+use ext::ExtensionRegistry;
 use ir::{DataType, IR, IRKind, ParameterValue};
 use irdb::IRDb;
 use std::fs::File;
@@ -1487,17 +1488,28 @@ impl Engine {
     /// Address-arithmetic and layout instructions are no-ops because their
     /// values were already committed to `self.ir_locs` during iteration.
     /// Returns `Err` and emits diagnostics if any write or assertion fails.
-    pub fn execute(&self, irdb: &IRDb, diags: &mut Diags, file: &mut File) -> Result<()> {
+    pub fn execute(
+        &self,
+        irdb: &IRDb,
+        diags: &mut Diags,
+        file: &mut File,
+        ext_registry: &ExtensionRegistry,
+    ) -> Result<()> {
         self.trace("Engine::execute:");
-        
+
         self.execute_core_operations(irdb, diags, file)?;
-        self.execute_extensions(irdb, diags, file)?;
+        self.execute_extensions(irdb, diags, file, ext_registry)?;
 
         Ok(())
     }
 
     /// Evaluates all standard Brink operations sequentially.
-    fn execute_core_operations(&self, irdb: &IRDb, diags: &mut Diags, file: &mut File) -> Result<()> {
+    fn execute_core_operations(
+        &self,
+        irdb: &IRDb,
+        diags: &mut Diags,
+        file: &mut File,
+    ) -> Result<()> {
         self.trace("Engine::execute_core_operations:");
         let mut result;
         let mut error_count = 0;
@@ -1561,10 +1573,16 @@ impl Engine {
 
     /// Isolates and evaluates all extension calls.
     /// Builds a topological dependency DAG to execute extensions in the correct order.
-    fn execute_extensions(&self, irdb: &IRDb, _diags: &mut Diags, _file: &mut File) -> Result<()> {
+    fn execute_extensions(
+        &self,
+        irdb: &IRDb,
+        _diags: &mut Diags,
+        _file: &mut File,
+        _ext_registry: &ExtensionRegistry,
+    ) -> Result<()> {
         self.trace("Engine::execute_extensions:");
-        
-        // Scope extraction: we isolate ONLY the extension calls 
+
+        // Scope extraction: we isolate ONLY the extension calls
         // decoupled from the core pipeline logic.
         let mut extension_nodes = Vec::new();
         for (idx, ir) in irdb.ir_vec.iter().enumerate() {

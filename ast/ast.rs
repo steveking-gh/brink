@@ -959,7 +959,11 @@ impl<'toks> Ast<'toks> {
                     self.tok_num += 1;
                     ns_nid.append(id_nid, &mut self.arena);
                 } else {
-                    diags.err1("AST_39", "Expected identifier after namespace", next_tinfo.span());
+                    diags.err1(
+                        "AST_39",
+                        "Expected identifier after namespace",
+                        next_tinfo.span(),
+                    );
                     return self.dbg_exit_pratt("parse_pratt", &None, false);
                 }
 
@@ -969,48 +973,48 @@ impl<'toks> Ast<'toks> {
                 {
                     self.tok_num += 1; // consume '('
 
-                        loop {
-                            let Some(check_tinfo) = self.peek() else {
-                                self.err_no_input(diags);
-                                return self.dbg_exit_pratt("parse_pratt", &None, false);
-                            };
+                    loop {
+                        let Some(check_tinfo) = self.peek() else {
+                            self.err_no_input(diags);
+                            return self.dbg_exit_pratt("parse_pratt", &None, false);
+                        };
 
-                            // A trailing close parenthesis indicates the end of the argument list.
-                            if check_tinfo.tok == LexToken::CloseParen {
-                                self.tok_num += 1; // consume ')'
-                                break;
-                            }
-
-                            // Recursively parse the next argument within the parenthesis.
-                            let mut arg_opt = None;
-                            if !self.parse_pratt(0, &mut arg_opt, diags) {
-                                return self.dbg_exit_pratt("parse_pratt", &None, false);
-                            }
-                            if let Some(arg_nid) = arg_opt {
-                                ns_nid.append(arg_nid, &mut self.arena);
-                            }
-
-                            // Arguments must be separated by commas or terminated by a close parenthesis.
-                            let Some(delim_tinfo) = self.peek() else {
-                                self.err_no_input(diags);
-                                return self.dbg_exit_pratt("parse_pratt", &None, false);
-                            };
-
-                            let delim_tok = delim_tinfo.tok;
-                            if delim_tok == LexToken::Comma {
-                                self.tok_num += 1; // consume ','
-                            } else if delim_tok == LexToken::CloseParen {
-                                self.tok_num += 1; // consume ')'
-                                break;
-                            } else {
-                                diags.err1(
-                                    "AST_38",
-                                    "Expected ',' or ')' in function call",
-                                    delim_tinfo.span(),
-                                );
-                                return self.dbg_exit_pratt("parse_pratt", &None, false);
-                            }
+                        // A trailing close parenthesis indicates the end of the argument list.
+                        if check_tinfo.tok == LexToken::CloseParen {
+                            self.tok_num += 1; // consume ')'
+                            break;
                         }
+
+                        // Recursively parse the next argument within the parenthesis.
+                        let mut arg_opt = None;
+                        if !self.parse_pratt(0, &mut arg_opt, diags) {
+                            return self.dbg_exit_pratt("parse_pratt", &None, false);
+                        }
+                        if let Some(arg_nid) = arg_opt {
+                            ns_nid.append(arg_nid, &mut self.arena);
+                        }
+
+                        // Arguments must be separated by commas or terminated by a close parenthesis.
+                        let Some(delim_tinfo) = self.peek() else {
+                            self.err_no_input(diags);
+                            return self.dbg_exit_pratt("parse_pratt", &None, false);
+                        };
+
+                        let delim_tok = delim_tinfo.tok;
+                        if delim_tok == LexToken::Comma {
+                            self.tok_num += 1; // consume ','
+                        } else if delim_tok == LexToken::CloseParen {
+                            self.tok_num += 1; // consume ')'
+                            break;
+                        } else {
+                            diags.err1(
+                                "AST_38",
+                                "Expected ',' or ')' in function call",
+                                delim_tinfo.span(),
+                            );
+                            return self.dbg_exit_pratt("parse_pratt", &None, false);
+                        }
+                    }
                 }
             }
 
@@ -1031,48 +1035,48 @@ impl<'toks> Ast<'toks> {
                 {
                     self.tok_num += 1; // consume '('
 
-                        loop {
-                            let Some(check_tinfo) = self.peek() else {
-                                self.err_no_input(diags);
-                                return self.dbg_exit_pratt("parse_pratt", &None, false);
-                            };
+                    loop {
+                        let Some(check_tinfo) = self.peek() else {
+                            self.err_no_input(diags);
+                            return self.dbg_exit_pratt("parse_pratt", &None, false);
+                        };
 
-                            // A trailing close parenthesis indicates the end of the argument list.
-                            if check_tinfo.tok == LexToken::CloseParen {
-                                self.tok_num += 1; // consume ')'
-                                break;
-                            }
-
-                            // Recursively parse the next argument within the parenthesis.
-                            let mut arg_opt = None;
-                            if !self.parse_pratt(0, &mut arg_opt, diags) {
-                                return self.dbg_exit_pratt("parse_pratt", &None, false);
-                            }
-                            if let Some(arg_nid) = arg_opt {
-                                id_nid.append(arg_nid, &mut self.arena);
-                            }
-
-                            // Arguments must be separated by commas or terminated by a close parenthesis.
-                            let Some(delim_tinfo) = self.peek() else {
-                                self.err_no_input(diags);
-                                return self.dbg_exit_pratt("parse_pratt", &None, false);
-                            };
-
-                            let delim_tok = delim_tinfo.tok;
-                            if delim_tok == LexToken::Comma {
-                                self.tok_num += 1; // consume ','
-                            } else if delim_tok == LexToken::CloseParen {
-                                self.tok_num += 1; // consume ')'
-                                break;
-                            } else {
-                                diags.err1(
-                                    "AST_38",
-                                    "Expected ',' or ')' in function call",
-                                    delim_tinfo.span(),
-                                );
-                                return self.dbg_exit_pratt("parse_pratt", &None, false);
-                            }
+                        // A trailing close parenthesis indicates the end of the argument list.
+                        if check_tinfo.tok == LexToken::CloseParen {
+                            self.tok_num += 1; // consume ')'
+                            break;
                         }
+
+                        // Recursively parse the next argument within the parenthesis.
+                        let mut arg_opt = None;
+                        if !self.parse_pratt(0, &mut arg_opt, diags) {
+                            return self.dbg_exit_pratt("parse_pratt", &None, false);
+                        }
+                        if let Some(arg_nid) = arg_opt {
+                            id_nid.append(arg_nid, &mut self.arena);
+                        }
+
+                        // Arguments must be separated by commas or terminated by a close parenthesis.
+                        let Some(delim_tinfo) = self.peek() else {
+                            self.err_no_input(diags);
+                            return self.dbg_exit_pratt("parse_pratt", &None, false);
+                        };
+
+                        let delim_tok = delim_tinfo.tok;
+                        if delim_tok == LexToken::Comma {
+                            self.tok_num += 1; // consume ','
+                        } else if delim_tok == LexToken::CloseParen {
+                            self.tok_num += 1; // consume ')'
+                            break;
+                        } else {
+                            diags.err1(
+                                "AST_38",
+                                "Expected ',' or ')' in function call",
+                                delim_tinfo.span(),
+                            );
+                            return self.dbg_exit_pratt("parse_pratt", &None, false);
+                        }
+                    }
                 }
             }
 
