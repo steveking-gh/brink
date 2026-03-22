@@ -267,9 +267,9 @@ impl<'toks> Ast<'toks> {
                 // Checking whether 'include'appears immediately after a statement boundary (or at the
                 // start of the file) prevents eagerly intercepting valid parser-level error
                 // cases like AST_32 (Reserved section name) or AST_33 (Reserved const name).
-                let is_directive = tv.last().is_none_or(|t| {
-                    matches!(t.tok, LexToken::Semicolon | LexToken::CloseBrace)
-                });
+                let is_directive = tv
+                    .last()
+                    .is_none_or(|t| matches!(t.tok, LexToken::Semicolon | LexToken::CloseBrace));
 
                 if is_directive {
                     let next_tok = lex.next();
@@ -931,13 +931,67 @@ impl<'toks> Ast<'toks> {
             }
 
             // These simple atoms end up as leaf nodes in the AST
-            LexToken::QuotedString
-            | LexToken::Integer
-            | LexToken::I64
-            | LexToken::U64
-            | LexToken::Identifier => {
+            LexToken::QuotedString | LexToken::Integer | LexToken::I64 | LexToken::U64 => {
                 *top = Some(self.arena.new_node(self.tok_num));
                 self.tok_num += 1;
+            }
+
+            // Identifiers are usually scalar variables or section names.
+            // However, if an identifier is immediately followed by an open parenthesis `(`,
+            // the parser actively eats tokens looking for the trailing close parenthesis `)`
+            // to construct a generic function invocation, e.g., `foo(arg1, arg2)`. At this
+            // AST stage, we parse all arguments without verifying function support. That
+            // validation happens in later phases.
+            LexToken::Identifier => {
+                let id_nid = self.arena.new_node(self.tok_num);
+                *top = Some(id_nid);
+                self.tok_num += 1;
+
+                if let Some(next_tinfo) = self.peek()
+                    && next_tinfo.tok == LexToken::OpenParen
+                {
+                    self.tok_num += 1; // consume '('
+
+                        loop {
+                            let check_tinfo = self.peek();
+                            if check_tinfo.is_none() {
+                                self.err_no_input(diags);
+                                return self.dbg_exit_pratt("parse_pratt", &None, false);
+                            }
+                            if check_tinfo.unwrap().tok == LexToken::CloseParen {
+                                self.tok_num += 1; // consume ')'
+                                break;
+                            }
+
+                            let mut arg_opt = None;
+                            if !self.parse_pratt(0, &mut arg_opt, diags) {
+                                return self.dbg_exit_pratt("parse_pratt", &None, false);
+                            }
+                            if let Some(arg_nid) = arg_opt {
+                                id_nid.append(arg_nid, &mut self.arena);
+                            }
+
+                            let delim_tinfo = self.peek();
+                            if delim_tinfo.is_none() {
+                                self.err_no_input(diags);
+                                return self.dbg_exit_pratt("parse_pratt", &None, false);
+                            }
+                            let delim_tok = delim_tinfo.unwrap().tok;
+                            if delim_tok == LexToken::Comma {
+                                self.tok_num += 1; // consume ','
+                            } else if delim_tok == LexToken::CloseParen {
+                                self.tok_num += 1; // consume ')'
+                                break;
+                            } else {
+                                diags.err1(
+                                    "AST_38",
+                                    "Expected ',' or ')' in function call",
+                                    delim_tinfo.unwrap().span(),
+                                );
+                                return self.dbg_exit_pratt("parse_pratt", &None, false);
+                            }
+                        }
+                }
             }
 
             // Built-in functions with an optional identifier inside parens

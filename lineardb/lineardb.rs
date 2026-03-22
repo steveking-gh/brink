@@ -448,8 +448,7 @@ impl<'toks> LinearDb {
                 // The destination operand is presumably an input operand in the parent.
                 returned_operands.push(idx);
             }
-            LexToken::Identifier
-            | LexToken::U64
+            LexToken::U64
             | LexToken::I64
             | LexToken::Integer
             | LexToken::QuotedString => {
@@ -466,6 +465,28 @@ impl<'toks> LinearDb {
                     idx
                 };
                 returned_operands.push(idx);
+            }
+            // Identifiers possessing AST children denote parsed function calls.
+            // Currently, Brink offers no extension registry or generic function 
+            // handling. Therefore, encountering any function call intentionally 
+            // generates a clean compilation error.
+            LexToken::Identifier => {
+                if ast.has_children(parent_nid) {
+                    let m = format!("Unknown function '{}'", tinfo.val);
+                    diags.err1("LINEAR_14", &m, tinfo.span());
+                    result = false;
+                } else {
+                    let idx = if in_const_expr {
+                        let idx = self.const_operand_vec.len();
+                        self.const_operand_vec.push(LinOperand::new(None, tinfo));
+                        idx
+                    } else {
+                        let idx = self.operand_vec.len();
+                        self.operand_vec.push(LinOperand::new(None, tinfo));
+                        idx
+                    };
+                    returned_operands.push(idx);
+                }
             }
             LexToken::SetSec | LexToken::SetImg | LexToken::SetAbs | LexToken::Align => {
                 // To implement align or pad, we map to IR as follows:
