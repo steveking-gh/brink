@@ -128,6 +128,8 @@ pub enum LexToken {
     Semicolon,
     #[regex("[_a-zA-Z][0-9a-zA-Z_]*:")]
     Label,
+    #[regex("[_a-zA-Z][0-9a-zA-Z_]*::")]
+    Namespace,
     #[regex("[_a-zA-Z][0-9a-zA-Z_]*")]
     Identifier,
 
@@ -936,6 +938,82 @@ impl<'toks> Ast<'toks> {
                 self.tok_num += 1;
             }
 
+            // A namespace component like `custom::` signals the start of a namespaced path.
+            // This token must be immediately followed by a trailing identifier. If an open parenthesis
+            // `(` follows the identifier, the parser aggregates the tokens into a generic
+            // function invocation (e.g., `custom::foo(arg1, arg2)`).
+            LexToken::Namespace => {
+                let ns_nid = self.arena.new_node(self.tok_num);
+                *top = Some(ns_nid);
+                self.tok_num += 1;
+
+                // A namespace prefix must immediately be followed by an identifier.
+                let Some(next_tinfo) = self.peek() else {
+                    self.err_no_input(diags);
+                    return self.dbg_exit_pratt("parse_pratt", &None, false);
+                };
+
+                // Add the trailing identifier as the first child of the namespace node.
+                if next_tinfo.tok == LexToken::Identifier {
+                    let id_nid = self.arena.new_node(self.tok_num);
+                    self.tok_num += 1;
+                    ns_nid.append(id_nid, &mut self.arena);
+                } else {
+                    diags.err1("AST_39", "Expected identifier after namespace", next_tinfo.span());
+                    return self.dbg_exit_pratt("parse_pratt", &None, false);
+                }
+
+                // If an open parenthesis follows, we parse this as a function invocation.
+                if let Some(after_tinfo) = self.peek()
+                    && after_tinfo.tok == LexToken::OpenParen
+                {
+                    self.tok_num += 1; // consume '('
+
+                        loop {
+                            let Some(check_tinfo) = self.peek() else {
+                                self.err_no_input(diags);
+                                return self.dbg_exit_pratt("parse_pratt", &None, false);
+                            };
+
+                            // A trailing close parenthesis indicates the end of the argument list.
+                            if check_tinfo.tok == LexToken::CloseParen {
+                                self.tok_num += 1; // consume ')'
+                                break;
+                            }
+
+                            // Recursively parse the next argument within the parenthesis.
+                            let mut arg_opt = None;
+                            if !self.parse_pratt(0, &mut arg_opt, diags) {
+                                return self.dbg_exit_pratt("parse_pratt", &None, false);
+                            }
+                            if let Some(arg_nid) = arg_opt {
+                                ns_nid.append(arg_nid, &mut self.arena);
+                            }
+
+                            // Arguments must be separated by commas or terminated by a close parenthesis.
+                            let Some(delim_tinfo) = self.peek() else {
+                                self.err_no_input(diags);
+                                return self.dbg_exit_pratt("parse_pratt", &None, false);
+                            };
+
+                            let delim_tok = delim_tinfo.tok;
+                            if delim_tok == LexToken::Comma {
+                                self.tok_num += 1; // consume ','
+                            } else if delim_tok == LexToken::CloseParen {
+                                self.tok_num += 1; // consume ')'
+                                break;
+                            } else {
+                                diags.err1(
+                                    "AST_38",
+                                    "Expected ',' or ')' in function call",
+                                    delim_tinfo.span(),
+                                );
+                                return self.dbg_exit_pratt("parse_pratt", &None, false);
+                            }
+                        }
+                }
+            }
+
             // Identifiers are usually scalar variables or section names.
             // However, if an identifier is immediately followed by an open parenthesis `(`,
             // the parser actively eats tokens looking for the trailing close parenthesis `)`
@@ -947,22 +1025,25 @@ impl<'toks> Ast<'toks> {
                 *top = Some(id_nid);
                 self.tok_num += 1;
 
+                // If an open parenthesis follows, we parse this as a function invocation.
                 if let Some(next_tinfo) = self.peek()
                     && next_tinfo.tok == LexToken::OpenParen
                 {
                     self.tok_num += 1; // consume '('
 
                         loop {
-                            let check_tinfo = self.peek();
-                            if check_tinfo.is_none() {
+                            let Some(check_tinfo) = self.peek() else {
                                 self.err_no_input(diags);
                                 return self.dbg_exit_pratt("parse_pratt", &None, false);
-                            }
-                            if check_tinfo.unwrap().tok == LexToken::CloseParen {
+                            };
+
+                            // A trailing close parenthesis indicates the end of the argument list.
+                            if check_tinfo.tok == LexToken::CloseParen {
                                 self.tok_num += 1; // consume ')'
                                 break;
                             }
 
+                            // Recursively parse the next argument within the parenthesis.
                             let mut arg_opt = None;
                             if !self.parse_pratt(0, &mut arg_opt, diags) {
                                 return self.dbg_exit_pratt("parse_pratt", &None, false);
@@ -971,12 +1052,13 @@ impl<'toks> Ast<'toks> {
                                 id_nid.append(arg_nid, &mut self.arena);
                             }
 
-                            let delim_tinfo = self.peek();
-                            if delim_tinfo.is_none() {
+                            // Arguments must be separated by commas or terminated by a close parenthesis.
+                            let Some(delim_tinfo) = self.peek() else {
                                 self.err_no_input(diags);
                                 return self.dbg_exit_pratt("parse_pratt", &None, false);
-                            }
-                            let delim_tok = delim_tinfo.unwrap().tok;
+                            };
+
+                            let delim_tok = delim_tinfo.tok;
                             if delim_tok == LexToken::Comma {
                                 self.tok_num += 1; // consume ','
                             } else if delim_tok == LexToken::CloseParen {
@@ -986,7 +1068,7 @@ impl<'toks> Ast<'toks> {
                                 diags.err1(
                                     "AST_38",
                                     "Expected ',' or ')' in function call",
-                                    delim_tinfo.unwrap().span(),
+                                    delim_tinfo.span(),
                                 );
                                 return self.dbg_exit_pratt("parse_pratt", &None, false);
                             }

@@ -1755,4 +1755,9 @@ mod tests {
             .stdout(predicates::str::contains("0x0000000000005003ULL"));
         fs::remove_file("map_labels.bin").ok();
     }
+
+    #[test]
+    fn invalid_namespace() {
+        assert_brink_failure("tests/invalid_namespace.brink", &["IRDB_40"]);
+    }
 } // mod tests

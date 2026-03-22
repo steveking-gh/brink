@@ -1,5 +1,5 @@
 section main {
-    wr32 foo(1, 2);
+    wr32 custom::foo(1, 2);
 }
 
 output main;

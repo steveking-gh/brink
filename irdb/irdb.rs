@@ -118,6 +118,7 @@ impl IRDb {
             ast::LexToken::Integer => data_type = Some(DataType::Integer),
             ast::LexToken::QuotedString => data_type = Some(DataType::QuotedString),
             ast::LexToken::Label => data_type = Some(DataType::Identifier),
+            ast::LexToken::Namespace => data_type = Some(DataType::Identifier),
             ast::LexToken::Identifier => {
                 // If this identifier is a resolved const, return the const's type.
                 if let Some(cv) = const_values.get(lop.sval.as_str()) {
@@ -507,7 +508,12 @@ impl IRDb {
             IRKind::Wrs | IRKind::Print => self.validate_string_expr_operands(ir, diags),
             IRKind::Const => self.validate_const_operands(ir, diags),
             IRKind::ExtensionCall => {
-                let m = format!("Unknown function '{}'", self.get_opnd_as_identifier(ir, 0));
+                let name = self.get_opnd_as_identifier(ir, 0);
+                let m = if let Some(idx) = name.find("::") {
+                    format!("Unknown namespace '{}'", &name[..idx])
+                } else {
+                    format!("Unknown function '{}'", name)
+                };
                 diags.err1("IRDB_40", &m, ir.src_loc.clone());
                 false
             }

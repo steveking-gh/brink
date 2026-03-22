@@ -1489,6 +1489,16 @@ impl Engine {
     /// Returns `Err` and emits diagnostics if any write or assertion fails.
     pub fn execute(&self, irdb: &IRDb, diags: &mut Diags, file: &mut File) -> Result<()> {
         self.trace("Engine::execute:");
+        
+        self.execute_core_operations(irdb, diags, file)?;
+        self.execute_extensions(irdb, diags, file)?;
+
+        Ok(())
+    }
+
+    /// Evaluates all standard Brink operations sequentially.
+    fn execute_core_operations(&self, irdb: &IRDb, diags: &mut Diags, file: &mut File) -> Result<()> {
+        self.trace("Engine::execute_core_operations:");
         let mut result;
         let mut error_count = 0;
         for ir in &irdb.ir_vec {
@@ -1546,6 +1556,33 @@ impl Engine {
         if error_count > 0 {
             return Err(anyhow!("Error detected"));
         }
+        Ok(())
+    }
+
+    /// Isolates and evaluates all extension calls.
+    /// Builds a topological dependency DAG to execute extensions in the correct order.
+    fn execute_extensions(&self, irdb: &IRDb, _diags: &mut Diags, _file: &mut File) -> Result<()> {
+        self.trace("Engine::execute_extensions:");
+        
+        // Scope extraction: we isolate ONLY the extension calls 
+        // decoupled from the core pipeline logic.
+        let mut extension_nodes = Vec::new();
+        for (idx, ir) in irdb.ir_vec.iter().enumerate() {
+            if let IRKind::ExtensionCall = ir.kind {
+                extension_nodes.push(idx);
+            }
+        }
+
+        if extension_nodes.is_empty() {
+            return Ok(());
+        }
+
+        // Skeleton for Phase 4:
+        // 1. Map `extension_nodes` to their respective Read/Write bounds via the Extension Registry.
+        // 2. Build adjacency list based on overlapping bounds.
+        // 3. Output a stable topological sort (tie-broken by sequential file location).
+        // 4. Dispatch the execution callbacks in topologically sorted order.
+
         Ok(())
     }
 }

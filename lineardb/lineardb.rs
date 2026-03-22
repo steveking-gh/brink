@@ -466,8 +466,46 @@ impl<'toks> LinearDb {
                 };
                 returned_operands.push(idx);
             }
+            LexToken::Namespace => {
+                // A namespace call like `custom::foo(args...)`
+                // First child is ALWAYS the identifier, subsequent children are arguments
+                let mut children = ast.children(parent_nid);
+                let id_child = children.next().unwrap();
+                let id_tinfo = ast.get_tinfo(id_child);
+
+                let extension_name = format!("{}{}", tinfo.val, id_tinfo.val); // custom:: + foo = custom::foo
+
+                let ir_lid = self.new_ir(parent_nid, ast, IRKind::ExtensionCall, in_const_expr);
+
+                let mut name_op = LinOperand::new(None, tinfo);
+                name_op.sval = extension_name;
+                self.add_new_operand_to_ir(ir_lid, name_op, in_const_expr);
+
+                let mut lops = Vec::new();
+                for child in children {
+                    result &= self.record_r(
+                        rdepth + 1,
+                        child,
+                        &mut lops,
+                        diags,
+                        ast,
+                        ast_db,
+                        in_const_expr,
+                    );
+                }
+
+                for idx in lops {
+                    self.add_existing_operand_to_ir(ir_lid, idx, in_const_expr);
+                }
+
+                let out_idx = self.add_new_operand_to_ir(
+                    ir_lid,
+                    LinOperand::new(Some(ir_lid), tinfo),
+                    in_const_expr,
+                );
+                returned_operands.push(out_idx);
+            }
             // Identifiers possessing AST children denote parsed function calls.
-            // We capture the identifier and its argument children to construct an ExtensionCall IR.
             LexToken::Identifier => {
                 if ast.has_children(parent_nid) {
                     let ir_lid = self.new_ir(parent_nid, ast, IRKind::ExtensionCall, in_const_expr);
@@ -475,17 +513,19 @@ impl<'toks> LinearDb {
                     // Add the function name itself as the first operand
                     self.add_new_operand_to_ir(ir_lid, LinOperand::new(None, tinfo), in_const_expr);
 
-                    // Record children (arguments)
+                    // Record remaining children (arguments)
                     let mut lops = Vec::new();
-                    result &= self.record_children_r(
-                        rdepth + 1,
-                        parent_nid,
-                        &mut lops,
-                        diags,
-                        ast,
-                        ast_db,
-                        in_const_expr,
-                    );
+                    for child in ast.children(parent_nid) {
+                        result &= self.record_r(
+                            rdepth + 1,
+                            child,
+                            &mut lops,
+                            diags,
+                            ast,
+                            ast_db,
+                            in_const_expr,
+                        );
+                    }
 
                     // Add the argument operands to the IR
                     for idx in lops {
