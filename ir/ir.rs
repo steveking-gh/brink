@@ -38,6 +38,7 @@ pub enum IRKind {
     Divide,
     DoubleEq,
     Eq,
+    ExtensionCall,
     GEq,
     I64,
     Img,

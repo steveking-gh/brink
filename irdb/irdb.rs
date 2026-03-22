@@ -506,6 +506,11 @@ impl IRDb {
             IRKind::Wrf => self.validate_wrf_operands(ir, diags),
             IRKind::Wrs | IRKind::Print => self.validate_string_expr_operands(ir, diags),
             IRKind::Const => self.validate_const_operands(ir, diags),
+            IRKind::ExtensionCall => {
+                let m = format!("Unknown function '{}'", self.get_opnd_as_identifier(ir, 0));
+                diags.err1("IRDB_40", &m, ir.src_loc.clone());
+                false
+            }
             IRKind::NEq
             | IRKind::LEq
             | IRKind::GEq

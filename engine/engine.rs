@@ -1257,7 +1257,8 @@ impl Engine {
                     | IRKind::Assert
                     | IRKind::Print
                     | IRKind::I64
-                    | IRKind::U64 => true,
+                    | IRKind::U64
+                    | IRKind::ExtensionCall => true,
                 }
             }
             if self.ir_locs == old_locations {
@@ -1529,7 +1530,8 @@ impl Engine {
                 | IRKind::SectionStart
                 | IRKind::SectionEnd
                 | IRKind::LeftShift
-                | IRKind::RightShift => Ok(()),
+                | IRKind::RightShift
+                | IRKind::ExtensionCall => Ok(()),
             };
 
             if result.is_err() {

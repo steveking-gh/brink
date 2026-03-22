@@ -467,14 +467,38 @@ impl<'toks> LinearDb {
                 returned_operands.push(idx);
             }
             // Identifiers possessing AST children denote parsed function calls.
-            // Currently, Brink offers no extension registry or generic function 
-            // handling. Therefore, encountering any function call intentionally 
-            // generates a clean compilation error.
+            // We capture the identifier and its argument children to construct an ExtensionCall IR.
             LexToken::Identifier => {
                 if ast.has_children(parent_nid) {
-                    let m = format!("Unknown function '{}'", tinfo.val);
-                    diags.err1("LINEAR_14", &m, tinfo.span());
-                    result = false;
+                    let ir_lid = self.new_ir(parent_nid, ast, IRKind::ExtensionCall, in_const_expr);
+
+                    // Add the function name itself as the first operand
+                    self.add_new_operand_to_ir(ir_lid, LinOperand::new(None, tinfo), in_const_expr);
+
+                    // Record children (arguments)
+                    let mut lops = Vec::new();
+                    result &= self.record_children_r(
+                        rdepth + 1,
+                        parent_nid,
+                        &mut lops,
+                        diags,
+                        ast,
+                        ast_db,
+                        in_const_expr,
+                    );
+
+                    // Add the argument operands to the IR
+                    for idx in lops {
+                        self.add_existing_operand_to_ir(ir_lid, idx, in_const_expr);
+                    }
+
+                    // Output operand for the extension result
+                    let out_idx = self.add_new_operand_to_ir(
+                        ir_lid,
+                        LinOperand::new(Some(ir_lid), tinfo),
+                        in_const_expr,
+                    );
+                    returned_operands.push(out_idx);
                 } else {
                     let idx = if in_const_expr {
                         let idx = self.const_operand_vec.len();
