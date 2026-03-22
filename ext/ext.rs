@@ -35,10 +35,13 @@ impl ExtensionRegistry {
         }
     }
 
-    /// Registers a new extension instance.
+    /// Registers a new extension instance. Panics if an extension with the same name already exists.
     pub fn register(&mut self, extension: Box<dyn BrinkExtension>) {
-        self.extensions
-            .insert(extension.name().to_string(), extension);
+        let name = extension.name().to_string();
+        if self.extensions.contains_key(&name) {
+            panic!("Extension '{}' is already registered", name);
+        }
+        self.extensions.insert(name, extension);
     }
 
     /// Retrieves a registered extension by its fully-qualified name.
@@ -85,6 +88,14 @@ mod tests {
             reg.get("missing::func").is_none(),
             "Should reject unregistered extensions"
         );
+    }
+
+    #[test]
+    #[should_panic(expected = "Extension 'brink::test_crc' is already registered")]
+    fn test_duplicate_registration_panics() {
+        let mut reg = ExtensionRegistry::new();
+        reg.register(Box::new(MockCrc));
+        reg.register(Box::new(MockCrc));
     }
 
     #[test]
