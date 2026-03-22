@@ -258,7 +258,7 @@ pub fn format_c99(map: &MapDb) -> String {
 ///
 /// Addresses and offsets are hex strings (`"0x..."`) for readability.
 /// Sizes and the total are plain JSON numbers.
-/// Const values use the same string representation as `format_human`.
+/// Const values use the same string representation as `format_csv`.
 ///
 /// ```json
 /// {
@@ -436,20 +436,20 @@ mod tests {
 
     #[test]
     fn header_contains_output_file_and_base_addr() {
-        let out = format_human(&make_map());
+        let out = format_csv(&make_map());
         assert!(out.contains("out.bin"), "output file name missing");
         assert!(out.contains("0x0000000000001000"), "base addr missing");
     }
 
     #[test]
     fn header_contains_total_size() {
-        let out = format_human(&make_map());
-        assert!(out.contains("128 bytes"), "total size in bytes missing");
+        let out = format_csv(&make_map());
+        assert!(out.contains("128"), "total size in bytes missing");
     }
 
     #[test]
     fn sections_contain_names_and_addresses() {
-        let out = format_human(&make_map());
+        let out = format_csv(&make_map());
         assert!(out.contains("text"), "section name 'text' missing");
         assert!(out.contains("data"), "section name 'data' missing");
         // abs_start of 'text' section
@@ -466,13 +466,13 @@ mod tests {
 
     #[test]
     fn sections_contain_sizes() {
-        let out = format_human(&make_map());
+        let out = format_csv(&make_map());
         assert!(out.contains("64,"), "section size '64' missing");
     }
 
     #[test]
     fn labels_contain_names_and_addresses() {
-        let out = format_human(&make_map());
+        let out = format_csv(&make_map());
         assert!(out.contains("start"), "label 'start' missing");
         assert!(out.contains("end_marker"), "label 'end_marker' missing");
         assert!(
@@ -483,7 +483,7 @@ mod tests {
 
     #[test]
     fn consts_appear_before_sections_in_output() {
-        let out = format_human(&make_map());
+        let out = format_csv(&make_map());
         let const_pos = out.find("Constants").expect("Constants section missing");
         let section_pos = out.find("Sections").expect("Sections section missing");
         assert!(
@@ -494,7 +494,7 @@ mod tests {
 
     #[test]
     fn consts_contain_names_and_values() {
-        let out = format_human(&make_map());
+        let out = format_csv(&make_map());
         assert!(out.contains("BASE"), "const name 'BASE' missing");
         assert!(out.contains("COUNT"), "const name 'COUNT' missing");
         // U64 renders as hex
@@ -516,7 +516,7 @@ mod tests {
             labels: vec![],
             consts: vec![],
         };
-        let out = format_human(&map);
+        let out = format_csv(&map);
         // Each table should report (none) when empty
         assert_eq!(
             out.matches("(none)").count(),
@@ -548,7 +548,7 @@ mod tests {
             labels: vec![],
             consts: vec![],
         };
-        let out = format_human(&map);
+        let out = format_csv(&map);
         assert_eq!(
             out.matches("foo").count(),
             2,

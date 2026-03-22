@@ -8,6 +8,7 @@ members = [
     "irdb",
     "diags",
     "map",
+    "ext",
 ]
 
 [workspace.package]

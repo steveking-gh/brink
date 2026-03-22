@@ -1,0 +1,14 @@
+[package]
+name = "ext"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[lib]
+path = "ext.rs"
+
+[dependencies]
+tracing = "0.1.44"
+
+[dev-dependencies]
+tracing-subscriber = "0.3.22"
