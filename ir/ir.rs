@@ -24,6 +24,7 @@ pub enum DataType {
     Integer, // ambiguously U64 or I64
     QuotedString,
     Identifier,
+    Extension,
     Unknown,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -59,12 +60,14 @@ pub enum IRKind {
     SectionEnd,
     SectionStart,
     Sizeof,
+    SizeofExt,
     Subtract,
     ToI64,
     ToU64,
     U64,
     /// Write N bytes (little-endian). N is the byte width: 1..=8.
     Wr(u8),
+    WrExt,
     Wrf,
     Wrs,
 }
@@ -76,6 +79,7 @@ pub enum ParameterValue {
     Integer(i64), // ambiguously U64 or I64, physically backed by i64
     QuotedString(String),
     Identifier(String),
+    Extension,
     Unknown,
 }
 
@@ -87,6 +91,7 @@ impl ParameterValue {
             ParameterValue::Integer(_) => DataType::Integer,
             ParameterValue::QuotedString(_) => DataType::QuotedString,
             ParameterValue::Identifier(_) => DataType::Identifier,
+            ParameterValue::Extension => DataType::Extension,
             ParameterValue::Unknown => DataType::Unknown,
         }
     }
@@ -231,6 +236,9 @@ impl IROperand {
                         .replace("\\0", "\0")
                         .replace("\\t", "\t"),
                 ));
+            }
+            DataType::Extension => {
+                return Some(ParameterValue::Extension);
             }
             DataType::U64 => {
                 if is_immediate {

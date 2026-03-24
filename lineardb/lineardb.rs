@@ -359,57 +359,89 @@ impl<'toks> LinearDb {
                 returned_operands.push(idx);
             }
             LexToken::Wr => {
-                // A vector to track the operands of this expression.
                 let mut lops = Vec::new();
-                // Write the contents of a section.  This isn't a simple recursion
-                // into the children.  Instead, we redirect to the specified section.
-                let sec_name_str = ast.get_child_str(parent_nid, 0).unwrap();
-                debug!(
-                    "LinearDb::record_r: recursing into section {}",
-                    sec_name_str
-                );
+                let child_nid = ast.children(parent_nid).next().unwrap();
+                let child_tinfo = ast.get_tinfo(child_nid);
 
-                // Using the name of the section, use the AST database to get a reference
-                // to the section object.  ast_db processing has already guaranteed
-                // that the section name is legitimate, so unwrap().
-                let section = ast_db.sections.get(sec_name_str).unwrap();
-                let sec_nid = section.nid;
-
-                // Recurse into the referenced section.  Section content is never
-                // part of a const expression, so always pass false here.
-                result &= self.record_r(rdepth + 1, sec_nid, &mut lops, diags, ast, ast_db, false);
-                // The 'wr' expression does not produce an IR of its own,
-                // but inserts an entire section in-place.  So, we don't have a
-                // linear ID for the 'wr' and expect no operands.
-                result &= self.operand_count_is_valid(0, &lops, diags, tinfo);
+                // Determine if this is writing a Section or an Extension.
+                // Sections are standalone identifiers. Extensions possess namespace contexts or inner arguments.
+                if child_tinfo.tok == LexToken::Identifier && !ast.has_children(child_nid) {
+                    let sec_name_str = child_tinfo.val;
+                    let section = ast_db.sections.get(sec_name_str).unwrap();
+                    let sec_nid = section.nid;
+                    result &=
+                        self.record_r(rdepth + 1, sec_nid, &mut lops, diags, ast, ast_db, false);
+                    result &= self.operand_count_is_valid(0, &lops, diags, tinfo);
+                } else {
+                    let ir_lid = self.new_ir(parent_nid, ast, IRKind::WrExt, in_const_expr);
+                    // Record the inner ExtensionCall
+                    result &= self.record_children_r(
+                        rdepth + 1,
+                        parent_nid,
+                        &mut lops,
+                        diags,
+                        ast,
+                        ast_db,
+                        in_const_expr,
+                    );
+                    result &= self.operand_count_is_valid(1, &lops, diags, tinfo);
+                    for idx in lops {
+                        self.add_existing_operand_to_ir(ir_lid, idx, in_const_expr);
+                    }
+                }
             }
             LexToken::Sizeof => {
-                // A vector to track the operands of this expression.
-                let mut lops = Vec::new();
-                // Get the size of the section.  Section name is an identifier operand.
-                let ir_lid = self.new_ir(parent_nid, ast, IRKind::Sizeof, in_const_expr);
-                // There is child, which is the identifier
-                result &= self.record_children_r(
-                    rdepth + 1,
-                    parent_nid,
-                    &mut lops,
-                    diags,
-                    ast,
-                    ast_db,
-                    in_const_expr,
-                );
-                // 1 operand expected
-                result &= self.process_operands(1, &mut lops, ir_lid, diags, tinfo, in_const_expr);
+                // Peek at the first child to distinguish sizeof(section) from
+                // sizeof(namespace::ext_name).
+                let first_child = ast.children(parent_nid).next().unwrap();
+                let first_child_tinfo = ast.get_tinfo(first_child);
 
-                // Add a destination operand to the operation to hold the result
-                let idx = self.add_new_operand_to_ir(
-                    ir_lid,
-                    LinOperand::new(Some(ir_lid), tinfo),
-                    in_const_expr,
-                );
-                // Also add the destination operand to the local operands
-                // The destination operand is presumably an input operand in the parent.
-                returned_operands.push(idx);
+                if first_child_tinfo.tok == LexToken::Namespace {
+                    // sizeof(namespace::ext_name) — size-only query.
+                    // The AST stage guarantees no arguments are present (AST_40).
+                    let ns_children: Vec<_> = ast.children(first_child).collect();
+                    let ext_id_tinfo = ast.get_tinfo(ns_children[0]);
+                    let full_name = format!("{}{}", first_child_tinfo.val, ext_id_tinfo.val);
+
+                    let ir_lid = self.new_ir(parent_nid, ast, IRKind::SizeofExt, in_const_expr);
+
+                    // Store the full extension name (e.g. "brink::test_crc") as an
+                    // Identifier operand, using the Namespace token so irdb resolves
+                    // it to DataType::Identifier — the same convention used by ExtensionCall.
+                    let mut name_op = LinOperand::new(None, first_child_tinfo);
+                    name_op.sval = full_name;
+                    self.add_new_operand_to_ir(ir_lid, name_op, in_const_expr);
+
+                    // Destination operand carries the computed size at engine time.
+                    let idx = self.add_new_operand_to_ir(
+                        ir_lid,
+                        LinOperand::new(Some(ir_lid), tinfo),
+                        in_const_expr,
+                    );
+                    returned_operands.push(idx);
+                } else {
+                    // sizeof(section_name) — existing path.
+                    let mut lops = Vec::new();
+                    let ir_lid = self.new_ir(parent_nid, ast, IRKind::Sizeof, in_const_expr);
+                    result &= self.record_children_r(
+                        rdepth + 1,
+                        parent_nid,
+                        &mut lops,
+                        diags,
+                        ast,
+                        ast_db,
+                        in_const_expr,
+                    );
+                    result &=
+                        self.process_operands(1, &mut lops, ir_lid, diags, tinfo, in_const_expr);
+
+                    let idx = self.add_new_operand_to_ir(
+                        ir_lid,
+                        LinOperand::new(Some(ir_lid), tinfo),
+                        in_const_expr,
+                    );
+                    returned_operands.push(idx);
+                }
             }
             LexToken::Abs | LexToken::Img | LexToken::Sec => {
                 // A vector to track the operands of this expression.
@@ -495,9 +527,11 @@ impl<'toks> LinearDb {
                     self.add_existing_operand_to_ir(ir_lid, idx, in_const_expr);
                 }
 
+                let mut out_tinfo = tinfo.clone();
+                out_tinfo.tok = LexToken::U64;
                 let out_idx = self.add_new_operand_to_ir(
                     ir_lid,
-                    LinOperand::new(Some(ir_lid), tinfo),
+                    LinOperand::new(Some(ir_lid), &out_tinfo),
                     in_const_expr,
                 );
                 returned_operands.push(out_idx);
@@ -530,9 +564,11 @@ impl<'toks> LinearDb {
                     }
 
                     // Output operand for the extension result
+                    let mut out_tinfo = tinfo.clone();
+                    out_tinfo.tok = LexToken::U64;
                     let out_idx = self.add_new_operand_to_ir(
                         ir_lid,
-                        LinOperand::new(Some(ir_lid), tinfo),
+                        LinOperand::new(Some(ir_lid), &out_tinfo),
                         in_const_expr,
                     );
                     returned_operands.push(out_idx);

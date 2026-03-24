@@ -96,6 +96,11 @@ impl IRDb {
         );
         let lop = &lin_db.operand_vec[lop_num];
         let mut data_type = None;
+        if let Some(lin_ir_lid) = lop.ir_lid
+            && lin_db.ir_vec[lin_ir_lid].op == IRKind::ExtensionCall
+        {
+            return Some(DataType::Extension);
+        }
 
         match lop.tok {
             // The following produce a boolean regardless of input data types
@@ -522,6 +527,38 @@ impl IRDb {
                         format!("Unknown function '{}'", name)
                     };
                     diags.err1("IRDB_40", &m, ir.src_loc.clone());
+                    return false;
+                }
+                true
+            }
+            IRKind::SizeofExt => {
+                let name = self.get_opnd_as_identifier(ir, 0);
+                if ext_registry.get(name).is_none() {
+                    let m = if let Some(idx) = name.find("::") {
+                        format!("Unknown namespace '{}'", &name[..idx])
+                    } else {
+                        format!("Unknown extension '{}'", name)
+                    };
+                    diags.err1("IRDB_44", &m, ir.src_loc.clone());
+                    return false;
+                }
+                true
+            }
+            IRKind::WrExt => {
+                let len = ir.operands.len();
+                if len != 1 {
+                    let m = format!("'{:?}' requires exactly 1 input operand.", ir.kind);
+                    diags.err1("IRDB_43", &m, ir.src_loc.clone());
+                    return false;
+                }
+                let lop_idx = ir.operands[0];
+                let lop = &self.parms[lop_idx];
+                if lop.val.data_type() != DataType::Extension {
+                    diags.err1(
+                        "IRDB_41",
+                        "Expected generic 'wr' statement to output an extension result.",
+                        ir.src_loc.clone(),
+                    );
                     return false;
                 }
                 true
@@ -1085,6 +1122,9 @@ impl IRDb {
                         DataType::QuotedString => {
                             let v = operand.val.to_str();
                             op.push_str(&format!(" ({:?}){}", operand.val.data_type(), v));
+                        }
+                        DataType::Extension => {
+                            op.push_str(&format!(" ({:?})", operand.val.data_type()));
                         }
                         DataType::Unknown => {
                             println!("Dump: Found unknown Data Type operand {:?}", operand);

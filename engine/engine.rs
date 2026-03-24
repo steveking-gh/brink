@@ -132,6 +132,53 @@ impl Engine {
         true
     }
 
+    /// Evaluates a dynamic `wr` statement specifically targeting compiled `BrinkExtension` traits.
+    /// We check the extension registry to find the fixed length payload size.
+    fn iterate_wrext(
+        &mut self,
+        ir: &IR,
+        irdb: &IRDb,
+        current: &mut Location,
+        ext_registry: &ExtensionRegistry,
+        diags: &mut Diags,
+    ) -> bool {
+        self.trace(
+            format!(
+                "Engine::iterate_wrext: img {}, sec {}",
+                current.img, current.sec
+            )
+            .as_str(),
+        );
+
+        let opnd_idx = ir.operands[0];
+        let opnd = &irdb.parms[opnd_idx];
+
+        // The operand to a `wr` statement isn't a direct identifier; it evaluates downwards
+        // to essentially an unresolved IR node mapping point. We use `is_output_of()` to crawl backwards
+        // up the instruction's dependency graph to find the `ExtensionCall` IR node that produced this
+        // target mapping. From there, we extract the extension's string name.
+        if let Some(prod_ir_idx) = opnd.is_output_of() {
+            let prod_ir = &irdb.ir_vec[prod_ir_idx];
+            if prod_ir.kind == IRKind::ExtensionCall {
+                let ext_name_opnd = &irdb.parms[prod_ir.operands[0]];
+                let ext_name = ext_name_opnd.val.to_identifier();
+                if let Some(ext) = ext_registry.get(ext_name) {
+                    let size = ext.size() as u64;
+                    current.img += size;
+                    current.sec += size;
+                    return true;
+                }
+            }
+        }
+
+        diags.err1(
+            "EXEC_50",
+            "Failed to resolve extension size during layout.",
+            ir.src_loc.clone(),
+        );
+        false
+    }
+
     // Used for Wr8 though Wr64
     fn iterate_wrx(
         &mut self,
@@ -735,47 +782,74 @@ impl Engine {
         let in_parm_num0 = ir.operands[0]; // identifier
         let out_parm_num = ir.operands[1];
 
-        let sec_name = self.parms[in_parm_num0].to_identifier().to_string();
+        let in_parm = &self.parms[in_parm_num0];
 
-        // We've already verified that the section identifier exists,
-        // but unless the section actually got used in the output,
-        // then we won't find location info for it.
-        let ir_rng = irdb.sized_locs.get(&sec_name);
-        if ir_rng.is_none() {
-            let msg = format!(
-                "Can't take sizeof() section '{}' not used in output.",
-                sec_name
-            );
-            diags.err1("EXEC_5", &msg, ir.src_loc.clone());
-            return false;
+        if in_parm.data_type() == DataType::Identifier {
+            let sec_name = in_parm.to_identifier().to_string();
+
+            // We've already verified that the section identifier exists,
+            // but unless the section actually got used in the output,
+            // then we won't find location info for it.
+            let ir_rng = irdb.sized_locs.get(&sec_name);
+            if ir_rng.is_none() {
+                let msg = format!(
+                    "Can't take sizeof() section '{}' not used in output.",
+                    sec_name
+                );
+                diags.err1("EXEC_5", &msg, ir.src_loc.clone());
+                return false;
+            }
+            let ir_rng = ir_rng.unwrap();
+            assert!(ir_rng.start <= ir_rng.end);
+            let start_loc = &self.ir_locs[ir_rng.start];
+            let end_loc = &self.ir_locs[ir_rng.end];
+
+            if start_loc.img > end_loc.img {
+                self.trace(
+                    format!(
+                        "Starting img offset {} > ending img offset {} in {}",
+                        start_loc.img, end_loc.img, sec_name
+                    )
+                    .as_str(),
+                );
+                *self.parms[out_parm_num].to_u64_mut() = 0;
+            } else {
+                let sz: u64 = end_loc.img - start_loc.img;
+                self.trace(format!("Sizeof {} is currently {}", sec_name, sz).as_str());
+                *self.parms[out_parm_num].to_u64_mut() = sz;
+            }
+            return true;
         }
-        let ir_rng = ir_rng.unwrap();
-        assert!(ir_rng.start <= ir_rng.end);
-        let start_loc = &self.ir_locs[ir_rng.start];
-        let end_loc = &self.ir_locs[ir_rng.end];
 
-        if start_loc.img > end_loc.img {
-            // When the start has a larger image offset than the end, it means
-            // something before this section grew significant during the current
-            // iteration.  The starting offset has already been updated during
-            // this iteration, but not yet th end.  In this case, report a zero
-            // size and wait for the next iteration where the ending offset will
-            // be more accurate.
-            self.trace(
-                format!(
-                    "Starting img offset {} > ending img offset {} in {}",
-                    start_loc.img, end_loc.img, sec_name
-                )
-                .as_str(),
-            );
-            *self.parms[out_parm_num].to_u64_mut() = 0;
+        diags.err1(
+            "EXEC_52",
+            "sizeof() only accepts section names.",
+            ir.src_loc.clone(),
+        );
+        false
+    }
+
+    fn iterate_sizeof_ext(
+        &mut self,
+        ir: &IR,
+        diags: &mut Diags,
+        ext_registry: &ExtensionRegistry,
+    ) -> bool {
+        // SizeofExt has 2 operands: [0] = extension name (Identifier), [1] = output U64
+        assert!(ir.operands.len() == 2);
+        let out_parm_num = ir.operands[1];
+        let name = self.parms[ir.operands[0]].to_identifier().to_string();
+        if let Some(ext) = ext_registry.get(&name) {
+            *self.parms[out_parm_num].to_u64_mut() = ext.size() as u64;
+            true
         } else {
-            let sz: u64 = end_loc.img - start_loc.img;
-            self.trace(format!("Sizeof {} is currently {}", sec_name, sz).as_str());
-            *self.parms[out_parm_num].to_u64_mut() = sz;
+            diags.err1(
+                "EXEC_53",
+                "Unknown extension in sizeof().",
+                ir.src_loc.clone(),
+            );
+            false
         }
-
-        true
     }
 
     /// Compute the transient current address.  This case is called when
@@ -1101,7 +1175,12 @@ impl Engine {
         true
     }
 
-    pub fn new(irdb: &IRDb, diags: &mut Diags, abs_start: usize) -> anyhow::Result<Self> {
+    pub fn new(
+        irdb: &IRDb,
+        ext_registry: &ExtensionRegistry,
+        diags: &mut Diags,
+        abs_start: usize,
+    ) -> anyhow::Result<Self> {
         // The first iterate loop may access any IR location, so initialize all
         // ir_locs locations to zero.
         let ir_locs = vec![Location { img: 0, sec: 0 }; irdb.ir_vec.len()];
@@ -1123,7 +1202,7 @@ impl Engine {
             engine.parms.push(opnd.clone_val());
         }
 
-        let result = engine.iterate(irdb, diags, abs_start);
+        let result = engine.iterate(irdb, ext_registry, diags, abs_start);
         if !result {
             anyhow::bail!("Engine construction failed.");
         }
@@ -1187,7 +1266,13 @@ impl Engine {
     /// location vectors.  `abs_start` sets the base image address for the first
     /// section.  Returns `false` and emits diagnostics if any instruction fails
     /// validation or execution during the loop.
-    pub fn iterate(&mut self, irdb: &IRDb, diags: &mut Diags, abs_start: usize) -> bool {
+    pub fn iterate(
+        &mut self,
+        irdb: &IRDb,
+        ext_registry: &ExtensionRegistry,
+        diags: &mut Diags,
+        abs_start: usize,
+    ) -> bool {
         self.trace(format!("Engine::iterate: abs_start = {}", abs_start).as_str());
         let mut result = true;
         let mut old_locations = Vec::new();
@@ -1230,6 +1315,7 @@ impl Engine {
                         self.iterate_type_conversion(ir, irdb, operation, &current, diags)
                     }
                     IRKind::Sizeof => self.iterate_sizeof(ir, irdb, diags, &current),
+                    IRKind::SizeofExt => self.iterate_sizeof_ext(ir, diags, ext_registry),
 
                     // Unlike print, we have to iterate on the string write operation since
                     // the size of the string affects the size of the output image.
@@ -1243,6 +1329,9 @@ impl Engine {
                     IRKind::SectionEnd => self.iterate_section_end(ir, irdb, diags, &mut current),
 
                     IRKind::Wr(_) => self.iterate_wrx(ir, irdb, diags, &mut current),
+                    IRKind::WrExt => {
+                        self.iterate_wrext(ir, irdb, &mut current, ext_registry, diags)
+                    }
                     IRKind::Align => self.iterate_align(ir, irdb, diags, &current),
                     IRKind::SetSec | IRKind::SetImg | IRKind::SetAbs => {
                         self.iterate_set(ir, irdb, diags, &current)
@@ -1497,7 +1586,7 @@ impl Engine {
     ) -> Result<()> {
         self.trace("Engine::execute:");
 
-        self.execute_core_operations(irdb, diags, file)?;
+        self.execute_core_operations(irdb, diags, file, ext_registry)?;
         self.execute_extensions(irdb, diags, file, ext_registry)?;
 
         Ok(())
@@ -1509,6 +1598,7 @@ impl Engine {
         irdb: &IRDb,
         diags: &mut Diags,
         file: &mut File,
+        ext_registry: &ExtensionRegistry,
     ) -> Result<()> {
         self.trace("Engine::execute_core_operations:");
         let mut result;
@@ -1531,6 +1621,7 @@ impl Engine {
                 | IRKind::Sec
                 | IRKind::Label
                 | IRKind::Sizeof
+                | IRKind::SizeofExt
                 | IRKind::ToI64
                 | IRKind::ToU64
                 | IRKind::Eq
@@ -1554,6 +1645,31 @@ impl Engine {
                 | IRKind::LeftShift
                 | IRKind::RightShift
                 | IRKind::ExtensionCall => Ok(()),
+                IRKind::WrExt => {
+                    // We must emit empty zeroed bytes during the physical serial write loop
+                    // to guarantee that the output file expands to encompass the extension's
+                    // final layout boundaries before memory mapping executes.
+                    let opnd_idx = ir.operands[0];
+                    let opnd = &irdb.parms[opnd_idx];
+                    if let Some(prod_ir_idx) = opnd.is_output_of() {
+                        let prod_ir = &irdb.ir_vec[prod_ir_idx];
+                        if prod_ir.kind == IRKind::ExtensionCall {
+                            let ext_name_opnd = &irdb.parms[prod_ir.operands[0]];
+                            let ext_name = ext_name_opnd.val.to_identifier();
+                            if let Some(ext) = ext_registry.get(ext_name) {
+                                let size = ext.size();
+                                let buf = vec![0u8; size];
+                                if let Err(err) = file.write_all(&buf) {
+                                    return Err(anyhow::anyhow!(
+                                        "Failed to pre-pad extension space: {}",
+                                        err
+                                    ));
+                                }
+                            }
+                        }
+                    }
+                    Ok(())
+                }
             };
 
             if result.is_err() {
@@ -1576,9 +1692,9 @@ impl Engine {
     fn execute_extensions(
         &self,
         irdb: &IRDb,
-        _diags: &mut Diags,
-        _file: &mut File,
-        _ext_registry: &ExtensionRegistry,
+        diags: &mut Diags,
+        file: &mut File,
+        ext_registry: &ExtensionRegistry,
     ) -> Result<()> {
         self.trace("Engine::execute_extensions:");
 
@@ -1595,11 +1711,107 @@ impl Engine {
             return Ok(());
         }
 
-        // Skeleton for Phase 4:
-        // 1. Map `extension_nodes` to their respective Read/Write bounds via the Extension Registry.
-        // 2. Build adjacency list based on overlapping bounds.
-        // 3. Output a stable topological sort (tie-broken by sequential file location).
-        // 4. Dispatch the execution callbacks in topologically sorted order.
+        use memmap2::MmapOptions;
+
+        // We memory-map the output file to allow extensions zero-copy access to the fully generated image,
+        // and allow zero-copy patching of the extension's execution output without re-reading from disk.
+        // We synchronize the file first to ensure the OS sees all written data/padding before mapping.
+        if let Err(e) = file.sync_all() {
+            return Err(anyhow!(
+                "Failed to sync output file before memory mapping: {}",
+                e
+            ));
+        }
+
+        // This is the only bit of `unsafe code in brink.
+        let mut mmap = match unsafe { MmapOptions::new().map_mut(&*file) } {
+            Ok(m) => m,
+            Err(e) => return Err(anyhow!("Failed to memory map output file: {}", e)),
+        };
+
+        // Sequentially execute extensions and patch the output file.
+        let mut error_count = 0;
+        for &idx in &extension_nodes {
+            let ir = &irdb.ir_vec[idx];
+            let name = self.parms[ir.operands[0]].to_identifier();
+            let out_idx = *ir.operands.last().unwrap();
+
+            // Find the consumer of this ExtensionCall's output
+            let mut consumer_ir = None;
+            let mut consumer_idx = 0;
+            for (c_idx, c_ir) in irdb.ir_vec.iter().enumerate() {
+                if c_idx != idx && c_ir.operands.contains(&out_idx) {
+                    consumer_ir = Some(c_ir);
+                    consumer_idx = c_idx;
+                    break;
+                }
+            }
+
+            let Some(c_ir) = consumer_ir else {
+                diags.err1(
+                    "EXEC_45",
+                    "ExtensionCall output not consumed",
+                    ir.src_loc.clone(),
+                );
+                error_count += 1;
+                continue;
+            };
+
+            let byte_width = match c_ir.kind {
+                IRKind::WrExt => {
+                    let ext = ext_registry.get(name).unwrap();
+                    ext.size()
+                }
+                _ => {
+                    diags.err1(
+                        "EXEC_46",
+                        "Extension calls must be consumed by a generic `wr` statement. Fixed-size writes like `wr32` are prohibited.",
+                        ir.src_loc.clone(),
+                    );
+                    error_count += 1;
+                    continue;
+                }
+            };
+
+            let Some(ext) = ext_registry.get(name) else {
+                unreachable!("Extension {} not found in registry", name);
+            };
+
+            // Extract numeric arguments (skip the name at [0] and output index at the end)
+            let mut args = Vec::new();
+            for opnd_idx in &ir.operands[1..ir.operands.len() - 1] {
+                args.push(self.parms[*opnd_idx].to_u64());
+            }
+
+            let mut out_buffer = vec![0u8; byte_width];
+
+            if let Err(e) = ext.execute(&args, &mmap, &mut out_buffer) {
+                let msg = format!("Extension '{}' execution failed: {}", name, e);
+                diags.err1("EXEC_47", &msg, ir.src_loc.clone());
+                return Err(anyhow!(msg));
+            }
+
+            // Patch the file at the exact image offset where the consumer instruction evaluated.
+            let loc = &self.ir_locs[consumer_idx];
+            let abs_offset = loc.img as usize;
+
+            if abs_offset + byte_width > mmap.len() {
+                return Err(anyhow!(
+                    "Extension bounded write exceeds file bounds implicitly. This is a severe compiler bug."
+                ));
+            }
+
+            // Zero-copy assignment back into OS memory map.
+            mmap[abs_offset..abs_offset + byte_width].copy_from_slice(&out_buffer);
+        }
+
+        if error_count > 0 {
+            return Err(anyhow!("Error detected in extension execution"));
+        }
+
+        if let Err(e) = mmap.flush() {
+            return Err(anyhow!("Failed to flush memory-mapped file patches: {}", e));
+        }
 
         Ok(())
     }

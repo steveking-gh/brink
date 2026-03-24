@@ -5,7 +5,13 @@
       "Bash(ls c:/Users/kings/Documents/projects/brink/tests/*.brink)",
       "Bash(xargs grep:*)",
       "Bash(grep -l const c:/Users/kings/Documents/projects/brink/tests/*.brink)",
-      "Bash(cargo build:*)"
+      "Bash(cargo build:*)",
+      "Bash(cargo run:*)",
+      "Bash(echo \"Exit code: $?\")",
+      "Bash(ls c:UserskingsDocumentsprojectsbrinktests*extension* c:UserskingsDocumentsprojectsbrinktests*dynamic* c:UserskingsDocumentsprojectsbrinktests*sizeof_ext*)",
+      "Bash(cargo fmt:*)",
+      "Bash(cargo clippy:*)",
+      "Bash(grep -A 10 \"this \\\\`if\\\\` statement\")"
     ]
   }
 }

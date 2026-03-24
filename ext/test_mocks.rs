@@ -7,6 +7,10 @@ impl BrinkExtension for MockCrc {
         "brink::test_crc"
     }
 
+    fn size(&self) -> usize {
+        4
+    }
+
     fn execute(&self, args: &[u64], _img: &[u8], out: &mut [u8]) -> Result<(), String> {
         if args.len() != 1 {
             return Err("Expected exactly 1 argument for CRC".to_string());
@@ -27,6 +31,11 @@ impl BrinkExtension for MockLogger {
     fn name(&self) -> &str {
         "brink::test_logger"
     }
+
+    fn size(&self) -> usize {
+        0
+    }
+
     fn execute(&self, _args: &[u64], _img: &[u8], _out: &mut [u8]) -> Result<(), String> {
         tracing::info!("MockLogger executed successfully via tracing API");
         Err("Intentional mock fallback error".to_string())

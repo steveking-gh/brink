@@ -141,8 +141,8 @@ pub fn process(
         ir_db.dump();
     }
 
-    let engine =
-        Engine::new(&ir_db, &mut diags, 0).context("[PROC_5]: Error detected, halting.")?;
+    let engine = Engine::new(&ir_db, &ext_registry, &mut diags, 0)
+        .context("[PROC_5]: Error detected, halting.")?;
     if verbosity > 2 {
         engine.dump_locations();
     }
@@ -151,8 +151,13 @@ pub fn process(
     let fname_str = String::from(output_file.unwrap_or("output.bin").trim_matches(' '));
     debug!("process: output file name is {}", fname_str);
 
-    let mut file =
-        File::create(&fname_str).context(format!("Unable to create output file {}", fname_str))?;
+    let mut file = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(&fname_str)
+        .context(format!("Unable to create output file {}", fname_str))?;
 
     if engine
         .execute(&ir_db, &mut diags, &mut file, &ext_registry)
@@ -168,6 +173,21 @@ pub fn process(
         emit_map(map_csv, &format_csv(&map_db))?;
         emit_map(map_json, &format_json(&map_db))?;
         emit_map(map_c99, &format_c99(&map_db))?;
+    }
+    Ok(())
+}
+
+/// Writes `content` to stdout when `dest` is `Some("-")`, or to the named
+/// file when `dest` is `Some(path)`.  Does nothing when `dest` is `None`.
+fn emit_map(dest: Option<&str>, content: &str) -> Result<()> {
+    match dest {
+        None => {}
+        Some("-") => print!("{content}"),
+        Some(path) => {
+            let mut f = File::create(path).context(format!("Unable to create map file {path}"))?;
+            f.write_all(content.as_bytes())
+                .context(format!("Unable to write map file {path}"))?;
+        }
     }
     Ok(())
 }
@@ -269,19 +289,4 @@ mod tests {
     fn empty_name_is_error() {
         assert!(parse_define("=42").is_err());
     }
-}
-
-/// Writes `content` to stdout when `dest` is `Some("-")`, or to the named
-/// file when `dest` is `Some(path)`.  Does nothing when `dest` is `None`.
-fn emit_map(dest: Option<&str>, content: &str) -> Result<()> {
-    match dest {
-        None => {}
-        Some("-") => print!("{content}"),
-        Some(path) => {
-            let mut f = File::create(path).context(format!("Unable to create map file {path}"))?;
-            f.write_all(content.as_bytes())
-                .context(format!("Unable to write map file {path}"))?;
-        }
-    }
-    Ok(())
 }

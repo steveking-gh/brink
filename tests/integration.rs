@@ -1,24 +1,25 @@
 #[cfg(test)]
 mod tests {
     use assert_cmd::Command;
-    use serial_test::serial;
     use std::fs;
-
-    // Many tests just use the default output file "output.bin".
-    // This creates a race condition since each test deletes this
-    // file when done.
-    // Use #[serial] on tests the produce output.bin to fix this race condition.
 
     fn assert_brink_success(src: &str, output_bin: Option<&str>, expected_output: Option<&str>) {
         let mut cmd = Command::cargo_bin("brink").unwrap();
         cmd.arg(src);
-        if let Some(out_file) = output_bin {
-            cmd.arg("-o").arg(out_file);
-        }
-        cmd.assert().success();
 
-        let default_out = "output.bin";
-        let actual_out = output_bin.unwrap_or(default_out);
+        let derived_out;
+        let actual_out = if let Some(out_file) = output_bin {
+            cmd.arg("-o").arg(out_file);
+            out_file
+        } else {
+            // Generate a locally unique binary filename like `tests_test_dynamic_wr.brink.bin`
+            // avoiding `output.bin` race-conditions across the parallel testing harness entirely!
+            derived_out = format!("{}.bin", src.replace('/', "_").replace('\\', "_"));
+            cmd.arg("-o").arg(&derived_out);
+            &derived_out
+        };
+
+        cmd.assert().success().stderr(predicates::str::is_empty());
 
         if fs::metadata(actual_out).is_ok() {
             if let Some(expected) = expected_output {
@@ -67,13 +68,13 @@ mod tests {
     }
 
     #[test]
-    #[serial]
+
     fn wr_multi() {
         assert_brink_success("tests/wr_multi.brink", None, None);
     }
 
     #[test]
-    #[serial]
+
     fn wr_single() {
         assert_brink_success("tests/wr_single.brink", None, None);
     }
@@ -300,7 +301,7 @@ mod tests {
     }
 
     #[test]
-    #[serial]
+
     fn fuzz_found_16() {
         assert_brink_success("tests/fuzz_found_16.brink", None, None);
     }
@@ -373,37 +374,37 @@ mod tests {
     }
 
     #[test]
-    #[serial]
+
     fn integers_1() {
         assert_brink_success("tests/integers_1.brink", None, None);
     }
 
     #[test]
-    #[serial]
+
     fn integers_2() {
         assert_brink_success("tests/integers_2.brink", None, None);
     }
 
     #[test]
-    #[serial]
+
     fn integers_3() {
         assert_brink_success("tests/integers_3.brink", None, None);
     }
 
     #[test]
-    #[serial]
+
     fn integers_4() {
         assert_brink_failure("tests/integers_4.brink", &["[AST_19]"]);
     }
 
     #[test]
-    #[serial]
+
     fn integers_5() {
         assert_brink_failure("tests/integers_5.brink", &["[EXEC_13]"]);
     }
 
     #[test]
-    #[serial]
+
     fn neq_1() {
         assert_brink_success("tests/neq_1.brink", None, None);
     }
@@ -414,7 +415,7 @@ mod tests {
     }
 
     #[test]
-    #[serial]
+
     fn add_1() {
         assert_brink_success("tests/add_1.brink", None, None);
     }
@@ -425,7 +426,7 @@ mod tests {
     }
 
     #[test]
-    #[serial]
+
     fn subtract_1() {
         assert_brink_success("tests/subtract_1.brink", None, None);
     }
@@ -441,13 +442,13 @@ mod tests {
     }
 
     #[test]
-    #[serial]
+
     fn subtract_4() {
         assert_brink_success("tests/subtract_4.brink", None, None);
     }
 
     #[test]
-    #[serial]
+
     fn multiply_1() {
         assert_brink_success("tests/multiply_1.brink", None, None);
     }
@@ -458,79 +459,79 @@ mod tests {
     }
 
     #[test]
-    #[serial]
+
     fn divide_1() {
         assert_brink_success("tests/divide_1.brink", None, None);
     }
 
     #[test]
-    #[serial]
+
     fn modulo_1() {
         assert_brink_success("tests/modulo_1.brink", None, None);
     }
 
     #[test]
-    #[serial]
+
     fn shl_1() {
         assert_brink_success("tests/shl_1.brink", None, None);
     }
 
     #[test]
-    #[serial]
+
     fn shr_1() {
         assert_brink_success("tests/shr_1.brink", None, None);
     }
 
     #[test]
-    #[serial]
+
     fn bit_and_1() {
         assert_brink_success("tests/bit_and_1.brink", None, None);
     }
 
     #[test]
-    #[serial]
+
     fn bit_or_1() {
         assert_brink_success("tests/bit_or_1.brink", None, None);
     }
 
     #[test]
-    #[serial]
+
     fn geq_1() {
         assert_brink_success("tests/geq_1.brink", None, None);
     }
 
     #[test]
-    #[serial]
+
     fn leq_1() {
         assert_brink_success("tests/leq_1.brink", None, None);
     }
 
     #[test]
-    #[serial]
+
     fn logical_and_1() {
         assert_brink_success("tests/logical_and_1.brink", None, None);
     }
 
     #[test]
-    #[serial]
+
     fn logical_or_1() {
         assert_brink_success("tests/logical_or_1.brink", None, None);
     }
 
     #[test]
-    #[serial]
+
     fn address_1() {
         assert_brink_success("tests/address_1.brink", None, None);
     }
 
     #[test]
-    #[serial]
+
     fn address_2() {
         assert_brink_success("tests/address_2.brink", None, None);
     }
 
     #[test]
-    #[serial]
+
     fn address_3() {
         assert_brink_success("tests/address_3.brink", None, None);
     }
@@ -576,7 +577,7 @@ mod tests {
     }
 
     #[test]
-    #[serial]
+
     fn label_1() {
         assert_brink_success("tests/label_1.brink", None, None);
     }
@@ -601,31 +602,31 @@ mod tests {
     }
 
     #[test]
-    #[serial]
+
     fn to_u64_1() {
         assert_brink_success("tests/to_u64_1.brink", None, None);
     }
 
     #[test]
-    #[serial]
+
     fn to_i64_1() {
         assert_brink_success("tests/to_i64_1.brink", None, None);
     }
 
     #[test]
-    #[serial]
+
     fn to_i64_2() {
         assert_brink_success("tests/to_i64_2.brink", None, None);
     }
 
     #[test]
-    #[serial]
+
     fn print_1() {
         assert_brink_success("tests/print_1.brink", None, None);
     }
 
     #[test]
-    #[serial]
+
     fn print_2() {
         assert_brink_success("tests/print_2.brink", None, None);
     }
@@ -659,13 +660,13 @@ mod tests {
     }
 
     #[test]
-    #[serial]
+
     fn wrx_2() {
         assert_brink_success("tests/wrx_2.brink", None, None);
     }
 
     #[test]
-    #[serial]
+
     fn wrx_3() {
         assert_brink_success("tests/wrx_3.brink", None, None);
     }
@@ -827,13 +828,13 @@ mod tests {
     }
 
     #[test]
-    #[serial]
+
     fn align_1() {
         assert_brink_success("tests/align_1.brink", None, None);
     }
 
     #[test]
-    #[serial]
+
     fn align_2() {
         let _cmd = Command::cargo_bin("brink")
             .unwrap()
@@ -856,7 +857,7 @@ mod tests {
     }
 
     #[test]
-    #[serial]
+
     fn set_sec_1() {
         assert_brink_success("tests/set_sec_1.brink", None, None);
     }
@@ -867,7 +868,7 @@ mod tests {
     }
 
     #[test]
-    #[serial]
+
     fn set_img_1() {
         assert_brink_success("tests/set_img_1.brink", None, None);
     }
@@ -878,7 +879,7 @@ mod tests {
     }
 
     #[test]
-    #[serial]
+
     fn set_abs_1() {
         assert_brink_success("tests/set_abs_1.brink", None, None);
     }
@@ -889,7 +890,7 @@ mod tests {
     }
 
     #[test]
-    #[serial]
+
     fn set_sec_3() {
         let _cmd = Command::cargo_bin("brink")
             .unwrap()
@@ -931,6 +932,19 @@ mod tests {
     fn missing_input() {
         let mut cmd = Command::cargo_bin("brink").unwrap();
         cmd.arg("does_not_exist.brink").unwrap();
+    }
+
+    /// sizeof() works for both section names and extension names, and the
+    /// two forms agree on the byte count when the extension fills the section.
+    #[test]
+    fn test_extension_sizeof() {
+        assert_brink_success("tests/test_extension_sizeof.brink", None, None);
+    }
+
+    /// sizeof() with extension call syntax (arguments) is a compile error.
+    #[test]
+    fn sizeof_ext_name_with_args_fails() {
+        assert_brink_failure("tests/test_extension_sizeof_fail.brink", &["[AST_40]"]);
     }
 
     /// Assert that every error/warning/note code string passed to the diags API
@@ -1355,17 +1369,20 @@ mod tests {
 
     /// Omitting FILE from --map-csv creates <stem>.map.csv in the current directory.
     #[test]
-    #[serial]
     fn map_csv_default_filename() {
         let mut cmd = Command::cargo_bin("brink").unwrap();
-        cmd.arg("tests/map_default.brink")
+        // Copy the test file locally so the default output map name doesn't collide
+        // with other map tests reading the same map_default.brink input!
+        fs::copy("tests/map_default.brink", "tests/map_csv_default.brink").unwrap();
+
+        cmd.arg("tests/map_csv_default.brink")
             .arg("-o")
-            .arg("map_default.bin")
+            .arg("map_csv_default.bin")
             .arg("--map-csv");
         cmd.assert().success();
 
-        let map = fs::read_to_string("map_default.map.csv")
-            .expect("default map file map_default.map.csv not created");
+        let map = fs::read_to_string("map_csv_default.map.csv")
+            .expect("default map file map_csv_default.map.csv not created");
         assert!(
             map.contains("foo"),
             "section 'foo' missing from default map"
@@ -1375,8 +1392,9 @@ mod tests {
             "base address missing from default map"
         );
 
-        fs::remove_file("map_default.bin").ok();
-        fs::remove_file("map_default.map.csv").ok();
+        fs::remove_file("map_csv_default.bin").ok();
+        fs::remove_file("map_csv_default.map.csv").ok();
+        fs::remove_file("tests/map_csv_default.brink").ok();
     }
 
     /// --map-csv=- writes map content to stdout.
@@ -1499,22 +1517,24 @@ mod tests {
 
     /// Omitting FILE from --map-json creates <stem>.map.json in the current directory.
     #[test]
-    #[serial]
     fn map_json_default_filename() {
         let mut cmd = Command::cargo_bin("brink").unwrap();
-        cmd.arg("tests/map_default.brink")
+        fs::copy("tests/map_default.brink", "tests/map_json_default.brink").unwrap();
+
+        cmd.arg("tests/map_json_default.brink")
             .arg("-o")
             .arg("map_json_default.bin")
             .arg("--map-json");
         cmd.assert().success();
 
-        let text = fs::read_to_string("map_default.map.json")
-            .expect("default JSON map file map_default.map.json not created");
+        let text = fs::read_to_string("map_json_default.map.json")
+            .expect("default JSON map file map_json_default.map.json not created");
         let v: serde_json::Value = serde_json::from_str(&text).expect("not valid JSON");
         assert_eq!(v["base_addr"], "0x0000000000001000");
 
         fs::remove_file("map_json_default.bin").ok();
-        fs::remove_file("map_default.map.json").ok();
+        fs::remove_file("map_json_default.map.json").ok();
+        fs::remove_file("tests/map_json_default.brink").ok();
     }
 
     /// --map-json=- writes JSON map content to stdout.
@@ -1669,7 +1689,6 @@ mod tests {
     }
 
     #[test]
-    #[serial]
     fn include_success() {
         let mut cmd = Command::cargo_bin("brink").unwrap();
         cmd.arg("tests/include_success_main.brink")
@@ -1684,7 +1703,6 @@ mod tests {
     }
 
     #[test]
-    #[serial]
     fn include_nested_success() {
         let mut cmd = Command::cargo_bin("brink").unwrap();
         cmd.arg("tests/include_nested_main.brink")
@@ -1700,25 +1718,27 @@ mod tests {
 
     /// Omitting FILE from --map-c99 creates <stem>.map.h in the current directory.
     #[test]
-    #[serial]
     fn map_c99_default_filename() {
         let mut cmd = Command::cargo_bin("brink").unwrap();
-        cmd.arg("tests/map_default.brink")
+        fs::copy("tests/map_default.brink", "tests/map_c99_default.brink").unwrap();
+
+        cmd.arg("tests/map_c99_default.brink")
             .arg("-o")
-            .arg("map_default.bin")
+            .arg("map_c99_default.bin")
             .arg("--map-c99");
         cmd.assert().success();
 
-        let map = fs::read_to_string("map_default.map.h")
-            .expect("Failed to open expected default map file map_default.map.h");
+        let map = fs::read_to_string("map_c99_default.map.h")
+            .expect("Failed to open expected default map file map_c99_default.map.h");
 
-        assert!(map.contains("#define MAP_DEFAULT_MAP_H"));
-        assert!(map.contains("MAP_DEFAULT_MAP_foo_ADDR"));
-        assert!(map.contains("MAP_DEFAULT_MAP_TOTAL_SIZE"));
+        assert!(map.contains("#define MAP_C99_DEFAULT_MAP_H"));
+        assert!(map.contains("MAP_C99_DEFAULT_MAP_foo_ADDR"));
+        assert!(map.contains("MAP_C99_DEFAULT_MAP_TOTAL_SIZE"));
         assert!(map.contains("ULL"));
 
-        fs::remove_file("map_default.bin").ok();
-        fs::remove_file("map_default.map.h").ok();
+        fs::remove_file("map_c99_default.bin").ok();
+        fs::remove_file("map_c99_default.map.h").ok();
+        fs::remove_file("tests/map_c99_default.brink").ok();
     }
 
     /// --map-c99=- writes map content to stdout.
@@ -1759,5 +1779,22 @@ mod tests {
     #[test]
     fn invalid_namespace() {
         assert_brink_failure("tests/invalid_namespace.brink", &["IRDB_40"]);
+    }
+
+    #[test]
+    fn execute_extension_crc() {
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/test_extension.brink")
+            .arg("-o")
+            .arg("execute_extension_crc.bin")
+            .assert()
+            .success();
+
+        let produced =
+            fs::read("execute_extension_crc.bin").expect("execute_extension_crc.bin not found");
+        let expected = vec![0xAA, 0xBB, 0xCC, 0xDD];
+        assert_eq!(produced, expected, "Mismatch in CRC mock output");
+        fs::remove_file("execute_extension_crc.bin").ok();
     }
 } // mod tests

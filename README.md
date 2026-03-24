@@ -46,6 +46,7 @@ The previous build step created the Brink binary as `./target/release/brink`.  Y
 | `-q`, `--quiet`     | Suppress all console output, including errors. Overrides `-v`. Useful for fuzz testing.                                           |
 | `--noprint`         | Suppress `print` statement output from the source program.                                                                        |
 | `-D<NAME>[=VALUE]`  | Define a const value from the command line. May be repeated. See [Command-Line Const Defines](#command-line-const-defines) below. |
+| `--list-extensions` | List all available extensions compiled into brink as controlled by Cargo feature flags.                                           |
 | `--map-hf[=FILE]`   | Write a human-friendly map file. See [Map File Output](#map-file-output) below.                                                   |
 | `--map-json[=FILE]` | Write a JSON map file. See [Map File Output](#map-file-output) below.                                                             |
 
@@ -67,7 +68,7 @@ Both map options list every section, label, and constant with its address and si
 
 Brink writes map output to the current working directory when no path is given, keeping build artifacts out of source directories.  Both formats report the same semantic payload and both flags may be specified together.
 
-### CSV Format (`--map-csv`)
+### CSV Format Maps (`--map-csv`)
 
 Produces a comma-separated, fixed-column CSV file that imports directly into a spreadsheet.
 
@@ -90,7 +91,7 @@ Example:
     Name,            Address,             Img Offset,
     start,           0x0000000000001000,  0x0000000000000000,
 
-### JSON Format (`--map-json`)
+### JSON Format Maps (`--map-json`)
 
 Produces a pretty-printed JSON file.  Addresses and offsets are hex strings; sizes are plain numbers.
 
@@ -113,7 +114,7 @@ Example:
       ]
     }
 
-### C99 Header Format (`--map-c99`)
+### C99 Header Format Maps (`--map-c99`)
 
 Produces a C preprocessor (C99 compatible) header file.  The header file is named `<stem>.map.h` where `<stem>` is the stem of the input file name.
 
@@ -293,7 +294,7 @@ In addition to writing to 'output.bin'.
 
 # The Location Counter
 
-Like the [GNU linker 'ld'](https://ftp.gnu.org/old-gnu/Manuals/ld-2.9.1/html_mono/ld.html), Brink uses the concept of a *location counter*.  The location counter is the current position in the output file, referenced from either the start of the current section, the start of the entire output file (or image) or the absolute logical address.  The location counter can only move forward.
+Like the [GNU linker 'ld'](https://ftp.gnu.org/old-gnu/Manuals/ld-2.9.1/html_mono/ld.html), Brink uses the concept of a *location counter*.  The location counter is the current position in the output file, referenced from either the start of the current section, the start of the entire output image or the absolute logical address.  **The location counter can only move forward.**
 
 The following diagram shows the basic concepts.  Users specify the starting logical address using an [output](#output-section-identifier-absolute-starting-address) statement.
 
@@ -955,6 +956,21 @@ Example:
 
 ---
 
+## `wr <namespace>::<extension_name>(<arg1>, <arg2>, ...);`
+
+Evaluates the specified extension call and writes the result to the output image.  The extension's `.size()` method specifies the number of bytes to write to the output image.
+
+Example:
+
+    section foo {
+        wr custom::crc(start_label, end_label);
+        assert sizeof(custom::crc) == 4;
+    }
+
+    output foo;
+
+---
+
 ## `wr8 <expression> [, <expression>];`
 ## `wr16 <expression> [, <expression>];`
 ## `wr24 <expression> [, <expression>];`
@@ -1050,9 +1066,9 @@ Extensions build and link to Brink at compile time as controlled by Cargo featur
 
 * In addition to image buffer access, extensions can have their own input parameters like a normal function call.
 
-* Extensions return a **fixed length** result by writing into a fixed length borrowed mutable slice (`&mut [u8]`).  This fixed length requirement enables Brink to deterministically complete the image layout phase.  This requirement also allows zero-copy access to the extension's return buffer.
-
 * Extensions are identified by a **name** in a **namespace**.  Brink reserves the namespaces `std` and `brink`.
+
+* Extensions report their fixed length binary footprint by implementing the `.size()` trait method. Brink calls each extension's `.size()` method **exactly once** during image layout calculations and caches the result.  Brink always passes a mutable output slice (`&mut [u8]`) of the reported size to the extension's `.generate()` method.
 
 * Extensions register themselves at compile time in Brink's internal extension registry.
 
@@ -1062,7 +1078,11 @@ Extensions build and link to Brink at compile time as controlled by Cargo featur
 
 ## Invoking Extensions
 
-Users invoke extensions using function-style syntax.  For example, consider an extension named `crc` in a namespace called `custom`.  Our `crc` extension takes two labels to define the start/end of the data section to hash and returns a u32 CRC value.  The user would write the CRC value to the image using `wr32 custom::crc(start_label, end_label);`.
+Users invoke extensions using function-style syntax.  For example, consider an extension named `crc` in a namespace called `custom`.  This `crc` extension takes two labels to define the start/end of the data section to hash and returns a 4-byte CRC value.
+
+Users write the extension's output to the image using the generic `wr` command, for example `wr custom::crc(start_label, end_label);`.  Fixed-size write commands like `wr32` are invalid for extensions. If the designer needs to pad the extension's output to a specific size, they must follow the `wr` command with a `set_sec` or `align` statement.
+
+Users can query the size of an extension's output using the `sizeof` operator. For example, `assert sizeof(custom::crc) == 4;`.
 
 ## Execution Order
 

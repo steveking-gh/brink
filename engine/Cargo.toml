@@ -19,3 +19,4 @@ ir = { path = "../ir" }
 irdb = { path = "../irdb" }
 ext = { path = "../ext" }
 tracing = "0.1.44"
+memmap2 = "0.9.10"

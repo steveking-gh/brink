@@ -1,0 +1,10 @@
+// Tests sizeof() for both section names and extension names.
+// sizeof(top) returns the section byte size; sizeof(brink::test_crc) returns
+// the extension's fixed byte footprint — both must agree on 4 bytes here.
+section top {
+    wr brink::test_crc(0xAABBCCDD);
+    assert sizeof(top) == 4;
+    assert sizeof(brink::test_crc) == 4;
+}
+
+output top 0;

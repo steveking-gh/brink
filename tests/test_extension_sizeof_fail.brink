@@ -1,0 +1,8 @@
+// sizeof() does not accept extension call syntax with arguments.
+// brink::test_crc(0xAABBCCDD) with parens is a call expression, not a name.
+section top {
+    wr brink::test_crc(0xAABBCCDD);
+    assert sizeof(brink::test_crc(0xAABBCCDD)) == 4;
+}
+
+output top 0;

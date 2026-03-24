@@ -6,6 +6,9 @@ pub trait BrinkExtension {
     /// E.g., "brink::test_crc"
     fn name(&self) -> &str;
 
+    /// Reports the exact number of bytes this extension will write to the out_buffer.
+    fn size(&self) -> usize;
+
     /// Executes the extension with the given arguments and image buffers.
     ///
     /// * `args` - An array of 64-bit integer values corresponding to the evaluated arguments.

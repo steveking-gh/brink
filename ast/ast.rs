@@ -827,13 +827,21 @@ impl<'toks> Ast<'toks> {
         self.dbg_exit("parse_section_contents", false)
     }
 
-    /// Parses a `wr` statement that copies a named section into the output.
+    /// Parses a `wr` statement that copies a named section into the output
+    /// or evaluates an extension call.
     ///
     /// ```text
     /// wr <name>;
     ///
     ///   wr               <- root node for a section-write statement
     ///   └── <Identifier> <- name of the section to be written
+    ///
+    /// or
+    ///
+    /// wr <namespace::extension_name>(<args>);
+    ///
+    ///   wr               <- root node for an extension call
+    ///   └── <namespace::extension_name>(<args>) <- extension call
     /// ```
     fn parse_wr(&mut self, parent_nid: NodeId, diags: &mut Diags) -> bool {
         self.dbg_enter("parse_wr");
@@ -842,14 +850,8 @@ impl<'toks> Ast<'toks> {
         // Add the wr keyword as a child of the parent and advance
         let wr_nid = self.add_to_parent_and_advance(parent_nid);
 
-        // Next, an identifier is expected
-        if self.expect_leaf(
-            diags,
-            wr_nid,
-            LexToken::Identifier,
-            "AST_15",
-            "Expected a section identifier after 'wr'",
-        ) {
+        // Next, an expression is expected
+        if self.expect_expr(wr_nid, diags) {
             result = self.expect_semi(diags, wr_nid);
         }
         self.dbg_exit("parse_wr", result)
@@ -1107,9 +1109,40 @@ impl<'toks> Ast<'toks> {
                 if !self.expect_token_no_add(LexToken::OpenParen, diags) {
                     return self.dbg_exit_pratt("parse_pratt", &None, false);
                 }
-                if !self.expect_token(LexToken::Identifier, diags, top.unwrap()) {
+                let mut arg_opt = None;
+                if !self.parse_pratt(0, &mut arg_opt, diags) {
                     return self.dbg_exit_pratt("parse_pratt", &None, false);
                 }
+
+                // Check the children to determine if this sizeof() is valid.
+                let is_valid = if let Some(arg_nid) = arg_opt {
+                    let arg_tinfo = self.get_tinfo(arg_nid);
+                    if arg_tinfo.tok == LexToken::Identifier {
+                        // An identifier has children if parsed as a function call,
+                        // which is an error.
+                        !self.has_children(arg_nid)
+                    } else if arg_tinfo.tok == LexToken::Namespace {
+                        // A namespace has exactly one child (the trailing identifier) if called
+                        // correctly as just an extension name, e.g. `sizeof(foo::bar)`.
+                        // If the namespace has > 1 child, the user tried to pass arguments
+                        // to sizeof(), which is an error.
+                        arg_nid.children(&self.arena).count() == 1
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                };
+
+                if !is_valid {
+                    let err_span = arg_opt.map_or(self.get_tinfo(top.unwrap()).span(), |nid| {
+                        self.get_tinfo(nid).span()
+                    });
+                    diags.err1("AST_40", "sizeof() accepts only a section name or an extension identifier without arguments", err_span);
+                    return self.dbg_exit_pratt("parse_pratt", &None, false);
+                }
+
+                top.unwrap().append(arg_opt.unwrap(), &mut self.arena);
                 if !self.expect_token_no_add(LexToken::CloseParen, diags) {
                     return self.dbg_exit_pratt("parse_pratt", &None, false);
                 }
@@ -1720,33 +1753,44 @@ impl<'toks> AstDb<'toks> {
         result &= match tinfo.tok {
             // Wr statement must specify a valid section name
             LexToken::Wr => {
-                if !self.validate_section_name(0, parent_nid, ast, diags) {
-                    return false;
-                }
                 let mut children = parent_nid.children(&ast.arena);
                 // the section name is the first child of the output
                 // AST processing guarantees this exists.
                 let sec_nid = children.next().unwrap();
                 let sec_tinfo = ast.get_tinfo(sec_nid);
-                let sec_str = sec_tinfo.val;
 
-                // Make sure we haven't already recursed through this section.
-                if nested_sections.contains(sec_str) {
-                    let m = "Writing section creates a cycle.";
-                    diags.err1("AST_6", m, sec_tinfo.span());
-                    false
-                } else {
-                    // add this section to our nested sections tracker
-                    nested_sections.insert(sec_str);
-                    let section = self.sections.get(sec_str).unwrap();
-                    let children = section.nid.children(&ast.arena);
-                    for nid in children {
-                        result &=
-                            self.validate_nesting_r(rdepth + 1, nid, ast, nested_sections, diags);
+                if sec_tinfo.tok == LexToken::Identifier && !ast.has_children(sec_nid) {
+                    if !self.validate_section_name(0, parent_nid, ast, diags) {
+                        return false;
                     }
-                    // We're done with the section, so remove it from the nesting hash.
-                    nested_sections.remove(sec_str);
-                    result
+
+                    let sec_str = sec_tinfo.val;
+
+                    // Make sure we haven't already recursed through this section.
+                    if nested_sections.contains(sec_str) {
+                        let m = "Writing section creates a cycle.";
+                        diags.err1("AST_6", m, sec_tinfo.span());
+                        false
+                    } else {
+                        // add this section to our nested sections tracker
+                        nested_sections.insert(sec_str);
+                        let section = self.sections.get(sec_str).unwrap();
+                        let children = section.nid.children(&ast.arena);
+                        for nid in children {
+                            result &= self.validate_nesting_r(
+                                rdepth + 1,
+                                nid,
+                                ast,
+                                nested_sections,
+                                diags,
+                            );
+                        }
+                        // We're done with the section, so remove it from the nesting hash.
+                        nested_sections.remove(sec_str);
+                        result
+                    }
+                } else {
+                    true
                 }
             }
             _ => {
