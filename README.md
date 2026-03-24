@@ -1050,8 +1050,8 @@ The command line option `--list-extensions` outputs the names of all available e
 
 To understand how extensions work, it helps to understand the Brink image creation phases.
 
-1. **Layout Phase**: First, Brink iteratively evaluates all expressions that affect image size and layout.  For example, Brink evaluates `align` expressions during this phase.  On the other hand, Brink mostly skips statements like `wr64`, since knowing the result is 64-bits long is sufficient to determine the layout.  This phase completes when successive layout iterations produce identical results.
-2. **Generate Phase**: Next, Brink evaluates statements that populate data values into the image.  Brink first evaluates `wr` statements that do not call extensions, then evaluates `wr` statements that call extensions.  During this phase, Brink evaluates operations with extensions in dependency order.  Brink determines dependencies by analyzing overlaps between one extension's read range and another's write range.  This enables later operations to use the output of earlier operations.  Brink checks for and returns an error if the sequence of operations contains a cycle.
+1. **Layout Phase**: First, Brink iteratively evaluates all expressions that affect image size and layout.  For example, Brink evaluates `align` expressions and extension `size()` calls during this phase.  On the other hand, Brink mostly skips statements like `wr64`, since knowing the result is 64-bits long is sufficient to determine the layout.  This phase completes when successive layout iterations produce identical results.
+2. **Generate Phase**: Next, Brink evaluates statements that populate data values into the image.  Brink first evaluates `wr` statements that do NOT call extensions, then evaluates `wr` statements with extensions.  Like other operations, Brink executes extension calls in image order.
 3. **Validation Phase**: Finally, Brink evaluates `assert` statements, including those that call extensions.  Note that Brink may take an early exit in any phase if an `assert` statement will unambiguously fail.
 
 ---
@@ -1086,13 +1086,13 @@ Users can query the size of an extension's output using the `sizeof` operator. F
 
 ## Execution Order
 
-Brink executes operations with extensions in dependency order.  Brink determines dependencies by analyzing overlaps between one extension's read range and another's write range.  This enables later operations to use the output of earlier operations.  Brink checks for and returns an error if the sequence of operations contains a cycle.
+Brink executes extension calls in image order.  The compiler flattens the user's section hierarchy into a linear IR sequence that preserves source code order.
 
-If no dependency exists between a given pair of extension calls, then Brink executes operations in location counter order from lowest to highest.  In other words, operations writing to the start of an image execute before operations writing to the end of the image.
+For an extension that reads from a region written by an earlier extension, source order determines correctness.  Place the producing `wr` statement before the consuming `wr` statement so that Brink executes the producer first.
 
-Finally, Brink executes `assert` statements which can include extension calls.
+Brink executes `assert` statements after all `wr` statements complete, including `assert` statements that call extensions.
 
-Extensions execute serially using the Brink engine thread.
+Brink executes all extension calls serially on the engine thread.
 
 ---
 
