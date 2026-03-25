@@ -77,7 +77,53 @@ impl BrinkExtension for MockLogger {
     }
 }
 
+/// Reads the first 16 bytes of the image buffer and writes each byte + 1
+/// to the output buffer.  Used to verify that `img_buffer` is correctly
+/// populated before an extension executes.
+pub struct MockIncrement {
+    size_call_count: Cell<usize>,
+}
+
+impl MockIncrement {
+    pub fn new() -> Self {
+        Self { size_call_count: Cell::new(0) }
+    }
+}
+
+impl Default for MockIncrement {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl BrinkExtension for MockIncrement {
+    fn name(&self) -> &str {
+        "brink::test_increment"
+    }
+
+    fn size(&self) -> usize {
+        let prev = self.size_call_count.get();
+        assert_eq!(prev, 0, "MockIncrement::size() called more than once");
+        self.size_call_count.set(prev + 1);
+        16
+    }
+
+    fn execute(&self, _args: &[u64], img_buffer: &[u8], out_buffer: &mut [u8]) -> Result<(), String> {
+        if img_buffer.len() < 16 {
+            return Err(format!(
+                "brink::test_increment expected at least 16 image bytes, got {}",
+                img_buffer.len()
+            ));
+        }
+        for (out, src) in out_buffer.iter_mut().zip(img_buffer.iter()) {
+            *out = src.wrapping_add(1);
+        }
+        Ok(())
+    }
+}
+
 pub fn register_test_extensions(reg: &mut ExtensionRegistry) {
     reg.register(Box::new(MockCrc::new()));
     reg.register(Box::new(MockLogger::new()));
+    reg.register(Box::new(MockIncrement::new()));
 }

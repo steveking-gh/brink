@@ -947,6 +947,35 @@ mod tests {
         assert_brink_failure("tests/test_extension_sizeof_fail.brink", &["[AST_40]"]);
     }
 
+    /// Writes 0x00-0x0F then runs brink::test_increment, which reads the 16
+    /// image bytes and appends each byte + 1.  Verifies all 32 output bytes.
+    #[test]
+    fn execute_extension_increment() {
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/test_extension_increment.brink")
+            .arg("-o")
+            .arg("execute_extension_increment.bin")
+            .assert()
+            .success();
+
+        let produced = fs::read("execute_extension_increment.bin")
+            .expect("execute_extension_increment.bin not found");
+
+        let mut expected = vec![0u8; 32];
+        // First 16 bytes: 0x00-0x0F
+        for (i, b) in expected[..16].iter_mut().enumerate() {
+            *b = i as u8;
+        }
+        // Next 16 bytes: each source byte + 1
+        for i in 0..16 {
+            expected[16 + i] = (i as u8).wrapping_add(1);
+        }
+
+        assert_eq!(produced, expected, "Mismatch in increment extension output");
+        fs::remove_file("execute_extension_increment.bin").ok();
+    }
+
     /// Assert that every error/warning/note code string passed to the diags API
     /// is unique across the entire source base.  A duplicated code would mean
     /// that `grep "SOME_CODE"` hits two unrelated call sites, defeating the
