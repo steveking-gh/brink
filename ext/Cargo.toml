@@ -8,6 +8,7 @@ edition.workspace = true
 path = "ext.rs"
 
 [dependencies]
+brink_extension = { path = "../brink_extension" }
 tracing = "0.1.44"
 
 [dev-dependencies]

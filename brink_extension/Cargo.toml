@@ -1,0 +1,8 @@
+[package]
+name = "brink_extension"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[lib]
+path = "lib.rs"

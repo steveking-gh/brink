@@ -9,6 +9,7 @@ members = [
     "diags",
     "map",
     "ext",
+    "brink_extension",
 ]
 
 [workspace.package]

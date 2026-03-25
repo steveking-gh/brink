@@ -1,23 +1,6 @@
 use std::collections::HashMap;
 
-/// A trait representing Brink extension.
-pub trait BrinkExtension {
-    /// Returns the name of the extension as it will be invoked in Brink scripts.
-    /// E.g., "brink::test_crc"
-    fn name(&self) -> &str;
-
-    /// Reports the exact number of bytes this extension will write to the out_buffer.
-    fn size(&self) -> usize;
-
-    /// Executes the extension with the given arguments and image buffers.
-    ///
-    /// * `args` - An array of 64-bit integer values corresponding to the evaluated arguments.
-    /// * `img_buffer` - A slice of the generated Brink image bytes up to this point.
-    /// * `out_buffer` - A mutable slice where the extension should write its output.
-    ///   The size typically corresponds to the WR statement width (e.g., 4 bytes for wr32).
-    fn execute(&self, args: &[u64], img_buffer: &[u8], out_buffer: &mut [u8])
-    -> Result<(), String>;
-}
+pub use brink_extension::BrinkExtension;
 
 /// A registry that owns and provides lookup for all available Brink extensions.
 pub struct ExtensionRegistry {

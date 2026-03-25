@@ -11,7 +11,8 @@
       "Bash(ls c:UserskingsDocumentsprojectsbrinktests*extension* c:UserskingsDocumentsprojectsbrinktests*dynamic* c:UserskingsDocumentsprojectsbrinktests*sizeof_ext*)",
       "Bash(cargo fmt:*)",
       "Bash(cargo clippy:*)",
-      "Bash(grep -A 10 \"this \\\\`if\\\\` statement\")"
+      "Bash(grep -A 10 \"this \\\\`if\\\\` statement\")",
+      "Bash(grep -E \"\\(^[^/]*Cargo.toml$|/ext/|/src/\\)\")"
     ]
   }
 }
