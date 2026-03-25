@@ -2,9 +2,21 @@ use std::collections::HashMap;
 
 pub use brink_extension::BrinkExtension;
 
+/// Owns a registered extension alongside its cached size.
+///
+/// Brink calls [`BrinkExtension::size`] exactly once — at registration time —
+/// and stores the result here. All internal size lookups use [`cached_size`]
+/// rather than calling the extension again.
+///
+/// [`cached_size`]: ExtensionEntry::cached_size
+pub struct ExtensionEntry {
+    pub extension: Box<dyn BrinkExtension>,
+    pub cached_size: usize,
+}
+
 /// A registry that owns and provides lookup for all available Brink extensions.
 pub struct ExtensionRegistry {
-    extensions: HashMap<String, Box<dyn BrinkExtension>>,
+    extensions: HashMap<String, ExtensionEntry>,
 }
 
 impl Default for ExtensionRegistry {
@@ -21,18 +33,21 @@ impl ExtensionRegistry {
         }
     }
 
-    /// Registers a new extension instance. Panics if an extension with the same name already exists.
+    /// Registers a new extension. Calls [`BrinkExtension::size`] exactly once
+    /// and caches the result. Panics if an extension with the same name is
+    /// already registered.
     pub fn register(&mut self, extension: Box<dyn BrinkExtension>) {
         let name = extension.name().to_string();
         if self.extensions.contains_key(&name) {
             panic!("Extension '{}' is already registered", name);
         }
-        self.extensions.insert(name, extension);
+        let cached_size = extension.size();
+        self.extensions.insert(name, ExtensionEntry { extension, cached_size });
     }
 
-    /// Retrieves a registered extension by its fully-qualified name.
-    pub fn get(&self, name: &str) -> Option<&dyn BrinkExtension> {
-        self.extensions.get(name).map(|b| b.as_ref())
+    /// Retrieves a registered extension entry by its fully-qualified name.
+    pub fn get(&self, name: &str) -> Option<&ExtensionEntry> {
+        self.extensions.get(name)
     }
 }
 
@@ -46,7 +61,7 @@ mod tests {
     #[test]
     fn test_registry_registration_and_lookup() {
         let mut reg = ExtensionRegistry::new();
-        reg.register(Box::new(MockCrc));
+        reg.register(Box::new(MockCrc::new()));
 
         assert!(
             reg.get("brink::test_crc").is_some(),
@@ -62,33 +77,53 @@ mod tests {
     #[should_panic(expected = "Extension 'brink::test_crc' is already registered")]
     fn test_duplicate_registration_panics() {
         let mut reg = ExtensionRegistry::new();
-        reg.register(Box::new(MockCrc));
-        reg.register(Box::new(MockCrc));
+        reg.register(Box::new(MockCrc::new()));
+        reg.register(Box::new(MockCrc::new()));
+    }
+
+    /// size() must be called exactly once — at registration — and never again.
+    #[test]
+    fn test_size_called_once_on_register() {
+        let mut reg = ExtensionRegistry::new();
+        reg.register(Box::new(MockCrc::new()));
+        // Retrieve the entry multiple times; the Cell counter must stay at 1.
+        let _ = reg.get("brink::test_crc");
+        let _ = reg.get("brink::test_crc");
+        // MockCrc::size() would panic on a second call, so reaching here is the assertion.
+    }
+
+    /// cached_size must equal the value size() returned.
+    #[test]
+    fn test_cached_size_matches_extension() {
+        let mut reg = ExtensionRegistry::new();
+        reg.register(Box::new(MockCrc::new()));
+        let entry = reg.get("brink::test_crc").unwrap();
+        assert_eq!(entry.cached_size, 4);
     }
 
     #[test]
     fn test_valid_extension_execution() {
         let mut reg = ExtensionRegistry::new();
-        reg.register(Box::new(MockCrc));
-        let ext = reg.get("brink::test_crc").unwrap();
+        reg.register(Box::new(MockCrc::new()));
+        let entry = reg.get("brink::test_crc").unwrap();
 
         let args = vec![0xDEADBEEF];
         let mut out = vec![0; 4];
         let img = vec![];
 
-        ext.execute(&args, &img, &mut out).unwrap();
+        entry.extension.execute(&args, &img, &mut out).unwrap();
         assert_eq!(out, vec![0xDE, 0xAD, 0xBE, 0xEF]);
     }
 
     #[test]
     fn test_invalid_argument_count() {
         let mut reg = ExtensionRegistry::new();
-        reg.register(Box::new(MockCrc));
-        let ext = reg.get("brink::test_crc").unwrap();
+        reg.register(Box::new(MockCrc::new()));
+        let entry = reg.get("brink::test_crc").unwrap();
 
         let args = vec![1, 2]; // Pass 2 args, but mock only expects 1
         let mut out = vec![0; 4];
-        let res = ext.execute(&args, &[], &mut out);
+        let res = entry.extension.execute(&args, &[], &mut out);
         assert!(res.is_err());
         assert_eq!(res.unwrap_err(), "Expected exactly 1 argument for CRC");
     }
@@ -96,12 +131,12 @@ mod tests {
     #[test]
     fn test_invalid_output_buffer() {
         let mut reg = ExtensionRegistry::new();
-        reg.register(Box::new(MockCrc));
-        let ext = reg.get("brink::test_crc").unwrap();
+        reg.register(Box::new(MockCrc::new()));
+        let entry = reg.get("brink::test_crc").unwrap();
 
         let args = vec![1];
         let mut out = vec![0; 2]; // Mock expects 4
-        let res = ext.execute(&args, &[], &mut out);
+        let res = entry.extension.execute(&args, &[], &mut out);
         assert!(res.is_err());
         assert_eq!(res.unwrap_err(), "Expected 4 bytes of output space");
     }
@@ -144,10 +179,10 @@ mod tests {
             .try_init();
 
         let mut reg = ExtensionRegistry::new();
-        reg.register(Box::new(MockLogger));
+        reg.register(Box::new(MockLogger::new()));
 
-        let ext = reg.get("brink::test_logger").unwrap();
-        let res = ext.execute(&[], &[], &mut []);
+        let entry = reg.get("brink::test_logger").unwrap();
+        let res = entry.extension.execute(&[], &[], &mut []);
 
         // Exercise the error reporting assertion
         assert!(res.is_err());

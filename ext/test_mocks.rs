@@ -1,6 +1,21 @@
+use std::cell::Cell;
 use super::*;
 
-pub struct MockCrc;
+pub struct MockCrc {
+    size_call_count: Cell<usize>,
+}
+
+impl MockCrc {
+    pub fn new() -> Self {
+        Self { size_call_count: Cell::new(0) }
+    }
+}
+
+impl Default for MockCrc {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl BrinkExtension for MockCrc {
     fn name(&self) -> &str {
@@ -8,6 +23,9 @@ impl BrinkExtension for MockCrc {
     }
 
     fn size(&self) -> usize {
+        let prev = self.size_call_count.get();
+        assert_eq!(prev, 0, "MockCrc::size() called more than once");
+        self.size_call_count.set(prev + 1);
         4
     }
 
@@ -25,7 +43,21 @@ impl BrinkExtension for MockCrc {
     }
 }
 
-pub struct MockLogger;
+pub struct MockLogger {
+    size_call_count: Cell<usize>,
+}
+
+impl MockLogger {
+    pub fn new() -> Self {
+        Self { size_call_count: Cell::new(0) }
+    }
+}
+
+impl Default for MockLogger {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl BrinkExtension for MockLogger {
     fn name(&self) -> &str {
@@ -33,6 +65,9 @@ impl BrinkExtension for MockLogger {
     }
 
     fn size(&self) -> usize {
+        let prev = self.size_call_count.get();
+        assert_eq!(prev, 0, "MockLogger::size() called more than once");
+        self.size_call_count.set(prev + 1);
         0
     }
 
@@ -43,6 +78,6 @@ impl BrinkExtension for MockLogger {
 }
 
 pub fn register_test_extensions(reg: &mut ExtensionRegistry) {
-    reg.register(Box::new(MockCrc));
-    reg.register(Box::new(MockLogger));
+    reg.register(Box::new(MockCrc::new()));
+    reg.register(Box::new(MockLogger::new()));
 }

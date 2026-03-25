@@ -157,13 +157,15 @@ impl Engine {
         // to essentially an unresolved IR node mapping point. We use `is_output_of()` to crawl backwards
         // up the instruction's dependency graph to find the `ExtensionCall` IR node that produced this
         // target mapping. From there, we extract the extension's string name.
+        let mut ext_name_for_diag = "<unknown>";
         if let Some(prod_ir_idx) = opnd.is_output_of() {
             let prod_ir = &irdb.ir_vec[prod_ir_idx];
             if prod_ir.kind == IRKind::ExtensionCall {
                 let ext_name_opnd = &irdb.parms[prod_ir.operands[0]];
                 let ext_name = ext_name_opnd.val.to_identifier();
-                if let Some(ext) = ext_registry.get(ext_name) {
-                    let size = ext.size() as u64;
+                ext_name_for_diag = ext_name;
+                if let Some(entry) = ext_registry.get(ext_name) {
+                    let size = entry.cached_size as u64;
                     current.img += size;
                     current.sec += size;
                     return true;
@@ -173,7 +175,7 @@ impl Engine {
 
         diags.err1(
             "EXEC_50",
-            "Failed to resolve extension size during layout.",
+            &format!("Failed to resolve extension '{}' size during layout.", ext_name_for_diag),
             ir.src_loc.clone(),
         );
         false
@@ -839,13 +841,13 @@ impl Engine {
         assert!(ir.operands.len() == 2);
         let out_parm_num = ir.operands[1];
         let name = self.parms[ir.operands[0]].to_identifier().to_string();
-        if let Some(ext) = ext_registry.get(&name) {
-            *self.parms[out_parm_num].to_u64_mut() = ext.size() as u64;
+        if let Some(entry) = ext_registry.get(&name) {
+            *self.parms[out_parm_num].to_u64_mut() = entry.cached_size as u64;
             true
         } else {
             diags.err1(
                 "EXEC_53",
-                "Unknown extension in sizeof().",
+                &format!("Unknown extension '{}' in sizeof().", name),
                 ir.src_loc.clone(),
             );
             false
@@ -1656,13 +1658,12 @@ impl Engine {
                         if prod_ir.kind == IRKind::ExtensionCall {
                             let ext_name_opnd = &irdb.parms[prod_ir.operands[0]];
                             let ext_name = ext_name_opnd.val.to_identifier();
-                            if let Some(ext) = ext_registry.get(ext_name) {
-                                let size = ext.size();
-                                let buf = vec![0u8; size];
+                            if let Some(entry) = ext_registry.get(ext_name) {
+                                let buf = vec![0u8; entry.cached_size];
                                 if let Err(err) = file.write_all(&buf) {
                                     return Err(anyhow::anyhow!(
-                                        "Failed to pre-pad extension space: {}",
-                                        err
+                                        "Failed to pre-pad space for extension '{}': {}",
+                                        ext_name, err
                                     ));
                                 }
                             }
@@ -1750,31 +1751,28 @@ impl Engine {
             let Some(c_ir) = consumer_ir else {
                 diags.err1(
                     "EXEC_45",
-                    "ExtensionCall output not consumed",
+                    &format!("Extension '{}' output not consumed", name),
                     ir.src_loc.clone(),
                 );
                 error_count += 1;
                 continue;
             };
 
+            let Some(entry) = ext_registry.get(name) else {
+                unreachable!("Extension '{}' not found in registry", name);
+            };
+
             let byte_width = match c_ir.kind {
-                IRKind::WrExt => {
-                    let ext = ext_registry.get(name).unwrap();
-                    ext.size()
-                }
+                IRKind::WrExt => entry.cached_size,
                 _ => {
                     diags.err1(
                         "EXEC_46",
-                        "Extension calls must be consumed by a generic `wr` statement. Fixed-size writes like `wr32` are prohibited.",
+                        &format!("Extension '{}' must be consumed by a generic `wr` statement. Fixed-size writes like `wr32` are prohibited.", name),
                         ir.src_loc.clone(),
                     );
                     error_count += 1;
                     continue;
                 }
-            };
-
-            let Some(ext) = ext_registry.get(name) else {
-                unreachable!("Extension {} not found in registry", name);
             };
 
             // Extract numeric arguments (skip the name at [0] and output index at the end)
@@ -1785,7 +1783,7 @@ impl Engine {
 
             let mut out_buffer = vec![0u8; byte_width];
 
-            if let Err(e) = ext.execute(&args, &mmap, &mut out_buffer) {
+            if let Err(e) = entry.extension.execute(&args, &mmap, &mut out_buffer) {
                 let msg = format!("Extension '{}' execution failed: {}", name, e);
                 diags.err1("EXEC_47", &msg, ir.src_loc.clone());
                 return Err(anyhow!(msg));
