@@ -976,6 +976,19 @@ mod tests {
         fs::remove_file("execute_extension_increment.bin").ok();
     }
 
+    /// Global asserts (outside any section) pass through the validation phase
+    /// after all sections and extensions are fully written.
+    #[test]
+    fn global_assert_passes() {
+        assert_brink_success("tests/test_global_assert.brink", None, None);
+    }
+
+    /// A global assert that evaluates false must emit EXEC_2.
+    #[test]
+    fn global_assert_fails() {
+        assert_brink_failure("tests/test_global_assert_fail.brink", &["[EXEC_2]"]);
+    }
+
     /// Assert that every error/warning/note code string passed to the diags API
     /// is unique across the entire source base.  A duplicated code would mean
     /// that `grep "SOME_CODE"` hits two unrelated call sites, defeating the

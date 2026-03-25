@@ -1,0 +1,9 @@
+// A global assert that deliberately fails to verify the validation phase
+// emits EXEC_2 as expected.
+section foo {
+    wr8 0x01;
+}
+
+assert sizeof(foo) == 99;
+
+output foo 0;

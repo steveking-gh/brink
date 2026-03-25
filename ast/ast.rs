@@ -503,6 +503,15 @@ impl<'toks> Ast<'toks> {
                 LexToken::Section => self.parse_section(self.root, diags),
                 LexToken::Output => self.parse_output(self.root, diags),
                 LexToken::Const => self.parse_const(self.root, diags),
+                LexToken::Assert => {
+                    // Global assert: evaluated in the validation phase after all
+                    // sections and extensions are written.
+                    let ok = self.parse_expr(self.root, diags);
+                    if !ok {
+                        self.advance_past_semicolon();
+                    }
+                    ok
+                }
 
                 // Unrecognized top level token.  Report the error, but keep going
                 // to try to give the user more errors in batches.
@@ -1578,6 +1587,7 @@ pub struct AstDb<'toks> {
     pub labels: HashMap<&'toks str, Label>,
     pub consts: HashMap<&'toks str, Const<'toks>>,
     pub output: Output<'toks>,
+    pub global_asserts: Vec<NodeId>,
     //pub properties: HashMap<NodeId, NodeProperty>
 }
 
@@ -1819,6 +1829,7 @@ impl<'toks> AstDb<'toks> {
         let mut sections: HashMap<&'toks str, Section<'toks>> = HashMap::new();
         let mut output: Option<Output<'toks>> = None;
         let mut consts: HashMap<&'toks str, Const<'toks>> = HashMap::new();
+        let mut global_asserts: Vec<NodeId> = Vec::new();
 
         // First phase, record all sections, files, and the output.
         // These are defined only at top level so no need for recursion.
@@ -1829,6 +1840,9 @@ impl<'toks> AstDb<'toks> {
                     LexToken::Section => Self::record_section(diags, nid, ast, &mut sections),
                     LexToken::Output => Self::record_output(diags, nid, ast, &mut output),
                     LexToken::Const => Self::record_const(diags, nid, ast, &mut consts),
+                    // Global asserts are collected here and linearized later.
+                    // They have no name to record in any map.
+                    LexToken::Assert => { global_asserts.push(nid); true }
                     _ => {
                         let msg = format!("Invalid top-level expression {}", tinfo.val);
                         diags.err1("AST_24", &msg, tinfo.span().clone());
@@ -1870,6 +1884,7 @@ impl<'toks> AstDb<'toks> {
             labels: HashMap::new(),
             consts,
             output: output.unwrap(),
+            global_asserts,
         };
 
         if !ast_db.validate_section_name(0, output_nid, ast, diags) {

@@ -1,0 +1,14 @@
+// Global assert statements run in the validation phase, after all sections
+// and extensions are fully written.  These assertions verify sizeof and
+// extension output size from outside any section.
+section foo {
+    wr8 0x01;
+    wr8 0x02;
+    wr brink::test_crc(0xAABBCCDD);
+}
+
+// Verifiable after the generate and extension phases complete.
+assert sizeof(foo) == 6;
+assert sizeof(brink::test_crc) == 4;
+
+output foo 0;

@@ -951,6 +951,16 @@ impl<'toks> LinearDb {
             }
         }
 
+        // Linearize top-level assert statements.  These are appended after the
+        // section IR so they execute in the validation phase, after all bytes
+        // and extension output are fully committed.
+        for &nid in &ast_db.global_asserts {
+            let mut lops = Vec::new();
+            if !linear_db.record_r(1, nid, &mut lops, diags, ast, ast_db, false) {
+                anyhow::bail!("LinearDb construction failed.");
+            }
+        }
+
         // debug
         linear_db.dump();
 

@@ -1397,7 +1397,29 @@ impl Engine {
         }
     }
 
-    fn execute_assert(&self, ir: &IR, irdb: &IRDb, diags: &mut Diags, _file: &File) -> Result<()> {
+    /// Validation phase: evaluates every `assert` in the IR against the
+    /// completed image.  Runs after both `execute_core_operations` and
+    /// `execute_extensions`, so extension output is fully committed.
+    fn execute_validation(&self, irdb: &IRDb, diags: &mut Diags) -> Result<()> {
+        self.trace("Engine::execute_validation:");
+        let mut error_count = 0;
+        for ir in &irdb.ir_vec {
+            if ir.kind == IRKind::Assert
+                && self.execute_assert(ir, irdb, diags).is_err()
+            {
+                error_count += 1;
+                if error_count > 10 {
+                    break;
+                }
+            }
+        }
+        if error_count > 0 {
+            return Err(anyhow!("Error detected"));
+        }
+        Ok(())
+    }
+
+    fn execute_assert(&self, ir: &IR, irdb: &IRDb, diags: &mut Diags) -> Result<()> {
         self.trace("Engine::execute_assert:");
         let mut result = Ok(());
         let opnd_num = ir.operands[0];
@@ -1572,12 +1594,14 @@ impl Engine {
         Ok(())
     }
 
-    /// Performs a single, final pass over the IR to write the output image.
+    /// Performs the generate and validation passes over the IR.
     /// Called once after `iterate` reached a stable location assignment.
-    /// Only instructions that produce output bytes (`Wr`, `Wrs`, `Wrf`) or
-    /// observable side-effects (`Assert`, `Print`) are dispatched here.
-    /// Address-arithmetic and layout instructions are no-ops because their
-    /// values were already committed to `self.ir_locs` during iteration.
+    ///
+    /// Phase order matches the README specification:
+    /// 1. Generate — writes output bytes (`Wr`, `Wrs`, `Wrf`, `WrExt` pre-pad, `Print`).
+    /// 2. Extensions — patches extension output into the memory-mapped file.
+    /// 3. Validation — evaluates all `assert` statements against the completed image.
+    ///
     /// Returns `Err` and emits diagnostics if any write or assertion fails.
     pub fn execute(
         &self,
@@ -1590,11 +1614,14 @@ impl Engine {
 
         self.execute_core_operations(irdb, diags, file, ext_registry)?;
         self.execute_extensions(irdb, diags, file, ext_registry)?;
+        self.execute_validation(irdb, diags)?;
 
         Ok(())
     }
 
-    /// Evaluates all standard Brink operations sequentially.
+    /// Generate phase: writes all output bytes and print side-effects.
+    /// Assert statements are intentionally skipped here — they run in
+    /// `execute_validation` after the image is fully written.
     fn execute_core_operations(
         &self,
         irdb: &IRDb,
@@ -1608,10 +1635,11 @@ impl Engine {
         for ir in &irdb.ir_vec {
             result = match ir.kind {
                 IRKind::Wr(_) => self.execute_wrx(ir, irdb, diags, file),
-                IRKind::Assert => self.execute_assert(ir, irdb, diags, file),
                 IRKind::Print => self.execute_print(ir, irdb, diags, file),
                 IRKind::Wrs => self.execute_wrs(ir, irdb, diags, file),
                 IRKind::Wrf => self.execute_wrf(ir, irdb, diags, file),
+                // Assert runs in the validation phase, after all bytes are written.
+                IRKind::Assert => Ok(()),
                 // the rest of these operations are computed during iteration
                 IRKind::SetSec
                 | IRKind::SetImg
