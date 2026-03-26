@@ -13,7 +13,8 @@
       "Bash(cargo clippy:*)",
       "Bash(grep -A 10 \"this \\\\`if\\\\` statement\")",
       "Bash(grep -E \"\\(^[^/]*Cargo.toml$|/ext/|/src/\\)\")",
-      "Bash(grep -l \"assert\" /c/Users/kings/Documents/projects/brink/tests/*.brink)"
+      "Bash(grep -l \"assert\" /c/Users/kings/Documents/projects/brink/tests/*.brink)",
+      "Bash(grep -v \"^warning: unused import\\\\|^  --> \\\\|^   |\\\\|^$\\\\|Finished\\\\|Checking\\\\|Compiling\")"
     ]
   }
 }

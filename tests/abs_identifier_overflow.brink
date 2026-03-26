@@ -1,5 +1,9 @@
+// set_abs places abs_base at 0xFFFF...FE; writing two bytes in padding makes
+// abs_base + off overflow on the second write -> EXEC_43.
 section padding {
-    set_img 0xFFFFFFFFFFFFFFFF;
+    set_abs 0xFFFFFFFFFFFFFFFE;
+    wr8 0;   // off=1, abs = 0xFFFF...FF (ok)
+    wr8 0;   // off=2, abs = 0xFFFF...FE + 2 overflows -> EXEC_43
 }
 section target {
     wr8 1;
@@ -7,6 +11,5 @@ section target {
 section main {
     wr padding;
     wr target;
-    print abs(target);
 }
-output main 0x5;
+output main 0x0;

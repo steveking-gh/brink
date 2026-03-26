@@ -1,10 +1,12 @@
+// set_abs rebases abs_base and resets off to zero.
+// No padding bytes are emitted; sizeof reflects only actual writes.
 section foo {
-    wrs "Hello";
-    set_abs 0x1020;
-    assert sizeof(foo) == 0x20;
-    assert abs() == 0x1020;
-    assert img() == 0x20;
-    assert sec() == 0x20;
+    wrs "Hello";        // off=5, abs_base=0x1000, abs=0x1005, sec=5
+    set_abs 0x1020;     // abs_base=0x1020, off=0; no bytes written, sec unchanged
+    assert sizeof(foo) == 5;   // only the 5 bytes from wrs were written
+    assert abs() == 0x1020;    // abs_base + off = 0x1020 + 0
+    assert off() == 0;         // off resets to 0 on set_abs
+    assert sec() == 5;         // sec tracks section offset, unaffected by set_abs
 }
 
 output foo 0x1000;

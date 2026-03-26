@@ -26,8 +26,18 @@ use tracing::{debug, error, info, trace, warn};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Location {
-    img: u64,
+    /// Total bytes written to the output file.  Internal use only; drives
+    /// WrDispatch offsets and mmap slicing.  Never resets.
+    file_pos: u64,
+    /// Offset from the most recent `set_abs` anchor (or `start_addr` if
+    /// `set_abs` has never been called).  Exposed to scripts as `off()`.
+    /// Resets to 0 on each `set_abs` call.
+    off: u64,
+    /// Offset within the current section.  Pushed/popped at section boundaries.
     sec: u64,
+    /// The absolute address anchor established by the last `set_abs` call, or
+    /// `start_addr` at image start.  `abs() == abs_base + off`.
+    abs_base: u64,
 }
 
 /// Records one occurrence of a section write in the output image.
@@ -101,8 +111,8 @@ impl Engine {
     ) -> bool {
         self.trace(
             format!(
-                "Engine::iterate_wrs: img {}, sec {}",
-                current.img, current.sec
+                "Engine::iterate_wrs: file_pos {}, off {}, sec {}",
+                current.file_pos, current.off, current.sec
             )
             .as_str(),
         );
@@ -117,7 +127,7 @@ impl Engine {
         // Will panic if usize does not fit in u64
         let sz = xstr.len() as u64;
 
-        let Some(new_img) = current.img.checked_add(sz) else {
+        let Some(new_file_pos) = current.file_pos.checked_add(sz) else {
             diags.err1(
                 "EXEC_41",
                 "Write operation causes location counter overflow",
@@ -125,8 +135,18 @@ impl Engine {
             );
             return false;
         };
+        let new_off = current.off + sz; // safe: off <= file_pos, so if file_pos+sz didn't overflow, this won't
+        if current.abs_base.checked_add(new_off).is_none() {
+            diags.err1(
+                "EXEC_43",
+                "Write operation causes absolute address overflow",
+                ir.src_loc.clone(),
+            );
+            return false;
+        }
 
-        current.img = new_img;
+        current.file_pos = new_file_pos;
+        current.off = new_off;
         current.sec = current.sec.saturating_add(sz);
 
         true
@@ -144,8 +164,8 @@ impl Engine {
     ) -> bool {
         self.trace(
             format!(
-                "Engine::iterate_wrext: img {}, sec {}",
-                current.img, current.sec
+                "Engine::iterate_wrext: file_pos {}, off {}, sec {}",
+                current.file_pos, current.off, current.sec
             )
             .as_str(),
         );
@@ -171,7 +191,8 @@ impl Engine {
                 ext_name_for_diag = ext_name;
                 if let Some(entry) = ext_registry.get(ext_name) {
                     let size = entry.cached_size as u64;
-                    current.img += size;
+                    current.file_pos += size;
+                    current.off += size;
                     current.sec += size;
                     return true;
                 }
@@ -199,9 +220,10 @@ impl Engine {
 
         self.trace(
             format!(
-                "Engine::iterate_wrx-{}: img {}, sec {}",
+                "Engine::iterate_wrx-{}: file_pos {}, off {}, sec {}",
                 byte_size * 8,
-                current.img,
+                current.file_pos,
+                current.off,
                 current.sec
             )
             .as_str(),
@@ -263,8 +285,8 @@ impl Engine {
 
         self.trace(format!("Engine::iterate_wrx-{}: size is {}", byte_size * 8, sz).as_str());
 
-        // Guard against overflow on the image location counter
-        let Some(new_img) = current.img.checked_add(sz) else {
+        // Guard against overflow on the file position counter
+        let Some(new_file_pos) = current.file_pos.checked_add(sz) else {
             diags.err1(
                 "EXEC_37",
                 "Write operation causes location counter overflow",
@@ -272,8 +294,18 @@ impl Engine {
             );
             return false;
         };
+        let new_off = current.off + sz; // safe: off <= file_pos
+        if current.abs_base.checked_add(new_off).is_none() {
+            diags.err1(
+                "EXEC_43",
+                "Write operation causes absolute address overflow",
+                ir.src_loc.clone(),
+            );
+            return false;
+        }
 
-        current.img = new_img;
+        current.file_pos = new_file_pos;
+        current.off = new_off;
         current.sec = current.sec.saturating_add(sz);
 
         result
@@ -304,13 +336,13 @@ impl Engine {
         self.trace(
             format!(
                 "Engine::iterate_wrf '{}' with size {}: \
-                                img {}, sec {}",
-                file_path, byte_size, current.img, current.sec
+                                file_pos {}, off {}, sec {}",
+                file_path, byte_size, current.file_pos, current.off, current.sec
             )
             .as_str(),
         );
 
-        let Some(new_img) = current.img.checked_add(byte_size) else {
+        let Some(new_file_pos) = current.file_pos.checked_add(byte_size) else {
             diags.err1(
                 "EXEC_40",
                 "Write operation causes location counter overflow",
@@ -318,8 +350,18 @@ impl Engine {
             );
             return false;
         };
+        let new_off = current.off + byte_size; // safe: off <= file_pos
+        if current.abs_base.checked_add(new_off).is_none() {
+            diags.err1(
+                "EXEC_43",
+                "Write operation causes absolute address overflow",
+                ir.src_loc.clone(),
+            );
+            return false;
+        }
 
-        current.img = new_img;
+        current.file_pos = new_file_pos;
+        current.off = new_off;
         current.sec = current.sec.saturating_add(byte_size);
 
         true
@@ -520,8 +562,8 @@ impl Engine {
     ) -> bool {
         self.trace(
             format!(
-                "Engine::iterate_type_conversion: img {}, sec {}",
-                current.img, current.sec
+                "Engine::iterate_type_conversion: file_pos {}, sec {}",
+                current.file_pos, current.sec
             )
             .as_str(),
         );
@@ -593,8 +635,8 @@ impl Engine {
     ) -> bool {
         self.trace(
             format!(
-                "Engine::iterate_arithmetic: img {}, sec {}",
-                current.img, current.sec
+                "Engine::iterate_arithmetic: file_pos {}, sec {}",
+                current.file_pos, current.sec
             )
             .as_str(),
         );
@@ -778,8 +820,8 @@ impl Engine {
     ) -> bool {
         self.trace(
             format!(
-                "Engine::iterate_sizeof: img {}, sec {}",
-                current.img, current.sec
+                "Engine::iterate_sizeof: file_pos {}, sec {}",
+                current.file_pos, current.sec
             )
             .as_str(),
         );
@@ -811,17 +853,17 @@ impl Engine {
             let start_loc = &self.ir_locs[ir_rng.start];
             let end_loc = &self.ir_locs[ir_rng.end];
 
-            if start_loc.img > end_loc.img {
+            if start_loc.file_pos > end_loc.file_pos {
                 self.trace(
                     format!(
-                        "Starting img offset {} > ending img offset {} in {}",
-                        start_loc.img, end_loc.img, sec_name
+                        "Starting file_pos {} > ending file_pos {} in {}",
+                        start_loc.file_pos, end_loc.file_pos, sec_name
                     )
                     .as_str(),
                 );
                 *self.parms[out_parm_num].to_u64_mut() = 0;
             } else {
-                let sz: u64 = end_loc.img - start_loc.img;
+                let sz: u64 = end_loc.file_pos - start_loc.file_pos;
                 self.trace(format!("Sizeof {} is currently {}", sec_name, sz).as_str());
                 *self.parms[out_parm_num].to_u64_mut() = sz;
             }
@@ -864,8 +906,8 @@ impl Engine {
     fn iterate_current_address(&mut self, ir: &IR, diags: &mut Diags, current: &Location) -> bool {
         self.trace(
             format!(
-                "Engine::iterate_current_address: img {}, sec {}",
-                current.img, current.sec
+                "Engine::iterate_current_address: file_pos {}, off {}, sec {}",
+                current.file_pos, current.off, current.sec
             )
             .as_str(),
         );
@@ -876,18 +918,18 @@ impl Engine {
 
         match ir.kind {
             IRKind::Abs => {
-                let Some(val) = current.img.checked_add(self.start_addr) else {
+                let Some(val) = current.abs_base.checked_add(current.off) else {
                     diags.err1(
                         "EXEC_39",
-                        "Location counter and absolute starting address overflow",
+                        "Absolute address (abs_base + off) overflow",
                         ir.src_loc.clone(),
                     );
                     return false;
                 };
                 *out = val;
             }
-            IRKind::Img => {
-                *out = current.img;
+            IRKind::Off => {
+                *out = current.off;
             }
             IRKind::Sec => {
                 *out = current.sec;
@@ -912,8 +954,8 @@ impl Engine {
     ) -> bool {
         self.trace(
             format!(
-                "Engine::iterate_align: img {}, sec {}",
-                current.img, current.sec
+                "Engine::iterate_align: file_pos {}, off {}, sec {}",
+                current.file_pos, current.off, current.sec
             )
             .as_str(),
         );
@@ -945,13 +987,10 @@ impl Engine {
         let out_parm = &mut self.parms[out_parm_num];
         let out = out_parm.to_u64_mut();
 
-        // We'll at least panic at runtime if conversion from
-        // usize to u64 fails instead of bad output binary.
-        let img: u64 = current.img;
-        let Some(abs_val) = img.checked_add(self.start_addr) else {
+        let Some(abs_val) = current.abs_base.checked_add(current.off) else {
             diags.err1(
                 "EXEC_42",
-                "Location counter and absolute starting address overflow",
+                "Absolute address (abs_base + off) overflow",
                 ir.src_loc.clone(),
             );
             return false;
@@ -972,7 +1011,7 @@ impl Engine {
     /// Compute the required number of bytes to pad the current section to the specified size.
     /// We don't actually pad anything yet, since that happens in a subsequent
     /// wr8 instruction.
-    /// This function covers set_sec, set_img and set_abs.
+    /// This function covers set_sec and set_off.
     fn iterate_set(
         &mut self,
         ir: &IR,
@@ -982,8 +1021,8 @@ impl Engine {
     ) -> bool {
         self.trace(
             format!(
-                "Engine::iterate_set: {:?}: img {}, sec {}",
-                ir.kind, current.img, current.sec
+                "Engine::iterate_set: {:?}: file_pos {}, off {}, sec {}",
+                ir.kind, current.file_pos, current.off, current.sec
             )
             .as_str(),
         );
@@ -1009,18 +1048,7 @@ impl Engine {
         let out = out_parm.to_u64_mut();
 
         let loc = match ir.kind {
-            IRKind::SetAbs => {
-                let Some(val) = current.img.checked_add(self.start_addr) else {
-                    diags.err1(
-                        "EXEC_43",
-                        "Location counter and absolute starting address overflow",
-                        ir.src_loc.clone(),
-                    );
-                    return false;
-                };
-                val
-            }
-            IRKind::SetImg => current.img,
+            IRKind::SetOff => current.off,
             IRKind::SetSec => current.sec,
             bad => panic!("called iterate_set for IR {:?}", bad),
         };
@@ -1041,6 +1069,38 @@ impl Engine {
         true
     }
 
+    /// Handle `set_abs(X)`: pure cursor rebase.
+    /// Sets abs_base = X and resets off = 0.  No bytes are emitted.
+    /// Backward rebase is valid (firmware load-address use case).
+    fn iterate_set_abs(&mut self, ir: &IR, current: &mut Location) -> bool {
+        let set_parm_num = ir.operands[0];
+        let set_val = self.parms[set_parm_num].to_u64();
+
+        self.trace(
+            format!(
+                "Engine::iterate_set_abs: abs_base {} -> {}, off reset to 0",
+                current.abs_base, set_val
+            )
+            .as_str(),
+        );
+
+        let num_operands = ir.operands.len();
+        assert!(num_operands == 2 || num_operands == 3);
+        let out_parm_num = if num_operands == 2 {
+            ir.operands[1]
+        } else {
+            ir.operands[2]
+        };
+
+        current.abs_base = set_val;
+        current.off = 0;
+
+        // No bytes to write; tell the consumer wr8 to emit 0 bytes.
+        *self.parms[out_parm_num].to_u64_mut() = 0;
+
+        true
+    }
+
     /// Compute the transient address of the identifier.  This case is called when
     /// Abs/Img/Sec is called with an identifier.
     fn iterate_identifier_address(
@@ -1052,12 +1112,12 @@ impl Engine {
     ) -> bool {
         self.trace(
             format!(
-                "Engine::iterate_identifier_address: img {}, sec {}",
-                current.img, current.sec
+                "Engine::iterate_identifier_address: file_pos {}, off {}, sec {}",
+                current.file_pos, current.off, current.sec
             )
             .as_str(),
         );
-        // Abs/Img/Sec take one optional input and produce one output.
+        // Abs/Off/Sec take one optional input and produce one output.
         // We've already discarded surrounding () on the operand.
         assert!(ir.operands.len() == 2);
         let in_parm_num0 = ir.operands[0]; // identifier
@@ -1084,24 +1144,24 @@ impl Engine {
         let start_loc = &self.ir_locs[*ir_num];
         match ir.kind {
             IRKind::Abs => {
-                let Some(val) = start_loc.img.checked_add(self.start_addr) else {
+                let Some(val) = start_loc.abs_base.checked_add(start_loc.off) else {
                     diags.err1(
                         "EXEC_44",
-                        "Location counter and absolute starting address overflow",
+                        "Absolute address (abs_base + off) overflow for identifier",
                         ir.src_loc.clone(),
                     );
                     return false;
                 };
                 *out = val;
             }
-            IRKind::Img => {
-                *out = start_loc.img;
+            IRKind::Off => {
+                *out = start_loc.off;
             }
             IRKind::Sec => {
                 *out = start_loc.sec;
             }
             bad => {
-                panic!("Called iterate_current_address with bogus IR {:?}", bad);
+                panic!("Called iterate_identifier_address with bogus IR {:?}", bad);
             }
         }
 
@@ -1117,12 +1177,12 @@ impl Engine {
     ) -> bool {
         self.trace(
             format!(
-                "Engine::iterate_address: img {}, sec {}",
-                current.img, current.sec
+                "Engine::iterate_address: file_pos {}, off {}, sec {}",
+                current.file_pos, current.off, current.sec
             )
             .as_str(),
         );
-        // Abs/Img/SEc take one optional input and produce one output.
+        // Abs/Off/Sec take one optional input and produce one output.
         // We've already discarded surrounding () on the operand.
         let num_operands = ir.operands.len();
 
@@ -1147,8 +1207,8 @@ impl Engine {
         self.sec_names.push(sec_name);
         self.trace(
             format!(
-                "Engine::iterate_section_start: img {}, sec {}",
-                current.img, current.sec
+                "Engine::iterate_section_start: file_pos {}, sec {}",
+                current.file_pos, current.sec
             )
             .as_str(),
         );
@@ -1170,8 +1230,8 @@ impl Engine {
         let sec_name = irdb.get_opnd_as_identifier(ir, 0).to_string();
         self.trace(
             format!(
-                "Engine::iterate_section_end: '{}', img {}, sec {}",
-                sec_name, current.img, current.sec
+                "Engine::iterate_section_end: '{}', file_pos {}, sec {}",
+                sec_name, current.file_pos, current.sec
             )
             .as_str(),
         );
@@ -1190,7 +1250,10 @@ impl Engine {
     ) -> anyhow::Result<Self> {
         // The first iterate loop may access any IR location, so initialize all
         // ir_locs locations to zero.
-        let ir_locs = vec![Location { img: 0, sec: 0 }; irdb.ir_vec.len()];
+        let ir_locs = vec![
+            Location { file_pos: 0, off: 0, sec: 0, abs_base: irdb.start_addr };
+            irdb.ir_vec.len()
+        ];
 
         let mut engine = Engine {
             parms: Vec::new(),
@@ -1239,8 +1302,8 @@ impl Engine {
                 }
                 IRKind::SectionEnd => {
                     let (name, start_idx) = stack.pop().expect("Unmatched SectionEnd in ir_vec");
-                    let img_start = self.ir_locs[start_idx].img;
-                    let img_end = self.ir_locs[i].img;
+                    let img_start = self.ir_locs[start_idx].file_pos;
+                    let img_end = self.ir_locs[i].file_pos;
                     self.wr_dispatches.push(WrDispatch {
                         name,
                         img_start,
@@ -1249,7 +1312,7 @@ impl Engine {
                 }
                 IRKind::Label => {
                     let name = irdb.get_opnd_as_identifier(ir, 0).to_string();
-                    let img_offset = self.ir_locs[i].img;
+                    let img_offset = self.ir_locs[i].file_pos;
                     self.label_dispatches
                         .push(LabelDispatch { name, img_offset });
                 }
@@ -1288,15 +1351,15 @@ impl Engine {
         while result && !stable {
             self.trace(format!("Engine::iterate: Iteration count {}", iter_count).as_str());
             iter_count += 1;
-            let mut current = Location { img: 0, sec: 0 };
+            let mut current = Location { file_pos: 0, off: 0, sec: 0, abs_base: self.start_addr };
 
             // make sure we exited as many sections as we entered on each iteration
             assert!(self.sec_offsets.is_empty());
 
             for (lid, ir) in irdb.ir_vec.iter().enumerate() {
                 debug!(
-                    "Engine::iterate on lid {} at img offset {}",
-                    lid, current.img
+                    "Engine::iterate on lid {} at file_pos {}",
+                    lid, current.file_pos
                 );
                 // record our location after each IR
                 self.ir_locs[lid] = current.clone();
@@ -1326,7 +1389,7 @@ impl Engine {
 
                     // Unlike print, we have to iterate on the string write operation since
                     // the size of the string affects the size of the output image.
-                    IRKind::Abs | IRKind::Img | IRKind::Sec => {
+                    IRKind::Abs | IRKind::Off | IRKind::Sec => {
                         self.iterate_address(ir, irdb, diags, &current)
                     }
                     IRKind::Wrs => self.iterate_wrs(ir, irdb, diags, &mut current),
@@ -1340,9 +1403,10 @@ impl Engine {
                         self.iterate_wrext(ir, irdb, &mut current, ext_registry, diags)
                     }
                     IRKind::Align => self.iterate_align(ir, irdb, diags, &current),
-                    IRKind::SetSec | IRKind::SetImg | IRKind::SetAbs => {
+                    IRKind::SetSec | IRKind::SetOff => {
                         self.iterate_set(ir, irdb, diags, &current)
                     }
+                    IRKind::SetAbs => self.iterate_set_abs(ir, &mut current),
 
                     IRKind::Wrf => self.iterate_wrf(ir, irdb, diags, &mut current),
 
@@ -1649,12 +1713,12 @@ impl Engine {
                 IRKind::Assert => Ok(()),
                 // the rest of these operations are computed during iteration
                 IRKind::SetSec
-                | IRKind::SetImg
+                | IRKind::SetOff
                 | IRKind::SetAbs
                 | IRKind::Align
                 | IRKind::Abs
                 | IRKind::Const
-                | IRKind::Img
+                | IRKind::Off
                 | IRKind::Sec
                 | IRKind::Label
                 | IRKind::Sizeof
@@ -1883,7 +1947,7 @@ impl Engine {
 
             // Patch the file at the exact image offset where the consumer instruction evaluated.
             let loc = &self.ir_locs[consumer_idx];
-            let abs_offset = loc.img as usize;
+            let abs_offset = loc.file_pos as usize;
 
             if abs_offset + byte_width > mmap.len() {
                 return Err(anyhow!(

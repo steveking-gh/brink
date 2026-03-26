@@ -98,7 +98,7 @@ fn tok_to_irkind(tok: LexToken) -> IRKind {
         LexToken::Eq => IRKind::Eq,
         LexToken::FSlash => IRKind::Divide,
         LexToken::GEq => IRKind::GEq,
-        LexToken::Img => IRKind::Img,
+        LexToken::Off => IRKind::Off,
         LexToken::LEq => IRKind::LEq,
         LexToken::Minus => IRKind::Subtract,
         LexToken::NEq => IRKind::NEq,
@@ -108,7 +108,7 @@ fn tok_to_irkind(tok: LexToken) -> IRKind {
         LexToken::Print => IRKind::Print,
         LexToken::Sec => IRKind::Sec,
         LexToken::SetAbs => IRKind::SetAbs,
-        LexToken::SetImg => IRKind::SetImg,
+        LexToken::SetOff => IRKind::SetOff,
         LexToken::SetSec => IRKind::SetSec,
         LexToken::Sizeof => IRKind::Sizeof,
         LexToken::ToI64 => IRKind::ToI64,
@@ -447,7 +447,7 @@ impl<'toks> LinearDb {
                     returned_operands.push(idx);
                 }
             }
-            LexToken::Abs | LexToken::Img | LexToken::Sec => {
+            LexToken::Abs | LexToken::Off | LexToken::Sec => {
                 // A vector to track the operands of this expression.
                 let mut lops = Vec::new();
                 // Create the new IR
@@ -589,7 +589,7 @@ impl<'toks> LinearDb {
                     returned_operands.push(idx);
                 }
             }
-            LexToken::SetSec | LexToken::SetImg | LexToken::SetAbs | LexToken::Align => {
+            LexToken::SetSec | LexToken::SetOff | LexToken::SetAbs | LexToken::Align => {
                 // To implement align or pad, we map to IR as follows:
                 // align val, fill_val; ==> align val, count; wr8 fill_val, count;
                 // pad   val, fill_val; ==> pad   val, count; wr8 fill_val, count;
@@ -1234,7 +1234,7 @@ impl IdentDb {
         let mut result = true;
         for lir in &lindb.ir_vec {
             result &= match lir.op {
-                IRKind::Abs | IRKind::Img | IRKind::Sizeof => {
+                IRKind::Abs | IRKind::Off | IRKind::Sizeof => {
                     self.verify_operand_refs(lir, lindb, diags)
                 }
                 _ => true,

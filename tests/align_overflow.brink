@@ -1,5 +1,6 @@
+// set_off pads to off = 0xFFFF...E; align 4 needs 2 more bytes, the second overflows file_pos -> EXEC_37.
 section main {
-    set_img 0xFFFFFFFFFFFFFFFE;
+    set_off 0xFFFFFFFFFFFFFFFE;
     align 4;
 }
-output main 0x0000000000000004;
+output main 0;

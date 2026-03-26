@@ -558,12 +558,12 @@ mod tests {
 
     #[test]
     fn abs_overflow() {
-        assert_brink_failure("tests/abs_overflow.brink", &["[EXEC_39]"]);
+        assert_brink_failure("tests/abs_overflow.brink", &["[EXEC_43]"]);
     }
 
     #[test]
     fn align_overflow() {
-        assert_brink_failure("tests/align_overflow.brink", &["[EXEC_42]"]);
+        assert_brink_failure("tests/align_overflow.brink", &["[EXEC_37]"]);
     }
 
     #[test]
@@ -573,7 +573,7 @@ mod tests {
 
     #[test]
     fn abs_identifier_overflow() {
-        assert_brink_failure("tests/abs_identifier_overflow.brink", &["[EXEC_44]"]);
+        assert_brink_failure("tests/abs_identifier_overflow.brink", &["[EXEC_43]"]);
     }
 
     #[test]
@@ -869,13 +869,13 @@ mod tests {
 
     #[test]
 
-    fn set_img_1() {
-        assert_brink_success("tests/set_img_1.brink", None, None);
+    fn set_off_1() {
+        assert_brink_success("tests/set_off_1.brink", None, None);
     }
 
     #[test]
-    fn set_img_2() {
-        assert_brink_failure("tests/set_img_2.brink", &["[EXEC_22]"]);
+    fn set_off_2() {
+        assert_brink_failure("tests/set_off_2.brink", &["[EXEC_22]"]);
     }
 
     #[test]
@@ -886,7 +886,7 @@ mod tests {
 
     #[test]
     fn set_abs_2() {
-        assert_brink_failure("tests/set_abs_2.brink", &["[EXEC_22]"]);
+        assert_brink_success("tests/set_abs_2.brink", None, None);
     }
 
     #[test]

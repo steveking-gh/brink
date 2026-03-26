@@ -111,14 +111,14 @@ impl IRDb {
             // The following produce a boolean regardless of input data types
             ast::LexToken::Align
             | ast::LexToken::SetSec
-            | ast::LexToken::SetImg
+            | ast::LexToken::SetOff
             | ast::LexToken::SetAbs
             | ast::LexToken::DoubleEq
             | ast::LexToken::NEq
             | ast::LexToken::GEq
             | ast::LexToken::LEq
             | ast::LexToken::Abs
-            | ast::LexToken::Img
+            | ast::LexToken::Off
             | ast::LexToken::Sec
             | ast::LexToken::DoublePipe
             | ast::LexToken::DoubleAmpersand
@@ -517,7 +517,7 @@ impl IRDb {
         section_names: &HashSet<String>,
     ) -> bool {
         match ir.kind {
-            IRKind::Align | IRKind::SetSec | IRKind::SetImg | IRKind::SetAbs | IRKind::Wr(_) => {
+            IRKind::Align | IRKind::SetSec | IRKind::SetOff | IRKind::SetAbs | IRKind::Wr(_) => {
                 self.validate_numeric_1_or_2(ir, diags)
             }
             IRKind::Assert => self.validate_numeric_1(ir, diags),
@@ -668,7 +668,7 @@ impl IRDb {
             | IRKind::Sizeof
             | IRKind::Label
             | IRKind::Abs
-            | IRKind::Img
+            | IRKind::Off
             | IRKind::Eq
             | IRKind::Sec => true,
         }
@@ -902,7 +902,7 @@ impl IRDb {
             }
             ast::LexToken::Sizeof
             | ast::LexToken::Abs
-            | ast::LexToken::Img
+            | ast::LexToken::Off
             | ast::LexToken::Sec => {
                 let m = format!(
                     "Operation '{:?}' cannot be used in a const expression \

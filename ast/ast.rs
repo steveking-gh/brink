@@ -36,8 +36,8 @@ pub enum LexToken {
     Align,
     #[token("set_sec")]
     SetSec,
-    #[token("set_img")]
-    SetImg,
+    #[token("set_off")]
+    SetOff,
     #[token("set_abs")]
     SetAbs,
     #[token("assert")]
@@ -52,8 +52,8 @@ pub enum LexToken {
     ToI64,
     #[token("abs")]
     Abs,
-    #[token("img")]
-    Img,
+    #[token("off")]
+    Off,
     #[token("sec")]
     Sec,
     #[token("wrs")]
@@ -811,7 +811,7 @@ impl<'toks> Ast<'toks> {
                 | LexToken::Assert
                 | LexToken::Align
                 | LexToken::SetSec
-                | LexToken::SetImg
+                | LexToken::SetOff
                 | LexToken::SetAbs
                 | LexToken::Print => self.parse_expr(parent, diags),
                 _ => {
@@ -1093,7 +1093,7 @@ impl<'toks> Ast<'toks> {
 
             // Built-in functions with an optional identifier inside parens
             // ( [optional identifier] )
-            LexToken::Abs | LexToken::Img | LexToken::Sec => {
+            LexToken::Abs | LexToken::Off | LexToken::Sec => {
                 // Create the node for the function and move past
                 *top = Some(self.arena.new_node(self.tok_num));
                 self.tok_num += 1;

@@ -6,12 +6,12 @@ section foo {
     wr8 5;
     set_sec 16;
     assert abs() == 16;
-    assert img() == 16;
+    assert off() == 16;
     assert sec() == 16;
     wr8 0xAA, 3;
     set_sec 24, 0xFF;
     assert abs() == 24;
-    assert img() == 24;
+    assert off() == 24;
     assert sec() == 24;
     set_sec 24, 0xEE; // should do Nothing
     wr8 0xAA, 3;
