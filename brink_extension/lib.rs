@@ -1,4 +1,22 @@
-/// The trait that all Brink extensions must implement.
+// Extension traits for the Brink binary image compiler.
+//
+// This crate is the API for Brink extension authors and defines
+// the two traits an extension can implement:
+//
+//   BrinkExtension      — for extensions that write fixed output with no image
+//                         access.  The call site supplies only arguments.
+//
+//   BrinkRangedExtension — for extensions that need to read a region of the
+//                          image being built.  The call site supplies an explicit
+//                          byte range (start_offset, length) or a section name;
+//                          Brink slices the image accordingly before calling
+//                          execute().
+//
+// Brink registers extensions at startup via the ExtensionRegistry
+// (defined in the ext crate).  Brink calls size() exactly once at registration and
+// caches the result.  The `brink` and `std` namespaces are reserved for built-in use.
+
+/// Implement this trait for extensions that read a caller-specified slice of the image.
 ///
 /// An extension writes a fixed number of bytes into the Brink image.  An extension
 /// may optionally take arguments from the call site and access a slice of all or
@@ -22,8 +40,6 @@
 ///     }
 /// }
 /// ```
-
-/// Implement for extensions that do not need a caller-specified slice of the image.
 pub trait BrinkExtension {
     /// Returns the namespace and name used to invoke this extension.
     /// For example, `"my_org::crc"`. The `brink` and `std` namespaces are reserved.
