@@ -1,0 +1,14 @@
+// Form 3: section-name sugar with a single output section.
+// The `out` section holds 4 data bytes followed by the 8-byte sum extension.
+// brink::test_ranged_sum receives the entire `out` section (12 bytes) as its
+// image slice; the sum of the 4 data bytes = 10, extension slot bytes are 0.
+// Expected output: 4 data bytes + 8-byte sum (sum = 1+2+3+4 = 10 as LE u64).
+section out {
+    wr8 0x01; wr8 0x02; wr8 0x03; wr8 0x04;
+    wr brink::test_ranged_sum(out);
+    assert sizeof(out) == 12;
+}
+
+assert sizeof(brink::test_ranged_sum) == 8;
+
+output out 0;

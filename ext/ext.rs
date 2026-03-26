@@ -1,16 +1,41 @@
 use std::collections::HashMap;
 
 pub use brink_extension::BrinkExtension;
+pub use brink_extension::BrinkRangedExtension;
+
+/// Wraps either a basic or ranged extension behind a unified enum.
+///
+/// The variant determines which `execute` signature Brink calls and whether
+/// the call site must supply an image range specifier.
+pub enum RegisteredExtension {
+    Basic(Box<dyn BrinkExtension>),
+    Ranged(Box<dyn BrinkRangedExtension>),
+}
+
+impl RegisteredExtension {
+    /// Returns the extension's fully-qualified name.
+    pub fn name(&self) -> &str {
+        match self {
+            Self::Basic(e) => e.name(),
+            Self::Ranged(e) => e.name(),
+        }
+    }
+
+    /// Returns `true` if the extension requires an image range at its call site.
+    pub fn is_ranged(&self) -> bool {
+        matches!(self, Self::Ranged(_))
+    }
+}
 
 /// Owns a registered extension alongside its cached size.
 ///
-/// Brink calls [`BrinkExtension::size`] exactly once — at registration time —
-/// and stores the result here. All internal size lookups use [`cached_size`]
-/// rather than calling the extension again.
+/// Brink calls `size()` exactly once — at registration time — and stores the
+/// result here. All internal size lookups use [`cached_size`] rather than
+/// calling the extension again.
 ///
 /// [`cached_size`]: ExtensionEntry::cached_size
 pub struct ExtensionEntry {
-    pub extension: Box<dyn BrinkExtension>,
+    pub extension: RegisteredExtension,
     pub cached_size: usize,
 }
 
@@ -33,16 +58,44 @@ impl ExtensionRegistry {
         }
     }
 
-    /// Registers a new extension. Calls [`BrinkExtension::size`] exactly once
-    /// and caches the result. Panics if an extension with the same name is
+    /// Registers a non-ranged extension. Calls [`BrinkExtension::size`] exactly
+    /// once and caches the result. Panics if an extension with the same name is
     /// already registered.
-    pub fn register(&mut self, extension: Box<dyn BrinkExtension>) {
-        let name = extension.name().to_string();
-        if self.extensions.contains_key(&name) {
-            panic!("Extension '{}' is already registered", name);
-        }
-        let cached_size = extension.size();
-        self.extensions.insert(name, ExtensionEntry { extension, cached_size });
+    pub fn register(&mut self, ext: Box<dyn BrinkExtension>) {
+        let name = ext.name().to_string();
+        assert!(
+            !self.extensions.contains_key(&name),
+            "Extension '{}' is already registered",
+            name
+        );
+        let cached_size = ext.size();
+        self.extensions.insert(
+            name,
+            ExtensionEntry {
+                extension: RegisteredExtension::Basic(ext),
+                cached_size,
+            },
+        );
+    }
+
+    /// Registers a ranged extension. Calls [`BrinkRangedExtension::size`] exactly
+    /// once and caches the result. Panics if an extension with the same name is
+    /// already registered.
+    pub fn register_ranged(&mut self, ext: Box<dyn BrinkRangedExtension>) {
+        let name = ext.name().to_string();
+        assert!(
+            !self.extensions.contains_key(&name),
+            "Extension '{}' is already registered",
+            name
+        );
+        let cached_size = ext.size();
+        self.extensions.insert(
+            name,
+            ExtensionEntry {
+                extension: RegisteredExtension::Ranged(ext),
+                cached_size,
+            },
+        );
     }
 
     /// Retrieves a registered extension entry by its fully-qualified name.
@@ -101,17 +154,36 @@ mod tests {
         assert_eq!(entry.cached_size, 4);
     }
 
+    /// is_ranged() must reflect the registration method used.
+    #[test]
+    fn test_is_ranged_reflects_variant() {
+        let mut reg = ExtensionRegistry::new();
+        reg.register(Box::new(MockCrc::new()));
+        reg.register_ranged(Box::new(MockIncrement::new()));
+
+        assert!(
+            !reg.get("brink::test_crc").unwrap().extension.is_ranged(),
+            "Basic extension must not be ranged"
+        );
+        assert!(
+            reg.get("brink::test_increment").unwrap().extension.is_ranged(),
+            "Ranged extension must be ranged"
+        );
+    }
+
     #[test]
     fn test_valid_extension_execution() {
         let mut reg = ExtensionRegistry::new();
         reg.register(Box::new(MockCrc::new()));
         let entry = reg.get("brink::test_crc").unwrap();
 
-        let args = vec![0xDEADBEEF];
-        let mut out = vec![0; 4];
-        let img = vec![];
+        let args = vec![0xDEADBEEF_u64];
+        let mut out = vec![0u8; 4];
 
-        entry.extension.execute(&args, &img, &mut out).unwrap();
+        let RegisteredExtension::Basic(ref ext) = entry.extension else {
+            panic!("Expected Basic extension");
+        };
+        ext.execute(&args, &mut out).unwrap();
         assert_eq!(out, vec![0xDE, 0xAD, 0xBE, 0xEF]);
     }
 
@@ -121,9 +193,12 @@ mod tests {
         reg.register(Box::new(MockCrc::new()));
         let entry = reg.get("brink::test_crc").unwrap();
 
-        let args = vec![1, 2]; // Pass 2 args, but mock only expects 1
-        let mut out = vec![0; 4];
-        let res = entry.extension.execute(&args, &[], &mut out);
+        let RegisteredExtension::Basic(ref ext) = entry.extension else {
+            panic!("Expected Basic extension");
+        };
+        let args = vec![1u64, 2]; // mock expects exactly 1
+        let mut out = vec![0u8; 4];
+        let res = ext.execute(&args, &mut out);
         assert!(res.is_err());
         assert_eq!(res.unwrap_err(), "Expected exactly 1 argument for CRC");
     }
@@ -134,11 +209,31 @@ mod tests {
         reg.register(Box::new(MockCrc::new()));
         let entry = reg.get("brink::test_crc").unwrap();
 
-        let args = vec![1];
-        let mut out = vec![0; 2]; // Mock expects 4
-        let res = entry.extension.execute(&args, &[], &mut out);
+        let RegisteredExtension::Basic(ref ext) = entry.extension else {
+            panic!("Expected Basic extension");
+        };
+        let args = vec![1u64];
+        let mut out = vec![0u8; 2]; // mock expects 4
+        let res = ext.execute(&args, &mut out);
         assert!(res.is_err());
         assert_eq!(res.unwrap_err(), "Expected 4 bytes of output space");
+    }
+
+    #[test]
+    fn test_ranged_sum_execution() {
+        let mut reg = ExtensionRegistry::new();
+        reg.register_ranged(Box::new(MockRangedSum::new()));
+        let entry = reg.get("brink::test_ranged_sum").unwrap();
+        assert_eq!(entry.cached_size, 8);
+
+        let RegisteredExtension::Ranged(ref ext) = entry.extension else {
+            panic!("Expected Ranged extension");
+        };
+        let img = vec![0x01u8, 0x02, 0x03, 0x04];
+        let mut out = vec![0u8; 8];
+        ext.execute(&[], &img, &mut out).unwrap();
+        let sum = u64::from_be_bytes(out.try_into().unwrap());
+        assert_eq!(sum, 10, "Sum of 1+2+3+4 must be 10");
     }
 
     #[test]
@@ -171,8 +266,7 @@ mod tests {
         let logs = Arc::new(Mutex::new(Vec::new()));
         let writer = MockWriter { logs: logs.clone() };
 
-        // Try initializing the global subscriber.
-        // It might be initialized by another test running competitively, so we drop the Result.
+        // try_init may fail if another test already initialized the subscriber.
         let _ = tracing_subscriber::fmt()
             .with_writer(writer)
             .with_max_level(tracing::Level::INFO)
@@ -182,13 +276,14 @@ mod tests {
         reg.register(Box::new(MockLogger::new()));
 
         let entry = reg.get("brink::test_logger").unwrap();
-        let res = entry.extension.execute(&[], &[], &mut []);
+        let RegisteredExtension::Basic(ref ext) = entry.extension else {
+            panic!("Expected Basic extension");
+        };
+        let res = ext.execute(&[], &mut []);
 
-        // Exercise the error reporting assertion
         assert!(res.is_err());
         assert_eq!(res.unwrap_err(), "Intentional mock fallback error");
 
-        // Exercise the logging assertion
         let log_output = String::from_utf8(logs.lock().unwrap().clone()).unwrap();
         assert!(log_output.contains("MockLogger executed successfully via tracing API"));
     }

@@ -14,7 +14,7 @@
 
 use anyhow::{Result, anyhow};
 use diags::Diags;
-use ext::ExtensionRegistry;
+use ext::{ExtensionRegistry, RegisteredExtension};
 use ir::{DataType, IR, IRKind, ParameterValue};
 use irdb::IRDb;
 use std::fs::File;
@@ -160,7 +160,12 @@ impl Engine {
         let mut ext_name_for_diag = "<unknown>";
         if let Some(prod_ir_idx) = opnd.is_output_of() {
             let prod_ir = &irdb.ir_vec[prod_ir_idx];
-            if prod_ir.kind == IRKind::ExtensionCall {
+            if matches!(
+                prod_ir.kind,
+                IRKind::ExtensionCall
+                    | IRKind::ExtensionCallRanged
+                    | IRKind::ExtensionCallSection
+            ) {
                 let ext_name_opnd = &irdb.parms[prod_ir.operands[0]];
                 let ext_name = ext_name_opnd.val.to_identifier();
                 ext_name_for_diag = ext_name;
@@ -1350,7 +1355,9 @@ impl Engine {
                     | IRKind::Print
                     | IRKind::I64
                     | IRKind::U64
-                    | IRKind::ExtensionCall => true,
+                    | IRKind::ExtensionCall
+                    | IRKind::ExtensionCallRanged
+                    | IRKind::ExtensionCallSection => true,
                 }
             }
             if self.ir_locs == old_locations {
@@ -1674,7 +1681,9 @@ impl Engine {
                 | IRKind::SectionEnd
                 | IRKind::LeftShift
                 | IRKind::RightShift
-                | IRKind::ExtensionCall => Ok(()),
+                | IRKind::ExtensionCall
+                | IRKind::ExtensionCallRanged
+                | IRKind::ExtensionCallSection => Ok(()),
                 IRKind::WrExt => {
                     // We must emit empty zeroed bytes during the physical serial write loop
                     // to guarantee that the output file expands to encompass the extension's
@@ -1683,7 +1692,12 @@ impl Engine {
                     let opnd = &irdb.parms[opnd_idx];
                     if let Some(prod_ir_idx) = opnd.is_output_of() {
                         let prod_ir = &irdb.ir_vec[prod_ir_idx];
-                        if prod_ir.kind == IRKind::ExtensionCall {
+                        if matches!(
+                            prod_ir.kind,
+                            IRKind::ExtensionCall
+                                | IRKind::ExtensionCallRanged
+                                | IRKind::ExtensionCallSection
+                        ) {
                             let ext_name_opnd = &irdb.parms[prod_ir.operands[0]];
                             let ext_name = ext_name_opnd.val.to_identifier();
                             if let Some(entry) = ext_registry.get(ext_name) {
@@ -1731,7 +1745,12 @@ impl Engine {
         // decoupled from the core pipeline logic.
         let mut extension_nodes = Vec::new();
         for (idx, ir) in irdb.ir_vec.iter().enumerate() {
-            if let IRKind::ExtensionCall = ir.kind {
+            if matches!(
+                ir.kind,
+                IRKind::ExtensionCall
+                    | IRKind::ExtensionCallRanged
+                    | IRKind::ExtensionCallSection
+            ) {
                 extension_nodes.push(idx);
             }
         }
@@ -1803,15 +1822,60 @@ impl Engine {
                 }
             };
 
-            // Extract numeric arguments (skip the name at [0] and output index at the end)
-            let mut args = Vec::new();
-            for opnd_idx in &ir.operands[1..ir.operands.len() - 1] {
-                args.push(self.parms[*opnd_idx].to_u64());
-            }
+            // Build (img_slice, args) according to the call form.
+            //
+            // ExtensionCall (form 1):
+            //   operands = [name, arg0..., output]
+            //   No image access; args are operands[1..last].
+            //
+            // ExtensionCallRanged (form 2):
+            //   operands = [name, range_start, range_length, arg0..., output]
+            //   img_slice = mmap[range_start..range_start+range_length]
+            //   args are operands[3..last].
+            //
+            // ExtensionCallSection (form 3):
+            //   operands = [name, section_id, arg0..., output]
+            //   Engine resolves (img_start, size) from wr_dispatches.
+            //   args are operands[2..last].
+            let last = ir.operands.len() - 1;
+            let (img_slice_range, arg_operand_range) = match ir.kind {
+                IRKind::ExtensionCall => (0..0, 1..last),
+                IRKind::ExtensionCallRanged => {
+                    let start  = self.parms[ir.operands[1]].to_u64() as usize;
+                    let length = self.parms[ir.operands[2]].to_u64() as usize;
+                    (start..start + length, 3..last)
+                }
+                IRKind::ExtensionCallSection => {
+                    let sec_name = self.parms[ir.operands[1]].to_identifier();
+                    let dispatch = self.wr_dispatches.iter().find(|d| d.name == sec_name);
+                    let Some(d) = dispatch else {
+                        return Err(anyhow!(
+                            "Extension '{}': section '{}' not found in dispatch table. \
+                             This is a compiler bug.",
+                            name, sec_name
+                        ));
+                    };
+                    let start = d.img_start as usize;
+                    (start..start + d.size as usize, 2..last)
+                }
+                _ => unreachable!(),
+            };
+
+            let args: Vec<u64> = ir.operands[arg_operand_range]
+                .iter()
+                .map(|&i| self.parms[i].to_u64())
+                .collect();
 
             let mut out_buffer = vec![0u8; byte_width];
 
-            if let Err(e) = entry.extension.execute(&args, &mmap, &mut out_buffer) {
+            let exec_result = match &entry.extension {
+                RegisteredExtension::Basic(e) => e.execute(&args, &mut out_buffer),
+                RegisteredExtension::Ranged(e) => {
+                    e.execute(&args, &mmap[img_slice_range], &mut out_buffer)
+                }
+            };
+
+            if let Err(e) = exec_result {
                 let msg = format!("Extension '{}' execution failed: {}", name, e);
                 diags.err1("EXEC_47", &msg, ir.src_loc.clone());
                 return Err(anyhow!(msg));

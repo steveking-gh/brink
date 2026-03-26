@@ -21,7 +21,7 @@ use tracing::{debug, error, info, trace, warn};
 
 use ast::{Ast, AstDb, LexToken, TokenInfo, is_reserved_identifier};
 use ir::IRKind;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// The operand type for linear IRs.  This operand type is very similar to the
 /// IROperand type, with the critical distinction that LinOperand creation
@@ -163,6 +163,10 @@ pub struct LinearDb {
 
     /// Source location of the address token in the `output` statement, if present.
     pub output_addr_loc: Option<SourceSpan>,
+
+    /// Names of every section declared in the source file (from `ast_db.sections`).
+    /// Used by IRDB to disambiguate extension call forms without requiring access to the AST.
+    pub section_names: HashSet<String>,
 }
 
 /**
@@ -911,6 +915,9 @@ impl<'toks> LinearDb {
             }
         }
 
+        let section_names: HashSet<String> =
+            ast_db.sections.keys().map(|s| s.to_string()).collect();
+
         let mut linear_db = LinearDb {
             ir_vec: Vec::new(),
             const_ir_vec: Vec::new(),
@@ -921,6 +928,7 @@ impl<'toks> LinearDb {
             output_sec_loc,
             output_addr_str,
             output_addr_loc,
+            section_names,
         };
 
         // Using the name of the output section, use the AST database to get a reference
