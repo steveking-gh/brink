@@ -24,17 +24,25 @@ use tracing::{debug, error, info, trace, warn};
 #[derive(Clone, Debug)]
 pub struct SectionEntry {
     pub name: String,
-    pub img_start: u64,
+    /// Byte offset from the start of the output file where this section begins.
+    pub file_offset: u64,
+    /// Offset from the most recent `set_abs` anchor at the point this section begins.
+    pub off: u64,
+    /// Absolute address at the point this section begins (`abs_base + off`).
     pub abs_start: u64,
     pub size: u64,
 }
 
 /// Position of a label in the output image.
-/// Entries sort by `img_offset` (output order).
+/// Entries sort by `file_offset` (output order).
 #[derive(Clone, Debug)]
 pub struct LabelEntry {
     pub name: String,
-    pub img_offset: u64,
+    /// Byte offset from the start of the output file where this label appears.
+    pub file_offset: u64,
+    /// Offset from the most recent `set_abs` anchor at this label.
+    pub off: u64,
+    /// Absolute address at this label (`abs_base + off`).
     pub abs_addr: u64,
 }
 
@@ -98,12 +106,12 @@ pub fn fmt_const_value(pv: &ParameterValue) -> String {
 /// BASE,            0x0000000000001000,
 ///
 /// Sections
-/// Name,            Address,             Img Offset,          Size (bytes),
-/// foo,             0x0000000000001000,  0x0000000000000000,  50,
+/// Name,            Address,             Offset,              File Offset,         Size (bytes),
+/// foo,             0x0000000000001000,  0x0000000000000000,  0x0000000000000000,  50,
 ///
 /// Labels
-/// Name,            Address,             Img Offset,
-/// lab1,            0x0000000000001004,  0x0000000000000004,
+/// Name,            Address,             Offset,              File Offset,
+/// lab1,            0x0000000000001004,  0x0000000000000004,  0x0000000000000004,
 /// ```
 pub fn format_csv(map: &MapDb) -> String {
     use std::fmt::Write;
@@ -137,15 +145,15 @@ pub fn format_csv(map: &MapDb) -> String {
         let name_w = name_col_width(map.sections.iter().map(|s| s.name.as_str()));
         writeln!(
             out,
-            "{:<name_w$},  {:<18},  {:<18},  Size (bytes),",
-            "Name", "Address", "Img Offset"
+            "{:<name_w$},  {:<18},  {:<18},  {:<18},  Size (bytes),",
+            "Name", "Address", "Offset", "File Offset"
         )
         .unwrap();
         for s in &map.sections {
             writeln!(
                 out,
-                "{:<name_w$},  0x{:016x},  0x{:016x},  {},",
-                s.name, s.abs_start, s.img_start, s.size
+                "{:<name_w$},  0x{:016x},  0x{:016x},  0x{:016x},  {},",
+                s.name, s.abs_start, s.off, s.file_offset, s.size
             )
             .unwrap();
         }
@@ -160,15 +168,15 @@ pub fn format_csv(map: &MapDb) -> String {
         let name_w = name_col_width(map.labels.iter().map(|l| l.name.as_str()));
         writeln!(
             out,
-            "{:<name_w$},  {:<18},  Img Offset,",
-            "Name,", "Address,"
+            "{:<name_w$},  {:<18},  {:<18},  File Offset,",
+            "Name,", "Address,", "Offset,"
         )
         .unwrap();
         for l in &map.labels {
             writeln!(
                 out,
-                "{:<name_w$},  0x{:016x},  0x{:016x},",
-                l.name, l.abs_addr, l.img_offset
+                "{:<name_w$},  0x{:016x},  0x{:016x},  0x{:016x},",
+                l.name, l.abs_addr, l.off, l.file_offset
             )
             .unwrap();
         }
@@ -215,8 +223,14 @@ pub fn format_c99(map: &MapDb) -> String {
             .unwrap();
             writeln!(
                 out,
-                "#define {}_MAP_{}_IMG_OFFSET 0x{:016x}ULL",
-                stem, sec_name, sec.img_start
+                "#define {}_MAP_{}_OFFSET 0x{:016x}ULL",
+                stem, sec_name, sec.off
+            )
+            .unwrap();
+            writeln!(
+                out,
+                "#define {}_MAP_{}_FILE_OFFSET 0x{:016x}ULL",
+                stem, sec_name, sec.file_offset
             )
             .unwrap();
             writeln!(
@@ -241,8 +255,14 @@ pub fn format_c99(map: &MapDb) -> String {
             .unwrap();
             writeln!(
                 out,
-                "#define {}_MAP_{}_IMG_OFFSET 0x{:016x}ULL",
-                stem, lab_name, lab.img_offset
+                "#define {}_MAP_{}_OFFSET 0x{:016x}ULL",
+                stem, lab_name, lab.off
+            )
+            .unwrap();
+            writeln!(
+                out,
+                "#define {}_MAP_{}_FILE_OFFSET 0x{:016x}ULL",
+                stem, lab_name, lab.file_offset
             )
             .unwrap();
             writeln!(out).unwrap();
@@ -271,11 +291,13 @@ pub fn format_c99(map: &MapDb) -> String {
 ///   ],
 ///   "sections": [
 ///     { "name": "text", "address": "0x0000000000001000",
-///       "img_offset": "0x0000000000000000", "size": 50 }
+///       "offset": "0x0000000000000000",
+///       "file_offset": "0x0000000000000000", "size": 50 }
 ///   ],
 ///   "labels": [
 ///     { "name": "start", "address": "0x0000000000001000",
-///       "img_offset": "0x0000000000000000" }
+///       "offset": "0x0000000000000000",
+///       "file_offset": "0x0000000000000000" }
 ///   ]
 /// }
 /// ```
@@ -293,10 +315,11 @@ pub fn format_json(map: &MapDb) -> String {
         .iter()
         .map(|s| {
             json!({
-                "name":       s.name,
-                "address":    format!("0x{:016x}", s.abs_start),
-                "img_offset": format!("0x{:016x}", s.img_start),
-                "size":       s.size,
+                "name":        s.name,
+                "address":     format!("0x{:016x}", s.abs_start),
+                "offset":      format!("0x{:016x}", s.off),
+                "file_offset": format!("0x{:016x}", s.file_offset),
+                "size":        s.size,
             })
         })
         .collect();
@@ -306,9 +329,10 @@ pub fn format_json(map: &MapDb) -> String {
         .iter()
         .map(|l| {
             json!({
-                "name":       l.name,
-                "address":    format!("0x{:016x}", l.abs_addr),
-                "img_offset": format!("0x{:016x}", l.img_offset),
+                "name":        l.name,
+                "address":     format!("0x{:016x}", l.abs_addr),
+                "offset":      format!("0x{:016x}", l.off),
+                "file_offset": format!("0x{:016x}", l.file_offset),
             })
         })
         .collect();
@@ -338,23 +362,25 @@ impl MapDb {
             .iter()
             .map(|wd| SectionEntry {
                 name: wd.name.clone(),
-                img_start: wd.img_start,
-                abs_start: base_addr + wd.img_start,
+                file_offset: wd.img_start,
+                off: wd.off_start,
+                abs_start: wd.abs_start,
                 size: wd.size,
             })
             .collect();
-        sections.sort_by_key(|s| s.img_start);
+        sections.sort_by_key(|s| s.file_offset);
 
         let mut labels: Vec<LabelEntry> = engine
             .label_dispatches
             .iter()
             .map(|ld| LabelEntry {
                 name: ld.name.clone(),
-                img_offset: ld.img_offset,
-                abs_addr: base_addr + ld.img_offset,
+                file_offset: ld.img_offset,
+                off: ld.off,
+                abs_addr: ld.abs_addr,
             })
             .collect();
-        labels.sort_by_key(|l| l.img_offset);
+        labels.sort_by_key(|l| l.file_offset);
 
         let mut consts: Vec<ConstEntry> = irdb
             .const_values
@@ -366,10 +392,10 @@ impl MapDb {
             .collect();
         consts.sort_by(|a, b| a.name.cmp(&b.name));
 
-        // Total output size: maximum extent of any section (img_start + size).
+        // Total output size: maximum extent of any section (file_offset + size).
         let total_size = sections
             .iter()
-            .map(|s| s.img_start + s.size)
+            .map(|s| s.file_offset + s.size)
             .max()
             .unwrap_or(0);
 
@@ -399,13 +425,15 @@ mod tests {
             sections: vec![
                 SectionEntry {
                     name: "text".to_string(),
-                    img_start: 0x00,
+                    file_offset: 0x00,
+                    off: 0x00,
                     abs_start: 0x1000,
                     size: 0x40,
                 },
                 SectionEntry {
                     name: "data".to_string(),
-                    img_start: 0x40,
+                    file_offset: 0x40,
+                    off: 0x40,
                     abs_start: 0x1040,
                     size: 0x40,
                 },
@@ -413,12 +441,14 @@ mod tests {
             labels: vec![
                 LabelEntry {
                     name: "start".to_string(),
-                    img_offset: 0x00,
+                    file_offset: 0x00,
+                    off: 0x00,
                     abs_addr: 0x1000,
                 },
                 LabelEntry {
                     name: "end_marker".to_string(),
-                    img_offset: 0x7f,
+                    file_offset: 0x7f,
+                    off: 0x7f,
                     abs_addr: 0x107f,
                 },
             ],
@@ -535,13 +565,15 @@ mod tests {
             sections: vec![
                 SectionEntry {
                     name: "foo".to_string(),
-                    img_start: 0x00,
+                    file_offset: 0x00,
+                    off: 0x00,
                     abs_start: 0x00,
                     size: 0x10,
                 },
                 SectionEntry {
                     name: "foo".to_string(),
-                    img_start: 0x10,
+                    file_offset: 0x10,
+                    off: 0x10,
                     abs_start: 0x10,
                     size: 0x10,
                 },
@@ -599,7 +631,7 @@ mod tests {
             .collect();
         assert!(names.contains(&"text"), "section 'text' missing");
         assert!(names.contains(&"data"), "section 'data' missing");
-        // text abs_start = base(0x1000) + img_start(0x00) = 0x1000
+        // text abs_start = 0x1000, off = 0x00, file_offset = 0x00
         let text = sections.iter().find(|s| s["name"] == "text").unwrap();
         assert_eq!(text["address"], "0x0000000000001000");
         assert_eq!(text["size"], 0x40u64);
@@ -653,13 +685,15 @@ mod tests {
             sections: vec![
                 SectionEntry {
                     name: "foo".to_string(),
-                    img_start: 0x00,
+                    file_offset: 0x00,
+                    off: 0x00,
                     abs_start: 0x00,
                     size: 0x10,
                 },
                 SectionEntry {
                     name: "foo".to_string(),
-                    img_start: 0x10,
+                    file_offset: 0x10,
+                    off: 0x10,
                     abs_start: 0x10,
                     size: 0x10,
                 },

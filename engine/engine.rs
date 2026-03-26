@@ -46,7 +46,12 @@ pub struct Location {
 #[derive(Clone, Debug)]
 pub struct WrDispatch {
     pub name: String,
+    /// Byte offset from the start of the output file where this section begins.
     pub img_start: u64,
+    /// Offset from the most recent `set_abs` anchor at the point this section begins.
+    pub off_start: u64,
+    /// Absolute address at the point this section begins (`abs_base + off`).
+    pub abs_start: u64,
     pub size: u64,
 }
 
@@ -54,7 +59,12 @@ pub struct WrDispatch {
 #[derive(Clone, Debug)]
 pub struct LabelDispatch {
     pub name: String,
+    /// Byte offset from the start of the output file where this label appears.
     pub img_offset: u64,
+    /// Offset from the most recent `set_abs` anchor at this label.
+    pub off: u64,
+    /// Absolute address at this label (`abs_base + off`).
+    pub abs_addr: u64,
 }
 
 pub struct Engine {
@@ -1302,19 +1312,27 @@ impl Engine {
                 }
                 IRKind::SectionEnd => {
                     let (name, start_idx) = stack.pop().expect("Unmatched SectionEnd in ir_vec");
-                    let img_start = self.ir_locs[start_idx].file_pos;
+                    let start_loc = &self.ir_locs[start_idx];
+                    let img_start = start_loc.file_pos;
                     let img_end = self.ir_locs[i].file_pos;
+                    let off_start = start_loc.off;
+                    let abs_start = start_loc.abs_base.saturating_add(off_start);
                     self.wr_dispatches.push(WrDispatch {
                         name,
                         img_start,
+                        off_start,
+                        abs_start,
                         size: img_end - img_start,
                     });
                 }
                 IRKind::Label => {
                     let name = irdb.get_opnd_as_identifier(ir, 0).to_string();
-                    let img_offset = self.ir_locs[i].file_pos;
+                    let loc = &self.ir_locs[i];
+                    let img_offset = loc.file_pos;
+                    let off = loc.off;
+                    let abs_addr = loc.abs_base.saturating_add(off);
                     self.label_dispatches
-                        .push(LabelDispatch { name, img_offset });
+                        .push(LabelDispatch { name, img_offset, off, abs_addr });
                 }
                 _ => {}
             }

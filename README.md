@@ -84,12 +84,12 @@ Example:
     BASE,            0x0000000000001000,
 
     Sections
-    Name,            Address,             Img Offset,          Size (bytes),
-    text,            0x0000000000001000,  0x0000000000000000,  0x00000032,
+    Name,            Address,             Offset,              File Offset,         Size (bytes),
+    text,            0x0000000000001000,  0x0000000000000000,  0x0000000000000000,  0x00000032,
 
     Labels
-    Name,            Address,             Img Offset,
-    start,           0x0000000000001000,  0x0000000000000000,
+    Name,            Address,             Offset,              File Offset,
+    start,           0x0000000000001000,  0x0000000000000000,  0x0000000000000000,
 
 ### JSON Format Maps (`--map-json`)
 
@@ -106,11 +106,11 @@ Example:
       ],
       "sections": [
         { "name": "text", "address": "0x0000000000001000",
-          "img_offset": "0x0000000000000000", "size": 50 }
+          "offset": "0x0000000000000000", "file_offset": "0x0000000000000000", "size": 50 }
       ],
       "labels": [
         { "name": "start", "address": "0x0000000000001000",
-          "img_offset": "0x0000000000000000" }
+          "offset": "0x0000000000000000", "file_offset": "0x0000000000000000" }
       ]
     }
 
@@ -132,12 +132,14 @@ Example:
 
 // Sections
 #define OUTPUT_MAP_TEXT_ADDR 0x0000000000001000ULL
-#define OUTPUT_MAP_TEXT_IMG_OFFSET 0x0000000000000000ULL
+#define OUTPUT_MAP_TEXT_OFFSET 0x0000000000000000ULL
+#define OUTPUT_MAP_TEXT_FILE_OFFSET 0x0000000000000000ULL
 #define OUTPUT_MAP_TEXT_SIZE 50ULL
 
 // Labels
 #define OUTPUT_MAP_START_ADDR 0x0000000000001000ULL
-#define OUTPUT_MAP_START_IMG_OFFSET 0x0000000000000000ULL
+#define OUTPUT_MAP_START_OFFSET 0x0000000000000000ULL
+#define OUTPUT_MAP_START_FILE_OFFSET 0x0000000000000000ULL
 
 #endif
 ```
@@ -298,9 +300,9 @@ Like the [GNU linker 'ld'](https://ftp.gnu.org/old-gnu/Manuals/ld-2.9.1/html_mon
 
 The following diagram shows the basic concepts.  Users specify the starting logical address using an [output](#output-section-identifier-absolute-starting-address) statement.
 
-![Location Counter and sec/img/abs offsets](./images/location_counter.svg)
+![Location Counter and sec/off/abs offsets](./images/location_counter.svg)
 
-Programs can query the location counter using the [abs](#abs-identifier----u64), [img](#img-identifier----u64) and [sec](#sec-identifier----u64) statements.  Programs force the location counter forward to a specific offset or address using the [set_sec](#set_sec-expression--pad-byte-value), [set_img](#set_img-expression--pad-byte-value) and [set_abs](#set_abs-expression--pad-byte-value) statements.  Brink reports an error if any set operation would cause the location counter to move backwards.
+Programs can query the location counter using the [abs](#abs-identifier----u64), [off](#off-identifier----u64) and [sec](#sec-identifier----u64) statements.  Programs force the location counter forward to a specific offset or address using the [set_sec](#set_sec-expression--pad-byte-value), [set_off](#set_off-expression--pad-byte-value) and [set_abs](#set_abs-expression--pad-byte-value) statements.  Brink reports an error if any set operation would cause the location counter to move backwards.  `set_abs` is the exception: it rebases the absolute anchor without moving forward or requiring a forward-only target.
 
 ## Unit Testing
 
@@ -409,7 +411,7 @@ Brink reserves two identifier *prefixes*.  Any identifier beginning with a reser
 | Reserved Prefix | Reason                                                                          |
 | --------------- | ------------------------------------------------------------------------------- |
 | `wr`            | Write instructions (`wr8`, `wr16`, `wrs`, `wrf`, and future variants)           |
-| `set_`          | Configuration directives (`set_sec`, `set_img`, `set_abs`, and future variants) |
+| `set_`          | Configuration directives (`set_sec`, `set_off`, `set_abs`, and future variants) |
 
 Brink also reserves the following *exact* keywords for future language features:
 
@@ -646,38 +648,38 @@ A const value expression cannot depend on sizes or locations in the output file.
 
 ---
 
-## `img( [identifier] ) -> U64`
+## `off( [identifier] ) -> U64`
 
-When called with an identifier, returns the byte offset as a U64 of the identifier from the start of the output image.  When called without an identifier, returns the current image offset.
+Returns the byte offset from the most recent `set_abs` anchor as a U64.  When called without an identifier, returns the current offset.  When called with an identifier, returns the offset at the start of the named section.  The offset resets to zero on each `set_abs` call.  Where no `set_abs` has been issued, the offset equals the file position from the start of the output image.
 
 Example:
 
     const BASE = 0x1000u;
 
     section fiz {
-        assert img() == 6;
+        assert off() == 6;
         wrs "fiz";
-        assert img() == 9;
-        assert img(foo) == 0;
+        assert off() == 9;
+        assert off(foo) == 0;
     }
 
     section bar {
-        assert img() == 3;
+        assert off() == 3;
         wrs "bar";
-        assert img() == 6;
+        assert off() == 6;
         wr fiz;
-        assert img() == 9;
+        assert off() == 9;
     }
 
     // top level section
     section foo {
-        assert img() == 0;
+        assert off() == 0;
         wrs "foo";
-        assert img() == 3;
-        assert img(fiz) == 6;
+        assert off() == 3;
+        assert off(fiz) == 6;
         wr bar;
-        assert img() == 9;
-        assert img(bar) == 3;
+        assert off() == 9;
+        assert off(bar) == 3;
     }
 
     output foo BASE;  // starting absolute address is BASE
