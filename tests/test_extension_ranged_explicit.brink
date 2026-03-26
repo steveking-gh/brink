@@ -1,0 +1,14 @@
+// Form 2: explicit (start_offset, length) range.
+// Section `top` contains 4 data bytes followed by the 8-byte sum produced by
+// brink::test_ranged_sum.  The call specifies offset 0 and length 4, so the
+// extension receives exactly the four data bytes.
+// Expected output: 12 bytes — 0x01 0x02 0x03 0x04 then 0x0A 0x00...0x00 (sum=10 LE u64).
+section top {
+    wr8 0x01; wr8 0x02; wr8 0x03; wr8 0x04;
+    wr brink::test_ranged_sum(0, 4);
+    assert sizeof(top) == 12;
+}
+
+assert sizeof(brink::test_ranged_sum) == 8;
+
+output top 0;

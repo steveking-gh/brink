@@ -947,8 +947,8 @@ mod tests {
         assert_brink_failure("tests/test_extension_sizeof_fail.brink", &["[AST_40]"]);
     }
 
-    /// Writes 0x00-0x0F then runs brink::test_increment, which reads the 16
-    /// image bytes and appends each byte + 1.  Verifies all 32 output bytes.
+    /// Form 3 (section-name): brink::test_increment receives the `top` section
+    /// slice (16 bytes) and appends each byte + 1.  Total output: 32 bytes.
     #[test]
     fn execute_extension_increment() {
         Command::cargo_bin("brink")
@@ -962,18 +962,85 @@ mod tests {
         let produced = fs::read("execute_extension_increment.bin")
             .expect("execute_extension_increment.bin not found");
 
-        let mut expected = vec![0u8; 32];
-        // First 16 bytes: 0x00-0x0F
-        for (i, b) in expected[..16].iter_mut().enumerate() {
-            *b = i as u8;
-        }
-        // Next 16 bytes: each source byte + 1
+        assert_eq!(produced.len(), 32, "Expected 32 bytes total");
+
+        // First 16 bytes: 0x00-0x0F written by the section.
         for i in 0..16 {
-            expected[16 + i] = (i as u8).wrapping_add(1);
+            assert_eq!(produced[i], i as u8, "Data byte {i} mismatch");
+        }
+        // Next 16 bytes: the section slice incremented by 1.
+        for i in 0..16 {
+            assert_eq!(
+                produced[16 + i],
+                (i as u8).wrapping_add(1),
+                "Incremented byte {i} mismatch"
+            );
         }
 
-        assert_eq!(produced, expected, "Mismatch in increment extension output");
         fs::remove_file("execute_extension_increment.bin").ok();
+    }
+
+    /// Form 2 (explicit range): brink::test_ranged_sum reads bytes [0..4] of the
+    /// image (the four data bytes written before it) and emits their sum as a
+    /// big-endian u64.  Output: 4 data bytes + 8-byte sum = 12 bytes.
+    #[test]
+    fn execute_extension_ranged_explicit() {
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/test_extension_ranged_explicit.brink")
+            .arg("-o")
+            .arg("execute_extension_ranged_explicit.bin")
+            .assert()
+            .success();
+
+        let produced = fs::read("execute_extension_ranged_explicit.bin")
+            .expect("execute_extension_ranged_explicit.bin not found");
+
+        assert_eq!(produced.len(), 12, "Expected 12 bytes total");
+
+        // First 4 bytes: 0x01-0x04.
+        assert_eq!(&produced[..4], &[0x01, 0x02, 0x03, 0x04], "Data bytes mismatch");
+
+        // Next 8 bytes: sum of 1+2+3+4 = 10 as little-endian u64.
+        let sum = u64::from_le_bytes(produced[4..12].try_into().unwrap());
+        assert_eq!(sum, 10, "Sum must be 10");
+
+        fs::remove_file("execute_extension_ranged_explicit.bin").ok();
+    }
+
+    // Form 3 (section-name): brink::test_ranged_sum receives the entire `out`
+    // section (4 data bytes + 8-byte extension slot) as its image slice.
+    // Sum of 0x01+0x02+0x03+0x04 = 10; extension slot bytes are zero.
+    // Total output: 4 data bytes + 8-byte sum = 12 bytes.
+    #[test]
+    fn execute_extension_section_sum() {
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/test_extension_section_sum.brink")
+            .arg("-o")
+            .arg("execute_extension_section_sum.bin")
+            .assert()
+            .success();
+
+        let produced = fs::read("execute_extension_section_sum.bin")
+            .expect("execute_extension_section_sum.bin not found");
+
+        assert_eq!(produced.len(), 12, "Expected 4 data bytes + 8-byte sum = 12 bytes");
+
+        assert_eq!(&produced[..4], &[0x01, 0x02, 0x03, 0x04], "Data bytes mismatch");
+
+        // Sum of 1+2+3+4 = 10 (extension slot zeros do not affect the sum).
+        let sum = u64::from_le_bytes(produced[4..12].try_into().unwrap());
+        assert_eq!(sum, 10, "Sum must be 10");
+
+        fs::remove_file("execute_extension_section_sum.bin").ok();
+    }
+
+    /// Error case: a BrinkRangedExtension called with no range specifier must
+    /// be rejected at IRDB time with IRDB_45.
+    #[test]
+    fn execute_extension_no_range_error() {
+        assert_brink_failure("tests/test_extension_no_range_error.brink", &["[IRDB_45]"]);
     }
 
     /// Global asserts (outside any section) pass through the validation phase

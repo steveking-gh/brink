@@ -13,7 +13,7 @@
 
 use diags::Diags;
 use diags::SourceSpan;
-use lineardb::LinearDb;
+use lineardb::{LinIR, LinearDb};
 
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
@@ -97,7 +97,12 @@ impl IRDb {
         let lop = &lin_db.operand_vec[lop_num];
         let mut data_type = None;
         if let Some(lin_ir_lid) = lop.ir_lid
-            && lin_db.ir_vec[lin_ir_lid].op == IRKind::ExtensionCall
+            && matches!(
+                lin_db.ir_vec[lin_ir_lid].op,
+                IRKind::ExtensionCall
+                    | IRKind::ExtensionCallRanged
+                    | IRKind::ExtensionCallSection
+            )
         {
             return Some(DataType::Extension);
         }
@@ -509,6 +514,7 @@ impl IRDb {
         ir: &IR,
         diags: &mut Diags,
         ext_registry: &ExtensionRegistry,
+        section_names: &HashSet<String>,
     ) -> bool {
         match ir.kind {
             IRKind::Align | IRKind::SetSec | IRKind::SetImg | IRKind::SetAbs | IRKind::Wr(_) => {
@@ -527,6 +533,81 @@ impl IRDb {
                         format!("Unknown function '{}'", name)
                     };
                     diags.err1("IRDB_40", &m, ir.src_loc.clone());
+                    return false;
+                }
+                true
+            }
+            IRKind::ExtensionCallRanged => {
+                let name = self.get_opnd_as_identifier(ir, 0);
+                if ext_registry.get(name).is_none() {
+                    let m = if let Some(idx) = name.find("::") {
+                        format!("Unknown namespace '{}'", &name[..idx])
+                    } else {
+                        format!("Unknown function '{}'", name)
+                    };
+                    diags.err1("IRDB_50", &m, ir.src_loc.clone());
+                    return false;
+                }
+                // Need at least [name, start, length, output] = 4 operands.
+                if ir.operands.len() < 4 {
+                    let m = format!(
+                        "Ranged extension '{}' requires (start_offset, length) \
+                         as the first two arguments",
+                        name
+                    );
+                    diags.err1("IRDB_45", &m, ir.src_loc.clone());
+                    return false;
+                }
+                // operands[1] and operands[2] must be numeric.
+                for opnd_pos in [1usize, 2usize] {
+                    let opnd = &self.parms[ir.operands[opnd_pos]];
+                    let dt = opnd.val.data_type();
+                    if !matches!(dt, DataType::U64 | DataType::I64 | DataType::Integer) {
+                        let m = format!(
+                            "Ranged extension '{}': range argument {} must be a numeric \
+                             expression, found {:?}",
+                            name, opnd_pos, dt
+                        );
+                        diags.err2("IRDB_46", &m, ir.src_loc.clone(), opnd.src_loc.clone());
+                        return false;
+                    }
+                }
+                true
+            }
+            IRKind::ExtensionCallSection => {
+                let name = self.get_opnd_as_identifier(ir, 0);
+                if ext_registry.get(name).is_none() {
+                    let m = if let Some(idx) = name.find("::") {
+                        format!("Unknown namespace '{}'", &name[..idx])
+                    } else {
+                        format!("Unknown function '{}'", name)
+                    };
+                    diags.err1("IRDB_51", &m, ir.src_loc.clone());
+                    return false;
+                }
+                // Need at least [name, section_id, output] = 3 operands.
+                assert!(
+                    ir.operands.len() >= 3,
+                    "ExtensionCallSection must have at least 3 operands"
+                );
+                // operands[1] must be an Identifier matching a known section.
+                let sec_opnd = &self.parms[ir.operands[1]];
+                let ParameterValue::Identifier(ref sec_name) = sec_opnd.val else {
+                    let m = format!(
+                        "Extension '{}': first argument must be a section identifier, \
+                         found {:?}",
+                        name,
+                        sec_opnd.val.data_type()
+                    );
+                    diags.err2("IRDB_47", &m, ir.src_loc.clone(), sec_opnd.src_loc.clone());
+                    return false;
+                };
+                if !section_names.contains(sec_name.as_str()) {
+                    let m = format!(
+                        "Extension '{}': unknown section '{}' in call",
+                        name, sec_name
+                    );
+                    diags.err2("IRDB_48", &m, ir.src_loc.clone(), sec_opnd.src_loc.clone());
                     return false;
                 }
                 true
@@ -601,16 +682,29 @@ impl IRDb {
         diags: &mut Diags,
         ext_registry: &ExtensionRegistry,
     ) -> bool {
+        // Section names come from LinearDb, which collected them from ast_db.sections
+        // at construction time.  This covers all declared sections, including non-output
+        // sections that are never linearized into ir_vec.
+        let section_names = &lin_db.section_names;
+
         let mut result = true;
         for lir in &lin_db.ir_vec {
-            let kind = lir.op;
+            // Disambiguate ExtensionCall into the specific form before building the IR.
+            // All extension calls arrive from LinearDB as IRKind::ExtensionCall; we
+            // refine that here using the registry and section name set.
+            let kind = if lir.op == IRKind::ExtensionCall {
+                self.disambiguate_extension_call(lir, lin_db, ext_registry, section_names)
+            } else {
+                lir.op
+            };
+
             let ir = IR {
                 kind,
                 operands: lir.operand_vec.clone(),
                 src_loc: lir.src_loc.clone(),
             };
             let ir_num = self.ir_vec.len();
-            if self.validate_operands(&ir, diags, ext_registry) {
+            if self.validate_operands(&ir, diags, ext_registry, section_names) {
                 match kind {
                     IRKind::Label => {
                         // create the addressable entry and set the IR number
@@ -641,6 +735,51 @@ impl IRDb {
             }
         }
         result
+    }
+
+    /// Determines the specific IR kind for an ExtensionCall node.
+    ///
+    /// LinearDB emits `ExtensionCall` for all extension invocations.  This
+    /// method inspects the first user argument and the registry to select the
+    /// appropriate refined kind:
+    ///
+    /// - First user arg is an identifier matching a known section **and** the
+    ///   extension is ranged → `ExtensionCallSection`
+    /// - Extension is ranged (no section match) → `ExtensionCallRanged`
+    /// - Extension is non-ranged → `ExtensionCall` (unchanged)
+    /// - Extension not found → `ExtensionCall` (IRDB_40 will fire in validate_operands)
+    fn disambiguate_extension_call(
+        &self,
+        lir: &LinIR,
+        lin_db: &LinearDb,
+        ext_registry: &ExtensionRegistry,
+        section_names: &HashSet<String>,
+    ) -> IRKind {
+        // operands layout: [name, user_arg0, ..., output]
+        // At least 2 operands (name + output) always present; user args are in between.
+        let has_user_args = lir.operand_vec.len() > 2;
+
+        // Resolve the extension name from the name operand (always operands[0]).
+        let name_sval = &lin_db.operand_vec[lir.operand_vec[0]].sval;
+        let Some(entry) = ext_registry.get(name_sval) else {
+            return IRKind::ExtensionCall; // validate_operands will emit IRDB_40
+        };
+
+        if !entry.extension.is_ranged() {
+            return IRKind::ExtensionCall;
+        }
+
+        // Ranged extension: check whether the first user arg is a section name.
+        if has_user_args {
+            let first_user_lop = &lin_db.operand_vec[lir.operand_vec[1]];
+            if first_user_lop.tok == ast::LexToken::Identifier
+                && section_names.contains(first_user_lop.sval.as_str())
+            {
+                return IRKind::ExtensionCallSection;
+            }
+        }
+
+        IRKind::ExtensionCallRanged
     }
 
     /// Resolve all const declarations in `lin_db.const_map`, storing each
