@@ -1,3 +1,16 @@
+Fuzz tests run until stopped with Ctrl-C.  In my experience, fuzz tests will catch a problem in 60 seconds or not at all.
+
+Cargo fuzz uses LLVM's libFuzzer internally, which provides a vast array of runtime options.  To see thh options using the nightly compiler build:
+
+    cargo +nightly fuzz run fuzz_target_1 -- -help=1
+
+A copy of this help output is in the fuzz_help.txt file.
+
+For example, setting a smaller 5 second timeout for hangs and maximum input length of 256 bytes.
+
+    cargo +nightly fuzz run fuzz_target_1 -- -timeout=5 -max_len=256
+
+
 libfuzzer usage:
 
 To run fuzzing pass on 0 or more directories.

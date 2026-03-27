@@ -4,8 +4,8 @@
 
 Brink is a domain specific language for linking and composing of an output file.
 Brink simplifies construction of complex files by managing sizes, offsets and
-ordering in a readable declarative style.  Brink was created with FLASH or other
-NVM images in mind, especially for use in embedded systems.
+ordering in a readable declarative style.  Brink was created with FLASH, ROM or other
+non-volatile memory images in mind.
 
 # Quick Start
 
@@ -34,28 +34,16 @@ The previous build step created the Brink binary as `./target/release/brink`.  Y
 
     $ cargo install --path ./
 
-# Command Line Options
+# Command Line Options Reference
 
     brink [OPTIONS] <input>
 
+The required input file contains the brink source code to compile and build the output file.  Brink source files typically have a .brink file extensions.
+
 | Option              | Description                                                                                                                       |
 | ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `<input>`           | Brink source file to compile (required).                                                                                          |
-| `-o <file>`         | Output binary file name. Defaults to `output.bin`.                                                                                |
-| `-v`                | Increase verbosity. Repeat up to four times (`-v -v -v -v`).                                                                      |
-| `-q`, `--quiet`     | Suppress all console output, including errors. Overrides `-v`. Useful for fuzz testing.                                           |
-| `--noprint`         | Suppress `print` statement output from the source program.                                                                        |
-| `-D<NAME>[=VALUE]`  | Define a const value from the command line. May be repeated. See [Command-Line Const Defines](#command-line-const-defines) below. |
+| `-D<name>[=value]`  | Defines a `const` value from the command line.<br>See [Command-Line Const Defines](#command-line-const-defines) below.            |
 | `--list-extensions` | List all available extensions compiled into brink as controlled by Cargo feature flags.                                           |
-| `--map-hf[=FILE]`   | Write a human-friendly map file. See [Map File Output](#map-file-output) below.                                                   |
-| `--map-json[=FILE]` | Write a JSON map file. See [Map File Output](#map-file-output) below.                                                             |
-
-## Map File Output
-
-Both map options list every section, label, and constant with its address and size.  Both accept the same FILE argument forms:
-
-| Invocation          | Result                                                                                                                            |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | `--map-csv`         | Writes a CSV format map file `<stem>.map.csv` to the current directory.<br>For example: `firmware.brink` → `firmware.map.csv`.    |
 | `--map-csv=<file>`  | Writes a CSV map file to the specified file.                                                                                      |
 | `--map-csv=-`       | Writes a CSV map file to stdout.                                                                                                  |
@@ -65,116 +53,40 @@ Both map options list every section, label, and constant with its address and si
 | `--map-json`        | Writes a JSON format map file `<stem>.map.json` to the current directory.<br>For example: `firmware.brink` → `firmware.map.json`. |
 | `--map-json=<file>` | Writes a JSON map to the specified file.                                                                                          |
 | `--map-json=-`      | Writes a JSON map to stdout.                                                                                                      |
+| `--noprint`         | Suppress `print` statement output from the source program.                                                                        |
+| `-o <file>`         | Output file name. Defaults to `output.bin`.                                                                                       |
+| `-q`, `--quiet`     | Suppress all console output, including errors. Overrides `-v`. Useful for fuzz testing.                                           |
+| `-v`                | Increase verbosity. Repeat up to four times (`-v -v -v -v`).                                                                      |
 
-Brink writes map output to the current working directory when no path is given, keeping build artifacts out of source directories.  Both formats report the same semantic payload and both flags may be specified together.
-
-### CSV Format Maps (`--map-csv`)
-
-Produces a comma-separated, fixed-column CSV file that imports directly into a spreadsheet.
-
-Example:
-
-    Output File, output.bin
-    Base Address, 0x0000000000001000
-    Total Size (hex), 0x0000000000000050
-    Total Size (decimal), 80
-
-    Constants
-    Name,            Value,
-    BASE,            0x0000000000001000,
-
-    Sections
-    Name,            Address,             Offset,              File Offset,         Size (bytes),
-    text,            0x0000000000001000,  0x0000000000000000,  0x0000000000000000,  0x00000032,
-
-    Labels
-    Name,            Address,             Offset,              File Offset,
-    start,           0x0000000000001000,  0x0000000000000000,  0x0000000000000000,
-
-### JSON Format Maps (`--map-json`)
-
-Produces a pretty-printed JSON file.  Addresses and offsets are hex strings; sizes are plain numbers.
-
-Example:
-
-    {
-      "output_file": "output.bin",
-      "base_addr": "0x0000000000001000",
-      "total_size": 80,
-      "constants": [
-        { "name": "BASE", "value": "0x0000000000001000" }
-      ],
-      "sections": [
-        { "name": "text", "address": "0x0000000000001000",
-          "offset": "0x0000000000000000", "file_offset": "0x0000000000000000", "size": 50 }
-      ],
-      "labels": [
-        { "name": "start", "address": "0x0000000000001000",
-          "offset": "0x0000000000000000", "file_offset": "0x0000000000000000" }
-      ]
-    }
-
-### C99 Header Format Maps (`--map-c99`)
-
-Produces a C preprocessor (C99 compatible) header file.  The header file is named `<stem>.map.h` where `<stem>` is the stem of the input file name.
-
-Example:
-
-```c
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-// Automatically generated file! Do not edit!
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-#ifndef OUTPUT_MAP_H
-#define OUTPUT_MAP_H
-
-#define OUTPUT_MAP_BASE_ADDR 0x0000000000001000ULL
-#define OUTPUT_MAP_TOTAL_SIZE 80ULL
-
-// Sections
-#define OUTPUT_MAP_TEXT_ADDR 0x0000000000001000ULL
-#define OUTPUT_MAP_TEXT_OFFSET 0x0000000000000000ULL
-#define OUTPUT_MAP_TEXT_FILE_OFFSET 0x0000000000000000ULL
-#define OUTPUT_MAP_TEXT_SIZE 50ULL
-
-// Labels
-#define OUTPUT_MAP_START_ADDR 0x0000000000001000ULL
-#define OUTPUT_MAP_START_OFFSET 0x0000000000000000ULL
-#define OUTPUT_MAP_START_FILE_OFFSET 0x0000000000000000ULL
-
-#endif
-```
+When the user does not specify a path, Brink writes map file(s) and the output to the current working directory.
 
 ## Command-Line Const Defines
 
-The `-D` option injects a const into the program from the command line, matching the GCC `-D` preprocessor syntax.  Specify `-D` once per each const definition.
+The `-D` option injects a [`const`](#const-identifier--expr) definition into the program from the command line.
+This option is modelled after the GCC `-D` preprocessor syntax.  You can specify `-D` multiple times, once per each definition.  For example:
 
     brink -DBASE=0x8000 -DCOUNT=16 firmware.brink
 
-Brink resolves a `-D` name everywhere a source `const` resolves — in expressions, `output` addresses, `assert` statements, and so on.  `-D` **overrides** any same-named `const` in the source.
+The `name` must be a valid Brink [identifier](#identifiers).  The `value` is optional; without a value, Brink sets the `const` to 1, with type `Integer`, following the GCC boolean-flag convention.
 
-Both map formats (`--map-hf` and `--map-json`) list `-D` consts alongside source consts.
+`-D` **overrides** any same-named `const` definition in the source.
 
-### Syntax
-
-    -D<NAME>
-    -D<NAME>=<VALUE>
-
-`NAME` must be a valid Brink identifier.  `VALUE` is optional; without a value, Brink sets the const to `Integer(1)`, following the GCC boolean-flag convention.
+Map output lists all `const` definitions including `-D` consts.
 
 ### Value Type Inference
 
-Brink infers the type from the value string, matching source const rules.
+Brink knows or infers the type from the value string using the same rules as source code for type inference.
 
-| Example          | Value  | Type      | Description                             |
-| ---------------- | ------ | --------- | --------------------------------------- |
-| `-DFLAG`         | 1      | `Integer` | Defaults to true (1).                   |
-| `-DCOUNT=16`     | 16     | `Integer` | Plain decimal → `Integer`               |
-| `-DBASE=0x1000`  | 0x1000 | `U64`     | Hex/binary/octal without suffix → `U64` |
-| `-DBASE=0x1000u` | 0x1000 | `U64`     | `u` suffix → `U64` (explicit)           |
-| `-DOFFSET=0x40i` | 0x40   | `I64`     | `i` suffix → `I64`                      |
-| `-DDELTA=-4`     | -4     | `I64`     | Negative decimal → `I64`                |
+| Example          | Value  | Type      | Description                                |
+| ---------------- | ------ | --------- | ------------------------------------------ |
+| `-DFLAG`         | 1      | `Integer` | Defaults to true (1).                      |
+| `-DCOUNT=16`     | 16     | `Integer` | Plain decimal → `Integer`                  |
+| `-DBASE=0x1000`  | 0x1000 | `U64`     | Hex/binary without suffix → implicit `U64` |
+| `-DBASE=0x1000u` | 0x1000 | `U64`     | `u` suffix → explicit `U64`                |
+| `-DOFFSET=0x40i` | 0x40   | `I64`     | `i` suffix → explicit `I64`                |
+| `-DDELTA=-4`     | -4     | `I64`     | Negative decimal → implicit `I64`          |
 
-### Examples
+### Example
 
 Define a base address and section count at the command line:
 
@@ -296,7 +208,7 @@ In addition to writing to 'output.bin'.
 
 # The Location Counter
 
-Like the [GNU linker 'ld'](https://ftp.gnu.org/old-gnu/Manuals/ld-2.9.1/html_mono/ld.html), Brink uses the concept of a *location counter*.  The location counter is the current position in the output file, referenced from either the start of the current section, the start of the entire output image or the absolute logical address.  **The location counter can only move forward.**
+Like the [GNU linker 'ld'](https://ftp.gnu.org/old-gnu/Manuals/ld-2.9.1/html_mono/ld.html), Brink uses the concept of a *location counter*.  The location counter marks position of the **next** byte of output.  Users can reference and manipulate the location relative to the start of the current section, the start of the entire output file, or the absolute logical address.  Like the GNU linker, **the location counter can only move forward.**
 
 The following diagram shows the basic concepts.  Users specify the starting logical address using an [output](#output-section-identifier-absolute-starting-address) statement.
 
@@ -306,55 +218,33 @@ Programs can query the location counter using the [abs](#abs-identifier----u64),
 
 ## Unit Testing
 
-Brink supports unit tests.
+Brink relies on 100's of unit tests to catch bugs.
 
     cargo test
 
 ## Fuzz Testing
 
-Brink supports fuzz tests for its various submodules.  Fuzz testing starts from
+Brink supports fuzz tests for several of its internal libraries.  Fuzz testing starts from
 a corpus of random inputs and then further randomizes those inputs to try to
-cause crashes and hangs.  At the time of writing (Rust 1.51.0), fuzz testing
-**requires the nightly build**.
-
-To run fuzz tests:
-
-    $ cd process
-    $ cargo +nightly fuzz run fuzz_target_1
-
-    $ cd lineardb
-    $ cargo +nightly fuzz run fuzz_target_1
-
-    $ cd ast
-    $ cargo +nightly fuzz run fuzz_target_1
-
-Fuzz tests run until stopped with Ctrl-C.  In my experience, fuzz tests will catch a problem in 60 seconds or not at all.
-
-Cargo fuzz uses LLVM's libFuzzer internally, which provides a vast array of runtime options.  To see thh options using the nightly compiler build:
-
-    cargo +nightly fuzz run fuzz_target_1 -- -help=1
-
-A copy of this help output is in the fuzz_help.txt file.
-
-For example, setting a smaller 5 second timeout for hangs and maximum input length of 256 bytes.
-
-    cargo +nightly fuzz run fuzz_target_1 -- -timeout=5 -max_len=256
+cause crashes and hangs.  At the time of writing, fuzz testing
+**requires the nightly build**.  See `fuzz_help.txt` in the source repo for more information.
 
 # Basic Structure of a Brink Program
 
+A Brink source file consists of a series of declarations that define the structure of an output file as composed from a hierarchy of smaller parts.  These parts can be [`section`](#section) definitions, inline data, strings, pointers, offsets, pad bytes, and so on.  Brink also supports `ex
+
 A Brink source file consists of one or more section definitions and exactly one output statement.    Each section has a unique name.  The output statement specifies the name of the top level section.  Starting from the top section, Brink recursively evaluates each section and produces the output file.  For example, we can define a section with a write-string (wrs) expression:
 
-    section foo {
-        wrs "I'm foo";
+    section foo {        // Start a new section named 'foo'
+        wrs "I'm foo";   // wrs writes a string into the section.
     }
 
-    output foo;
+    output foo;          // Final output
 
 Produces a default output named `output.bin`.
 
     $ cat output.bin
     I'm foo
-
 
 
 Using a write (wr) statement, sections can write other sections:
@@ -365,7 +255,7 @@ Using a write (wr) statement, sections can write other sections:
 
     section bar {
         wrs "I'm bar\n";
-        wr foo;
+        wr foo;           // nested section
     }
 
     output bar;
@@ -375,6 +265,26 @@ Produces `output.bin`:
     $ cat output.bin
     I'm bar
     I'm foo
+
+
+Users can extend Brink with custom data processing using [Brink Extension](#brink-extensions).  Users write the output of their extension call into a section with a `wr`.
+
+    section foo {
+        wrs "I'm foo\n";
+    }
+
+    section bar {
+        wrs "I'm bar\n";
+        wr foo;           // nested section
+    }
+
+    section final {
+        wr bar;
+        wr my_stuff::crc(bar);  // Write a 4 byte CRC hash for section 'bar'.
+    }
+
+    assert(sizeof(final) == 20);
+    output final;
 
 ---
 
@@ -396,22 +306,26 @@ Like C language, statements must be terminated with a trailing semicolon charact
 
 Brink supports the following data types:
 
-* `U64` - 64-bit unsigned values
-* `I64` - 64-bit signed values
-* `Integer` - 64-bit with flexible sign treatment
-* `QuotedString` - A UTF-8 string in double quotes
-* `Identifier` - Identifier names
+* 64-bit unsigned values
+* 64-bit signed values
+* 64-bit integers with flexible sign treatment
+* UTF-8 string in double quotes
 
-## Reserved Identifiers
+Arithmetic operations on U64, I64
+
+## Identifiers
+
+An identifier begins with a letter (A–Z, a–z) or an underscore (_), followed by zero or more letters, digits (0–9), or underscores.  Identifiers are case-sensitive.
 
 Brink reserves certain identifiers and rejects their use as section names, const names, or label names at compile time.
 
-Brink reserves two identifier *prefixes*.  Any identifier beginning with a reserved prefix triggers an error, regardless of the suffix:
+Brink also reserves two identifier *prefixes*.  Any user defined identifier beginning with a reserved prefix triggers an error.
 
 | Reserved Prefix | Reason                                                                          |
 | --------------- | ------------------------------------------------------------------------------- |
 | `wr`            | Write instructions (`wr8`, `wr16`, `wrs`, `wrf`, and future variants)           |
 | `set_`          | Configuration directives (`set_sec`, `set_off`, `set_abs`, and future variants) |
+| `__`            | Leading double underscore names refer to builtin identifiers.                   |
 
 Brink also reserves the following *exact* keywords for future language features:
 
@@ -832,6 +746,39 @@ When a section offset specifies an identifier, the identifier must be in the sco
     }
 
     output foo 0x1000;
+
+---
+
+## `section <name> { ... }`
+
+A section is a named, reusable block of content.  Sections are the primary building block of a Brink program.  Each section defines a sequence of bytes, built up from write statements and location counter operations such as `align`.  Sections may also contain labels, assertions, print statements and so on.  Sections may write other sections into themselves so long as the nesting does not create a cycle.
+
+Section names must be valid [identifiers](#identifiers), must be globally unique, and must not conflict with const names, label names, or [reserved identifiers](#reserved-identifiers).
+
+Sections have their own section-relative location counter which resets to zero at the start of each section.  Sections can read and advance the section location counter with [`sec()`](#sec-identifier----u64) and [`set_sec()`](#set_sec-expression--pad-byte-value) statements respectively.
+
+The root section named in the [`output`](#output-section-identifier-absolute-starting-address) statement is the only section Brink writes to the output file.  Other sections can be directly or indirectly included via [`wr`](#wr-section-identifier) statements from the output section.  Unreachable sections produce a warning.
+
+Example:
+
+    section magic {
+        wrs "FIRM";           // 4-byte magic number
+        wr8 0x01;             // version
+        assert sec() == 5;    // Section location counter should be 5
+    }
+
+    section body {
+        wr8 0xAA, 16;         // 16 bytes of payload
+    }
+
+    section image {
+        wr magic;
+        align 256;            // Body should start on 256 byte boundary
+        wr body;
+        assert sizeof(image) == 272;  // 256 + 16
+    }
+
+    output image 0x0800_0000u;
 
 ---
 
