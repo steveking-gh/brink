@@ -212,7 +212,7 @@ Like the [GNU linker 'ld'](https://ftp.gnu.org/old-gnu/Manuals/ld-2.9.1/html_mon
 
 The following diagram shows the basic concepts.  Users specify the starting logical address using an [output](#output-section-identifier-absolute-starting-address) statement.
 
-![Location Counter and sec/off/abs offsets](./images/location_counter_plain_svg.svg)
+![Location Counter and sec/off/abs offsets](./images/location_counter_plain_no_text.svg)
 
 Programs can query the location counter using the [abs](#abs-identifier----u64), [off](#off-identifier----u64) and [sec](#sec-identifier----u64) statements.  Programs force the location counter forward to a specific offset or address using the [set_sec](#set_sec-expression--pad-byte-value), [set_off](#set_off-expression--pad-byte-value) and [set_abs](#set_abs-expression--pad-byte-value) statements.  Brink reports an error if any set operation would cause the location counter to move backwards.  `set_abs` is the exception: it rebases the absolute anchor without moving forward or requiring a forward-only target.
 
