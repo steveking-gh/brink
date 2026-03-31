@@ -853,24 +853,57 @@ Example:
         wr8 5;
         set_addr 16;
         assert addr() == 16;
+        assert addr_offset() = 0;   // set_addr resets addr_offset
         assert file_offset() == 5;  // set_addr does not pad
         assert sec_offset() == 5;
         wr8 0xAA, 3;
-        set_sec_offset 24, 0xFF;
-        assert addr() == 24;  // set_sec_offset moved addr too
-        assert file_offset() == 24;
-        assert sec_offset() == 24;
-        set_sec_offset 24, 0xEE; // should do Nothing
-        assert addr() == 24;
-        assert file_offset() == 24;
-        assert sec_offset() == 24;
-        wr8 0xAA, 3;
-        set_sec_offset 28, 0x77; // should pad to 28
-        assert sizeof(foo) == 28;
-        assert addr() == 28
+        assert addr_offset() = 3;
+        assert file_offset() == 8;
+        assert sec_offset() == 8;
+        set_sec_offset 24, 0xFF;     // Adds 24 - 8 = 16 pad bytes
+        assert addr() == 35;         // 19 + 16 = 35
+        assert addr_offset() = 19;   // 3 + 16 = 19
+        assert file_offset() == 24;  // 8 + 16 = 24
+        assert sec_offset() == 24;   // 8 + 16 = 24
     }
 
     output foo;
+
+---
+
+## `set_addr_offset <expression> [, <pad byte value>];`
+
+Pads the output until `addr_offset` reaches the specified value.  Users may specify an optional pad byte value or use the default value of 0.
+
+If the specified value is less than the current `addr_offset`, Brink reports an error.
+
+`set_addr_offset` is most useful after a `set_addr` call, because `set_addr` resets `addr_offset` to zero.  This lets users pad to a size relative to their chosen address anchor without knowing what the surrounding section's `sec_offset` happens to be.
+
+Example:
+
+    const BASE = 0x1000u;
+
+    section header {
+        wrs "FIRM";           // 4-byte magic number
+        wr8 0x01;             // version byte
+    }                         // addr_offset == 5 on exit
+
+    section body {
+        wr header;
+        // Relocate body to its target load address.
+        // addr_offset resets to 0.
+        set_addr 0xF000u;
+        wr8 0xAA, 3;          // 3 bytes of payload
+        // Pad to 0x20 bytes from the 0xF000 anchor.
+        set_addr_offset 0x20;
+        assert addr() == 0xF020;
+        assert addr_offset() == 0x20;
+        assert sec_offset() == 0x25;  // 5 (header) + 3 (payload) + 29 (pad) = 0x25
+    }
+
+    output body BASE;
+
+---
 
 ## `set_file_offset <expression> [, <pad byte value>];`
 ## `set_sec_offset <expression> [, <pad byte value>];`
