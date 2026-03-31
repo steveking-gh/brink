@@ -363,8 +363,8 @@ impl MapDb {
             .map(|wd| SectionEntry {
                 name: wd.name.clone(),
                 file_offset: wd.file_offset,
-                off: wd.off_start,
-                abs_start: wd.abs_start,
+                off: wd.addr_offset,
+                abs_start: wd.addr,
                 size: wd.size,
             })
             .collect();
@@ -376,8 +376,8 @@ impl MapDb {
             .map(|ld| LabelEntry {
                 name: ld.name.clone(),
                 file_offset: ld.file_offset,
-                off: ld.off,
-                abs_addr: ld.abs_addr,
+                off: ld.addr_offset,
+                abs_addr: ld.addr,
             })
             .collect();
         labels.sort_by_key(|l| l.file_offset);

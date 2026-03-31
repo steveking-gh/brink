@@ -28,16 +28,16 @@ use tracing::{debug, error, info, trace, warn};
 pub struct Location {
     /// Total bytes written to the output file.  Internal use only; drives
     /// WrDispatch offsets and mmap slicing.  Never resets.
-    file_pos: u64,
-    /// Offset from the most recent `set_addr` anchor (or `start_addr` if
+    file_offset: u64,
+    /// Offset from the most recent `set_addr` base (or `start_addr` if
     /// `set_addr` has never been called).  Exposed to scripts as `addr_offset()`.
     /// Resets to 0 on each `set_addr` call.
-    off: u64,
+    addr_offset: u64,
     /// Offset within the current section.  Pushed/popped at section boundaries.
-    sec: u64,
-    /// The absolute address anchor established by the last `set_addr` call, or
-    /// `start_addr` at image start.  `addr() == abs_base + off`.
-    abs_base: u64,
+    sec_offset: u64,
+    /// The address base established by the last `set_addr` call, or
+    /// `start_addr` at image start.  `addr() == addr_base + addr_offset`.
+    addr_base: u64,
 }
 
 /// Records one occurrence of a section write in the output image.
@@ -49,9 +49,9 @@ pub struct WrDispatch {
     /// Byte offset from the start of the output file where this section begins.
     pub file_offset: u64,
     /// Offset from the most recent `set_addr` anchor at the point this section begins.
-    pub off_start: u64,
-    /// Absolute address at the point this section begins (`abs_base + off`).
-    pub abs_start: u64,
+    pub addr_offset: u64,
+    /// Address at the point this section begins (`addr_base + addr_offset`).
+    pub addr: u64,
     pub size: u64,
 }
 
@@ -62,9 +62,9 @@ pub struct LabelDispatch {
     /// Byte offset from the start of the output file where this label appears.
     pub file_offset: u64,
     /// Offset from the most recent `set_addr` anchor at this label.
-    pub off: u64,
-    /// Absolute address at this label (`abs_base + off`).
-    pub abs_addr: u64,
+    pub addr_offset: u64,
+    /// Absolute address at this label (`abs_base + addr_offset`).
+    pub addr: u64,
 }
 
 pub struct Engine {
@@ -122,7 +122,7 @@ impl Engine {
         self.trace(
             format!(
                 "Engine::iterate_wrs: file_pos {}, off {}, sec {}",
-                current.file_pos, current.off, current.sec
+                current.file_offset, current.addr_offset, current.sec_offset
             )
             .as_str(),
         );
@@ -137,7 +137,7 @@ impl Engine {
         // Will panic if usize does not fit in u64
         let sz = xstr.len() as u64;
 
-        let Some(new_file_pos) = current.file_pos.checked_add(sz) else {
+        let Some(new_file_pos) = current.file_offset.checked_add(sz) else {
             diags.err1(
                 "EXEC_41",
                 "Write operation causes location counter overflow",
@@ -145,8 +145,8 @@ impl Engine {
             );
             return false;
         };
-        let new_off = current.off + sz; // safe: off <= file_pos, so if file_pos+sz didn't overflow, this won't
-        if current.abs_base.checked_add(new_off).is_none() {
+        let new_off = current.addr_offset + sz; // safe: off <= file_pos, so if file_pos+sz didn't overflow, this won't
+        if current.addr_base.checked_add(new_off).is_none() {
             diags.err1(
                 "EXEC_43",
                 "Write operation causes absolute address overflow",
@@ -155,9 +155,9 @@ impl Engine {
             return false;
         }
 
-        current.file_pos = new_file_pos;
-        current.off = new_off;
-        current.sec = current.sec.saturating_add(sz);
+        current.file_offset = new_file_pos;
+        current.addr_offset = new_off;
+        current.sec_offset = current.sec_offset.saturating_add(sz);
 
         true
     }
@@ -175,7 +175,7 @@ impl Engine {
         self.trace(
             format!(
                 "Engine::iterate_wrext: file_pos {}, off {}, sec {}",
-                current.file_pos, current.off, current.sec
+                current.file_offset, current.addr_offset, current.sec_offset
             )
             .as_str(),
         );
@@ -201,9 +201,9 @@ impl Engine {
                 ext_name_for_diag = ext_name;
                 if let Some(entry) = ext_registry.get(ext_name) {
                     let size = entry.cached_size as u64;
-                    current.file_pos += size;
-                    current.off += size;
-                    current.sec += size;
+                    current.file_offset += size;
+                    current.addr_offset += size;
+                    current.sec_offset += size;
                     return true;
                 }
             }
@@ -232,9 +232,9 @@ impl Engine {
             format!(
                 "Engine::iterate_wrx-{}: file_pos {}, off {}, sec {}",
                 byte_size * 8,
-                current.file_pos,
-                current.off,
-                current.sec
+                current.file_offset,
+                current.addr_offset,
+                current.sec_offset
             )
             .as_str(),
         );
@@ -296,7 +296,7 @@ impl Engine {
         self.trace(format!("Engine::iterate_wrx-{}: size is {}", byte_size * 8, sz).as_str());
 
         // Guard against overflow on the file position counter
-        let Some(new_file_pos) = current.file_pos.checked_add(sz) else {
+        let Some(new_file_pos) = current.file_offset.checked_add(sz) else {
             diags.err1(
                 "EXEC_37",
                 "Write operation causes location counter overflow",
@@ -304,8 +304,8 @@ impl Engine {
             );
             return false;
         };
-        let new_off = current.off + sz; // safe: off <= file_pos
-        if current.abs_base.checked_add(new_off).is_none() {
+        let new_off = current.addr_offset + sz; // safe: off <= file_pos
+        if current.addr_base.checked_add(new_off).is_none() {
             diags.err1(
                 "EXEC_43",
                 "Write operation causes absolute address overflow",
@@ -314,9 +314,9 @@ impl Engine {
             return false;
         }
 
-        current.file_pos = new_file_pos;
-        current.off = new_off;
-        current.sec = current.sec.saturating_add(sz);
+        current.file_offset = new_file_pos;
+        current.addr_offset = new_off;
+        current.sec_offset = current.sec_offset.saturating_add(sz);
 
         result
     }
@@ -347,12 +347,12 @@ impl Engine {
             format!(
                 "Engine::iterate_wrf '{}' with size {}: \
                                 file_pos {}, off {}, sec {}",
-                file_path, byte_size, current.file_pos, current.off, current.sec
+                file_path, byte_size, current.file_offset, current.addr_offset, current.sec_offset
             )
             .as_str(),
         );
 
-        let Some(new_file_pos) = current.file_pos.checked_add(byte_size) else {
+        let Some(new_file_pos) = current.file_offset.checked_add(byte_size) else {
             diags.err1(
                 "EXEC_40",
                 "Write operation causes location counter overflow",
@@ -360,8 +360,8 @@ impl Engine {
             );
             return false;
         };
-        let new_off = current.off + byte_size; // safe: off <= file_pos
-        if current.abs_base.checked_add(new_off).is_none() {
+        let new_off = current.addr_offset + byte_size; // safe: off <= file_pos
+        if current.addr_base.checked_add(new_off).is_none() {
             diags.err1(
                 "EXEC_43",
                 "Write operation causes absolute address overflow",
@@ -370,9 +370,9 @@ impl Engine {
             return false;
         }
 
-        current.file_pos = new_file_pos;
-        current.off = new_off;
-        current.sec = current.sec.saturating_add(byte_size);
+        current.file_offset = new_file_pos;
+        current.addr_offset = new_off;
+        current.sec_offset = current.sec_offset.saturating_add(byte_size);
 
         true
     }
@@ -573,7 +573,7 @@ impl Engine {
         self.trace(
             format!(
                 "Engine::iterate_type_conversion: file_pos {}, sec {}",
-                current.file_pos, current.sec
+                current.file_offset, current.sec_offset
             )
             .as_str(),
         );
@@ -646,7 +646,7 @@ impl Engine {
         self.trace(
             format!(
                 "Engine::iterate_arithmetic: file_pos {}, sec {}",
-                current.file_pos, current.sec
+                current.file_offset, current.sec_offset
             )
             .as_str(),
         );
@@ -831,7 +831,7 @@ impl Engine {
         self.trace(
             format!(
                 "Engine::iterate_sizeof: file_pos {}, sec {}",
-                current.file_pos, current.sec
+                current.file_offset, current.sec_offset
             )
             .as_str(),
         );
@@ -863,17 +863,17 @@ impl Engine {
             let start_loc = &self.ir_locs[ir_rng.start];
             let end_loc = &self.ir_locs[ir_rng.end];
 
-            if start_loc.file_pos > end_loc.file_pos {
+            if start_loc.file_offset > end_loc.file_offset {
                 self.trace(
                     format!(
                         "Starting file_pos {} > ending file_pos {} in {}",
-                        start_loc.file_pos, end_loc.file_pos, sec_name
+                        start_loc.file_offset, end_loc.file_offset, sec_name
                     )
                     .as_str(),
                 );
                 *self.parms[out_parm_num].to_u64_mut() = 0;
             } else {
-                let sz: u64 = end_loc.file_pos - start_loc.file_pos;
+                let sz: u64 = end_loc.file_offset - start_loc.file_offset;
                 self.trace(format!("Sizeof {} is currently {}", sec_name, sz).as_str());
                 *self.parms[out_parm_num].to_u64_mut() = sz;
             }
@@ -917,7 +917,7 @@ impl Engine {
         self.trace(
             format!(
                 "Engine::iterate_current_address: file_pos {}, off {}, sec {}",
-                current.file_pos, current.off, current.sec
+                current.file_offset, current.addr_offset, current.sec_offset
             )
             .as_str(),
         );
@@ -928,7 +928,7 @@ impl Engine {
 
         match ir.kind {
             IRKind::Addr => {
-                let Some(val) = current.abs_base.checked_add(current.off) else {
+                let Some(val) = current.addr_base.checked_add(current.addr_offset) else {
                     diags.err1(
                         "EXEC_39",
                         "Absolute address (abs_base + off) overflow",
@@ -939,13 +939,13 @@ impl Engine {
                 *out = val;
             }
             IRKind::AddrOffset => {
-                *out = current.off;
+                *out = current.addr_offset;
             }
             IRKind::SecOffset => {
-                *out = current.sec;
+                *out = current.sec_offset;
             }
             IRKind::FileOffset => {
-                *out = current.file_pos;
+                *out = current.file_offset;
             }
             bad => {
                 panic!("Called iterate_current_address with bogus IR {:?}", bad);
@@ -968,7 +968,7 @@ impl Engine {
         self.trace(
             format!(
                 "Engine::iterate_align: file_pos {}, off {}, sec {}",
-                current.file_pos, current.off, current.sec
+                current.file_offset, current.addr_offset, current.sec_offset
             )
             .as_str(),
         );
@@ -1000,7 +1000,7 @@ impl Engine {
         let out_parm = &mut self.parms[out_parm_num];
         let out = out_parm.to_u64_mut();
 
-        let Some(abs_val) = current.abs_base.checked_add(current.off) else {
+        let Some(abs_val) = current.addr_base.checked_add(current.addr_offset) else {
             diags.err1(
                 "EXEC_42",
                 "Absolute address (abs_base + off) overflow",
@@ -1035,7 +1035,7 @@ impl Engine {
         self.trace(
             format!(
                 "Engine::iterate_set: {:?}: file_pos {}, off {}, sec {}",
-                ir.kind, current.file_pos, current.off, current.sec
+                ir.kind, current.file_offset, current.addr_offset, current.sec_offset
             )
             .as_str(),
         );
@@ -1061,9 +1061,9 @@ impl Engine {
         let out = out_parm.to_u64_mut();
 
         let loc = match ir.kind {
-            IRKind::SetAddrOffset => current.off,
-            IRKind::SetSecOffset => current.sec,
-            IRKind::SetFileOffset => current.file_pos,
+            IRKind::SetAddrOffset => current.addr_offset,
+            IRKind::SetSecOffset => current.sec_offset,
+            IRKind::SetFileOffset => current.file_offset,
             bad => panic!("called iterate_set for IR {:?}", bad),
         };
 
@@ -1093,7 +1093,7 @@ impl Engine {
         self.trace(
             format!(
                 "Engine::iterate_set_addr: abs_base {} -> {}, off reset to 0",
-                current.abs_base, set_val
+                current.addr_base, set_val
             )
             .as_str(),
         );
@@ -1106,8 +1106,8 @@ impl Engine {
             ir.operands[2]
         };
 
-        current.abs_base = set_val;
-        current.off = 0;
+        current.addr_base = set_val;
+        current.addr_offset = 0;
 
         // No bytes to write; tell the consumer wr8 to emit 0 bytes.
         *self.parms[out_parm_num].to_u64_mut() = 0;
@@ -1127,7 +1127,7 @@ impl Engine {
         self.trace(
             format!(
                 "Engine::iterate_identifier_address: file_pos {}, off {}, sec {}",
-                current.file_pos, current.off, current.sec
+                current.file_offset, current.addr_offset, current.sec_offset
             )
             .as_str(),
         );
@@ -1158,7 +1158,7 @@ impl Engine {
         let start_loc = &self.ir_locs[*ir_num];
         match ir.kind {
             IRKind::Addr => {
-                let Some(val) = start_loc.abs_base.checked_add(start_loc.off) else {
+                let Some(val) = start_loc.addr_base.checked_add(start_loc.addr_offset) else {
                     diags.err1(
                         "EXEC_44",
                         "Absolute address (abs_base + off) overflow for identifier",
@@ -1169,13 +1169,13 @@ impl Engine {
                 *out = val;
             }
             IRKind::AddrOffset => {
-                *out = start_loc.off;
+                *out = start_loc.addr_offset;
             }
             IRKind::SecOffset => {
-                *out = start_loc.sec;
+                *out = start_loc.sec_offset;
             }
             IRKind::FileOffset => {
-                *out = start_loc.file_pos;
+                *out = start_loc.file_offset;
             }
             bad => {
                 panic!("Called iterate_identifier_address with bogus IR {:?}", bad);
@@ -1195,7 +1195,7 @@ impl Engine {
         self.trace(
             format!(
                 "Engine::iterate_address: file_pos {}, off {}, sec {}",
-                current.file_pos, current.off, current.sec
+                current.file_offset, current.addr_offset, current.sec_offset
             )
             .as_str(),
         );
@@ -1225,12 +1225,12 @@ impl Engine {
         self.trace(
             format!(
                 "Engine::iterate_section_start: file_pos {}, sec {}",
-                current.file_pos, current.sec
+                current.file_offset, current.sec_offset
             )
             .as_str(),
         );
-        self.sec_offsets.push(current.sec);
-        current.sec = 0;
+        self.sec_offsets.push(current.sec_offset);
+        current.sec_offset = 0;
 
         true
     }
@@ -1248,11 +1248,11 @@ impl Engine {
         self.trace(
             format!(
                 "Engine::iterate_section_end: '{}', file_pos {}, sec {}",
-                sec_name, current.file_pos, current.sec
+                sec_name, current.file_offset, current.sec_offset
             )
             .as_str(),
         );
-        current.sec += self.sec_offsets.pop().unwrap();
+        current.sec_offset += self.sec_offsets.pop().unwrap();
         // Track that's we've exited this section
         self.sec_names.pop();
 
@@ -1268,7 +1268,7 @@ impl Engine {
         // The first iterate loop may access any IR location, so initialize all
         // ir_locs locations to zero.
         let ir_locs = vec![
-            Location { file_pos: 0, off: 0, sec: 0, abs_base: irdb.start_addr };
+            Location { file_offset: 0, addr_offset: 0, sec_offset: 0, addr_base: irdb.start_addr };
             irdb.ir_vec.len()
         ];
 
@@ -1320,26 +1320,26 @@ impl Engine {
                 IRKind::SectionEnd => {
                     let (name, start_idx) = stack.pop().expect("Unmatched SectionEnd in ir_vec");
                     let start_loc = &self.ir_locs[start_idx];
-                    let file_start = start_loc.file_pos;
-                    let file_end = self.ir_locs[i].file_pos;
-                    let off_start = start_loc.off;
-                    let abs_start = start_loc.abs_base.saturating_add(off_start);
+                    let file_start = start_loc.file_offset;
+                    let file_end = self.ir_locs[i].file_offset;
+                    let addr_offset = start_loc.addr_offset;
+                    let addr = start_loc.addr_base.saturating_add(addr_offset);
                     self.wr_dispatches.push(WrDispatch {
                         name,
                         file_offset: file_start,
-                        off_start,
-                        abs_start,
+                        addr_offset,
+                        addr,
                         size: file_end - file_start,
                     });
                 }
                 IRKind::Label => {
                     let name = irdb.get_opnd_as_identifier(ir, 0).to_string();
                     let loc = &self.ir_locs[i];
-                    let file_offset = loc.file_pos;
-                    let off = loc.off;
-                    let abs_addr = loc.abs_base.saturating_add(off);
+                    let file_offset = loc.file_offset;
+                    let addr_offset = loc.addr_offset;
+                    let addr = loc.addr_base.saturating_add(addr_offset);
                     self.label_dispatches
-                        .push(LabelDispatch { name, file_offset, off, abs_addr });
+                        .push(LabelDispatch { name, file_offset, addr_offset, addr });
                 }
                 _ => {}
             }
@@ -1376,7 +1376,7 @@ impl Engine {
         while result && !stable {
             self.trace(format!("Engine::iterate: Iteration count {}", iter_count).as_str());
             iter_count += 1;
-            let mut current = Location { file_pos: 0, off: 0, sec: 0, abs_base: self.start_addr };
+            let mut current = Location { file_offset: 0, addr_offset: 0, sec_offset: 0, addr_base: self.start_addr };
 
             // make sure we exited as many sections as we entered on each iteration
             assert!(self.sec_offsets.is_empty());
@@ -1384,7 +1384,7 @@ impl Engine {
             for (lid, ir) in irdb.ir_vec.iter().enumerate() {
                 debug!(
                     "Engine::iterate on lid {} at file_pos {}",
-                    lid, current.file_pos
+                    lid, current.file_offset
                 );
                 // record our location after each IR
                 self.ir_locs[lid] = current.clone();
@@ -1974,7 +1974,7 @@ impl Engine {
 
             // Patch the file at the exact image offset where the consumer instruction evaluated.
             let loc = &self.ir_locs[consumer_idx];
-            let abs_offset = loc.file_pos as usize;
+            let abs_offset = loc.file_offset as usize;
 
             if abs_offset + byte_width > mmap.len() {
                 return Err(anyhow!(
