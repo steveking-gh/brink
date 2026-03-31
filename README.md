@@ -38,7 +38,7 @@ The previous build step created the Brink binary as `./target/release/brink`.  Y
 
     brink [OPTIONS] <input>
 
-The required input file contains the brink source code to compile and build the output file.  Brink source files typically have a .brink file extensions.
+The required input file contains the brink source code to compile and build the output file.  Brink source files typically have a .brink file extension.
 
 | Option              | Description                                                                                                                       |
 | ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
@@ -183,9 +183,7 @@ Produces output.bin containing the string `Hello World!\n`.
 
 # Basic Structure of a Brink Program
 
-A Brink source file consists of a series of declarations that define the structure of an output file as composed from a hierarchy of smaller parts.  These parts can be [`section`](#section) definitions, inline data, strings, pointers, offsets, pad bytes, and so on.  Brink also supports `ex
-
-A Brink source file consists of one or more section definitions and exactly one output statement.    Each section has a unique name.  The output statement specifies the name of the top level section.  Starting from the top section, Brink recursively evaluates each section and produces the output file.  For example, we can define a section with a write-string (wrs) expression:
+A Brink source file consists of one or more section definitions and exactly one output statement.  Each section has a unique name.  The output statement specifies the name of the top level section.  Starting from the top section, Brink recursively evaluates each section and produces the output file.  For example, we can define a section with a write-string (wrs) expression:
 
     section foo {        // Start a new section named 'foo'
         wrs "I'm foo";   // wrs writes a string into the section.
@@ -271,7 +269,7 @@ Prints the console message:
 
 Unlike the [GNU linker 'ld'](https://ftp.gnu.org/old-gnu/Manuals/ld-2.9.1/html_mono/ld.html) concept of a *location counter*, Brink uses *scoped addresses* and *scoped offsets* to track locations.  **Addresses and offsets are 64-bit unsigned values that mark the position of the *next* byte of output**.  Brink allows users to reference and manipulate these values, adding pad bytes as necessary.
 
-Importantly, addresses and offsets are *scoped* to their enclosing section.  When entering a nested (child) section, Brink saves the outer (parent) section's inflight address and offset values   When exiting a child section, Brink restores and updates the parent's address and offset values.  From the perspective of the parent section, a child section is a `wr` with the parent's addresses and offsets updated per the size of the child.
+Importantly, addresses and offsets are *scoped* to their enclosing section.  When entering a nested (child) section, Brink saves the outer (parent) section's inflight address and offset values.  When exiting a child section, Brink restores and updates the parent's address and offset values.  From the perspective of the parent section, a child section is a `wr` with the parent's addresses and offsets updated per the size of the child.
 
 For the specific case of the address and address offset, a child section inherits these values by default from the parent section.  If the child section does not use `set_addr`, then the address and address offset simply continue growing in step with the parent.
 
@@ -306,6 +304,22 @@ Brink enforces that set offset commands must specify an offset change greater or
 ## Brink Disallows Address and Offset Overflows
 
 Brink emits an error if an address or offset change causes 64-bit unsigned overflow.  In other words, programs cannot use unsigned overflow wrapping back to 0.
+
+# Order of Execution
+
+As a mental model, user's can think of program execution as occurring in *output order*.  Output order means the sequence of operations that produce bytes in-order starting with the initial byte of the output file.  In other words, an operation producing the first byte of the output will execute before an operation producing the second byte.
+
+Within a section definition, output order and source code order are the same.  However, outside of a section definition, output order and program order are not necessarily the same.  For example, source code may define whole sections in a different order than instantiated into in the output.
+
+## Output Creation Phases
+
+This section provides an overview of Brink's internal output creation phases.
+
+1. **Layout Phase**: First, Brink iteratively evaluates all expressions that affect output size and layout.  For example, Brink evaluates `align` expressions and extension `size()` calls during this phase.  On the other hand, Brink mostly skips statements like `wr64`, since knowing the result is 64-bits long is sufficient to determine the layout.  This phase completes when successive layout iterations produce identical results.
+2. **Generate Phase 1**: Next, Brink begins populating data values into the output.  In this first generation phase, Brink first evaluates `wr` statements that do NOT call extensions.  Brink evaluates wr calls in output order.
+3. **Generate Phase 2**: Next, Brink evaluates `wr` statement that call an [extension](#brink-extensions).  Like before, brink evaluates extension calls in output order.  Brink executes all extension calls serially on the engine thread.
+4. **Validation Phase**: Finally, Brink evaluates `assert` statements, including those that call extensions.  Note that Brink may take an early exit in any phase if an `assert` statement will unambiguously fail.
+
 
 ---
 
@@ -595,7 +609,7 @@ Returns the offset from the `output` or most recent `set_addr` anchor as a U64. 
 
 The offset resets to zero on each `set_addr` call.
 
-The following table shows the scoping rules for `addr_offset`.  To summarize, Brink tracks **exactly one address value** per name.  An `addr_offset(<name>)` command retrieves that one value regardless of the scope of the caller.
+The following table shows the scoping rules for `addr_offset`.  To summarize, Brink tracks **exactly one address offset value** per name.  An `addr_offset(<name>)` command retrieves that one value regardless of the scope of the caller.
 
 | Command Form                         | Scope used to determine address                         |
 | ------------------------------------ | ------------------------------------------------------- |
@@ -823,11 +837,11 @@ Example:
 
 ## `set_addr <expression>;`
 
-The `set_addr` command forces the current address to the specified value and resets the current `addr_offset` to zero.  These changes happen within the scope of the containing section.  Child sections inherit the new `addr` and `addr_offset` values bring another `set_addr` of their own.
+The `set_addr` command forces the current address to the specified value and resets the current `addr_offset` to zero.  These changes happen within the scope of the containing section.  Child sections inherit the new `addr` and `addr_offset` values unless they call `set_addr` themselves.
 
 Using `set_addr` *does not* change the value of the section offset nor file offset.  A `set_addr` command *does not* add pad bytes to the output.
 
-The `set_addr` command may move the address forward or backwards.  However, Brink tracks every output byte by address and reports an error a program tries to write to the same address more than once.
+The `set_addr` command may move the address forward or backwards.  However, Brink tracks every output byte by address and reports an error if a program tries to write to the same address more than once.
 
 Example:
 
@@ -837,20 +851,23 @@ Example:
         wr8 3;
         wr8 4;
         wr8 5;
-        set_sec_offset 16;
+        set_addr 16;
         assert addr() == 16;
-        assert file_offset() == 16;
-        assert sec_offset() == 16;
+        assert file_offset() == 5;  // set_addr does not pad
+        assert sec_offset() == 5;
         wr8 0xAA, 3;
         set_sec_offset 24, 0xFF;
-        assert addr() == 24;
+        assert addr() == 24;  // set_sec_offset moved addr too
         assert file_offset() == 24;
         assert sec_offset() == 24;
         set_sec_offset 24, 0xEE; // should do Nothing
+        assert addr() == 24;
+        assert file_offset() == 24;
+        assert sec_offset() == 24;
         wr8 0xAA, 3;
-        set_sec_offset 27, 0x33; // should do nothing
         set_sec_offset 28, 0x77; // should pad to 28
         assert sizeof(foo) == 28;
+        assert addr() == 28
     }
 
     output foo;
@@ -960,12 +977,12 @@ Example:
     }
 
     // Compose the top-level section
-    section file_offset {
+    section my_firmware {
         wr header;
         wr data;
     }
 
-    output file_offset;
+    output my_firmware;
 
 ---
 
@@ -1059,15 +1076,6 @@ The command line option `--list-extensions` outputs the names of all available e
 
 ---
 
-## How Extensions Work
-
-To understand how extensions work, it helps to understand the Brink output creation phases.
-
-1. **Layout Phase**: First, Brink iteratively evaluates all expressions that affect output size and layout.  For example, Brink evaluates `align` expressions and extension `size()` calls during this phase.  On the other hand, Brink mostly skips statements like `wr64`, since knowing the result is 64-bits long is sufficient to determine the layout.  This phase completes when successive layout iterations produce identical results.
-2. **Generate Phase**: Next, Brink evaluates statements that populate data values into the output.  Brink first evaluates `wr` statements that do NOT call extensions, then evaluates `wr` statements with extensions.  Like other operations, Brink executes extension calls in output order.
-3. **Validation Phase**: Finally, Brink evaluates `assert` statements, including those that call extensions.  Note that Brink may take an early exit in any phase if an `assert` statement will unambiguously fail.
-
----
 
 ## Extensions Are A Compile-Time Feature
 
@@ -1097,15 +1105,6 @@ Users write the extension's result to the output using the generic `wr` command,
 
 Users can query the size of an extension's output using the `sizeof` operator. For example, `assert sizeof(custom::crc) == 4;`.
 
-## Execution Order
-
-Brink executes extension calls in output order.  The compiler flattens the user's section hierarchy into a linear IR sequence that preserves source code order.
-
-For an extension that reads from a region written by an earlier extension, source order determines correctness.  Place the producing `wr` statement before the consuming `wr` statement so that Brink executes the producer first.
-
-Brink executes `assert` statements after all `wr` statements complete, including `assert` statements that call extensions.
-
-Brink executes all extension calls serially on the engine thread.
 
 ---
 
