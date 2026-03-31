@@ -1,0 +1,10 @@
+section foo {
+    wrs "Hello";
+    set_sec_offset 0x20;
+    assert sizeof(foo) == 0x20;
+    assert addr() == 0x1020;
+    assert addr_offset() == 0x20;
+    assert sec_offset() == 0x20;
+}
+
+output foo 0x1000;

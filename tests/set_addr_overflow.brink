@@ -1,0 +1,6 @@
+// set_addr places abs_base at u64::MAX; writing one byte makes abs_base + off overflow -> EXEC_43.
+section main {
+    set_addr 0xFFFFFFFFFFFFFFFF;
+    wr8 0;
+}
+output main 0;

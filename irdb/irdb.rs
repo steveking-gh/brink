@@ -110,16 +110,18 @@ impl IRDb {
         match lop.tok {
             // The following produce a boolean regardless of input data types
             ast::LexToken::Align
-            | ast::LexToken::SetSec
-            | ast::LexToken::SetOff
-            | ast::LexToken::SetAbs
+            | ast::LexToken::SetSecOffset
+            | ast::LexToken::SetAddrOffset
+            | ast::LexToken::SetAddr
+            | ast::LexToken::SetFileOffset
             | ast::LexToken::DoubleEq
             | ast::LexToken::NEq
             | ast::LexToken::GEq
             | ast::LexToken::LEq
-            | ast::LexToken::Abs
-            | ast::LexToken::Off
-            | ast::LexToken::Sec
+            | ast::LexToken::Addr
+            | ast::LexToken::AddrOffset
+            | ast::LexToken::SecOffset
+            | ast::LexToken::FileOffset
             | ast::LexToken::DoublePipe
             | ast::LexToken::DoubleAmpersand
             | ast::LexToken::Sizeof
@@ -517,7 +519,7 @@ impl IRDb {
         section_names: &HashSet<String>,
     ) -> bool {
         match ir.kind {
-            IRKind::Align | IRKind::SetSec | IRKind::SetOff | IRKind::SetAbs | IRKind::Wr(_) => {
+            IRKind::Align | IRKind::SetSecOffset | IRKind::SetAddrOffset | IRKind::SetAddr | IRKind::SetFileOffset | IRKind::Wr(_) => {
                 self.validate_numeric_1_or_2(ir, diags)
             }
             IRKind::Assert => self.validate_numeric_1(ir, diags),
@@ -667,10 +669,11 @@ impl IRDb {
             | IRKind::SectionEnd
             | IRKind::Sizeof
             | IRKind::Label
-            | IRKind::Abs
-            | IRKind::Off
+            | IRKind::Addr
+            | IRKind::AddrOffset
             | IRKind::Eq
-            | IRKind::Sec => true,
+            | IRKind::SecOffset
+            | IRKind::FileOffset => true,
         }
     }
 
@@ -901,9 +904,10 @@ impl IRDb {
                 }
             }
             ast::LexToken::Sizeof
-            | ast::LexToken::Abs
-            | ast::LexToken::Off
-            | ast::LexToken::Sec => {
+            | ast::LexToken::Addr
+            | ast::LexToken::AddrOffset
+            | ast::LexToken::SecOffset
+            | ast::LexToken::FileOffset => {
                 let m = format!(
                     "Operation '{:?}' cannot be used in a const expression \
                      because it requires engine-time layout or addressing.",

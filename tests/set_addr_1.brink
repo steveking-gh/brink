@@ -1,0 +1,12 @@
+// set_addr rebases abs_base and resets off to zero.
+// No padding bytes are emitted; sizeof reflects only actual writes.
+section foo {
+    wrs "Hello";        // off=5, abs_base=0x1000, abs=0x1005, sec=5
+    set_addr 0x1020;     // abs_base=0x1020, off=0; no bytes written, sec unchanged
+    assert sizeof(foo) == 5;   // only the 5 bytes from wrs were written
+    assert addr() == 0x1020;    // abs_base + off = 0x1020 + 0
+    assert addr_offset() == 0;         // off resets to 0 on set_addr
+    assert sec_offset() == 5;         // sec tracks section offset, unaffected by set_addr
+}
+
+output foo 0x1000;

@@ -8,7 +8,7 @@ section foo {
     wr bar;
 
     // Ambiguous reference, should fail
-    assert off(bar) == 3;
+    assert addr_offset(bar) == 3;
 }
 
 output foo 0x1000;

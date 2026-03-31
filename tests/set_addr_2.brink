@@ -1,0 +1,11 @@
+// Backward rebase via set_addr is valid: abs_base can move to any address.
+// Useful for images with multiple load regions at different physical RAM addresses.
+section foo {
+    wrs "Hello";
+    set_addr 0x900;   // backward rebase is now valid — no error
+    assert sizeof(foo) == 5;
+    assert addr() == 0x900;
+    assert addr_offset() == 0;
+}
+
+output foo 0x1000;

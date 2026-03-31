@@ -1,0 +1,102 @@
+// file_offset_1.brink
+//
+// Verifies two properties of file_offset:
+//   1) file_offset() increments monotonically across all section boundaries.
+//      Unlike sec_offset(), it never resets on section entry.
+//      Unlike addr_offset(), it is unaffected by set_addr.
+//   2) set_file_offset pads the output until file_offset() reaches the
+//      specified value, writing a caller-supplied pad byte.
+//
+// Also verifies file_offset(<identifier>) for both section names and labels,
+// including the case where two labels from different sections share a file
+// position and must report the same value.
+
+// ── Layout overview ──────────────────────────────────────────────────────────
+//
+//  file[0..4]   "head"   (top, before set_addr)     lab_top_start @ 0
+//  file[4..7]   "inn"    (inner)                     lab_inner_start @ 4
+//                                                    lab_inner_exit @ 7
+//                                                    lab_before_pad @ 7  (same pos, top scope)
+//  file[7..16]  0xBB x9  (set_file_offset 16 pad)
+//  file[16..20] "tail"   (top, after pad)            lab_after_pad @ 16
+//
+// Total: 20 bytes.
+
+section inner {
+    // inner is written at file offset 4, inside top after "head".
+    assert file_offset() == 4;
+    assert sec_offset() == 0;
+    lab_inner_start: wrs "inn";
+    assert file_offset() == 7;
+    assert sec_offset() == 3;
+    // Label at the exit point of inner.  file_offset(lab_inner_exit) must
+    // equal file_offset(lab_before_pad) in top because both mark file offset 7.
+    lab_inner_exit:
+}
+
+section top {
+    assert file_offset() == 0;
+    assert sec_offset() == 0;
+    assert addr() == 0x1000;
+    assert addr_offset() == 0;
+
+    lab_top_start: wrs "head";             // file[0..4]
+    assert file_offset() == 4;
+    assert sec_offset() == 4;
+    assert addr() == 0x1004;
+    assert addr_offset() == 4;
+
+    // set_addr rebases the address anchor and resets addr_offset to 0,
+    // but must leave file_offset unchanged.
+    set_addr 0x8000;
+    assert addr() == 0x8000;
+    assert addr_offset() == 0;
+    assert file_offset() == 4;             // unaffected by set_addr
+
+    wr inner;                              // file[4..7]
+    assert file_offset() == 7;
+    assert addr() == 0x8003;
+    assert addr_offset() == 3;
+    assert sec_offset() == 7;
+
+    // Label at file offset 7 from top's scope — same position as lab_inner_exit.
+    lab_before_pad:
+
+    // Pad from file offset 7 to 16 with 0xBB (9 bytes).
+    set_file_offset 16, 0xBB;             // file[7..16]
+    assert file_offset() == 16;
+    assert sec_offset() == 16;
+    assert addr_offset() == 12;            // 3 (inner) + 9 (pad)
+    assert addr() == 0x800C;
+
+    // set_file_offset to the current value: must be a no-op.
+    set_file_offset 16, 0xCC;
+    assert file_offset() == 16;
+    assert sec_offset() == 16;
+
+    lab_after_pad: wrs "tail";             // file[16..20]
+    assert file_offset() == 20;
+    assert sec_offset() == 20;
+    assert sizeof(top) == 20;
+
+    // ── Identifier form: sections ────────────────────────────────────────────
+    assert file_offset(inner) == 4;
+    assert file_offset(top) == 0;
+
+    // ── Identifier form: labels ──────────────────────────────────────────────
+    // lab_top_start is in this section; its file position is the start of top.
+    assert file_offset(lab_top_start) == 0;
+
+    // lab_inner_start is inside inner; file_offset crosses section boundaries.
+    assert file_offset(lab_inner_start) == 4;
+
+    // lab_inner_exit (inner scope) and lab_before_pad (top scope) both mark
+    // file offset 7, demonstrating that file_offset is truly global.
+    assert file_offset(lab_inner_exit) == 7;
+    assert file_offset(lab_before_pad) == 7;
+
+    // lab_after_pad marks the start of "tail".
+    assert file_offset(lab_after_pad) == 16;
+}
+
+output top 0x1000;

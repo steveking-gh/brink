@@ -20,13 +20,13 @@ use tracing::{debug, error, info, trace, warn};
 
 /// One occurrence of a section write in the output image.
 /// A section written N times via `wr` produces N entries.
-/// Entries sort by `img_start` (output order).
+/// Entries sort by `file_offset` (output order).
 #[derive(Clone, Debug)]
 pub struct SectionEntry {
     pub name: String,
     /// Byte offset from the start of the output file where this section begins.
     pub file_offset: u64,
-    /// Offset from the most recent `set_abs` anchor at the point this section begins.
+    /// Offset from the most recent `set_addr` anchor at the point this section begins.
     pub off: u64,
     /// Absolute address at the point this section begins (`abs_base + off`).
     pub abs_start: u64,
@@ -40,7 +40,7 @@ pub struct LabelEntry {
     pub name: String,
     /// Byte offset from the start of the output file where this label appears.
     pub file_offset: u64,
-    /// Offset from the most recent `set_abs` anchor at this label.
+    /// Offset from the most recent `set_addr` anchor at this label.
     pub off: u64,
     /// Absolute address at this label (`abs_base + off`).
     pub abs_addr: u64,
@@ -362,7 +362,7 @@ impl MapDb {
             .iter()
             .map(|wd| SectionEntry {
                 name: wd.name.clone(),
-                file_offset: wd.img_start,
+                file_offset: wd.file_offset,
                 off: wd.off_start,
                 abs_start: wd.abs_start,
                 size: wd.size,
@@ -375,7 +375,7 @@ impl MapDb {
             .iter()
             .map(|ld| LabelEntry {
                 name: ld.name.clone(),
-                file_offset: ld.img_offset,
+                file_offset: ld.file_offset,
                 off: ld.off,
                 abs_addr: ld.abs_addr,
             })

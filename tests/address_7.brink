@@ -1,7 +1,7 @@
 section bar {
     wrs "bar";
     // should fail since bar isn't in this section
-    assert sec(boo) == 3;
+    assert sec_offset(boo) == 3;
 }
 
 // top level section

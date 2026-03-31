@@ -1,56 +1,56 @@
 section fiz {
-    assert abs() == 6;
-    assert off() == 6;
-    assert sec() == 0;
+    assert addr() == 6;
+    assert addr_offset() == 6;
+    assert sec_offset() == 0;
     wrs "fiz";
-    assert abs() == 9;
-    assert off() == 9;
-    assert sec() == 3;
+    assert addr() == 9;
+    assert addr_offset() == 9;
+    assert sec_offset() == 3;
 }
 
 
 section bar {
-    assert abs() == 3;
-    assert off() == 3;
-    assert sec() == 0;
+    assert addr() == 3;
+    assert addr_offset() == 3;
+    assert sec_offset() == 0;
     wrs "bar";
-    assert abs() == 6;
-    assert off() == 6;
-    assert sec() == 3;
+    assert addr() == 6;
+    assert addr_offset() == 6;
+    assert sec_offset() == 3;
     wr fiz;
-    assert abs() == 9;
-    assert off() == 9;
-    assert sec() == 6;
+    assert addr() == 9;
+    assert addr_offset() == 9;
+    assert sec_offset() == 6;
 }
 
 // top level section
 section foo {
-    assert abs() == 0;
-    assert off() == 0;
-    assert sec() == 0;
+    assert addr() == 0;
+    assert addr_offset() == 0;
+    assert sec_offset() == 0;
     wrs "foo";
-    assert abs() == 3;
-    assert off() == 3;
-    assert sec() == 3;
+    assert addr() == 3;
+    assert addr_offset() == 3;
+    assert sec_offset() == 3;
     wr bar;
-    assert abs() == 9;
-    assert off() == 9;
-    assert sec() == 9;
+    assert addr() == 9;
+    assert addr_offset() == 9;
+    assert sec_offset() == 9;
     wr boo;
-    assert abs() == 12;
-    assert off() == 12;
-    assert sec() == 12;
+    assert addr() == 12;
+    assert addr_offset() == 12;
+    assert sec_offset() == 12;
 }
 
 // section after reference
 section boo {
-    assert abs() == 9;
-    assert off() == 9;
-    assert sec() == 0;
+    assert addr() == 9;
+    assert addr_offset() == 9;
+    assert sec_offset() == 0;
     wrs "boo";
-    assert abs() == 12;
-    assert off() == 12;
-    assert sec() == 3;
+    assert addr() == 12;
+    assert addr_offset() == 12;
+    assert sec_offset() == 3;
 }
 
 output foo 0;

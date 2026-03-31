@@ -84,7 +84,7 @@ impl<'toks> LinIR {
 
 fn tok_to_irkind(tok: LexToken) -> IRKind {
     match tok {
-        LexToken::Abs => IRKind::Abs,
+        LexToken::Addr => IRKind::Addr,
         LexToken::Align => IRKind::Align,
         LexToken::Ampersand => IRKind::BitAnd,
         LexToken::Assert => IRKind::Assert,
@@ -98,7 +98,7 @@ fn tok_to_irkind(tok: LexToken) -> IRKind {
         LexToken::Eq => IRKind::Eq,
         LexToken::FSlash => IRKind::Divide,
         LexToken::GEq => IRKind::GEq,
-        LexToken::Off => IRKind::Off,
+        LexToken::AddrOffset => IRKind::AddrOffset,
         LexToken::LEq => IRKind::LEq,
         LexToken::Minus => IRKind::Subtract,
         LexToken::NEq => IRKind::NEq,
@@ -106,10 +106,12 @@ fn tok_to_irkind(tok: LexToken) -> IRKind {
         LexToken::Pipe => IRKind::BitOr,
         LexToken::Plus => IRKind::Add,
         LexToken::Print => IRKind::Print,
-        LexToken::Sec => IRKind::Sec,
-        LexToken::SetAbs => IRKind::SetAbs,
-        LexToken::SetOff => IRKind::SetOff,
-        LexToken::SetSec => IRKind::SetSec,
+        LexToken::SecOffset => IRKind::SecOffset,
+        LexToken::FileOffset => IRKind::FileOffset,
+        LexToken::SetAddr => IRKind::SetAddr,
+        LexToken::SetAddrOffset => IRKind::SetAddrOffset,
+        LexToken::SetSecOffset => IRKind::SetSecOffset,
+        LexToken::SetFileOffset => IRKind::SetFileOffset,
         LexToken::Sizeof => IRKind::Sizeof,
         LexToken::ToI64 => IRKind::ToI64,
         LexToken::ToU64 => IRKind::ToU64,
@@ -447,7 +449,7 @@ impl<'toks> LinearDb {
                     returned_operands.push(idx);
                 }
             }
-            LexToken::Abs | LexToken::Off | LexToken::Sec => {
+            LexToken::Addr | LexToken::AddrOffset | LexToken::SecOffset | LexToken::FileOffset => {
                 // A vector to track the operands of this expression.
                 let mut lops = Vec::new();
                 // Create the new IR
@@ -589,7 +591,7 @@ impl<'toks> LinearDb {
                     returned_operands.push(idx);
                 }
             }
-            LexToken::SetSec | LexToken::SetOff | LexToken::SetAbs | LexToken::Align => {
+            LexToken::SetSecOffset | LexToken::SetAddrOffset | LexToken::SetAddr | LexToken::SetFileOffset | LexToken::Align => {
                 // To implement align or pad, we map to IR as follows:
                 // align val, fill_val; ==> align val, count; wr8 fill_val, count;
                 // pad   val, fill_val; ==> pad   val, count; wr8 fill_val, count;
@@ -1135,8 +1137,8 @@ impl IdentDb {
             let lir = &lindb.ir_vec[lid];
             lid += 1;
             match lir.op {
-                // TODO need img and abs here?
-                IRKind::Sec => {
+                // TODO need addr_offset and addr here?
+                IRKind::SecOffset => {
                     result &= self.verify_operand_refs(lir, lindb, diags);
                 }
                 IRKind::SectionStart => {
@@ -1234,7 +1236,7 @@ impl IdentDb {
         let mut result = true;
         for lir in &lindb.ir_vec {
             result &= match lir.op {
-                IRKind::Abs | IRKind::Off | IRKind::Sizeof => {
+                IRKind::Addr | IRKind::AddrOffset | IRKind::FileOffset | IRKind::Sizeof => {
                     self.verify_operand_refs(lir, lindb, diags)
                 }
                 _ => true,
@@ -1274,7 +1276,7 @@ impl IdentDb {
 
     /// For the specified linear IR, verify any operands that are identifier
     /// references are valid as global identifiers.  Note that some
-    /// operations have no operands, e.g. img() and fall through this
+    /// operations have no operands, e.g. addr() and fall through this
     /// function harmlessly.
     fn verify_operand_refs(&self, lir: &LinIR, lindb: &LinearDb, diags: &mut Diags) -> bool {
         let mut result = true;

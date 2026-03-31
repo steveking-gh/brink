@@ -34,12 +34,14 @@ pub enum LexToken {
     Section,
     #[token("align")]
     Align,
-    #[token("set_sec")]
-    SetSec,
-    #[token("set_off")]
-    SetOff,
-    #[token("set_abs")]
-    SetAbs,
+    #[token("set_sec_offset")]
+    SetSecOffset,
+    #[token("set_addr_offset")]
+    SetAddrOffset,
+    #[token("set_addr")]
+    SetAddr,
+    #[token("set_file_offset")]
+    SetFileOffset,
     #[token("assert")]
     Assert,
     #[token("sizeof")]
@@ -50,12 +52,14 @@ pub enum LexToken {
     ToU64,
     #[token("to_i64")]
     ToI64,
-    #[token("abs")]
-    Abs,
-    #[token("off")]
-    Off,
-    #[token("sec")]
-    Sec,
+    #[token("addr")]
+    Addr,
+    #[token("addr_offset")]
+    AddrOffset,
+    #[token("sec_offset")]
+    SecOffset,
+    #[token("file_offset")]
+    FileOffset,
     #[token("wrs")]
     Wrs,
     #[token("wr8")]
@@ -167,8 +171,8 @@ pub enum LexToken {
 /// as a section name, const name, or label name.
 ///
 /// Reserved prefixes (all variants are reserved):
-///   - "wr"    — write instructions (wr8, wr16, …, wrs, wrf, and future variants)
-///   - "set_"  — configuration directives (set_sec, set_img, set_abs, and future variants)
+///   - "wr"    — write instructions (wr8, etc)
+///   - "set_"  — configuration directives (set_sec_offset, etc)
 ///
 /// Reserved exact keywords (reserved for future language features):
 ///   - "include" / "import" — file or module inclusion
@@ -810,9 +814,10 @@ impl<'toks> Ast<'toks> {
                 | LexToken::Wrs
                 | LexToken::Assert
                 | LexToken::Align
-                | LexToken::SetSec
-                | LexToken::SetOff
-                | LexToken::SetAbs
+                | LexToken::SetSecOffset
+                | LexToken::SetAddrOffset
+                | LexToken::SetAddr
+                | LexToken::SetFileOffset
                 | LexToken::Print => self.parse_expr(parent, diags),
                 _ => {
                     self.err_invalid_expression(diags, "AST_3");
@@ -1093,7 +1098,7 @@ impl<'toks> Ast<'toks> {
 
             // Built-in functions with an optional identifier inside parens
             // ( [optional identifier] )
-            LexToken::Abs | LexToken::Off | LexToken::Sec => {
+            LexToken::Addr | LexToken::AddrOffset | LexToken::SecOffset | LexToken::FileOffset => {
                 // Create the node for the function and move past
                 *top = Some(self.arena.new_node(self.tok_num));
                 self.tok_num += 1;
@@ -1306,7 +1311,7 @@ impl<'toks> Ast<'toks> {
 
     /// Parses a `label` statement.  Labels mark a named address within a section
     /// body and produce no output bytes; they exist solely so other expressions
-    /// can reference the address via `abs()`, `img()`, or `sec()`.
+    /// can reference the address via `addr()`, `addr_offset()`, or `sec_offset()`.
     ///
     /// ```text
     /// label <name>;

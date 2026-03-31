@@ -29,26 +29,26 @@ pub struct Location {
     /// Total bytes written to the output file.  Internal use only; drives
     /// WrDispatch offsets and mmap slicing.  Never resets.
     file_pos: u64,
-    /// Offset from the most recent `set_abs` anchor (or `start_addr` if
-    /// `set_abs` has never been called).  Exposed to scripts as `off()`.
-    /// Resets to 0 on each `set_abs` call.
+    /// Offset from the most recent `set_addr` anchor (or `start_addr` if
+    /// `set_addr` has never been called).  Exposed to scripts as `addr_offset()`.
+    /// Resets to 0 on each `set_addr` call.
     off: u64,
     /// Offset within the current section.  Pushed/popped at section boundaries.
     sec: u64,
-    /// The absolute address anchor established by the last `set_abs` call, or
-    /// `start_addr` at image start.  `abs() == abs_base + off`.
+    /// The absolute address anchor established by the last `set_addr` call, or
+    /// `start_addr` at image start.  `addr() == abs_base + off`.
     abs_base: u64,
 }
 
 /// Records one occurrence of a section write in the output image.
 /// A section written N times via `wr` produces N `WrDispatch` entries,
-/// each at a distinct `img_start` offset, in output order.
+/// each at a distinct `file_offset`, in output order.
 #[derive(Clone, Debug)]
 pub struct WrDispatch {
     pub name: String,
     /// Byte offset from the start of the output file where this section begins.
-    pub img_start: u64,
-    /// Offset from the most recent `set_abs` anchor at the point this section begins.
+    pub file_offset: u64,
+    /// Offset from the most recent `set_addr` anchor at the point this section begins.
     pub off_start: u64,
     /// Absolute address at the point this section begins (`abs_base + off`).
     pub abs_start: u64,
@@ -60,8 +60,8 @@ pub struct WrDispatch {
 pub struct LabelDispatch {
     pub name: String,
     /// Byte offset from the start of the output file where this label appears.
-    pub img_offset: u64,
-    /// Offset from the most recent `set_abs` anchor at this label.
+    pub file_offset: u64,
+    /// Offset from the most recent `set_addr` anchor at this label.
     pub off: u64,
     /// Absolute address at this label (`abs_base + off`).
     pub abs_addr: u64,
@@ -912,7 +912,7 @@ impl Engine {
     }
 
     /// Compute the transient current address.  This case is called when
-    /// Abs/Img/Sec is called without an identifier.
+    /// addr/addr_offset/sec_offset is called without an identifier.
     fn iterate_current_address(&mut self, ir: &IR, diags: &mut Diags, current: &Location) -> bool {
         self.trace(
             format!(
@@ -927,7 +927,7 @@ impl Engine {
         let out = out_parm.to_u64_mut();
 
         match ir.kind {
-            IRKind::Abs => {
+            IRKind::Addr => {
                 let Some(val) = current.abs_base.checked_add(current.off) else {
                     diags.err1(
                         "EXEC_39",
@@ -938,11 +938,14 @@ impl Engine {
                 };
                 *out = val;
             }
-            IRKind::Off => {
+            IRKind::AddrOffset => {
                 *out = current.off;
             }
-            IRKind::Sec => {
+            IRKind::SecOffset => {
                 *out = current.sec;
+            }
+            IRKind::FileOffset => {
+                *out = current.file_pos;
             }
             bad => {
                 panic!("Called iterate_current_address with bogus IR {:?}", bad);
@@ -1021,7 +1024,7 @@ impl Engine {
     /// Compute the required number of bytes to pad the current section to the specified size.
     /// We don't actually pad anything yet, since that happens in a subsequent
     /// wr8 instruction.
-    /// This function covers set_sec and set_off.
+    /// This function covers set_sec_offset and set_addr_offset.
     fn iterate_set(
         &mut self,
         ir: &IR,
@@ -1058,8 +1061,9 @@ impl Engine {
         let out = out_parm.to_u64_mut();
 
         let loc = match ir.kind {
-            IRKind::SetOff => current.off,
-            IRKind::SetSec => current.sec,
+            IRKind::SetAddrOffset => current.off,
+            IRKind::SetSecOffset => current.sec,
+            IRKind::SetFileOffset => current.file_pos,
             bad => panic!("called iterate_set for IR {:?}", bad),
         };
 
@@ -1079,16 +1083,16 @@ impl Engine {
         true
     }
 
-    /// Handle `set_abs(X)`: pure cursor rebase.
+    /// Handle `set_addr(X)`: pure cursor rebase.
     /// Sets abs_base = X and resets off = 0.  No bytes are emitted.
     /// Backward rebase is valid (firmware load-address use case).
-    fn iterate_set_abs(&mut self, ir: &IR, current: &mut Location) -> bool {
+    fn iterate_set_addr(&mut self, ir: &IR, current: &mut Location) -> bool {
         let set_parm_num = ir.operands[0];
         let set_val = self.parms[set_parm_num].to_u64();
 
         self.trace(
             format!(
-                "Engine::iterate_set_abs: abs_base {} -> {}, off reset to 0",
+                "Engine::iterate_set_addr: abs_base {} -> {}, off reset to 0",
                 current.abs_base, set_val
             )
             .as_str(),
@@ -1112,7 +1116,7 @@ impl Engine {
     }
 
     /// Compute the transient address of the identifier.  This case is called when
-    /// Abs/Img/Sec is called with an identifier.
+    /// addr/addr_offset/sec_offset is called with an identifier.
     fn iterate_identifier_address(
         &mut self,
         ir: &IR,
@@ -1127,7 +1131,7 @@ impl Engine {
             )
             .as_str(),
         );
-        // Abs/Off/Sec take one optional input and produce one output.
+        // addr/addr_offset/sec_offset take one optional input and produce one output.
         // We've already discarded surrounding () on the operand.
         assert!(ir.operands.len() == 2);
         let in_parm_num0 = ir.operands[0]; // identifier
@@ -1153,7 +1157,7 @@ impl Engine {
         let ir_num = ir_num.unwrap();
         let start_loc = &self.ir_locs[*ir_num];
         match ir.kind {
-            IRKind::Abs => {
+            IRKind::Addr => {
                 let Some(val) = start_loc.abs_base.checked_add(start_loc.off) else {
                     diags.err1(
                         "EXEC_44",
@@ -1164,11 +1168,14 @@ impl Engine {
                 };
                 *out = val;
             }
-            IRKind::Off => {
+            IRKind::AddrOffset => {
                 *out = start_loc.off;
             }
-            IRKind::Sec => {
+            IRKind::SecOffset => {
                 *out = start_loc.sec;
+            }
+            IRKind::FileOffset => {
+                *out = start_loc.file_pos;
             }
             bad => {
                 panic!("Called iterate_identifier_address with bogus IR {:?}", bad);
@@ -1192,7 +1199,7 @@ impl Engine {
             )
             .as_str(),
         );
-        // Abs/Off/Sec take one optional input and produce one output.
+        // addr/addr_offset/sec_offset take one optional input and produce one output.
         // We've already discarded surrounding () on the operand.
         let num_operands = ir.operands.len();
 
@@ -1295,10 +1302,10 @@ impl Engine {
     /// Scans `ir_vec` and the stable `ir_locs` to build `wr_dispatches` and
     /// `label_dispatches`.  Called once after iterate converges.
     ///
-    /// `ir_locs[i]` holds the image/section offset *before* IR `i` executes, so:
-    ///   - a `SectionStart` at index `i` begins at `ir_locs[i].img`
-    ///   - the matching `SectionEnd` at index `j` ends at `ir_locs[j].img`
-    ///   - section size = `ir_locs[j].img - ir_locs[i].img`
+    /// `ir_locs[i]` holds the file offset *before* IR `i` executes, so:
+    ///   - a `SectionStart` at index `i` begins at `ir_locs[i].file_pos`
+    ///   - the matching `SectionEnd` at index `j` ends at `ir_locs[j].file_pos`
+    ///   - section size = `ir_locs[j].file_pos - ir_locs[i].file_pos`
     ///
     /// A section written N times produces N `WrDispatch` entries in output order.
     fn build_dispatches(&mut self, irdb: &IRDb) {
@@ -1313,26 +1320,26 @@ impl Engine {
                 IRKind::SectionEnd => {
                     let (name, start_idx) = stack.pop().expect("Unmatched SectionEnd in ir_vec");
                     let start_loc = &self.ir_locs[start_idx];
-                    let img_start = start_loc.file_pos;
-                    let img_end = self.ir_locs[i].file_pos;
+                    let file_start = start_loc.file_pos;
+                    let file_end = self.ir_locs[i].file_pos;
                     let off_start = start_loc.off;
                     let abs_start = start_loc.abs_base.saturating_add(off_start);
                     self.wr_dispatches.push(WrDispatch {
                         name,
-                        img_start,
+                        file_offset: file_start,
                         off_start,
                         abs_start,
-                        size: img_end - img_start,
+                        size: file_end - file_start,
                     });
                 }
                 IRKind::Label => {
                     let name = irdb.get_opnd_as_identifier(ir, 0).to_string();
                     let loc = &self.ir_locs[i];
-                    let img_offset = loc.file_pos;
+                    let file_offset = loc.file_pos;
                     let off = loc.off;
                     let abs_addr = loc.abs_base.saturating_add(off);
                     self.label_dispatches
-                        .push(LabelDispatch { name, img_offset, off, abs_addr });
+                        .push(LabelDispatch { name, file_offset, off, abs_addr });
                 }
                 _ => {}
             }
@@ -1407,7 +1414,7 @@ impl Engine {
 
                     // Unlike print, we have to iterate on the string write operation since
                     // the size of the string affects the size of the output image.
-                    IRKind::Abs | IRKind::Off | IRKind::Sec => {
+                    IRKind::Addr | IRKind::AddrOffset | IRKind::SecOffset | IRKind::FileOffset => {
                         self.iterate_address(ir, irdb, diags, &current)
                     }
                     IRKind::Wrs => self.iterate_wrs(ir, irdb, diags, &mut current),
@@ -1421,10 +1428,10 @@ impl Engine {
                         self.iterate_wrext(ir, irdb, &mut current, ext_registry, diags)
                     }
                     IRKind::Align => self.iterate_align(ir, irdb, diags, &current),
-                    IRKind::SetSec | IRKind::SetOff => {
+                    IRKind::SetSecOffset | IRKind::SetAddrOffset | IRKind::SetFileOffset => {
                         self.iterate_set(ir, irdb, diags, &current)
                     }
-                    IRKind::SetAbs => self.iterate_set_abs(ir, &mut current),
+                    IRKind::SetAddr => self.iterate_set_addr(ir, &mut current),
 
                     IRKind::Wrf => self.iterate_wrf(ir, irdb, diags, &mut current),
 
@@ -1730,14 +1737,16 @@ impl Engine {
                 // Assert runs in the validation phase, after all bytes are written.
                 IRKind::Assert => Ok(()),
                 // the rest of these operations are computed during iteration
-                IRKind::SetSec
-                | IRKind::SetOff
-                | IRKind::SetAbs
+                IRKind::SetSecOffset
+                | IRKind::SetAddrOffset
+                | IRKind::SetAddr
+                | IRKind::SetFileOffset
                 | IRKind::Align
-                | IRKind::Abs
+                | IRKind::Addr
                 | IRKind::Const
-                | IRKind::Off
-                | IRKind::Sec
+                | IRKind::AddrOffset
+                | IRKind::SecOffset
+                | IRKind::FileOffset
                 | IRKind::Label
                 | IRKind::Sizeof
                 | IRKind::SizeofExt
@@ -1917,7 +1926,7 @@ impl Engine {
             //
             // ExtensionCallSection (form 3):
             //   operands = [name, section_id, arg0..., output]
-            //   Engine resolves (img_start, size) from wr_dispatches.
+            //   Engine resolves (file_offset, size) from wr_dispatches.
             //   args are operands[2..last].
             let last = ir.operands.len() - 1;
             let (img_slice_range, arg_operand_range) = match ir.kind {
@@ -1937,7 +1946,7 @@ impl Engine {
                             name, sec_name
                         ));
                     };
-                    let start = d.img_start as usize;
+                    let start = d.file_offset as usize;
                     (start..start + d.size as usize, 2..last)
                 }
                 _ => unreachable!(),

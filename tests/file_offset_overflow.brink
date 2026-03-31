@@ -1,0 +1,11 @@
+// file_offset_overflow.brink
+//
+// set_file_offset with a target less than the current file_offset must
+// produce EXEC_22 (location counter cannot move backwards).
+
+section foo {
+    wrs "Hello";                // file_offset() is now 5
+    set_file_offset 3;          // backwards: 3 < 5 → error
+}
+
+output foo;

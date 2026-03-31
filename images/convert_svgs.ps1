@@ -1,4 +1,17 @@
+# This is a helper script to convert our SVG source files to a plain format
+# with text converted to paths for proper rendering on Github. This script
+# uses Inkscape's command-line interface to perform the conversion.
+#
+# No equivalent helper script exists for Linux/Mac yet!
+#
 # Verified for Inkscape 1.4.3 (2026)
+# Usage:
+# 1. Place this script in the same directory as your SVG files.
+# 2. Run the script in PowerShell: `.\convert_svgs.ps1`
+#
+# The script will skip files that have already been converted
+# and are up to date.
+#
 $inkscapePath = "C:\Program Files\Inkscape\bin\inkscape.com"
 $suffix = "_plain_no_text"
 

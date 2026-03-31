@@ -29,7 +29,7 @@ pub enum DataType {
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IRKind {
-    Abs,
+    Addr,
     Add,
     Align,
     Assert,
@@ -46,11 +46,11 @@ pub enum IRKind {
     ExtensionCallRanged,
     /// Operands: [name, section_id, arg0..., output]
     /// section_id is an Identifier matching a known section; the engine resolves
-    /// (img_start, size) from wr_dispatches at runtime.
+    /// (file_offset, size) from wr_dispatches at runtime.
     ExtensionCallSection,
     GEq,
     I64,
-    Off,
+    AddrOffset,
     Label,
     LeftShift,
     LEq,
@@ -59,12 +59,14 @@ pub enum IRKind {
     Modulo,
     Multiply,
     NEq,
-    SetSec,
-    SetOff,
-    SetAbs,
+    SetSecOffset,
+    SetAddrOffset,
+    SetAddr,
+    SetFileOffset,
     Print,
     RightShift,
-    Sec,
+    SecOffset,
+    FileOffset,
     SectionEnd,
     SectionStart,
     Sizeof,

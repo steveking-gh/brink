@@ -567,8 +567,8 @@ mod tests {
     }
 
     #[test]
-    fn set_abs_overflow() {
-        assert_brink_failure("tests/set_abs_overflow.brink", &["[EXEC_43]"]);
+    fn set_addr_overflow() {
+        assert_brink_failure("tests/set_addr_overflow.brink", &["[EXEC_43]"]);
     }
 
     #[test]
@@ -858,58 +858,93 @@ mod tests {
 
     #[test]
 
-    fn set_sec_1() {
-        assert_brink_success("tests/set_sec_1.brink", None, None);
+    fn set_sec_offset_1() {
+        assert_brink_success("tests/set_sec_offset_1.brink", None, None);
     }
 
     #[test]
-    fn set_sec_2() {
-        assert_brink_failure("tests/set_sec_2.brink", &["[EXEC_22]"]);
-    }
-
-    #[test]
-
-    fn set_off_1() {
-        assert_brink_success("tests/set_off_1.brink", None, None);
-    }
-
-    #[test]
-    fn set_off_2() {
-        assert_brink_failure("tests/set_off_2.brink", &["[EXEC_22]"]);
+    fn set_sec_offset_2() {
+        assert_brink_failure("tests/set_sec_offset_2.brink", &["[EXEC_22]"]);
     }
 
     #[test]
 
-    fn set_abs_1() {
-        assert_brink_success("tests/set_abs_1.brink", None, None);
+    fn set_addr_offset_1() {
+        assert_brink_success("tests/set_addr_offset_1.brink", None, None);
     }
 
     #[test]
-    fn set_abs_2() {
-        assert_brink_success("tests/set_abs_2.brink", None, None);
+    fn set_addr_offset_2() {
+        assert_brink_failure("tests/set_addr_offset_2.brink", &["[EXEC_22]"]);
     }
 
     #[test]
 
-    fn set_sec_3() {
+    fn set_addr_1() {
+        assert_brink_success("tests/set_addr_1.brink", None, None);
+    }
+
+    #[test]
+    fn set_addr_2() {
+        assert_brink_success("tests/set_addr_2.brink", None, None);
+    }
+
+    #[test]
+
+    fn set_sec_offset_3() {
         let _cmd = Command::cargo_bin("brink")
             .unwrap()
-            .arg("tests/set_sec_3.brink")
-            .arg("-o set_sec_3.bin")
+            .arg("tests/set_sec_offset_3.brink")
+            .arg("-o set_sec_offset_3.bin")
             .assert()
             .success();
 
         // Verify output file is correct.  If so, then clean up.
-        let bytevec = fs::read("set_sec_3.bin").unwrap();
+        let bytevec = fs::read("set_sec_offset_3.bin").unwrap();
         let temp: Vec<u8> = vec![
-            1, 2, 3, 4, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // set_sec 16;
-            0xAA, 0xAA, 0xAA, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // set_sec 24, 0xFF;
-            0xAA, 0xAA, 0xAA, 0x77, // set_sec 28, 0x77;
+            1, 2, 3, 4, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // set_sec_offset 16;
+            0xAA, 0xAA, 0xAA, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // set_sec_offset 24, 0xFF;
+            0xAA, 0xAA, 0xAA, 0x77, // set_sec_offset 28, 0x77;
         ];
         println!("Bytevec length = {}", bytevec.len());
         assert!(bytevec.len() == 28);
         assert!(bytevec == temp);
-        fs::remove_file("set_sec_3.bin").unwrap();
+        fs::remove_file("set_sec_offset_3.bin").unwrap();
+    }
+
+    #[test]
+    fn file_offset_1() {
+        // Success: assert()-heavy test inside the .brink file verifies
+        // monotonic file_offset, set_addr independence, set_file_offset
+        // padding, and the identifier form file_offset(name).
+        let _cmd = Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/file_offset_1.brink")
+            .arg("-o file_offset_1.bin")
+            .assert()
+            .success();
+
+        // Verify the binary layout matches the expected pad bytes.
+        //   file[0..4]   "head"
+        //   file[4..7]   "inn"
+        //   file[7..16]  0xBB x9  (set_file_offset 16, 0xBB)
+        //   file[16..20] "tail"
+        let bytevec = fs::read("file_offset_1.bin").unwrap();
+        let expected: Vec<u8> = vec![
+            b'h', b'e', b'a', b'd',                         // "head"
+            b'i', b'n', b'n',                               // "inn"
+            0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, // 9 pad bytes
+            b't', b'a', b'i', b'l',                         // "tail"
+        ];
+        assert_eq!(bytevec.len(), 20);
+        assert_eq!(bytevec, expected);
+        fs::remove_file("file_offset_1.bin").unwrap();
+    }
+
+    #[test]
+    fn file_offset_overflow() {
+        // set_file_offset backwards (target < current) must produce EXEC_22.
+        assert_brink_failure("tests/file_offset_overflow.brink", &["[EXEC_22]"]);
     }
 
     #[test]
@@ -1232,7 +1267,7 @@ mod tests {
         assert_brink_failure("tests/const_sizeof_1.brink", &["[IRDB_19]"]);
     }
 
-    /// A const expression depends on abs(), which requires engine-time addressing.
+    /// A const expression depends on addr(), which requires engine-time addressing.
     /// Consts must be resolvable before the engine runs.  Expected: IRDB_19.
     #[test]
     fn const_abs_1() {

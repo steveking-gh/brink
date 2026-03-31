@@ -1,9 +1,9 @@
-// Const expression depends on abs(), which requires engine-time addressing.
+// Const expression depends on addr(), which requires engine-time addressing.
 // Const values must be resolvable before the engine runs.  Expected: IRDB_19.
 section foo {
     wr8 1;
 }
-const ADDR = abs(foo);
+const ADDR = addr(foo);
 section bar {
     wr64 ADDR;
 }
