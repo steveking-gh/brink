@@ -366,8 +366,6 @@ Brink also reserves the following *exact* keywords:
 
 | Reserved Keyword | Reason / possible future use  |
 | ---------------- | ----------------------------- |
-| `wrs`            | Write-string command          |
-| `wrf`            | Write-file command            |
 | `import`         | Module inclusion              |
 | `if`             | Conditional section inclusion |
 | `else`           | Conditional section inclusion |
