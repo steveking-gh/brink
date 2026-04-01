@@ -4,8 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [3.0.0] - 2026-03-25
-- Breaking change: set_abs no longer pads
-- Breaking change: img() has become off()
+- Large upgrade of Brink capability with many breaking changes.
+- Completed extension infrastructure
+- Completed section scoping for address and offset ranges
+- Completed address overwrite detection
+- Many commands have more obvious names now.
 
 ## [2.5.0] - 2026-03-25
 - Support for extensions
