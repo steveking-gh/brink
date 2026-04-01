@@ -309,7 +309,7 @@ Brink emits an error if an address or offset change causes 64-bit unsigned overf
 
 As a mental model, user's can think of program execution as occurring in *output order*.  Output order means the sequence of operations that produce bytes in-order starting with the initial byte of the output file.  In other words, an operation producing the first byte of the output will execute before an operation producing the second byte.
 
-Within a section definition, output order and source code order are the same.  However, outside of a section definition, output order and program order are not necessarily the same.  For example, source code may define whole sections in a different order than instantiated into in the output.
+Within a section definition, output order and source code order are the same.  However, outside of a section definition, output order and program order may differ.  For example, source code may define whole sections in a different order than instantiated into in the output.
 
 ## Output Creation Phases
 
