@@ -19,7 +19,7 @@ use lineardb::{LinIR, LinearDb};
 use tracing::{debug, error, info, trace, warn};
 
 use ext::ExtensionRegistry;
-use ir::{DataType, IR, IRKind, IROperand, ParameterValue};
+use ir::{ConstBuiltins, DataType, IR, IRKind, IROperand, ParameterValue};
 use parse_int::parse;
 use std::{
     collections::{HashMap, HashSet},
@@ -129,10 +129,14 @@ impl IRDb {
             | ast::LexToken::DoublePipe
             | ast::LexToken::DoubleAmpersand
             | ast::LexToken::Sizeof
-            | ast::LexToken::OutputSize
-            | ast::LexToken::OutputAddr
+            | ast::LexToken::BuiltinOutputSize
+            | ast::LexToken::BuiltinOutputAddr
+            | ast::LexToken::BuiltinVersionMajor
+            | ast::LexToken::BuiltinVersionMinor
+            | ast::LexToken::BuiltinVersionPatch
             | ast::LexToken::ToU64
             | ast::LexToken::U64 => data_type = Some(DataType::U64), // TODO: this will be I64 when we convert bool
+            ast::LexToken::BuiltinVersionString => data_type = Some(DataType::QuotedString),
             ast::LexToken::ToI64 | ast::LexToken::I64 => data_type = Some(DataType::I64),
             ast::LexToken::Integer => data_type = Some(DataType::Integer),
             ast::LexToken::QuotedString => data_type = Some(DataType::QuotedString),
@@ -674,8 +678,12 @@ impl IRDb {
             | IRKind::SectionStart
             | IRKind::SectionEnd
             | IRKind::Sizeof
-            | IRKind::OutputSize
-            | IRKind::OutputAddr
+            | IRKind::BuiltinOutputSize
+            | IRKind::BuiltinOutputAddr
+            | IRKind::BuiltinVersionString
+            | IRKind::BuiltinVersionMajor
+            | IRKind::BuiltinVersionMinor
+            | IRKind::BuiltinVersionPatch
             | IRKind::Label
             | IRKind::Addr
             | IRKind::AddrOffset
@@ -911,9 +919,22 @@ impl IRDb {
                     None
                 }
             }
+            // Version builtins are compile-time constants; resolve them directly.
+            ast::LexToken::BuiltinVersionString => {
+                Some(ParameterValue::QuotedString(ConstBuiltins::get().brink_version_string.to_string()))
+            }
+            ast::LexToken::BuiltinVersionMajor => {
+                Some(ParameterValue::U64(ConstBuiltins::get().brink_version_major))
+            }
+            ast::LexToken::BuiltinVersionMinor => {
+                Some(ParameterValue::U64(ConstBuiltins::get().brink_version_minor))
+            }
+            ast::LexToken::BuiltinVersionPatch => {
+                Some(ParameterValue::U64(ConstBuiltins::get().brink_version_patch))
+            }
             ast::LexToken::Sizeof
-            | ast::LexToken::OutputSize
-            | ast::LexToken::OutputAddr
+            | ast::LexToken::BuiltinOutputSize
+            | ast::LexToken::BuiltinOutputAddr
             | ast::LexToken::Addr
             | ast::LexToken::AddrOffset
             | ast::LexToken::SecOffset

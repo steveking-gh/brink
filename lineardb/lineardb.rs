@@ -112,8 +112,12 @@ fn tok_to_irkind(tok: LexToken) -> IRKind {
         LexToken::SetAddrOffset => IRKind::SetAddrOffset,
         LexToken::SetSecOffset => IRKind::SetSecOffset,
         LexToken::SetFileOffset => IRKind::SetFileOffset,
-        LexToken::OutputSize => IRKind::OutputSize,
-        LexToken::OutputAddr => IRKind::OutputAddr,
+        LexToken::BuiltinOutputSize => IRKind::BuiltinOutputSize,
+        LexToken::BuiltinOutputAddr => IRKind::BuiltinOutputAddr,
+        LexToken::BuiltinVersionString => IRKind::BuiltinVersionString,
+        LexToken::BuiltinVersionMajor => IRKind::BuiltinVersionMajor,
+        LexToken::BuiltinVersionMinor => IRKind::BuiltinVersionMinor,
+        LexToken::BuiltinVersionPatch => IRKind::BuiltinVersionPatch,
         LexToken::Sizeof => IRKind::Sizeof,
         LexToken::ToI64 => IRKind::ToI64,
         LexToken::ToU64 => IRKind::ToU64,
@@ -451,9 +455,14 @@ impl<'toks> LinearDb {
                     returned_operands.push(idx);
                 }
             }
-            // Built-in variable atoms: no input operands; the output section is
-            // resolved at engine time via IRDb::output_sec_str.
-            LexToken::OutputSize | LexToken::OutputAddr => {
+            // Built-in variable atoms: no input operands; values resolved at
+            // engine time (output builtins) or const-eval time (version builtins).
+            LexToken::BuiltinOutputSize
+            | LexToken::BuiltinOutputAddr
+            | LexToken::BuiltinVersionString
+            | LexToken::BuiltinVersionMajor
+            | LexToken::BuiltinVersionMinor
+            | LexToken::BuiltinVersionPatch => {
                 let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tinfo.tok), in_const_expr);
                 let idx = self.add_new_operand_to_ir(
                     ir_lid,

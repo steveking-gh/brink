@@ -962,12 +962,16 @@ Example:
 
 ## Built-in Variables
 
-Brink pre-defines built-in identifiers that begin with `__` (double underscore).  They can appear in expression contexts that accept the corresponding data type.  As noted in the table below, programs **cannot** use some built-ins in `const` expressions because their values depend on dynamic layout of the output.
+Brink pre-defines built-in identifiers that begin with `__` (double underscore).  They can appear in any expression context that accepts the corresponding type.  As shown in the table below, some builtins cannot be used in `const` expressions because their values depend on dynamic layout values.
 
-| Variable        | Type  | OK in `const`<br>expressions? | Description                                                              |
-| --------------- | ----- | ----------------------------- | ------------------------------------------------------------------------ |
-| `__OUTPUT_SIZE` | `U64` | No                            | Total output size in bytes.  Equivalent to `sizeof(<output-section>)`.   |
-| `__OUTPUT_ADDR` | `U64` | No                            | Starting address of the output.  Equivalent to `addr(<output-section>)`. |
+| Variable                 | Type     | OK in `const`? | Description                                                              |
+| ------------------------ | -------- | -------------- | ------------------------------------------------------------------------ |
+| `__OUTPUT_SIZE`          | `U64`    | No             | Total output size in bytes.  Equivalent to `sizeof(<output-section>)`.   |
+| `__OUTPUT_ADDR`          | `U64`    | No             | Starting address of the output.  Equivalent to `addr(<output-section>)`. |
+| `__BRINK_VERSION_STRING` | `String` | Yes            | Brink version as a string, e.g. `"4.3.2"`.                               |
+| `__BRINK_VERSION_MAJOR`  | `U64`    | Yes            | Major version component, e.g. "4" in "4.3.2"                             |
+| `__BRINK_VERSION_MINOR`  | `U64`    | Yes            | Minor version component, e.g. "3" in "4.3.2"                             |
+| `__BRINK_VERSION_PATCH`  | `U64`    | Yes            | Patch version component, e.g. "2" in "4.3.2"                             |
 
 ### `__OUTPUT_SIZE`
 
@@ -1014,6 +1018,45 @@ Example — embed the output base address in a table without repeating the const
     }
 
     output image 0x0800_0000;
+
+### `__BRINK_VERSION_STRING`
+
+Returns the Brink tool version as a string (e.g. `"4.0.0"`).  The value is fixed at compile time and may be used in `const` expressions, `wrs`, and `print`.
+
+Example — stamp the tool version into a firmware header:
+
+    section hdr {
+        wrs __BRINK_VERSION_STRING;
+    }
+
+    section image {
+        wr hdr;
+        wrs "payload";
+    }
+
+    output image;
+
+### `__BRINK_VERSION_MAJOR`, `__BRINK_VERSION_MINOR`, `__BRINK_VERSION_PATCH`
+
+Return the individual numeric components of the Brink version as `U64` values.  All three are fixed at compile time and may be used in `const` expressions and arithmetic.
+
+Example — pack the version into a 3-byte field and assert the tool is new enough:
+
+    const MIN_MAJOR = 4u;
+
+    section hdr {
+        assert __BRINK_VERSION_MAJOR >= MIN_MAJOR;
+        wr8 __BRINK_VERSION_MAJOR;
+        wr8 __BRINK_VERSION_MINOR;
+        wr8 __BRINK_VERSION_PATCH;
+    }
+
+    section image {
+        wr hdr;
+        wrs "payload";
+    }
+
+    output image;
 
 ---
 

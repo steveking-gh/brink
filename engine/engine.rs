@@ -15,7 +15,7 @@
 use anyhow::{Result, anyhow};
 use diags::{Diags, SourceSpan};
 use ext::{ExtensionRegistry, RegisteredExtension};
-use ir::{DataType, IR, IRKind, ParameterValue};
+use ir::{ConstBuiltins, DataType, IR, IRKind, ParameterValue};
 use irdb::IRDb;
 use std::collections::{BTreeMap, HashSet};
 use std::fs::File;
@@ -980,6 +980,30 @@ impl Engine {
         true
     }
 
+    fn iterate_builtin_version_string(&mut self, ir: &IR) -> bool {
+        assert!(ir.operands.len() == 1);
+        self.parms[ir.operands[0]] = ParameterValue::QuotedString(ConstBuiltins::get().brink_version_string.to_string());
+        true
+    }
+
+    fn iterate_builtin_version_major(&mut self, ir: &IR) -> bool {
+        assert!(ir.operands.len() == 1);
+        *self.parms[ir.operands[0]].to_u64_mut() = ConstBuiltins::get().brink_version_major;
+        true
+    }
+
+    fn iterate_builtin_version_minor(&mut self, ir: &IR) -> bool {
+        assert!(ir.operands.len() == 1);
+        *self.parms[ir.operands[0]].to_u64_mut() = ConstBuiltins::get().brink_version_minor;
+        true
+    }
+
+    fn iterate_builtin_version_patch(&mut self, ir: &IR) -> bool {
+        assert!(ir.operands.len() == 1);
+        *self.parms[ir.operands[0]].to_u64_mut() = ConstBuiltins::get().brink_version_patch;
+        true
+    }
+
     /// Compute the transient current address.  This case is called when
     /// addr/addr_offset/sec_offset is called without an identifier.
     fn iterate_current_address(&mut self, ir: &IR, diags: &mut Diags, current: &Location) -> bool {
@@ -1494,8 +1518,12 @@ impl Engine {
                     }
                     IRKind::Sizeof => self.iterate_sizeof(ir, irdb, diags, &current),
                     IRKind::SizeofExt => self.iterate_sizeof_ext(ir, diags, ext_registry),
-                    IRKind::OutputSize => self.iterate_output_size(ir, irdb, diags),
-                    IRKind::OutputAddr => self.iterate_output_addr(ir, irdb, diags),
+                    IRKind::BuiltinOutputSize => self.iterate_output_size(ir, irdb, diags),
+                    IRKind::BuiltinOutputAddr => self.iterate_output_addr(ir, irdb, diags),
+                    IRKind::BuiltinVersionString => self.iterate_builtin_version_string(ir),
+                    IRKind::BuiltinVersionMajor => self.iterate_builtin_version_major(ir),
+                    IRKind::BuiltinVersionMinor => self.iterate_builtin_version_minor(ir),
+                    IRKind::BuiltinVersionPatch => self.iterate_builtin_version_patch(ir),
 
                     // Unlike print, we have to iterate on the string write operation since
                     // the size of the string affects the size of the output image.
@@ -1923,8 +1951,12 @@ impl Engine {
                 | IRKind::Label
                 | IRKind::Sizeof
                 | IRKind::SizeofExt
-                | IRKind::OutputSize
-                | IRKind::OutputAddr
+                | IRKind::BuiltinOutputSize
+                | IRKind::BuiltinOutputAddr
+                | IRKind::BuiltinVersionString
+                | IRKind::BuiltinVersionMajor
+                | IRKind::BuiltinVersionMinor
+                | IRKind::BuiltinVersionPatch
                 | IRKind::ToI64
                 | IRKind::ToU64
                 | IRKind::Eq

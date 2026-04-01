@@ -414,6 +414,30 @@ mod tests {
         assert_brink_success("tests/sizeof_3.brink", Some("sizeof_3.bin"), Some("Wow!"));
     }
 
+    /// __BRINK_VERSION_STRING can be written with wrs and used in print.
+    #[test]
+    fn test_version_string_1() {
+        assert_brink_success("tests/test_version_string_1.brink", None, None);
+    }
+
+    /// __BRINK_VERSION_MAJOR/MINOR/PATCH are U64 values usable in expressions.
+    #[test]
+    fn test_version_numeric_1() {
+        assert_brink_success("tests/test_version_numeric_1.brink", None, None);
+    }
+
+    /// Version builtins are usable in const expressions.
+    #[test]
+    fn test_version_in_const_1() {
+        assert_brink_success("tests/test_version_in_const_1.brink", None, None);
+    }
+
+    /// Version builtins can be written into the output as wr8 operands.
+    #[test]
+    fn test_version_written_1() {
+        assert_brink_success("tests/test_version_written_1.brink", None, None);
+    }
+
     /// __OUTPUT_SIZE equals sizeof(output_section) and can be used in asserts.
     #[test]
     fn test_output_size_1() {

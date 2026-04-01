@@ -1,0 +1,13 @@
+// Version builtins are compile-time constants and may be used in const expressions.
+const MAJOR = __BRINK_VERSION_MAJOR;
+const MINOR = __BRINK_VERSION_MINOR;
+const PATCH = __BRINK_VERSION_PATCH;
+
+section image {
+    assert MAJOR >= 1u;
+    assert MINOR >= 0u;
+    assert PATCH >= 0u;
+    wr8 0;
+}
+
+output image;

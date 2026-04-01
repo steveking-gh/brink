@@ -1,0 +1,14 @@
+// Write version components into a firmware header using wr8.
+// Verifies version builtins work as wr operands.
+section hdr {
+    wr8  __BRINK_VERSION_MAJOR;
+    wr8  __BRINK_VERSION_MINOR;
+    wr8  __BRINK_VERSION_PATCH;
+    assert sizeof(hdr) == 3;
+}
+
+section image {
+    wr hdr;
+}
+
+output image;

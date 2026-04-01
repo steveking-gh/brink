@@ -22,6 +22,7 @@ edition = "2024"
 [package]
 name = "brink"
 version = "4.0.0"
+build = "build.rs"
 license-file = "LICENSE.txt"
 readme = "README.md"
 homepage = "https://github.com/steveking-gh/brink"

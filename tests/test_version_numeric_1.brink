@@ -1,0 +1,15 @@
+// __BRINK_VERSION_MAJOR/MINOR/PATCH are U64 values.
+// Verify they are self-consistent: a non-zero version must have a non-zero major.
+// Also verify they can be used in arithmetic expressions.
+section image {
+    assert __BRINK_VERSION_MAJOR >= 1u;
+    assert __BRINK_VERSION_MINOR >= 0u;
+    assert __BRINK_VERSION_PATCH >= 0u;
+
+    // Pack major.minor.patch into three bytes as a sanity check expression.
+    assert (__BRINK_VERSION_MAJOR << 16) | (__BRINK_VERSION_MINOR << 8) | __BRINK_VERSION_PATCH >= 1u;
+
+    wr8 0;
+}
+
+output image;

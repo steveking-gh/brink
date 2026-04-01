@@ -1,0 +1,8 @@
+// __BRINK_VERSION_STRING writes the tool version into the output.
+// Also verifies it can be used in a print statement.
+section image {
+    print "Brink version: ", __BRINK_VERSION_STRING, "\n";
+    wrs __BRINK_VERSION_STRING;
+}
+
+output image;

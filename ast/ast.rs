@@ -33,9 +33,17 @@ pub enum LexToken {
     // Built-in variables — must be listed before the Identifier regex so that
     // logos gives them priority over the generic identifier pattern.
     #[token("__OUTPUT_SIZE")]
-    OutputSize,
+    BuiltinOutputSize,
     #[token("__OUTPUT_ADDR")]
-    OutputAddr,
+    BuiltinOutputAddr,
+    #[token("__BRINK_VERSION_STRING")]
+    BuiltinVersionString,
+    #[token("__BRINK_VERSION_MAJOR")]
+    BuiltinVersionMajor,
+    #[token("__BRINK_VERSION_MINOR")]
+    BuiltinVersionMinor,
+    #[token("__BRINK_VERSION_PATCH")]
+    BuiltinVersionPatch,
     #[token("section")]
     Section,
     #[token("align")]
@@ -1204,7 +1212,12 @@ impl<'toks> Ast<'toks> {
             }
 
             // Built-in variable atoms — no parentheses, no arguments.
-            LexToken::OutputSize | LexToken::OutputAddr => {
+            LexToken::BuiltinOutputSize
+            | LexToken::BuiltinOutputAddr
+            | LexToken::BuiltinVersionString
+            | LexToken::BuiltinVersionMajor
+            | LexToken::BuiltinVersionMinor
+            | LexToken::BuiltinVersionPatch => {
                 *top = Some(self.arena.new_node(self.tok_num));
                 self.tok_num += 1;
             }

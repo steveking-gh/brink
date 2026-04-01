@@ -21,7 +21,7 @@ use ast::{Ast, AstDb};
 use diags::Diags;
 use engine::Engine;
 use ext::{ExtensionRegistry, test_mocks::register_test_extensions};
-use ir::ParameterValue;
+use ir::{ConstBuiltins, ParameterValue};
 use irdb::IRDb;
 use lineardb::LinearDb;
 use map::{MapDb, format_c99, format_csv, format_json};
@@ -107,6 +107,7 @@ pub fn process(
 ) -> Result<()> {
     info!("Processing {}", name);
     debug!("File contains: {}", fstr);
+    ConstBuiltins::init();
 
     let mut diags = Diags::new(name, fstr, verbosity, noprint);
 
