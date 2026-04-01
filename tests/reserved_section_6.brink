@@ -1,0 +1,6 @@
+// Identifiers starting with '__' are reserved and cannot be used as section names.
+// Expected: AST_32.
+section __builtin {
+    wr8 1;
+}
+output __builtin;

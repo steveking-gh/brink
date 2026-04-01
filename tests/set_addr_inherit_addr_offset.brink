@@ -1,0 +1,26 @@
+// Child with no set_addr inherits the parent's addr_offset and continues
+// counting from it.  On exit the parent's addr_offset advances by the
+// child's byte count.  Verifies basic addr_offset continuity across a
+// section boundary where no rebasing occurs.
+
+section child {
+    // Inherits parent's addr_offset of 5 -- no set_addr in this section.
+    assert addr_offset() == 5;
+    assert addr() == 0x1005;
+    wr8 0xCC, 3;
+    assert addr_offset() == 8;
+    assert addr() == 0x1008;
+    assert sec_offset() == 3;
+}
+
+section parent {
+    wr8 0x11, 5;
+    assert addr_offset() == 5;
+    assert addr() == 0x1005;
+    wr child;
+    assert addr_offset() == 8;
+    assert addr() == 0x1008;
+    assert sec_offset() == 8;
+}
+
+output parent 0x1000;

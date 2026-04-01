@@ -1,0 +1,6 @@
+// 'wrf' is a dedicated lexer token and cannot be used as a section name.
+// The lexer rejects it before the reserved-identifier check; parse errors fire.
+section wrf {
+    wr8 1;
+}
+output wrf;

@@ -170,24 +170,42 @@ pub enum LexToken {
 /// Returns true if `name` is a reserved identifier that may not be used
 /// as a section name, const name, or label name.
 ///
-/// Reserved prefixes (all variants are reserved):
-///   - "wr"    — write instructions (wr8, etc)
-///   - "set_"  — configuration directives (set_sec_offset, etc)
+/// Reserved prefixes:
+///   - "wr" + digit  — write instructions (wr8, wr16, wr32, etc)
+///   - "set_"        — configuration directives (set_sec_offset, set_addr, etc)
+///   - "__"          — leading double underscore names refer to builtin identifiers
 ///
-/// Reserved exact keywords (reserved for future language features):
-///   - "include" / "import" — file or module inclusion
-///   - "if" / "else"        — conditional section inclusion
-///   - "true" / "false"     — boolean literals
-///   - "extern"             — external section references
-///   - "let"                — future variable declarations
-///   - "fill"               — fill/pad byte ranges
+/// Reserved exact keywords:
+///   - "wrs" / "wrf"              — write-string and write-file commands
+///   - "include" / "import"       — file or module inclusion
+///   - "if" / "else"              — conditional section inclusion
+///   - "true" / "false"           — boolean literals
+///   - "extern"                   — external section references
+///   - "let"                      — future variable declarations
+///   - "fill"                     — fill/pad byte ranges
 pub fn is_reserved_identifier(name: &str) -> bool {
-    if name.starts_with("wr") || name.starts_with("set_") {
+    // "wr" followed by at least one digit reserves the numeric write variants.
+    if let Some(rest) = name.strip_prefix("wr") {
+        if rest.starts_with(|c: char| c.is_ascii_digit()) {
+            return true;
+        }
+    }
+    if name.starts_with("set_") || name.starts_with("__") {
         return true;
     }
     matches!(
         name,
-        "include" | "import" | "if" | "else" | "true" | "false" | "extern" | "let" | "fill"
+        "wrs"
+            | "wrf"
+            | "include"
+            | "import"
+            | "if"
+            | "else"
+            | "true"
+            | "false"
+            | "extern"
+            | "let"
+            | "fill"
     )
 }
 

@@ -1,0 +1,40 @@
+// Three-level nesting where each level calls set_addr.
+// Verifies that set_addr in a grandchild does not leak into the child or
+// the grandparent after each section exits.
+//
+// Layout (all sections output-addr start=0x1000):
+//   grandchild: set_addr 0xF000, write 2 bytes  → child_size = 2
+//   child:      set_addr 0xE000, write 3 bytes, wr grandchild
+//               → child_size = 5; on exit addr_base restored to 0x1000
+//   top:        write 4 bytes, wr child
+//               → total bytes = 9; addr() = 0x1009
+
+section grandchild {
+    set_addr 0xF000u;
+    wr8 0xCC, 2;
+    assert addr() == 0xF002;
+    assert addr_offset() == 2;
+    assert sec_offset() == 2;
+}
+
+section child {
+    set_addr 0xE000u;
+    wr8 0xBB, 3;
+    assert addr() == 0xE003;
+    wr grandchild;                     // +2 bytes; child_size of grandchild = 2
+    assert addr() == 0xE005;           // 0xE000 + 3 + 2 = 0xE005
+    assert addr_offset() == 5;
+    assert sec_offset() == 5;
+}
+
+section top {
+    wr8 0xAA, 4;
+    assert addr() == 0x1004;
+    wr child;                          // +5 bytes; addr_base restored to 0x1000
+    assert addr() == 0x1009;           // 0x1000 + 4 + 5 = 0x1009
+    assert addr_offset() == 9;
+    assert sec_offset() == 9;
+    assert sizeof(top) == 9;
+}
+
+output top 0x1000;

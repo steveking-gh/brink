@@ -1,6 +1,6 @@
-// Identifiers starting with 'wr' are reserved and may not be used as section names.
-// Expected: AST_32.
-section wr_custom {
+// Identifiers starting with 'wr' followed by a digit are reserved and may
+// not be used as section names.  Expected: AST_32.
+section wr8_custom {
     wr8 1;
 }
-output wr_custom;
+output wr8_custom;

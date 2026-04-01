@@ -1,0 +1,23 @@
+// Child calls set_addr to a lower address than the parent context.
+// This is a valid use case (e.g. a section that loads into low RAM).
+// After child exits, parent must see its own addr_base restored, not the
+// child's lower addr_base.
+
+section child {
+    set_addr 0x0100u;                  // much lower than parent's 0x1000 context
+    wr8 0xAA, 4;
+    assert addr() == 0x0104;
+    assert addr_offset() == 4;
+}
+
+section parent {
+    wr8 0x11, 6;
+    assert addr() == 0x1006;
+    wr child;
+    // child wrote 4 bytes; addr_base must be restored to 0x1000
+    assert addr() == 0x100A;          // 0x1000 + 6 + 4 = 0x100A
+    assert addr_offset() == 10;
+    assert sec_offset() == 10;
+}
+
+output parent 0x1000;

@@ -1,0 +1,27 @@
+// Verifies that set_addr inside a child section does not leak into the parent.
+// After the child exits, the parent must see its own addr_base and addr_offset
+// restored and advanced by the child's byte count.
+
+section child {
+    // Child rebases to a completely different address.
+    set_addr 0xF000u;
+    wr8 0xAA, 4;   // 4 bytes at 0xF000..0xF004
+    assert addr() == 0xF004;
+    assert addr_offset() == 4;
+}
+
+section parent {
+    wr8 0x11, 3;         // 3 bytes; addr = 0x1003, addr_offset = 3
+    assert addr() == 0x1003;
+    assert addr_offset() == 3;
+
+    wr child;            // child writes 4 bytes, then exits
+
+    // After child exit: parent addr_base must be restored to 0x1000,
+    // addr_offset must be 3 + 4 = 7, so addr() == 0x1007.
+    assert addr() == 0x1007;
+    assert addr_offset() == 7;
+    assert sec_offset() == 7;
+}
+
+output parent 0x1000;

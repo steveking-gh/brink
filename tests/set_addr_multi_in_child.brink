@@ -1,0 +1,27 @@
+// A child calls set_addr twice, writing bytes in three distinct address
+// regions.  The parent must see its addr_base and addr_offset updated only
+// by the child's total physical byte count (sec_offset), not by any of the
+// child's intermediate address values.
+
+section bouncy {
+    wr8 0xAA, 2;                       // sec_offset=2
+    set_addr 0x5000u;                  // addr_base=0x5000, addr_offset=0
+    wr8 0xBB, 3;                       // sec_offset=5
+    set_addr 0x8000u;                  // addr_base=0x8000, addr_offset=0
+    wr8 0xCC, 1;                       // sec_offset=6
+    assert addr() == 0x8001;
+    assert addr_offset() == 1;
+    assert sec_offset() == 6;
+}
+
+section outer {
+    wr8 0x00, 4;
+    assert addr() == 0x1004;
+    wr bouncy;                         // child_size=6; addr_base restored to 0x1000
+    assert addr() == 0x100A;           // 0x1000 + 4 + 6 = 0x100A
+    assert addr_offset() == 10;
+    assert sec_offset() == 10;
+    assert sizeof(outer) == 10;
+}
+
+output outer 0x1000;

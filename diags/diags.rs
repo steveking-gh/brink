@@ -69,6 +69,22 @@ impl Diags {
         self.print_report(report);
     }
 
+    /// Writes a warning to the terminal with a primary source location.
+    pub fn warn1(&self, code: &str, msg: &str, loc: SourceSpan) {
+        if self.verbosity == 0 {
+            return;
+        }
+
+        let start = loc.range.start;
+        let id = self.files[loc.file_id].0.clone();
+        let report = Report::build(ReportKind::Warning, id.clone(), start)
+            .with_code(code)
+            .with_message(msg)
+            .with_label(Label::new((id, loc.range)).with_color(Color::Yellow))
+            .finish();
+        self.print_report(report);
+    }
+
     /// Writes the diagnostic to the terminal with primary
     /// code location.
     pub fn err0(&self, code: &str, msg: &str) {

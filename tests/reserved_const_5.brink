@@ -1,0 +1,5 @@
+// Identifiers starting with '__' are reserved and cannot be used as const names.
+// Expected: AST_33.
+const __version = 1;
+section foo { wr8 1; }
+output foo;

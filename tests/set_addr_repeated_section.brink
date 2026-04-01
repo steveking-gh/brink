@@ -1,0 +1,29 @@
+// A section that calls set_addr is written twice by the parent.
+// Each invocation must see a fresh scope pushed from the parent's
+// current state, not from the previous invocation's internal state.
+// On the second wr, the parent's addr_offset entering the child is 4
+// (from the first wr), not 0.
+
+section chunk {
+    set_addr 0x9000u;
+    wr8 0xAA, 4;
+    // Internal state: addr() always 0x9004 regardless of how many times
+    // this section has been written, because set_addr anchors to 0x9000.
+    assert addr() == 0x9004;
+    assert addr_offset() == 4;
+    assert sec_offset() == 4;
+}
+
+section image {
+    wr chunk;                          // first write; 4 bytes
+    assert addr() == 0x0004;           // addr_base=0; 0+4=4
+    assert addr_offset() == 4;
+    assert sec_offset() == 4;
+    wr chunk;                          // second write; +4 bytes
+    assert addr() == 0x0008;
+    assert addr_offset() == 8;
+    assert sec_offset() == 8;
+    assert sizeof(image) == 8;
+}
+
+output image;

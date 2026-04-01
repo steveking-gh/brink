@@ -1,0 +1,14 @@
+// Verifies that set_sec_offset following set_addr at the *start* of a section
+// (sec_offset == 0) does NOT trigger warning EXEC_54.  When set_addr is the
+// first statement, addr_offset and sec_offset are in sync, so the warning
+// would be a false positive.
+section foo {
+    set_addr 0x2000u;     // first statement -- sec_offset is 0, flag stays unset
+    wr8 0xAA, 3;          // sec_offset == 3, addr_offset == 3
+    set_sec_offset 16;    // no warning expected
+    assert sec_offset() == 16;
+    assert addr_offset() == 16;
+    assert addr() == 0x2010;
+}
+
+output foo 0x1000;

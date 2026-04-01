@@ -1,0 +1,19 @@
+// Identifiers starting with 'wr' but NOT followed by a digit are now valid.
+// This tests that the narrowed prefix reservation does not over-reject.
+const wr_version = 42;
+
+section wr_header {
+    wr8 wr_version;
+}
+
+section wr_body {
+    wr8 0xFF, 3;
+}
+
+section image {
+    wr_start: wr wr_header;
+    wr wr_body;
+    assert sizeof(image) == 4;
+}
+
+output image;

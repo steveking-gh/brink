@@ -1,6 +1,6 @@
-// Identifiers starting with 'wr' are reserved and may not be used as const names.
-// Expected: AST_33.
-const wr_bits = 8;
+// Identifiers starting with 'wr' followed by a digit are reserved and may
+// not be used as const names.  Expected: AST_33.
+const wr8_bits = 8;
 section foo {
     wr8 1;
 }

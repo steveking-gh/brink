@@ -1,0 +1,34 @@
+// Two sibling sections both calling set_addr.
+// After sib_a exits and sib_b is entered, the parent's addr state must be
+// what it was after sib_a, not whatever sib_a left its own addr at.
+
+section sib_a {
+    set_addr 0x5000u;
+    wr8 0xAA, 3;
+    assert addr() == 0x5003;
+    assert addr_offset() == 3;
+}
+
+section sib_b {
+    set_addr 0x6000u;
+    wr8 0xBB, 5;
+    assert addr() == 0x6005;
+    assert addr_offset() == 5;
+}
+
+section parent {
+    wr8 0x11, 2;
+    assert addr() == 0x1002;
+    wr sib_a;
+    // sib_a wrote 3 bytes; addr_base restored to 0x1000; addr_offset = 2+3 = 5
+    assert addr() == 0x1005;
+    assert addr_offset() == 5;
+    wr sib_b;
+    // sib_b wrote 5 bytes; addr_base restored to 0x1000; addr_offset = 5+5 = 10
+    assert addr() == 0x100A;
+    assert addr_offset() == 10;
+    assert sec_offset() == 10;
+    assert sizeof(parent) == 10;
+}
+
+output parent 0x1000;

@@ -1,0 +1,7 @@
+// Identifiers starting with '__' are reserved and cannot be used as label names.
+// Expected: LINEAR_13.
+section foo {
+    __start:
+    wr8 1;
+}
+output foo;

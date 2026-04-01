@@ -17,6 +17,7 @@ use diags::Diags;
 use ext::{ExtensionRegistry, RegisteredExtension};
 use ir::{DataType, IR, IRKind, ParameterValue};
 use irdb::IRDb;
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::Write;
 use std::{convert::TryFrom, io::Read};
@@ -67,17 +68,36 @@ pub struct LabelDispatch {
     pub addr: u64,
 }
 
+/// All parent-scope state saved on section entry and restored on section exit.
+struct ScopeFrame {
+    /// Parent's section-relative byte offset, restored on exit.
+    sec_offset: u64,
+    /// Parent's address base (set by `set_addr` or inherited from start).
+    /// Restored on exit so a child's `set_addr` does not leak into the parent.
+    addr_base: u64,
+    /// Parent's address offset, advanced by the child's byte count on exit.
+    addr_offset: u64,
+    /// Section name, used for trace indentation.
+    sec_name: String,
+    /// True if `set_addr` fired mid-scope (sec_offset != 0 at the call site).
+    /// Arms the EXEC_54 warning for subsequent set_sec_offset / set_addr_offset.
+    set_addr_seen: bool,
+}
+
 pub struct Engine {
     parms: Vec<ParameterValue>,
     ir_locs: Vec<Location>,
 
-    /// Stack of section offsets.  Each time processing enters
-    /// a new section, we push the old section offset onto the stack
-    /// and pop when return back to the parent section.
-    sec_offsets: Vec<u64>,
+    /// One frame per active section, innermost last.  Pushed on SectionStart,
+    /// popped on SectionEnd.  Replaces the formerly separate sec_offsets,
+    /// sec_names, and set_addr_in_scope vecs.
+    scope_stack: Vec<ScopeFrame>,
 
-    /// Stack of sections for debug use
-    sec_names: Vec<String>,
+    /// (lid, code) pairs for which a warning has already been emitted.
+    /// Keyed by both index and code so distinct warnings on the same IR
+    /// instruction are deduplicated independently.  Prevents duplicate
+    /// diagnostics across iterate passes.
+    warned_lids: HashSet<(usize, &'static str)>,
 
     /// Starting absolute address, just copied from irdb for convenience.
     pub start_addr: u64,
@@ -104,11 +124,8 @@ impl Engine {
     /// Debug trace that produces an indented output with section name to make
     /// section nesting more readable.
     fn trace(&self, msg: &str) {
-        let mut sec_name = "";
-        let sec_depth = self.sec_names.len();
-        if sec_depth != 0 {
-            sec_name = self.sec_names.last().unwrap();
-        }
+        let sec_depth = self.scope_stack.len();
+        let sec_name = self.scope_stack.last().map(|f| f.sec_name.as_str()).unwrap_or("");
         trace!("{}{}: {}", "    ".repeat(sec_depth), sec_name, msg);
     }
 
@@ -1106,6 +1123,14 @@ impl Engine {
             ir.operands[2]
         };
 
+        // Record that set_addr was called mid-section if sec_offset is non-zero.
+        // This arms the warning for any subsequent set_sec_offset in this scope.
+        if current.sec_offset != 0 {
+            if let Some(frame) = self.scope_stack.last_mut() {
+                frame.set_addr_seen = true;
+            }
+        }
+
         current.addr_base = set_val;
         current.addr_offset = 0;
 
@@ -1210,8 +1235,7 @@ impl Engine {
         }
     }
 
-    /// At the start of a section, push the old section offset
-    /// and reset the current section offset to zero.
+    /// On section entry, save all parent cursor state that the child may modify.
     fn iterate_section_start(
         &mut self,
         ir: &IR,
@@ -1220,8 +1244,13 @@ impl Engine {
         current: &mut Location,
     ) -> bool {
         let sec_name = irdb.get_opnd_as_identifier(ir, 0).to_string();
-        // Track that's we've entered this new section
-        self.sec_names.push(sec_name);
+        self.scope_stack.push(ScopeFrame {
+            sec_offset: current.sec_offset,
+            addr_base: current.addr_base,
+            addr_offset: current.addr_offset,
+            sec_name,
+            set_addr_seen: false,
+        });
         self.trace(
             format!(
                 "Engine::iterate_section_start: file_pos {}, sec {}",
@@ -1229,14 +1258,13 @@ impl Engine {
             )
             .as_str(),
         );
-        self.sec_offsets.push(current.sec_offset);
         current.sec_offset = 0;
 
         true
     }
 
-    /// At the end of a section, pop the last section offset and add
-    /// its value to the current section offset
+    /// On section exit, restore parent cursor state and advance the parent's
+    /// offsets by the child's byte count.
     fn iterate_section_end(
         &mut self,
         ir: &IR,
@@ -1244,17 +1272,20 @@ impl Engine {
         _diags: &mut Diags,
         current: &mut Location,
     ) -> bool {
-        let sec_name = irdb.get_opnd_as_identifier(ir, 0).to_string();
+        let child_size = current.sec_offset;
+        let frame = self.scope_stack.pop().unwrap();
         self.trace(
             format!(
-                "Engine::iterate_section_end: '{}', file_pos {}, sec {}",
-                sec_name, current.file_offset, current.sec_offset
+                "Engine::iterate_section_end: '{}', child_size {}, file_pos {}",
+                irdb.get_opnd_as_identifier(ir, 0),
+                child_size,
+                current.file_offset
             )
             .as_str(),
         );
-        current.sec_offset += self.sec_offsets.pop().unwrap();
-        // Track that's we've exited this section
-        self.sec_names.pop();
+        current.sec_offset = frame.sec_offset + child_size;
+        current.addr_base = frame.addr_base;
+        current.addr_offset = frame.addr_offset + child_size;
 
         true
     }
@@ -1275,8 +1306,8 @@ impl Engine {
         let mut engine = Engine {
             parms: Vec::new(),
             ir_locs,
-            sec_offsets: Vec::new(),
-            sec_names: Vec::new(),
+            scope_stack: Vec::new(),
+            warned_lids: HashSet::new(),
             start_addr: irdb.start_addr,
             wr_dispatches: Vec::new(),
             label_dispatches: Vec::new(),
@@ -1379,7 +1410,7 @@ impl Engine {
             let mut current = Location { file_offset: 0, addr_offset: 0, sec_offset: 0, addr_base: self.start_addr };
 
             // make sure we exited as many sections as we entered on each iteration
-            assert!(self.sec_offsets.is_empty());
+            assert!(self.scope_stack.is_empty());
 
             for (lid, ir) in irdb.ir_vec.iter().enumerate() {
                 debug!(
@@ -1429,6 +1460,25 @@ impl Engine {
                     }
                     IRKind::Align => self.iterate_align(ir, irdb, diags, &current),
                     IRKind::SetSecOffset | IRKind::SetAddrOffset | IRKind::SetFileOffset => {
+                        if ir.kind != IRKind::SetFileOffset {
+                            if let Some(true) = self.scope_stack.last().map(|f| &f.set_addr_seen) {
+                                if self.warned_lids.insert((lid, "EXEC_54")) {
+                                    let cmd = if ir.kind == IRKind::SetSecOffset {
+                                        "set_sec_offset"
+                                    } else {
+                                        "set_addr_offset"
+                                    };
+                                    let msg = format!(
+                                        "[EXEC_54] Warning: '{}' follows 'set_addr' in the same \
+                                         section scope.  '{}' pads to a sec/addr_offset value, \
+                                         not to an address.  Consider 'set_addr_offset' after \
+                                         'set_addr' to pad relative to the address anchor.",
+                                        cmd, cmd
+                                    );
+                                    diags.warn1("EXEC_54", &msg, ir.src_loc.clone());
+                                }
+                            }
+                        }
                         self.iterate_set(ir, irdb, diags, &current)
                     }
                     IRKind::SetAddr => self.iterate_set_addr(ir, &mut current),

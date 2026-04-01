@@ -1,0 +1,5 @@
+// 'wrs' is a dedicated lexer token and cannot be used as a const name.
+// The lexer rejects it before the reserved-identifier check; parse errors fire.
+const wrs = 1;
+section foo { wr8 1; }
+output foo;

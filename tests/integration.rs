@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests {
     use assert_cmd::Command;
+    use predicates::prelude::PredicateBooleanExt;
     use std::fs;
 
     fn assert_brink_success(src: &str, output_bin: Option<&str>, expected_output: Option<&str>) {
@@ -38,6 +39,46 @@ mod tests {
             .failure();
         for code in expected_err_codes {
             assert = assert.stderr(predicates::str::contains(*code));
+        }
+    }
+
+    /// Asserts that brink succeeds and none of the specified codes appear on stderr.
+    /// Runs with `-v` so that any warnings would be visible if present.
+    fn assert_brink_no_warning(src: &str, absent_codes: &[&str]) {
+        let derived_out = format!("{}.bin", src.replace('/', "_").replace('\\', "_"));
+        let mut assert = Command::cargo_bin("brink")
+            .unwrap()
+            .arg("-v")
+            .arg(src)
+            .arg("-o")
+            .arg(&derived_out)
+            .assert()
+            .success();
+        for code in absent_codes {
+            assert = assert.stderr(predicates::str::contains(*code).not());
+        }
+        if fs::metadata(&derived_out).is_ok() {
+            fs::remove_file(&derived_out).unwrap();
+        }
+    }
+
+    /// Asserts that brink succeeds and emits the specified warning codes on stderr.
+    /// Runs with `-v` so that warnings are not suppressed.
+    fn assert_brink_warning(src: &str, expected_warn_codes: &[&str]) {
+        let derived_out = format!("{}.bin", src.replace('/', "_").replace('\\', "_"));
+        let mut assert = Command::cargo_bin("brink")
+            .unwrap()
+            .arg("-v")
+            .arg(src)
+            .arg("-o")
+            .arg(&derived_out)
+            .assert()
+            .success();
+        for code in expected_warn_codes {
+            assert = assert.stderr(predicates::str::contains(*code));
+        }
+        if fs::metadata(&derived_out).is_ok() {
+            fs::remove_file(&derived_out).unwrap();
         }
     }
 
@@ -890,6 +931,72 @@ mod tests {
     }
 
     #[test]
+    fn set_sec_offset_after_set_addr() {
+        assert_brink_warning(
+            "tests/set_sec_offset_after_set_addr.brink",
+            &["[EXEC_54]"],
+        );
+    }
+
+    #[test]
+    fn set_addr_scope_restore() {
+        // Child's set_addr must not leak addr_base or addr_offset into parent.
+        assert_brink_success("tests/set_addr_scope_restore.brink", None, None);
+    }
+
+    #[test]
+    fn set_addr_three_levels() {
+        // Grandchild set_addr must not reach child or grandparent on exit.
+        assert_brink_success("tests/set_addr_three_levels.brink", None, None);
+    }
+
+    #[test]
+    fn set_addr_two_siblings() {
+        // Second sibling must inherit restored parent addr state, not first sibling's.
+        assert_brink_success("tests/set_addr_two_siblings.brink", None, None);
+    }
+
+    #[test]
+    fn set_addr_repeated_section() {
+        // Section with set_addr written twice; each invocation scoped independently.
+        assert_brink_success("tests/set_addr_repeated_section.brink", None, None);
+    }
+
+    #[test]
+    fn set_addr_empty_child() {
+        // Empty child with set_addr writes 0 bytes; parent addr must not change.
+        assert_brink_success("tests/set_addr_empty_child.brink", None, None);
+    }
+
+    #[test]
+    fn set_addr_backward_child() {
+        // Child set_addr to lower address; parent addr_base restored correctly.
+        assert_brink_success("tests/set_addr_backward_child.brink", None, None);
+    }
+
+    #[test]
+    fn set_addr_inherit_addr_offset() {
+        // Child with no set_addr inherits and continues parent addr_offset.
+        assert_brink_success("tests/set_addr_inherit_addr_offset.brink", None, None);
+    }
+
+    #[test]
+    fn set_addr_multi_in_child() {
+        // Child calls set_addr twice; parent sees only the total byte count.
+        assert_brink_success("tests/set_addr_multi_in_child.brink", None, None);
+    }
+
+    #[test]
+    fn set_sec_offset_after_set_addr_no_warn() {
+        // set_addr as the first statement keeps addr_offset and sec_offset in
+        // sync, so EXEC_54 must not fire.
+        assert_brink_no_warning(
+            "tests/set_sec_offset_after_set_addr_no_warn.brink",
+            &["[EXEC_54]"],
+        );
+    }
+
+    #[test]
 
     fn set_sec_offset_3() {
         let _cmd = Command::cargo_bin("brink")
@@ -1117,6 +1224,7 @@ mod tests {
             "diags.err1(\"",
             "diags.err2(\"",
             "diags.warn(\"",
+            "diags.warn1(\"",
             "diags.note0(\"",
             "diags.note1(\"",
         ];
@@ -1407,16 +1515,67 @@ mod tests {
         assert_brink_failure("tests/reserved_section_3.brink", &["[AST_32]"]);
     }
 
+    /// 'wrs' is a dedicated lexer token and cannot be used as a section name.
+    /// The lexer rejects it before the reserved-identifier check fires.
+    #[test]
+    fn reserved_section_4() {
+        assert_brink_failure("tests/reserved_section_4.brink", &[]);
+    }
+
+    /// 'wrf' is a dedicated lexer token and cannot be used as a section name.
+    /// The lexer rejects it before the reserved-identifier check fires.
+    #[test]
+    fn reserved_section_5() {
+        assert_brink_failure("tests/reserved_section_5.brink", &[]);
+    }
+
+    /// Identifiers starting with '__' are reserved as section names.
+    #[test]
+    fn reserved_section_6() {
+        assert_brink_failure("tests/reserved_section_6.brink", &["[AST_32]"]);
+    }
+
     /// 'let' is reserved and cannot be used as a const name.
     #[test]
     fn reserved_const_3() {
         assert_brink_failure("tests/reserved_const_3.brink", &["[AST_33]"]);
     }
 
+    /// 'wrs' is a dedicated lexer token and cannot be used as a const name.
+    /// The lexer rejects it before the reserved-identifier check fires.
+    #[test]
+    fn reserved_const_4() {
+        assert_brink_failure("tests/reserved_const_4.brink", &[]);
+    }
+
+    /// Identifiers starting with '__' are reserved as const names.
+    #[test]
+    fn reserved_const_5() {
+        assert_brink_failure("tests/reserved_const_5.brink", &["[AST_33]"]);
+    }
+
     /// 'true' is reserved and cannot be used as a label name.
     #[test]
     fn reserved_label_3() {
         assert_brink_failure("tests/reserved_label_3.brink", &["[LINEAR_13]"]);
+    }
+
+    /// 'wrs' is a reserved exact keyword and cannot be used as a label name.
+    #[test]
+    fn reserved_label_4() {
+        assert_brink_failure("tests/reserved_label_4.brink", &["[LINEAR_13]"]);
+    }
+
+    /// Identifiers starting with '__' are reserved as label names.
+    #[test]
+    fn reserved_label_5() {
+        assert_brink_failure("tests/reserved_label_5.brink", &["[LINEAR_13]"]);
+    }
+
+    /// 'wr' without a following digit is now a valid identifier prefix.
+    #[test]
+    fn wr_prefix_now_valid() {
+        assert_brink_success("tests/wr_prefix_now_valid.brink", None, None);
     }
 
     // ── Map file output tests ─────────────────────────────────────────────────

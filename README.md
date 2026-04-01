@@ -356,24 +356,26 @@ Brink reserves certain identifiers and rejects their use as section names, const
 
 Brink also reserves two identifier *prefixes*.  Any user defined identifier beginning with a reserved prefix triggers an error.
 
-| Reserved Prefix | Reason                                                                          |
-| --------------- | ------------------------------------------------------------------------------- |
-| `wr`            | Write instructions (`wr8`, `wr16`, `wrs`, `wrf`, and future variants)           |
-| `set_`          | Configuration directives (`set_sec_offset`, `set_off`, `set_addr`, and future variants) |
-| `__`            | Leading double underscore names refer to builtin identifiers.                   |
+| Reserved Prefix  | Reason                                                                                  |
+| ---------------- | --------------------------------------------------------------------------------------- |
+| `wr` + digit     | Numeric write instructions (`wr8`, `wr16`, `wr32`, and future width variants)           |
+| `set_`           | Configuration directives (`set_sec_offset`, `set_addr`, `set_file_offset`, and future variants) |
+| `__`             | Leading double underscore names refer to builtin identifiers.                           |
 
-Brink also reserves the following *exact* keywords for future language features:
+Brink also reserves the following *exact* keywords:
 
-| Reserved Keyword | Possible future use           |
-| ---------------- | ----------------------------- |
-| `import`         | Module inclusion              |
-| `if`             | Conditional section inclusion |
-| `else`           | Conditional section inclusion |
-| `true`           | Boolean literal               |
-| `false`          | Boolean literal               |
-| `extern`         | External section references   |
-| `let`            | Variable declarations         |
-| `fill`           | Fill / pad byte ranges        |
+| Reserved Keyword | Reason / possible future use              |
+| ---------------- | ----------------------------------------- |
+| `wrs`            | Write-string command                      |
+| `wrf`            | Write-file command                        |
+| `import`         | Module inclusion                          |
+| `if`             | Conditional section inclusion             |
+| `else`           | Conditional section inclusion             |
+| `true`           | Boolean literal                           |
+| `false`          | Boolean literal                           |
+| `extern`         | External section references               |
+| `let`            | Variable declarations                     |
+| `fill`           | Fill / pad byte ranges                    |
 
 Keyword reservation is case-sensitive.  `Fill` and `FILL` are valid identifiers; `fill` is not.
 
@@ -840,6 +842,7 @@ Example:
 The `set_addr` command forces the current address to the specified value and resets the current `addr_offset` to zero.  These changes happen within the scope of the containing section.  Child sections inherit the new `addr` and `addr_offset` values unless they call `set_addr` themselves.
 
 Using `set_addr` *does not* change the value of the section offset nor file offset.  A `set_addr` command *does not* add pad bytes to the output.
+
 
 The `set_addr` command may move the address forward or backwards.  However, Brink tracks every output byte by address and reports an error if a program tries to write to the same address more than once.
 
