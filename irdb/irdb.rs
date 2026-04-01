@@ -56,6 +56,10 @@ pub struct IRDb {
 
     /// Maps each const identifier to its resolved parameter value.
     pub const_values: HashMap<String, ParameterValue>,
+
+    /// Name of the section designated by the `output` statement.
+    /// Used by the engine to evaluate `__OUTPUT_SIZE` and `__OUTPUT_ADDR`.
+    pub output_sec_str: String,
 }
 
 /// Error returned by `calc_u64_op` / `calc_i64_op` before a diagnostic is emitted.
@@ -125,6 +129,8 @@ impl IRDb {
             | ast::LexToken::DoublePipe
             | ast::LexToken::DoubleAmpersand
             | ast::LexToken::Sizeof
+            | ast::LexToken::OutputSize
+            | ast::LexToken::OutputAddr
             | ast::LexToken::ToU64
             | ast::LexToken::U64 => data_type = Some(DataType::U64), // TODO: this will be I64 when we convert bool
             ast::LexToken::ToI64 | ast::LexToken::I64 => data_type = Some(DataType::I64),
@@ -668,6 +674,8 @@ impl IRDb {
             | IRKind::SectionStart
             | IRKind::SectionEnd
             | IRKind::Sizeof
+            | IRKind::OutputSize
+            | IRKind::OutputAddr
             | IRKind::Label
             | IRKind::Addr
             | IRKind::AddrOffset
@@ -904,6 +912,8 @@ impl IRDb {
                 }
             }
             ast::LexToken::Sizeof
+            | ast::LexToken::OutputSize
+            | ast::LexToken::OutputAddr
             | ast::LexToken::Addr
             | ast::LexToken::AddrOffset
             | ast::LexToken::SecOffset
@@ -1189,6 +1199,7 @@ impl IRDb {
             start_addr: 0,
             files: HashMap::new(),
             const_values: HashMap::new(),
+            output_sec_str: lin_db.output_sec_str.clone(),
         };
 
         // Pre-populate const_values with command-line defines so they are

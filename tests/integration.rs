@@ -414,6 +414,30 @@ mod tests {
         assert_brink_success("tests/sizeof_3.brink", Some("sizeof_3.bin"), Some("Wow!"));
     }
 
+    /// __OUTPUT_SIZE equals sizeof(output_section) and can be used in asserts.
+    #[test]
+    fn test_output_size_1() {
+        assert_brink_success("tests/test_output_size_1.brink", None, None);
+    }
+
+    /// __OUTPUT_SIZE written into the output header as a 4-byte field.
+    #[test]
+    fn test_output_size_2() {
+        assert_brink_success("tests/test_output_size_2.brink", None, None);
+    }
+
+    /// __OUTPUT_ADDR equals addr(output_section) with a non-zero base address.
+    #[test]
+    fn test_output_addr_1() {
+        assert_brink_success("tests/test_output_addr_1.brink", None, None);
+    }
+
+    /// __OUTPUT_ADDR is zero when no base address is specified.
+    #[test]
+    fn test_output_addr_2() {
+        assert_brink_success("tests/test_output_addr_2.brink", None, None);
+    }
+
     #[test]
 
     fn integers_1() {
@@ -987,6 +1011,18 @@ mod tests {
     }
 
     #[test]
+    fn output_addr_root_anchors_without_output_base_after_set_addr() {
+        // __OUTPUT_ADDR should remain 0 when output has no base and first statement is set_addr.
+        assert_brink_success("tests/output_addr_section_set_addr.brink", None, None);
+    }
+
+    #[test]
+    fn output_addr_root_anchors_with_output_base_after_set_addr() {
+        // __OUTPUT_ADDR should remain output base when output has a base and first statement is set_addr.
+        assert_brink_success("tests/output_addr_section_set_addr_with_output_base.brink", None, None);
+    }
+
+    #[test]
     fn set_sec_offset_after_set_addr_no_warn() {
         // set_addr as the first statement keeps addr_offset and sec_offset in
         // sync, so EXEC_54 must not fire.
@@ -1422,6 +1458,16 @@ mod tests {
     #[test]
     fn const_sizeof_1() {
         assert_brink_failure("tests/const_sizeof_1.brink", &["[IRDB_19]"]);
+    }
+
+    /// A const expression uses __OUTPUT_SIZE, which requires engine-time layout.
+    /// Consts must be resolvable before the engine runs.  Expected: IRDB_19.
+    #[test]
+    fn test_output_builtin_const_fail() {
+        assert_brink_failure(
+            "tests/test_output_builtin_const_fail.brink",
+            &["[IRDB_19]"],
+        );
     }
 
     /// A const expression depends on addr(), which requires engine-time addressing.

@@ -960,6 +960,63 @@ Example:
     output foo;
 ---
 
+## Built-in Variables
+
+Brink pre-defines built-in identifiers that begin with `__` (double underscore).  They can appear in expression contexts that accept the corresponding data type.  As noted in the table below, programs **cannot** use some built-ins in `const` expressions because their values depend on dynamic layout of the output.
+
+| Variable        | Type  | OK in `const`<br>expressions? | Description                                                              |
+| --------------- | ----- | ----------------------------- | ------------------------------------------------------------------------ |
+| `__OUTPUT_SIZE` | `U64` | No                            | Total output size in bytes.  Equivalent to `sizeof(<output-section>)`.   |
+| `__OUTPUT_ADDR` | `U64` | No                            | Starting address of the output.  Equivalent to `addr(<output-section>)`. |
+
+### `__OUTPUT_SIZE`
+
+Returns the total size of the output file in bytes.
+
+Example — write a 4-byte header field containing the total output size:
+
+    section payload {
+        wrs "Hello";
+    }
+
+    section hdr {
+        wr32 __OUTPUT_SIZE;  // filled with total image size at link time
+    }
+
+    section image {
+        wr hdr;
+        wr payload;
+        assert __OUTPUT_SIZE == sizeof(image);  // equivalent forms
+    }
+
+    output image;
+
+### `__OUTPUT_ADDR`
+
+Returns the absolute starting address of the output.  When the `output` statement specifies a base address, `__OUTPUT_ADDR` equals that address.  When `output` specifies no base address, `__OUTPUT_ADDR` is zero.  This behavior is identical to `addr(<output-section>)`.
+
+Importantly, `__OUTPUT_ADDR` is fixed to the section start specified in the `output` statement, i.e. the entry point address, and does not “follow” an in-section `set_addr`.
+
+Example — embed the output base address in a table without repeating the constant:
+
+    section vtable {
+        wr32 __OUTPUT_ADDR;  // base address of the output image
+    }
+
+    section code {
+        wrs "code";
+    }
+
+    section image {
+        wr vtable;
+        wr code;
+        assert __OUTPUT_ADDR == addr(image);  // equivalent forms
+    }
+
+    output image 0x0800_0000;
+
+---
+
 ## `to_i64( <expression> ) -> I64`
 
 Converts the specified expression to the I64 type without regard to under/overflow.

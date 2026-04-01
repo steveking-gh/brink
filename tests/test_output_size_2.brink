@@ -1,0 +1,20 @@
+// __OUTPUT_SIZE written into the output header.
+// hdr holds the 4-byte total image size, followed by a 3-byte payload.
+// Total: 7 bytes.
+
+section payload {
+    wrs "ABC";
+}
+
+section hdr {
+    wr32 __OUTPUT_SIZE;
+}
+
+section image {
+    wr hdr;
+    wr payload;
+    assert __OUTPUT_SIZE == 7;
+    assert sizeof(image) == 7;
+}
+
+output image;

@@ -1,0 +1,13 @@
+section foo {
+    // No output base address specified, so __OUTPUT_ADDR should be 0.
+    // First operation is set_addr to move cursors to 0x8000_0000.
+    set_addr 0x8000_0000u;
+
+    assert addr() == 0x8000_0000;
+    assert __OUTPUT_ADDR == 0;
+
+    wr8 0xAA, 1;
+    assert addr() == 0x8000_0001;
+}
+
+output foo;

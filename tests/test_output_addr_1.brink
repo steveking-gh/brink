@@ -1,0 +1,14 @@
+// __OUTPUT_ADDR with a non-zero base address.
+// The output section starts at address 0x1000.
+
+section data {
+    wrs "Hi";
+}
+
+section image {
+    assert __OUTPUT_ADDR == 0x1000u;
+    assert __OUTPUT_ADDR == addr(image);
+    wr data;
+}
+
+output image 0x1000;

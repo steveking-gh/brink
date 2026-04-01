@@ -1,0 +1,11 @@
+// __OUTPUT_SIZE and __OUTPUT_ADDR cannot be used in const expressions
+// because they require engine-time layout information.
+// This file tests that __OUTPUT_SIZE in a const is rejected with IRDB_19.
+
+section foo {
+    wrs "test";
+}
+
+const IMAGE_SIZE = __OUTPUT_SIZE;
+
+output foo;

@@ -932,6 +932,54 @@ impl Engine {
         }
     }
 
+    fn iterate_output_size(&mut self, ir: &IR, irdb: &IRDb, diags: &mut Diags) -> bool {
+        // __OUTPUT_SIZE has no input operands, only a single output operand.
+        assert!(ir.operands.len() == 1);
+        let out_parm_num = ir.operands[0];
+        let sec_name = &irdb.output_sec_str;
+
+        let ir_rng = irdb.sized_locs.get(sec_name);
+        if ir_rng.is_none() {
+            let msg = format!("__OUTPUT_SIZE: output section '{}' not found.", sec_name);
+            diags.err1("EXEC_57", &msg, ir.src_loc.clone());
+            return false;
+        }
+        let ir_rng = ir_rng.unwrap();
+        assert!(ir_rng.start <= ir_rng.end);
+        let start_loc = &self.ir_locs[ir_rng.start];
+        let end_loc = &self.ir_locs[ir_rng.end];
+
+        if start_loc.file_offset > end_loc.file_offset {
+            *self.parms[out_parm_num].to_u64_mut() = 0;
+        } else {
+            *self.parms[out_parm_num].to_u64_mut() = end_loc.file_offset - start_loc.file_offset;
+        }
+        true
+    }
+
+    fn iterate_output_addr(&mut self, ir: &IR, irdb: &IRDb, diags: &mut Diags) -> bool {
+        // __OUTPUT_ADDR has no input operands, only a single output operand.
+        assert!(ir.operands.len() == 1);
+        let out_parm_num = ir.operands[0];
+        let sec_name = &irdb.output_sec_str;
+
+        let ir_num = irdb.addressed_locs.get(sec_name);
+        if ir_num.is_none() {
+            let msg = format!("__OUTPUT_ADDR: output section '{}' not reachable.", sec_name);
+            diags.err1("EXEC_58", &msg, ir.src_loc.clone());
+            return false;
+        }
+        let ir_num = ir_num.unwrap();
+        let start_loc = &self.ir_locs[*ir_num];
+
+        let Some(val) = start_loc.addr_base.checked_add(start_loc.addr_offset) else {
+            diags.err1("EXEC_59", "__OUTPUT_ADDR: address overflow.", ir.src_loc.clone());
+            return false;
+        };
+        *self.parms[out_parm_num].to_u64_mut() = val;
+        true
+    }
+
     /// Compute the transient current address.  This case is called when
     /// addr/addr_offset/sec_offset is called without an identifier.
     fn iterate_current_address(&mut self, ir: &IR, diags: &mut Diags, current: &Location) -> bool {
@@ -1446,6 +1494,8 @@ impl Engine {
                     }
                     IRKind::Sizeof => self.iterate_sizeof(ir, irdb, diags, &current),
                     IRKind::SizeofExt => self.iterate_sizeof_ext(ir, diags, ext_registry),
+                    IRKind::OutputSize => self.iterate_output_size(ir, irdb, diags),
+                    IRKind::OutputAddr => self.iterate_output_addr(ir, irdb, diags),
 
                     // Unlike print, we have to iterate on the string write operation since
                     // the size of the string affects the size of the output image.
@@ -1873,6 +1923,8 @@ impl Engine {
                 | IRKind::Label
                 | IRKind::Sizeof
                 | IRKind::SizeofExt
+                | IRKind::OutputSize
+                | IRKind::OutputAddr
                 | IRKind::ToI64
                 | IRKind::ToU64
                 | IRKind::Eq

@@ -112,6 +112,8 @@ fn tok_to_irkind(tok: LexToken) -> IRKind {
         LexToken::SetAddrOffset => IRKind::SetAddrOffset,
         LexToken::SetSecOffset => IRKind::SetSecOffset,
         LexToken::SetFileOffset => IRKind::SetFileOffset,
+        LexToken::OutputSize => IRKind::OutputSize,
+        LexToken::OutputAddr => IRKind::OutputAddr,
         LexToken::Sizeof => IRKind::Sizeof,
         LexToken::ToI64 => IRKind::ToI64,
         LexToken::ToU64 => IRKind::ToU64,
@@ -448,6 +450,17 @@ impl<'toks> LinearDb {
                     );
                     returned_operands.push(idx);
                 }
+            }
+            // Built-in variable atoms: no input operands; the output section is
+            // resolved at engine time via IRDb::output_sec_str.
+            LexToken::OutputSize | LexToken::OutputAddr => {
+                let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tinfo.tok), in_const_expr);
+                let idx = self.add_new_operand_to_ir(
+                    ir_lid,
+                    LinOperand::new(Some(ir_lid), tinfo),
+                    in_const_expr,
+                );
+                returned_operands.push(idx);
             }
             LexToken::Addr | LexToken::AddrOffset | LexToken::SecOffset | LexToken::FileOffset => {
                 // A vector to track the operands of this expression.

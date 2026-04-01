@@ -59,6 +59,8 @@ pub enum IRKind {
     Modulo,
     Multiply,
     NEq,
+    OutputAddr,
+    OutputSize,
     SetSecOffset,
     SetAddrOffset,
     SetAddr,

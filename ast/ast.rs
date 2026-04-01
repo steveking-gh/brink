@@ -30,6 +30,12 @@ use tracing::{debug, error, info, trace, warn};
 pub enum LexToken {
     #[token("const")]
     Const,
+    // Built-in variables — must be listed before the Identifier regex so that
+    // logos gives them priority over the generic identifier pattern.
+    #[token("__OUTPUT_SIZE")]
+    OutputSize,
+    #[token("__OUTPUT_ADDR")]
+    OutputAddr,
     #[token("section")]
     Section,
     #[token("align")]
@@ -1195,6 +1201,12 @@ impl<'toks> Ast<'toks> {
                 if !self.expect_token_no_add(LexToken::CloseParen, diags) {
                     return self.dbg_exit_pratt("parse_pratt", &None, false);
                 }
+            }
+
+            // Built-in variable atoms — no parentheses, no arguments.
+            LexToken::OutputSize | LexToken::OutputAddr => {
+                *top = Some(self.arena.new_node(self.tok_num));
+                self.tok_num += 1;
             }
 
             _ => {

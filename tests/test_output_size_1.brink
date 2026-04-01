@@ -1,0 +1,24 @@
+// Basic __OUTPUT_SIZE tests.
+// The output section is 'top' which contains two sections:
+//   hdr: 4 bytes (wr32)
+//   data: 5 bytes (wrs "Hello")
+// Total: 9 bytes.
+
+section hdr {
+    assert __OUTPUT_SIZE == 9;
+    wr32 0;
+}
+
+section data {
+    assert __OUTPUT_SIZE == 9;
+    wrs "Hello";
+}
+
+section top {
+    wr hdr;
+    wr data;
+    assert __OUTPUT_SIZE == 9;
+    assert __OUTPUT_SIZE == sizeof(top);
+}
+
+output top;

@@ -1,0 +1,9 @@
+// __OUTPUT_ADDR with no base address defaults to zero.
+
+section image {
+    assert __OUTPUT_ADDR == 0u;
+    assert __OUTPUT_ADDR == addr(image);
+    wrs "test";
+}
+
+output image;
