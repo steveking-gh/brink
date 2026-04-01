@@ -1,0 +1,8 @@
+// A ranged extension called with an explicit zero-length range.
+// brink::test_ranged_sum accepts empty input and returns sum=0.
+// Expected output: 8 bytes — 0x00 * 8 (sum of nothing = 0, LE u64).
+section top {
+    wr brink::test_ranged_sum(0, 0);
+    assert sizeof(top) == 8;
+}
+output top 0;

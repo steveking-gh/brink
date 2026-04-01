@@ -1,0 +1,7 @@
+// Verifies that sizeof(std::crc32c) reports 4 (bytes).
+section data {
+    wr8 0x00;
+    assert sizeof(std::crc32c) == 4;
+}
+
+output data;

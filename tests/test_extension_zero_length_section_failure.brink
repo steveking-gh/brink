@@ -1,0 +1,10 @@
+// A ranged extension called with the section-name form on an empty section.
+// brink::test_reject_empty returns an error when img_buffer is empty.
+// Expects a non-zero exit code.
+section empty {
+}
+section top {
+    wr empty;
+    wr brink::test_reject_empty(empty);
+}
+output top 0;

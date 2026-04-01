@@ -132,6 +132,7 @@ pub fn process(
 
     let mut ext_registry = ExtensionRegistry::new();
     register_test_extensions(&mut ext_registry);
+    extensions::register_all(&mut ext_registry);
 
     let ir_db = IRDb::new(&linear_db, &mut diags, &const_defines, &ext_registry)
         .context("[PROC_3]: Error detected, halting.")?;

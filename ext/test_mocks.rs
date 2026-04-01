@@ -159,9 +159,49 @@ impl BrinkRangedExtension for MockRangedSum {
     }
 }
 
+/// Rejects a zero-length input slice with an error.
+/// Used to verify that extensions can reject empty ranges.
+pub struct MockRejectEmpty {
+    size_call_count: Cell<usize>,
+}
+
+impl MockRejectEmpty {
+    pub fn new() -> Self {
+        Self { size_call_count: Cell::new(0) }
+    }
+}
+
+impl Default for MockRejectEmpty {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl BrinkRangedExtension for MockRejectEmpty {
+    fn name(&self) -> &str {
+        "brink::test_reject_empty"
+    }
+
+    fn size(&self) -> usize {
+        let prev = self.size_call_count.get();
+        assert_eq!(prev, 0, "MockRejectEmpty::size() called more than once");
+        self.size_call_count.set(prev + 1);
+        4
+    }
+
+    fn execute(&self, _args: &[u64], img_buffer: &[u8], out_buffer: &mut [u8]) -> Result<(), String> {
+        if img_buffer.is_empty() {
+            return Err("brink::test_reject_empty: input range must not be empty".to_string());
+        }
+        out_buffer.fill(0xAB);
+        Ok(())
+    }
+}
+
 pub fn register_test_extensions(reg: &mut ExtensionRegistry) {
     reg.register(Box::new(MockCrc::new()));
     reg.register(Box::new(MockLogger::new()));
     reg.register_ranged(Box::new(MockIncrement::new()));
     reg.register_ranged(Box::new(MockRangedSum::new()));
+    reg.register_ranged(Box::new(MockRejectEmpty::new()));
 }

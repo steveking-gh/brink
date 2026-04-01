@@ -277,12 +277,12 @@ The only global (non-scoped) offset is the `file_offset`.  Starting from 0, this
 
 The following table provides a summary of the addresses and offsets used in Brink.
 
-| Variable       | Section Entry | Section Exit      | [`set_addr`](set_addr-expression) | [`set_sec_offset`](set_sec_offset-expression--pad-byte-value) | [`set_addr_offset`](set_addr_offset-expression--pad-byte-value) | [`set_file_offset`](set_file_offset-expression--pad-byte-value) |
-| -------------- | ------------- | ----------------- | ---------- | ---------------- | ----------------- | ----------------- |
-| Address        | No Change     | Restore & Update  | Set        | Pad Forward      | Pad Forward       | Pad Forward       |
-| Address Offset | No Change     | Restore & Update  | Set to 0   | Pad Forward      | Pad Forward       | Pad Forward       |
-| Section Offset | Set to 0      | Restore & Update  | No change  | Pad Forward      | Pad Forward       | Pad Forward       |
-| File Offset    | No Change     | No Change         | No Change  | Pad Forward      | Pad Forward       | Pad Forward       |
+| Variable       | Section Entry | Section Exit     | [`set_addr`](set_addr-expression) | [`set_sec_offset`](set_sec_offset-expression--pad-byte-value) | [`set_addr_offset`](set_addr_offset-expression--pad-byte-value) | [`set_file_offset`](set_file_offset-expression--pad-byte-value) |
+| -------------- | ------------- | ---------------- | --------------------------------- | ------------------------------------------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------- |
+| Address        | No Change     | Restore & Update | Set                               | Pad Forward                                                   | Pad Forward                                                     | Pad Forward                                                     |
+| Address Offset | No Change     | Restore & Update | Set to 0                          | Pad Forward                                                   | Pad Forward                                                     | Pad Forward                                                     |
+| Section Offset | Set to 0      | Restore & Update | No change                         | Pad Forward                                                   | Pad Forward                                                     | Pad Forward                                                     |
+| File Offset    | No Change     | No Change        | No Change                         | Pad Forward                                                   | Pad Forward                                                     | Pad Forward                                                     |
 
 
 The following diagram shows several address and offset concepts.  Users specify the starting logical address using an [output](#output-section-identifier-absolute-starting-address) statement.
@@ -356,26 +356,26 @@ Brink reserves certain identifiers and rejects their use as section names, const
 
 Brink also reserves two identifier *prefixes*.  Any user defined identifier beginning with a reserved prefix triggers an error.
 
-| Reserved Prefix  | Reason                                                                                  |
-| ---------------- | --------------------------------------------------------------------------------------- |
-| `wr` + digit     | Numeric write instructions (`wr8`, `wr16`, `wr32`, and future width variants)           |
-| `set_`           | Configuration directives (`set_sec_offset`, `set_addr`, `set_file_offset`, and future variants) |
-| `__`             | Leading double underscore names refer to builtin identifiers.                           |
+| Reserved Prefix | Reason                                                                                          |
+| --------------- | ----------------------------------------------------------------------------------------------- |
+| `wr` + digit    | Numeric write instructions (`wr8`, `wr16`, `wr32`, and future width variants)                   |
+| `set_`          | Configuration directives (`set_sec_offset`, `set_addr`, `set_file_offset`, and future variants) |
+| `__`            | Leading double underscore names refer to builtin identifiers.                                   |
 
 Brink also reserves the following *exact* keywords:
 
-| Reserved Keyword | Reason / possible future use              |
-| ---------------- | ----------------------------------------- |
-| `wrs`            | Write-string command                      |
-| `wrf`            | Write-file command                        |
-| `import`         | Module inclusion                          |
-| `if`             | Conditional section inclusion             |
-| `else`           | Conditional section inclusion             |
-| `true`           | Boolean literal                           |
-| `false`          | Boolean literal                           |
-| `extern`         | External section references               |
-| `let`            | Variable declarations                     |
-| `fill`           | Fill / pad byte ranges                    |
+| Reserved Keyword | Reason / possible future use  |
+| ---------------- | ----------------------------- |
+| `wrs`            | Write-string command          |
+| `wrf`            | Write-file command            |
+| `import`         | Module inclusion              |
+| `if`             | Conditional section inclusion |
+| `else`           | Conditional section inclusion |
+| `true`           | Boolean literal               |
+| `false`          | Boolean literal               |
+| `extern`         | External section references   |
+| `let`            | Variable declarations         |
+| `fill`           | Fill / pad byte ranges        |
 
 Keyword reservation is case-sensitive.  `Fill` and `FILL` are valid identifiers; `fill` is not.
 
@@ -1129,7 +1129,7 @@ Extensions build and link to Brink at compile time as controlled by Cargo featur
 
 * Extensions register themselves at compile time in Brink's internal extension registry.
 
-* The `BrinkExtension` trait interface allows extensions to return logging and error diagnostics integrated with Brink's own diagnostic output.
+* The `BrinkExtension` trait interface allows extensions to return logging and error diagnostics integrated with Brink's own diagnostic output.  See []
 
 ---
 
@@ -1141,6 +1141,71 @@ Users write the extension's result to the output using the generic `wr` command,
 
 Users can query the size of an extension's output using the `sizeof` operator. For example, `assert sizeof(custom::crc) == 4;`.
 
+## Ranged and Nonranged Extensions
+
+Extensions have two possible forms: *ranged* and *nonranged*. A ranged extension takes an immutable slice of the output buffer as an additional input parameter.  This allows a ranged extension to produce a result based on output data, such as a CRC extension hashing a range of bytes.  Brink invokes ranged extensions even when the specified input range is empty.  Extensions that require non-empty input should return an error in that case.
+
+---
+
+## Creating and Registering a New Extension
+
+Extensions register through the `extensions` crate (`extensions/src/lib.rs`).
+`process.rs` calls `extensions::register_all` once at startup; adding an
+extension requires no changes outside `extensions/`.
+
+### Step 1 — Create the extension crate
+
+Place new extensions under `std/` for standard library extensions, or under a
+workspace path matching your namespace for third-party extensions.  Implement either
+`BrinkExtension` (no image slice access) or `BrinkRangedExtension` (image slice
+access) from the `brink_extension` crate.  Then, expose a `register` function:
+
+    // my_extension/src/lib.rs
+    use brink_extension::BrinkRangedExtension;
+    use ext::ExtensionRegistry;
+
+    pub struct MyExtension;
+
+    impl BrinkRangedExtension for MyExtension {
+        fn name(&self) -> &str { "my_ns::my_ext" }
+        fn size(&self) -> usize { 4 }
+        fn execute(&self, _args: &[u64], img: &[u8], out: &mut [u8]) -> Result<(), String> {
+            // write 4 bytes into out
+            Ok(())
+        }
+    }
+
+    pub fn register(registry: &mut ExtensionRegistry) {
+        registry.register_ranged(Box::new(MyExtension));
+    }
+
+### Step 2 — Add the crate to the workspace
+
+In the root `Cargo.toml`, add the crate path to `[workspace] members`.
+
+### Step 3 — Wire into `extensions/`
+
+In `extensions/Cargo.toml`, add the new crate as a dependency:
+
+    my_extension = { path = "../my_extension" }
+
+In `extensions/src/lib.rs`, call its register function inside `register_all`:
+
+    pub fn register_all(registry: &mut ExtensionRegistry) {
+        std_crc32c::register(registry);
+        my_extension::register(registry);  // add this line
+    }
+
+### Step 4 — Add tests
+
+Create a `tests/` directory in your extension crate with `.brink` scripts
+and an `integration.rs` test file.  Use `CARGO_MANIFEST_DIR` to locate
+`.brink` files relative to the workspace root — see
+`std/crc32c/tests/integration.rs` for a complete example.
+
+Run the extension's tests with:
+
+    cargo test -p my_extension
 
 ---
 
@@ -1164,14 +1229,18 @@ cause crashes and hangs.  At the time of writing, fuzz testing
 
 ## Brink Source Code Overview
 
-| File                 | Stage         | Summary in header                                                                                        |
-| -------------------- | ------------- | -------------------------------------------------------------------------------------------------------- |
-| ast/ast.rs           | Stage 1       | Logos lexer → token stream → arena AST → AstDb validation                                                |
-| diags/diags.rs       | Cross-cutting | Ariadne-backed diagnostic output channel used by every stage                                             |
-| engine/engine.rs     | Stage 4       | Iterate loop to stabilize location counters, then execute pass to write binary output                    |
-| ir/ir.rs             | Shared types  | IRKind, ParameterValue, IROperand, IR — the data flowing between stages 2–4                              |
-| irdb/irdb.rs         | Stage 3       | String-to-typed-value conversion, DataType resolution, operand and file validation                       |
-| lineardb/lineardb.rs | Stage 2       | AST flattening into parallel LinIR / LinOperand vectors; values still as strings                         |
-| map/map.rs           | Map output    | Constructs MapDb from post-iterate engine and irdb; renders human-friendly map text                      |
-| process/process.rs   | Orchestrator  | Sequences all four stages, parses `-D` defines, converts Err(()) to anyhow errors, opens the output file |
+| File                   | Stage         | Summary                                                                     |
+| ---------------------- | ------------- | --------------------------------------------------------------------------- |
+| ast/ast.rs             | Stage 1       | Logos lexer → token stream → arena AST → AstDb validation                   |
+| lineardb/lineardb.rs   | Stage 2       | AST flattening into linear IR and operand vectors; values are still strings |
+| irdb/irdb.rs           | Stage 3       | String to typed value conversion, operand and file validation               |
+| engine/engine.rs       | Stage 4       | Layout iteration loop, then execute pass to write binary output             |
+| ir/ir.rs               | Shared types  | IRKind, ParameterValue, IROperand, IR — the data flowing between stages 2–4 |
+| map/map.rs             | Map output    | Constructs MapDb and renders human-friendly map text                        |
+| process/process.rs     | Orchestrator  | Orchestration of all stages, parses `-D` defines, opens the output file     |
+| diags/diags.rs         | Cross-cutting | Ariadne-backed diagnostic output channel used by every stage                |
+| extensions/src/lib.rs  | Extensions    | Single registration point for all extensions                                |
+| brink_extension/lib.rs | Extensions    | Public API for extension authors                                            |
+| ext/ext.rs             | Extensions    | Runtime extension registry and dispatch wrapper                             |
+| std/crc32c/src/lib.rs  | std extension | CRC-32C (Castagnoli) hash over caller-specified output region               |
 

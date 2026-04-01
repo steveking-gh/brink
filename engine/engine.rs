@@ -2061,6 +2061,22 @@ impl Engine {
                 }
                 IRKind::ExtensionCallSection => {
                     let sec_name = self.parms[ir.operands[1]].to_identifier();
+                    let count = self.wr_dispatches.iter().filter(|d| d.name == sec_name).count();
+                    if count > 1 {
+                        diags.err1(
+                            "EXEC_56",
+                            &format!(
+                                "Section '{}' appears {} times in the output; \
+                                 the section-name form is ambiguous. Wrap with unique \
+                                 section name(s) or use the explicit-range form such as: \
+                                 `wr {}(<file_offset>, <length>)` to specify which occurrence.",
+                                sec_name, count, name,
+                            ),
+                            ir.src_loc.clone(),
+                        );
+                        error_count += 1;
+                        continue;
+                    }
                     let dispatch = self.wr_dispatches.iter().find(|d| d.name == sec_name);
                     let Some(d) = dispatch else {
                         return Err(anyhow!(

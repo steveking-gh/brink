@@ -1,0 +1,21 @@
+// Computes CRC32C using the section-name form.
+//
+// The section-name form slices the entire section from the output image,
+// including the 4 zeroed placeholder bytes pre-allocated for the CRC
+// field itself.  Input to the hash is therefore 8 bytes:
+//   [0x01, 0x02, 0x03, 0x04, 0x00, 0x00, 0x00, 0x00]
+//
+// CRC32C of those 8 bytes = 0xC1EBE357, LE: [0x57, 0xE3, 0xEB, 0xC1]
+// Total output: 8 bytes.
+//
+// To CRC only the data bytes (excluding the CRC field), use the explicit
+// range form instead: wr std::crc32c(0, 4)  — see crc32c_explicit_range.brink
+section data {
+    wr8 0x01; wr8 0x02; wr8 0x03; wr8 0x04;
+    wr std::crc32c(data);
+    assert sizeof(data) == 8;
+}
+
+assert sizeof(std::crc32c) == 4;
+
+output data;

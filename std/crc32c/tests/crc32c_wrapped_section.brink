@@ -1,0 +1,24 @@
+// Demonstrates the wrapper pattern for computing CRC over one occurrence
+// of a section that appears multiple times in the output.
+//
+// 'data' is written twice (via data_a and data_b).  Each wrapper appears
+// exactly once, so the section-name form is unambiguous.
+//
+// CRC32C([0x01,0x02,0x03,0x04]) = 0x29308CF4, LE: [0xF4, 0x8C, 0x30, 0x29]
+// Total output: 4 + 4 + 4 = 12 bytes.
+section data {
+    wr8 0x01; wr8 0x02; wr8 0x03; wr8 0x04;
+}
+section data_a {
+    wr data;
+}
+section data_b {
+    wr data;
+}
+section top {
+    wr data_a;
+    wr data_b;
+    wr std::crc32c(data_a);
+    assert sizeof(top) == 12;
+}
+output top;

@@ -21,4 +21,5 @@ irdb = { path = "../irdb" }
 engine = { path = "../engine" }
 map = { path = "../map" }
 ext = { path = "../ext" }
+extensions = { path = "../extensions" }
 tracing = "0.1.44"

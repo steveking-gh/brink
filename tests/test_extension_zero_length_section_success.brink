@@ -1,0 +1,11 @@
+// A ranged extension called with the section-name form on an empty section.
+// brink::test_ranged_sum accepts empty input and returns sum=0.
+// Expected output: 8 bytes — 0x00 * 8 (sum of nothing = 0, LE u64).
+section empty {
+}
+section top {
+    wr empty;
+    wr brink::test_ranged_sum(empty);
+    assert sizeof(top) == 8;
+}
+output top 0;

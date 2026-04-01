@@ -1,0 +1,7 @@
+// A ranged extension that explicitly rejects a zero-length input range.
+// brink::test_reject_empty returns an error when img_buffer is empty.
+// Expects a non-zero exit code.
+section top {
+    wr brink::test_reject_empty(0, 0);
+}
+output top 0;

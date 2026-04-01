@@ -1,0 +1,12 @@
+[package]
+name = "extensions"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+ext = { path = "../ext" }
+std_crc32c = { path = "../std/crc32c" }

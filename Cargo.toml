@@ -10,6 +10,8 @@ members = [
     "map",
     "ext",
     "brink_extension",
+    "std/crc32c",
+    "extensions",
 ]
 
 [workspace.package]

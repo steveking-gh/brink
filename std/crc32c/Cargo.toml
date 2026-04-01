@@ -1,0 +1,17 @@
+[package]
+name = "std_crc32c"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[lib]
+path = "src/crc32c.rs"
+
+[dependencies]
+brink_extension = { path = "../../brink_extension" }
+crc32c = "0.6"
+ext = { path = "../../ext" }
+
+[dev-dependencies]
+assert_cmd = "1.0.1"
+predicates = "1.0.5"

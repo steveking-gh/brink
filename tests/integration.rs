@@ -1185,6 +1185,55 @@ mod tests {
         assert_brink_failure("tests/test_extension_no_range_error.brink", &["[IRDB_45]"]);
     }
 
+    /// A ranged extension called with explicit length=0 succeeds when the
+    /// extension accepts empty input.  brink::test_ranged_sum returns 0.
+    #[test]
+    fn execute_extension_zero_length_success() {
+        let out_path = "test_ext_zero_length_success.bin";
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/test_extension_zero_length_success.brink")
+            .arg("-o")
+            .arg(out_path)
+            .assert()
+            .success();
+        let bytes = fs::read(out_path).expect("output file not found");
+        assert_eq!(bytes, vec![0u8; 8], "zero-length sum must be all zeros");
+        fs::remove_file(out_path).unwrap();
+    }
+
+    /// A ranged extension called with explicit length=0 fails when the
+    /// extension rejects empty input.  brink::test_reject_empty returns Err.
+    #[test]
+    fn execute_extension_zero_length_failure() {
+        assert_brink_failure("tests/test_extension_zero_length_failure.brink", &[]);
+    }
+
+    /// A ranged extension called with the section-name form on an empty section
+    /// succeeds when the extension accepts empty input.
+    /// brink::test_ranged_sum returns 0.
+    #[test]
+    fn execute_extension_zero_length_section_success() {
+        let out_path = "test_ext_zero_length_section_success.bin";
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/test_extension_zero_length_section_success.brink")
+            .arg("-o")
+            .arg(out_path)
+            .assert()
+            .success();
+        let bytes = fs::read(out_path).expect("output file not found");
+        assert_eq!(bytes, vec![0u8; 8], "zero-length section sum must be all zeros");
+        fs::remove_file(out_path).unwrap();
+    }
+
+    /// A ranged extension called with the section-name form on an empty section
+    /// fails when the extension rejects empty input.
+    #[test]
+    fn execute_extension_zero_length_section_failure() {
+        assert_brink_failure("tests/test_extension_zero_length_section_failure.brink", &[]);
+    }
+
     /// Global asserts (outside any section) pass through the validation phase
     /// after all sections and extensions are fully written.
     #[test]
