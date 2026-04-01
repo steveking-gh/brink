@@ -1,0 +1,16 @@
+// Two child sections placed back-to-back — no gap, no overlap.
+// Section a: 0x1000..0x1004, section b: 0x1004..0x1008.
+// Expects success with no EXEC_55.
+section a {
+    set_addr 0x1000;
+    wr32 0xAABBCCDD;
+}
+section b {
+    set_addr 0x1004;
+    wr32 0x11223344;
+}
+section top {
+    wr a;
+    wr b;
+}
+output top;

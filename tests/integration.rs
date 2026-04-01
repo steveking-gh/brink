@@ -2100,4 +2100,36 @@ mod tests {
         assert_eq!(produced, expected, "Mismatch in CRC mock output");
         fs::remove_file("execute_extension_crc.bin").ok();
     }
+
+    // ── Address overwrite detection (EXEC_55) ─────────────────────────────────
+
+    /// Two sections placed at the exact same address — complete overlap.
+    #[test]
+    fn addr_overwrite_1() {
+        assert_brink_failure("tests/addr_overwrite_1.brink", &["EXEC_55"]);
+    }
+
+    /// Second section starts inside the first section's range — partial overlap.
+    #[test]
+    fn addr_overwrite_2() {
+        assert_brink_failure("tests/addr_overwrite_2.brink", &["EXEC_55"]);
+    }
+
+    /// Second section is entirely contained within the first — engulfed overlap.
+    #[test]
+    fn addr_overwrite_3() {
+        assert_brink_failure("tests/addr_overwrite_3.brink", &["EXEC_55"]);
+    }
+
+    /// Two sections placed back-to-back with no gap — valid, no EXEC_55.
+    #[test]
+    fn addr_no_overwrite_1() {
+        assert_brink_no_warning("tests/addr_no_overwrite_1.brink", &["EXEC_55"]);
+    }
+
+    /// Two sections with a gap between them — valid, no EXEC_55.
+    #[test]
+    fn addr_no_overwrite_2() {
+        assert_brink_no_warning("tests/addr_no_overwrite_2.brink", &["EXEC_55"]);
+    }
 } // mod tests

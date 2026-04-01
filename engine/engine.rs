@@ -13,17 +13,21 @@
 // typed and validated IRDb.  Its output is the finished binary output file.
 
 use anyhow::{Result, anyhow};
-use diags::Diags;
+use diags::{Diags, SourceSpan};
 use ext::{ExtensionRegistry, RegisteredExtension};
 use ir::{DataType, IR, IRKind, ParameterValue};
 use irdb::IRDb;
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::fs::File;
 use std::io::Write;
 use std::{convert::TryFrom, io::Read};
 
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
+
+/// Tracks address ranges written during the execute phase.
+/// Maps `start_addr -> (end_addr_exclusive, src_loc)`.
+type WrittenRanges = BTreeMap<u64, (u64, SourceSpan)>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Location {
@@ -1608,7 +1612,7 @@ impl Engine {
         Ok(())
     }
 
-    fn execute_wrs(&self, ir: &IR, irdb: &IRDb, diags: &mut Diags, file: &mut File) -> Result<()> {
+    fn execute_wrs(&self, written_ranges: &mut WrittenRanges, lid: usize, ir: &IR, irdb: &IRDb, diags: &mut Diags, file: &mut File) -> Result<()> {
         self.trace("Engine::execute_wrs:");
         let xstr_opt = self.evaluate_string_expr(ir, irdb, diags);
         if xstr_opt.is_none() {
@@ -1618,6 +1622,13 @@ impl Engine {
         }
 
         let xstr = xstr_opt.unwrap();
+        let size = xstr.len() as u64;
+        let loc = &self.ir_locs[lid];
+        let addr = loc.addr_base + loc.addr_offset;
+        if !Self::check_and_record_range(written_ranges, addr, size, ir.src_loc.clone(), diags) {
+            return Err(anyhow!("Address overwrite detected"));
+        }
+
         let bufs = xstr.as_bytes();
         // the map_error lambda just converts io::error to a std::error
         let result = file.write_all(bufs).map_err(|err| err.into());
@@ -1629,17 +1640,22 @@ impl Engine {
         result
     }
 
-    fn execute_wrf(&self, ir: &IR, irdb: &IRDb, diags: &mut Diags, file: &mut File) -> Result<()> {
+    fn execute_wrf(&self, written_ranges: &mut WrittenRanges, lid: usize, ir: &IR, irdb: &IRDb, diags: &mut Diags, file: &mut File) -> Result<()> {
         self.trace("Engine::execute_wrf:");
 
-        let path_opnd = &self.parms[ir.operands[0]];
-        let path = path_opnd.to_str();
+        let path = self.parms[ir.operands[0]].to_str().to_owned();
 
         // we already verified this is a legit file path,
         // so unwrap is ok.
-        let file_info = irdb.files.get(path).unwrap();
+        let file_size = irdb.files.get(path.as_str()).unwrap().size;
 
-        let mut source_file = match File::open(path) {
+        let loc = &self.ir_locs[lid];
+        let addr = loc.addr_base + loc.addr_offset;
+        if !Self::check_and_record_range(written_ranges, addr, file_size, ir.src_loc.clone(), diags) {
+            return Err(anyhow!("Address overwrite detected"));
+        }
+
+        let mut source_file = match File::open(path.as_str()) {
             Ok(f) => f,
             Err(err) => {
                 let msg = format!(
@@ -1684,12 +1700,12 @@ impl Engine {
             }
         }
 
-        assert!(total_bytes as u64 == file_info.size);
+        assert!(total_bytes as u64 == file_size);
 
         Ok(())
     }
 
-    fn execute_wrx(&self, ir: &IR, _irdb: &IRDb, diags: &mut Diags, file: &mut File) -> Result<()> {
+    fn execute_wrx(&self, written_ranges: &mut WrittenRanges, lid: usize, ir: &IR, _irdb: &IRDb, diags: &mut Diags, file: &mut File) -> Result<()> {
         self.trace(format!("Engine::execute_wrx: {:?}", ir.kind).as_str());
         let byte_size = get_wrx_byte_width(ir);
 
@@ -1725,6 +1741,13 @@ impl Engine {
         }
 
         self.trace(format!("Repeat count = {}", repeat_count).as_str());
+        let total_size = (byte_size as u64) * repeat_count;
+        let loc = &self.ir_locs[lid];
+        let addr = loc.addr_base + loc.addr_offset;
+        if !Self::check_and_record_range(written_ranges, addr, total_size, ir.src_loc.clone(), diags) {
+            return Err(anyhow!("Address overwrite detected"));
+        }
+
         // The map_error lambda just converts io::error to a std::error
         // Write only the number of bytes required for the width of the wrx
         while repeat_count > 0 {
@@ -1738,6 +1761,54 @@ impl Engine {
         }
 
         Ok(())
+    }
+
+    /// Records `[start, start+size)` as written.  If the new range overlaps any
+    /// previously recorded range, emits EXEC_55 and returns `false`.  The caller
+    /// should propagate the error; the overlapping range is still recorded so
+    /// that further independent overlaps can also be reported.
+    fn check_and_record_range(
+        written_ranges: &mut WrittenRanges,
+        start: u64,
+        size: u64,
+        src_loc: SourceSpan,
+        diags: &mut Diags,
+    ) -> bool {
+        if size == 0 {
+            return true;
+        }
+        let end = start + size; // safe: callers already checked for overflow
+
+        // Check against the range that starts at or just before `start`.
+        let overlap = written_ranges
+            .range(..=start)
+            .next_back()
+            .filter(|(_, (prev_end, _))| *prev_end > start)
+            .map(|(&prev_start, (prev_end, prev_loc))| (prev_start, *prev_end, prev_loc.clone()))
+            .or_else(|| {
+                // Also check the range that starts strictly after `start` —
+                // it overlaps if its start is less than our end.
+                written_ranges
+                    .range(start + 1..)
+                    .next()
+                    .filter(|&(&next_start, _)| next_start < end)
+                    .map(|(&next_start, (next_end, next_loc))| {
+                        (next_start, *next_end, next_loc.clone())
+                    })
+            });
+
+        written_ranges.insert(start, (end, src_loc.clone()));
+
+        if let Some((prev_start, prev_end, prev_loc)) = overlap {
+            let msg = format!(
+                "Address range {:#x}..{:#x} overlaps previously written range {:#x}..{:#x}",
+                start, end, prev_start, prev_end,
+            );
+            diags.err2("EXEC_55", &msg, src_loc, prev_loc);
+            return false;
+        }
+
+        true
     }
 
     /// Performs the generate and validation passes over the IR.
@@ -1757,8 +1828,9 @@ impl Engine {
         ext_registry: &ExtensionRegistry,
     ) -> Result<()> {
         self.trace("Engine::execute:");
+        let mut written_ranges = BTreeMap::new();
 
-        self.execute_core_operations(irdb, diags, file, ext_registry)?;
+        self.execute_core_operations(&mut written_ranges, irdb, diags, file, ext_registry)?;
         self.execute_extensions(irdb, diags, file, ext_registry)?;
         self.execute_validation(irdb, diags)?;
 
@@ -1770,6 +1842,7 @@ impl Engine {
     /// `execute_validation` after the image is fully written.
     fn execute_core_operations(
         &self,
+        written_ranges: &mut WrittenRanges,
         irdb: &IRDb,
         diags: &mut Diags,
         file: &mut File,
@@ -1778,12 +1851,12 @@ impl Engine {
         self.trace("Engine::execute_core_operations:");
         let mut result;
         let mut error_count = 0;
-        for ir in &irdb.ir_vec {
+        for (lid, ir) in irdb.ir_vec.iter().enumerate() {
             result = match ir.kind {
-                IRKind::Wr(_) => self.execute_wrx(ir, irdb, diags, file),
+                IRKind::Wr(_) => self.execute_wrx(written_ranges, lid, ir, irdb, diags, file),
                 IRKind::Print => self.execute_print(ir, irdb, diags, file),
-                IRKind::Wrs => self.execute_wrs(ir, irdb, diags, file),
-                IRKind::Wrf => self.execute_wrf(ir, irdb, diags, file),
+                IRKind::Wrs => self.execute_wrs(written_ranges, lid, ir, irdb, diags, file),
+                IRKind::Wrf => self.execute_wrf(written_ranges, lid, ir, irdb, diags, file),
                 // Assert runs in the validation phase, after all bytes are written.
                 IRKind::Assert => Ok(()),
                 // the rest of these operations are computed during iteration
