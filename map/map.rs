@@ -52,6 +52,8 @@ pub struct LabelEntry {
 pub struct ConstEntry {
     pub name: String,
     pub value: ParameterValue,
+    /// True if the const was referenced at least once in the program.
+    pub used: bool,
 }
 
 /// Complete semantic payload of the output map.
@@ -130,9 +132,16 @@ pub fn format_csv(map: &MapDb) -> String {
         writeln!(out, "  (none)").unwrap();
     } else {
         let name_w = name_col_width(map.consts.iter().map(|c| c.name.as_str()));
-        writeln!(out, "{:<name_w$},  Value,", "Name,").unwrap();
+        writeln!(out, "{:<name_w$},  {:<20},  Used,", "Name,", "Value,").unwrap();
         for c in &map.consts {
-            writeln!(out, "{:<name_w$},  {},", c.name, fmt_const_value(&c.value)).unwrap();
+            writeln!(
+                out,
+                "{:<name_w$},  {:<20},  {},",
+                c.name,
+                fmt_const_value(&c.value),
+                if c.used { "yes" } else { "no" }
+            )
+            .unwrap();
         }
     }
 
@@ -307,7 +316,7 @@ pub fn format_json(map: &MapDb) -> String {
     let constants: Vec<Value> = map
         .consts
         .iter()
-        .map(|c| json!({ "name": c.name, "value": fmt_const_value(&c.value) }))
+        .map(|c| json!({ "name": c.name, "value": fmt_const_value(&c.value), "used": c.used }))
         .collect();
 
     let sections: Vec<Value> = map
@@ -383,11 +392,12 @@ impl MapDb {
         labels.sort_by_key(|l| l.file_offset);
 
         let mut consts: Vec<ConstEntry> = irdb
-            .const_values
-            .iter()
-            .map(|(name, pv)| ConstEntry {
-                name: name.clone(),
+            .symbol_table
+            .iter_defined_with_used()
+            .map(|(name, pv, used)| ConstEntry {
+                name: name.to_string(),
                 value: pv.clone(),
+                used,
             })
             .collect();
         consts.sort_by(|a, b| a.name.cmp(&b.name));
@@ -456,10 +466,12 @@ mod tests {
                 ConstEntry {
                     name: "BASE".to_string(),
                     value: ParameterValue::U64(0x1000),
+                    used: true,
                 },
                 ConstEntry {
                     name: "COUNT".to_string(),
                     value: ParameterValue::Integer(42),
+                    used: true,
                 },
             ],
         }
@@ -535,6 +547,26 @@ mod tests {
         );
         // Integer renders as decimal
         assert!(out.contains("42"), "const Integer decimal value missing");
+        // used consts show "yes"
+        assert!(out.contains("yes"), "used column 'yes' missing");
+    }
+
+    #[test]
+    fn consts_unused_shows_no() {
+        let map = MapDb {
+            output_file: "x.bin".to_string(),
+            base_addr: 0,
+            total_size: 0,
+            sections: vec![],
+            labels: vec![],
+            consts: vec![ConstEntry {
+                name: "UNUSED".to_string(),
+                value: ParameterValue::U64(0),
+                used: false,
+            }],
+        };
+        let out = format_csv(&map);
+        assert!(out.contains("no"), "used column 'no' missing for unused const");
     }
 
     #[test]
@@ -655,8 +687,10 @@ mod tests {
         let consts = v["constants"].as_array().unwrap();
         let base = consts.iter().find(|c| c["name"] == "BASE").unwrap();
         assert_eq!(base["value"], "0x0000000000001000");
+        assert_eq!(base["used"], true);
         let count = consts.iter().find(|c| c["name"] == "COUNT").unwrap();
         assert_eq!(count["value"], "42");
+        assert_eq!(count["used"], true);
     }
 
     #[test]

@@ -18,6 +18,7 @@ parse_int = "0.5.0"
 diags = { path = "../diags" }
 ast = { path = "../ast" }
 ir = { path = "../ir" }
+symtable = { path = "../symtable" }
 lineardb = { path = "../lineardb" }
 ext = { path = "../ext" }
 tracing = "0.1.44"

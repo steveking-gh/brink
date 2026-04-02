@@ -2,6 +2,7 @@
 members = [
     "ast",
     "ir",
+    "symtable",
     "lineardb",
     "engine",
     "process",

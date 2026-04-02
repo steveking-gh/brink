@@ -1,0 +1,12 @@
+[package]
+name = "symtable"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[lib]
+path = "symtable.rs"
+
+[dependencies]
+diags = { path = "../diags" }
+ir = { path = "../ir" }

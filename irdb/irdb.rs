@@ -20,6 +20,7 @@ use tracing::{debug, error, info, trace, warn};
 
 use ext::ExtensionRegistry;
 use ir::{ConstBuiltins, DataType, IR, IRKind, IROperand, ParameterValue};
+use symtable::SymbolTable;
 use parse_int::parse;
 use std::{
     collections::{HashMap, HashSet},
@@ -54,8 +55,8 @@ pub struct IRDb {
     /// Used for items that are addressable, including sections and labels
     pub addressed_locs: HashMap<String, usize>,
 
-    /// Maps each const identifier to its resolved parameter value.
-    pub const_values: HashMap<String, ParameterValue>,
+    /// Symbol table tracking every compile-time const from declaration through use.
+    pub symbol_table: SymbolTable,
 
     /// Name of the section designated by the `output` statement.
     /// Used by the engine to evaluate `__OUTPUT_SIZE` and `__OUTPUT_ADDR`.
@@ -91,7 +92,7 @@ impl IRDb {
         depth: usize,
         lop_num: usize,
         lin_db: &LinearDb,
-        const_values: &HashMap<String, ParameterValue>,
+        symbol_table: &SymbolTable,
         diags: &mut Diags,
     ) -> Option<DataType> {
         trace!(
@@ -144,7 +145,7 @@ impl IRDb {
             ast::LexToken::Namespace => data_type = Some(DataType::Identifier),
             ast::LexToken::Identifier => {
                 // If this identifier is a resolved const, return the const's type.
-                if let Some(cv) = const_values.get(lop.sval.as_str()) {
+                if let Some(cv) = symbol_table.get(lop.sval.as_str()) {
                     data_type = Some(cv.data_type());
                 } else {
                     data_type = Some(DataType::Identifier);
@@ -177,13 +178,13 @@ impl IRDb {
                 let rhs_num = lin_ir.operand_vec[1];
 
                 let lhs_opt =
-                    Self::get_operand_data_type_r(depth + 1, lhs_num, lin_db, const_values, diags);
+                    Self::get_operand_data_type_r(depth + 1, lhs_num, lin_db, symbol_table, diags);
                 if let Some(lhs_dt) = lhs_opt {
                     let rhs_opt = Self::get_operand_data_type_r(
                         depth + 1,
                         rhs_num,
                         lin_db,
-                        const_values,
+                        symbol_table,
                         diags,
                     );
                     if let Some(rhs_dt) = rhs_opt {
@@ -273,7 +274,8 @@ impl IRDb {
             // const value directly instead of keeping it as a bare Identifier.
             #[allow(clippy::collapsible_if)]
             if lop.tok == ast::LexToken::Identifier {
-                if let Some(const_val) = self.const_values.get(lop.sval.as_str()).cloned() {
+                if let Some(const_val) = self.symbol_table.get(lop.sval.as_str()).cloned() {
+                    self.symbol_table.mark_used(lop.sval.as_str());
                     self.parms.push(IROperand {
                         ir_lid: None,
                         src_loc: lop.src_loc.clone(),
@@ -285,7 +287,7 @@ impl IRDb {
             }
 
             let dt_opt =
-                Self::get_operand_data_type_r(0, lop_num, lin_db, &self.const_values, diags);
+                Self::get_operand_data_type_r(0, lop_num, lin_db, &self.symbol_table, diags);
             if dt_opt.is_none() {
                 return false; // error case, just give up
             }
@@ -802,7 +804,7 @@ impl IRDb {
     }
 
     /// Resolve all const declarations in `lin_db.const_map`, storing each
-    /// resolved value in `self.const_values`.  Must be called before
+    /// resolved value in `self.symbol_table`.  Must be called before
     /// `process_lin_operands` so that const references can be substituted.
     fn resolve_all_consts(&mut self, lin_db: &LinearDb, diags: &mut Diags) -> bool {
         let names: Vec<String> = lin_db.const_map.keys().cloned().collect();
@@ -829,7 +831,7 @@ impl IRDb {
         diags: &mut Diags,
     ) -> Option<ParameterValue> {
         // Already resolved — return the cached value.
-        if let Some(val) = self.const_values.get(name) {
+        if let Some(val) = self.symbol_table.get(name) {
             return Some(val.clone());
         }
 
@@ -850,7 +852,7 @@ impl IRDb {
         let val = self.eval_lin_const_expr(rhs_lop_num, lin_db, in_progress, diags, &src_loc)?;
         in_progress.remove(name);
 
-        self.const_values.insert(name.to_string(), val.clone());
+        self.symbol_table.define(name.to_string(), val.clone(), Some(src_loc));
         Some(val)
     }
 
@@ -908,7 +910,11 @@ impl IRDb {
             ast::LexToken::Identifier => {
                 // Reference to another const.
                 if lin_db.const_map.contains_key(sval.as_str()) {
-                    self.resolve_const_by_name(&sval, lin_db, in_progress, diags)
+                    let result = self.resolve_const_by_name(&sval, lin_db, in_progress, diags);
+                    if result.is_some() {
+                        self.symbol_table.mark_used(&sval);
+                    }
+                    result
                 } else {
                     let m = format!(
                         "Unknown identifier '{}' in const expression.  \
@@ -1219,14 +1225,14 @@ impl IRDb {
             addressed_locs: HashMap::new(),
             start_addr: 0,
             files: HashMap::new(),
-            const_values: HashMap::new(),
+            symbol_table: SymbolTable::new(),
             output_sec_str: lin_db.output_sec_str.clone(),
         };
 
-        // Pre-populate const_values with command-line defines so they are
+        // Pre-populate the symbol table with command-line defines so they are
         // available to source const expressions and can override source consts.
         for (name, value) in defines {
-            ir_db.const_values.insert(name.clone(), value.clone());
+            ir_db.symbol_table.define(name.clone(), value.clone(), None);
         }
 
         // Resolve all const declarations before anything else so their values
@@ -1236,11 +1242,12 @@ impl IRDb {
         }
 
         // Parse the optional output starting address.  If it is a const name,
-        // look it up in the now-resolved const_values map.
+        // look it up in the now-resolved symbol table.
         let start_addr = if let Some(addr_str) = lin_db.output_addr_str.as_ref() {
             if let Ok(addr) = parse::<u64>(addr_str) {
                 addr
-            } else if let Some(cv) = ir_db.const_values.get(addr_str.as_str()) {
+            } else if let Some(cv) = ir_db.symbol_table.get(addr_str.as_str()).cloned() {
+                ir_db.symbol_table.mark_used(addr_str.as_str());
                 cv.to_u64()
             } else {
                 let m = format!("Malformed integer operand {}", addr_str);
@@ -1256,6 +1263,8 @@ impl IRDb {
         if !ir_db.process_lin_operands(lin_db, diags) {
             anyhow::bail!("IRDb construction failed");
         }
+
+        ir_db.symbol_table.warn_unused(diags);
 
         // To avoid panic, don't proceed into IR if the operands are bad.
         if !ir_db.process_linear_ir(lin_db, diags, ext_registry) {

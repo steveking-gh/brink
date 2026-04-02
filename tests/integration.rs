@@ -1515,6 +1515,13 @@ mod tests {
         assert_brink_failure("tests/const_type_mismatch_1.brink", &["[IRDB_25]"]);
     }
 
+    /// A const is defined but never used anywhere in the program.
+    /// Expected: SYMTAB_1 warning.
+    #[test]
+    fn const_unused_1() {
+        assert_brink_warning("tests/test_const_unused_1.brink", &["[SYMTAB_1]"]);
+    }
+
     /// An I64 const is defined and used as a wr8 operand.
     #[test]
     fn const_i64_1() {
