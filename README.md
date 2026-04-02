@@ -216,7 +216,6 @@ Produces `output.bin`:
     I'm bar
     I'm foo
 
-
 Users can extend Brink with custom data processing using [Brink Extension](#brink-extensions).  Users write the output of their extension call into a section with a `wr`.
 
     section foo {
@@ -320,7 +319,11 @@ This section provides an overview of Brink's internal output creation phases.
 3. **Generate Phase 2**: Next, Brink evaluates `wr` statement that call an [extension](#brink-extensions).  Like before, brink evaluates extension calls in output order.  Brink executes all extension calls serially on the engine thread.
 4. **Validation Phase**: Finally, Brink evaluates `assert` statements, including those that call extensions.  Note that Brink may take an early exit in any phase if an `assert` statement will unambiguously fail.
 
+---
 
+# Managing Firmware Configuration
+
+Brink allows users to manage firmware configuration using [`const`](#const-identifier--expr) variable definitions in their source code and on the command line.  Brink also allows, [`include`](#include-file) files and
 ---
 
 # Brink Language Reference
@@ -521,6 +524,55 @@ Example:
 
 ---
 
+## `addr_offset( [identifier] ) -> U64`
+
+Returns the offset from the `output` or most recent `set_addr` anchor as a U64.  When called without an identifier, returns the current address offset.  When called with an identifier, returns the address offset at the start of the named section or label.
+
+The offset resets to zero on each `set_addr` call.
+
+The following table shows the scoping rules for `addr_offset`.  To summarize, Brink tracks **exactly one address offset value** per name.  An `addr_offset(<name>)` command retrieves that one value regardless of the scope of the caller.
+
+| Command Form                         | Scope used to determine address                         |
+| ------------------------------------ | ------------------------------------------------------- |
+| `addr_offset()`                      | Scope of current section                                |
+| `addr_offset(<section name>)`        | Scope of parent section that contains the child section |
+| `addr_offset(<output section name)>` | Scope of the `output` section                           |
+| `addr_offset(<label name>)`          | Scope of the section that contains the label            |
+
+Example:
+
+    const BASE = 0x1000u;
+
+    section fiz {
+        assert addr_offset() == 6;
+        wrs "fiz";
+        assert addr_offset() == 9;
+        assert addr_offset(foo) == 0;
+    }
+
+    section bar {
+        assert addr_offset() == 3;
+        wrs "bar";
+        assert addr_offset() == 6;
+        wr fiz;
+        assert addr_offset() == 9;
+    }
+
+    // top level section
+    section foo {
+        assert addr_offset() == 0;
+        wrs "foo";
+        assert addr_offset() == 3;
+        assert addr_offset(fiz) == 6;
+        wr bar;
+        assert addr_offset() == 9;
+        assert addr_offset(bar) == 3;
+    }
+
+    output foo BASE;  // starting address is BASE
+
+---
+
 ## `align <expression> [, <pad byte value>];`
 
 The align statement writes pad bytes into the current section until the absolute location counter reaches the specified alignment.  Align writes 0 as the default pad byte value, but the user may optionally specify a different value.
@@ -569,7 +621,6 @@ Example:
 
     output foo RAM_BASE;
 
-
 Const expressions support the full set of arithmetic, bitwise and comparison operators.
 Comparison operators evaluate to 1 (true) or 0 (false) and are useful for expressing
 relationships between constants:
@@ -589,7 +640,7 @@ relationships between constants:
 
 A const value expression cannot depend on addresses, sizes, offsets or any other dynamic aspect of the output file.  Brink resolves all const values before starting layout of the output.  For example:
 
-    const RAM_BASE = 0x8000_0000u;        // OK, just a 64b unsigned literal.
+    const RAM_BASE = 0x8000_0000;         // OK, just a 64b unsigned literal.
     const RAM_SIZE = 32768;               // OK, just a 64b integer literal.
     const RAM_END = RAM_BASE + RAM_SIZE;  // OK, const composed of other consts.
 
@@ -601,55 +652,69 @@ A const value expression cannot depend on addresses, sizes, offsets or any other
 
     output foo RAM_BASE;
 
+### Deferred Assignment
+
+`const` variables support deferred assignment.  This allows the user to declare a `const` variable, then assign a value to the variable *exactly once* in later code.  For example:
+
+    const IO_START;
+    ...
+    IO_START = 0xF000_0000_0000_0000;
+
+Deferred assignment is primarily useful in [`if/else`](#if-expression----else---expression) statements, which allow users to conditionally determine the value to assign.
+
+To provide errors and warnings, Brink tracks the defined/undefined and used/unused state of each variable.
+
 ---
 
-## `addr_offset( [identifier] ) -> U64`
+## `if <expression> { ... } else { ... }`
 
-Returns the offset from the `output` or most recent `set_addr` anchor as a U64.  When called without an identifier, returns the current address offset.  When called with an identifier, returns the address offset at the start of the named section or label.
+Allows conditional execution of other statements.
 
-The offset resets to zero on each `set_addr` call.
+> [!IMPORTANT]
+> Brink evaluates *all* `if/else` statements before starting layout of the output.  Therefore, an `if/else` expression may only depend on `const` variables and literal values.  In other words, `if/else` statements cannot depend on dynamic addresses, sizes, offsets or any other layout dependent aspect of the output file.
 
-The following table shows the scoping rules for `addr_offset`.  To summarize, Brink tracks **exactly one address offset value** per name.  An `addr_offset(<name>)` command retrieves that one value regardless of the scope of the caller.
+Brink currently limits the conditional blocks of an `if/else` to the following statement types:
 
-| Command Form                         | Scope used to determine address                         |
-| ------------------------------------ | ------------------------------------------------------- |
-| `addr_offset()`                      | Scope of current section                                |
-| `addr_offset(<section name>)`        | Scope of parent section that contains the child section |
-| `addr_offset(<output section name)>` | Scope of the `output` section                           |
-| `addr_offset(<label name>)`          | Scope of the section that contains the label            |
+* `const` variable assignment
+* `include`
+* `print`
+* `assert`
+* Nested `if/else` statements
 
+Files inserted using `include` must follow the same restrictions as above.
 
-Example:
+Users must pre-declare `const` variables assigned in a conditional block of an `if/else`.  For example:
 
-    const BASE = 0x1000u;
+    // Suppose the command line specified -DMEM_CONFIG="BIG"
 
-    section fiz {
-        assert addr_offset() == 6;
-        wrs "fiz";
-        assert addr_offset() == 9;
-        assert addr_offset(foo) == 0;
+    // Declare const variables ahead of conditional assignment.
+    // Brink keeps careful track of variables that are undefined or unused.
+    const FLASH_SIZE;
+    const RAM_SIZE;
+
+    print "Memory configuration is ", MEM_CONFIG, "\n";
+    if MEM_CONFIG == "BIG" {
+        FLASH_SIZE = 0x8_0000;
+        RAM_SIZE = 0x80_0000;
+        include "big_config.brink"
+    } else {
+        if MEM_CONFIG == "MEDIUM" {
+            FLASH_SIZE = 0x4_0000;
+            RAM_SIZE = 0x40_0000;
+            include "medium_config.brink"
+        } else {
+            if MEM_CONFIG == "SMALL" {
+                FLASH_SIZE = 0x2_0000;
+                RAM_SIZE = 0x20_0000;
+                include "small_config.brink"
+            } else {
+                print "Invalid memory configuration.  MEM_CONFIG must be BIG, MEDIUM or SMALL\n";
+                assert(0);  // Stop
+            }
+        }
     }
 
-    section bar {
-        assert addr_offset() == 3;
-        wrs "bar";
-        assert addr_offset() == 6;
-        wr fiz;
-        assert addr_offset() == 9;
-    }
-
-    // top level section
-    section foo {
-        assert addr_offset() == 0;
-        wrs "foo";
-        assert addr_offset() == 3;
-        assert addr_offset(fiz) == 6;
-        wr bar;
-        assert addr_offset() == 9;
-        assert addr_offset(bar) == 3;
-    }
-
-    output foo BASE;  // starting address is BASE
+If the taken path in an `if/else` statement does not assign a value to a predeclared `const` variable, then Brink reports an error if any later program statement uses that variable.
 
 ---
 
