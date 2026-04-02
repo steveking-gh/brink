@@ -1,0 +1,16 @@
+// A deferred assignment inside an if-block targets a const that is declared
+// later in source order.  The assignment must not succeed because the const
+// has not been declared yet at the point the if-block executes.
+// Expected: SYMTAB_3 error.
+
+if 1 == 1 {
+    LATE = 7;
+}
+
+const LATE;
+
+section foo {
+    wr32 1;
+}
+
+output foo;

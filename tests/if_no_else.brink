@@ -1,0 +1,12 @@
+// No else clause; condition true — assigned const used.
+const VAL;
+
+if 5 > 3 {
+    VAL = 7;
+}
+
+section foo {
+    wr32 VAL;
+}
+
+output foo;

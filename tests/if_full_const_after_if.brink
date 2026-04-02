@@ -1,0 +1,16 @@
+// An if-block condition references a const that is defined later in source
+// order.  The const must not be visible to the if-block because it has not
+// been defined yet at the point the if-block is evaluated.
+// Expected: IRDB_20 error (unknown identifier in const expression).
+
+if VAL == 5 {
+    // body doesn't matter
+}
+
+const VAL = 5;
+
+section foo {
+    wr32 1;
+}
+
+output foo;

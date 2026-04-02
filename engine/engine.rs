@@ -725,6 +725,8 @@ impl Engine {
                 IRKind::NEq => *out = (in0 != in1) as u64,
                 IRKind::GEq => *out = (in0 >= in1) as u64,
                 IRKind::LEq => *out = (in0 <= in1) as u64,
+                IRKind::Gt => *out = (in0 > in1) as u64,
+                IRKind::Lt => *out = (in0 < in1) as u64,
                 IRKind::BitAnd => *out = in0 & in1,
                 IRKind::LogicalAnd => *out = ((in0 != 0) && (in1 != 0)) as u64,
                 IRKind::BitOr => *out = in0 | in1,
@@ -779,6 +781,14 @@ impl Engine {
                 IRKind::GEq => {
                     let out = out_parm.to_u64_mut();
                     *out = (in0 >= in1) as u64
+                }
+                IRKind::Gt => {
+                    let out = out_parm.to_u64_mut();
+                    *out = (in0 > in1) as u64
+                }
+                IRKind::Lt => {
+                    let out = out_parm.to_u64_mut();
+                    *out = (in0 < in1) as u64
                 }
                 IRKind::NEq => {
                     let out = out_parm.to_u64_mut();
@@ -1512,6 +1522,8 @@ impl Engine {
                     | IRKind::DoubleEq
                     | IRKind::GEq
                     | IRKind::LEq
+                    | IRKind::Gt
+                    | IRKind::Lt
                     | IRKind::NEq => self.iterate_arithmetic(ir, irdb, operation, &current, diags),
                     IRKind::ToI64 | IRKind::ToU64 => {
                         self.iterate_type_conversion(ir, irdb, operation, &current, diags)
@@ -1578,7 +1590,13 @@ impl Engine {
                     | IRKind::U64
                     | IRKind::ExtensionCall
                     | IRKind::ExtensionCallRanged
-                    | IRKind::ExtensionCallSection => true,
+                    | IRKind::ExtensionCallSection
+                    // if/else IR only lives in const_ir_vec; never reaches the engine.
+                    | IRKind::ConstDeclare
+                    | IRKind::IfBegin
+                    | IRKind::ElseBegin
+                    | IRKind::IfEnd
+                    | IRKind::BareAssign => true,
                 }
             }
             if self.ir_locs == old_locations {
@@ -1963,6 +1981,8 @@ impl Engine {
                 | IRKind::NEq
                 | IRKind::GEq
                 | IRKind::LEq
+                | IRKind::Gt
+                | IRKind::Lt
                 | IRKind::DoubleEq
                 | IRKind::I64
                 | IRKind::U64
@@ -1981,7 +2001,13 @@ impl Engine {
                 | IRKind::RightShift
                 | IRKind::ExtensionCall
                 | IRKind::ExtensionCallRanged
-                | IRKind::ExtensionCallSection => Ok(()),
+                | IRKind::ExtensionCallSection
+                // if/else IR only lives in const_ir_vec; never reaches the engine.
+                | IRKind::ConstDeclare
+                | IRKind::IfBegin
+                | IRKind::ElseBegin
+                | IRKind::IfEnd
+                | IRKind::BareAssign => Ok(()),
                 IRKind::WrExt => {
                     // We must emit empty zeroed bytes during the physical serial write loop
                     // to guarantee that the output file expands to encompass the extension's

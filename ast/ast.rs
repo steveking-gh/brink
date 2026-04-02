@@ -30,6 +30,10 @@ use tracing::{debug, error, info, trace, warn};
 pub enum LexToken {
     #[token("const")]
     Const,
+    #[token("if")]
+    If,
+    #[token("else")]
+    Else,
     // Built-in variables — must be listed before the Identifier regex so that
     // logos gives them priority over the generic identifier pattern.
     #[token("__OUTPUT_SIZE")]
@@ -106,6 +110,11 @@ pub enum LexToken {
     GEq,
     #[token("<=")]
     LEq,
+    // Single '<' and '>' must be lexed after '<<', '>>', '>=', '<=' to avoid ambiguity.
+    #[token(">")]
+    Gt,
+    #[token("<")]
+    Lt,
     // Single '=' must be lexed after all the multi-character operators
     // that start with '=' to avoid ambiguity.
     #[token("=")]
@@ -539,6 +548,7 @@ impl<'toks> Ast<'toks> {
                 LexToken::Section => self.parse_section(self.root, diags),
                 LexToken::Output => self.parse_output(self.root, diags),
                 LexToken::Const => self.parse_const(self.root, diags),
+                LexToken::If => self.parse_if(self.root, diags),
                 LexToken::Assert => {
                     // Global assert: evaluated in the validation phase after all
                     // sections and extensions are written.
@@ -913,7 +923,7 @@ impl<'toks> Ast<'toks> {
             LexToken::DoubleLess | LexToken::DoubleGreater => Some((15, 16)),
             LexToken::Ampersand => Some((13, 14)),
             LexToken::Pipe => Some((11, 12)),
-            LexToken::DoubleEq | LexToken::NEq | LexToken::LEq | LexToken::GEq => Some((9, 10)),
+            LexToken::DoubleEq | LexToken::NEq | LexToken::LEq | LexToken::GEq | LexToken::Lt | LexToken::Gt => Some((9, 10)),
             LexToken::DoubleAmpersand => Some((7, 8)),
             LexToken::DoublePipe => Some((5, 6)),
             _ => None,
@@ -1246,11 +1256,15 @@ impl<'toks> Ast<'toks> {
             let op_tinfo = op_tinfo.unwrap();
             let tok = op_tinfo.tok;
 
-            // Comma, close paren and semicolon are terminating conditions
-            // because some upper layer is specifically looking for them.
+            // Comma, close paren, semicolon, open brace, and else are terminating
+            // conditions because some upper layer is specifically looking for them.
             if matches!(
                 tok,
-                LexToken::Comma | LexToken::CloseParen | LexToken::Semicolon
+                LexToken::Comma
+                    | LexToken::CloseParen
+                    | LexToken::Semicolon
+                    | LexToken::OpenBrace
+                    | LexToken::Else
             ) {
                 break;
             }
@@ -1412,6 +1426,7 @@ impl<'toks> Ast<'toks> {
     ///
     /// ```text
     /// const <name> = <expr>;
+    /// const <name>;  // deferred assignment
     ///
     ///   const            <- root node for a const declaration
     ///   ├── <Identifier> <- constant name
@@ -1435,16 +1450,177 @@ impl<'toks> Ast<'toks> {
             "AST_8",
             "Expected an identifier after 'const'",
         ) {
-            // After the identifier, an equals sign is expected
-            if self.expect_token(LexToken::Eq, diags, const_nid) {
-                // After the equals sign, a literal or literal expression is expected.
-                // The literal expression can be literals combined with other consts.
-                if self.expect_expr(const_nid, diags) {
+            // After the identifier: either '=' (full definition) or ';' (declare-only).
+            if let Some(tinfo) = self.peek() {
+                if tinfo.tok == LexToken::Eq {
+                    // Full definition: const NAME = expr;
+                    if self.expect_token(LexToken::Eq, diags, const_nid) {
+                        if self.expect_expr(const_nid, diags) {
+                            result = self.expect_semi(diags, const_nid);
+                        }
+                    }
+                } else if tinfo.tok == LexToken::Semicolon {
+                    // Declare-only: const NAME;  (value assigned later in an if/else body)
                     result = self.expect_semi(diags, const_nid);
+                } else {
+                    self.err_expected_after(
+                        diags,
+                        "AST_50",
+                        "Expected '=' or ';' after const identifier",
+                    );
                 }
+            } else {
+                self.err_no_input(diags);
             }
         }
         self.dbg_exit("parse_const", result)
+    }
+
+    /// Parses an `if/else` statement and attaches it to the AST.
+    ///
+    /// ```text
+    /// if <expr> { <body> } [else { <body> } | else if ...]
+    ///
+    ///   if                  <- root node
+    ///   ├── <condition>     <- pratt expression
+    ///   ├── {
+    ///   ├── [then_stmts...] <- see parse_if_body
+    ///   ├── }
+    ///   [├── else
+    ///    ├── {              <- or nested if node for `else if`
+    ///    ├── [else_stmts...]
+    ///    └── }]
+    /// ```
+    fn parse_if(&mut self, parent: NodeId, diags: &mut Diags) -> bool {
+        self.dbg_enter("parse_if");
+        // Consume 'if' and create root node
+        let if_nid = self.add_to_parent_and_advance(parent);
+
+        // Parse condition expression
+        if !self.expect_expr(if_nid, diags) {
+            return self.dbg_exit("parse_if", false);
+        }
+
+        // Expect opening brace for then-body
+        let brace_toknum = self.tok_num;
+        if !self.expect_leaf(diags, if_nid, LexToken::OpenBrace, "AST_51", "Expected '{' after if condition") {
+            return self.dbg_exit("parse_if", false);
+        }
+        if !self.parse_if_body(if_nid, diags, brace_toknum) {
+            return self.dbg_exit("parse_if", false);
+        }
+
+        // Check for optional else clause
+        let result = if let Some(tinfo) = self.peek() {
+            if tinfo.tok == LexToken::Else {
+                self.add_to_parent_and_advance(if_nid); // consume 'else', add as child
+                if let Some(next) = self.peek() {
+                    if next.tok == LexToken::If {
+                        // else if: parse nested if directly (no brace wrapper)
+                        self.parse_if(if_nid, diags)
+                    } else if next.tok == LexToken::OpenBrace {
+                        let else_brace = self.tok_num;
+                        self.add_to_parent_and_advance(if_nid); // consume '{'
+                        self.parse_if_body(if_nid, diags, else_brace)
+                    } else {
+                        self.err_expected_after(diags, "AST_52", "Expected '{' or 'if' after 'else'");
+                        false
+                    }
+                } else {
+                    self.err_no_input(diags);
+                    false
+                }
+            } else {
+                true // no else clause
+            }
+        } else {
+            self.err_no_input(diags);
+            false
+        };
+
+        self.dbg_exit("parse_if", result)
+    }
+
+    /// Parses the body of an `if` or `else` block.  Loops until `}` or end of input.
+    /// Allowed statements: bare assignment (`IDENT = expr;`), `print`, `assert`,
+    /// and nested `if/else`.
+    fn parse_if_body(&mut self, parent: NodeId, diags: &mut Diags, brace_tok_num: usize) -> bool {
+        self.dbg_enter("parse_if_body");
+        let mut result = true;
+        let mut tok_num_old = 0;
+
+        while let Some(tinfo) = self.peek() {
+            if tok_num_old == self.tok_num {
+                self.tok_num += 1;
+                continue;
+            }
+            tok_num_old = self.tok_num;
+
+            if tinfo.tok == LexToken::CloseBrace {
+                self.parse_leaf(parent); // add '}' as child
+                return self.dbg_exit("parse_if_body", result);
+            }
+
+            let parse_ok = match tinfo.tok {
+                // We allow `include` too, but include injection happens before parsing.
+                LexToken::Identifier => self.parse_deferred_assign(parent, diags),
+                LexToken::Print | LexToken::Assert => self.parse_expr(parent, diags),
+                LexToken::If => self.parse_if(parent, diags),
+                _ => {
+                    let msg = format!("'{}' is not allowed inside an if/else body", tinfo.val);
+                    diags.err1("AST_53", &msg, tinfo.span());
+                    false
+                }
+            };
+
+            if !parse_ok {
+                self.advance_past_semicolon();
+                result = false;
+            }
+        }
+
+        self.err_no_close_brace(diags, brace_tok_num);
+        self.dbg_exit("parse_if_body", false)
+    }
+
+    /// Parses a deferred assignment statement `IDENT = expr ;` inside an if/else body.
+    ///
+    /// ```text
+    ///   =                  <- root node (the assignment operator)
+    ///   ├── <Identifier>   <- LHS name
+    ///   └── <expr>         <- RHS value expression
+    /// ```
+    fn parse_deferred_assign(&mut self, parent: NodeId, diags: &mut Diags) -> bool {
+        self.dbg_enter("parse_deferred_assign");
+
+        // Confirm the token after the identifier is '=' (not '==', which would be a comparison).
+        let next_tok = self.tv.get(self.tok_num + 1).map(|t| t.tok);
+        if next_tok != Some(LexToken::Eq) {
+            let msg = format!(
+                "Expected '=' after identifier in if/else body, found '{}'",
+                self.tv.get(self.tok_num + 1).map(|t| t.val).unwrap_or("<end of input>")
+            );
+            diags.err1("AST_54", &msg, self.tv[self.tok_num].span());
+            return self.dbg_exit("parse_deferred_assign", false);
+        }
+
+        // Create the identifier node without attaching it to a parent yet.
+        let ident_nid = self.arena.new_node(self.tok_num);
+        self.tok_num += 1;
+
+        // Create the Eq node as the statement root (attached to parent).
+        let eq_nid = self.add_to_parent_and_advance(parent);
+
+        // Attach identifier as the first child of the Eq node.
+        eq_nid.append(ident_nid, &mut self.arena);
+
+        // Parse RHS expression as the second child.
+        if !self.expect_expr(eq_nid, diags) {
+            return self.dbg_exit("parse_deferred_assign", false);
+        }
+
+        let result = self.expect_semi(diags, eq_nid);
+        self.dbg_exit("parse_deferred_assign", result)
     }
 
     /// Adds the current token as a child of the parent and advances
@@ -1633,9 +1809,14 @@ impl<'toks> Output<'toks> {
 pub struct AstDb<'toks> {
     pub sections: HashMap<&'toks str, Section<'toks>>,
     pub labels: HashMap<&'toks str, Label>,
+    /// Full `const NAME = expr;` definitions, keyed by name.
     pub consts: HashMap<&'toks str, Const<'toks>>,
     pub output: Output<'toks>,
     pub global_asserts: Vec<NodeId>,
+    /// Declare-only `const NAME;` nodes, in source order.
+    pub declared_consts: Vec<NodeId>,
+    /// Top-level `if/else` block nodes, in source order.
+    pub if_else_blocks: Vec<NodeId>,
     //pub properties: HashMap<NodeId, NodeProperty>
 }
 
@@ -1878,6 +2059,8 @@ impl<'toks> AstDb<'toks> {
         let mut output: Option<Output<'toks>> = None;
         let mut consts: HashMap<&'toks str, Const<'toks>> = HashMap::new();
         let mut global_asserts: Vec<NodeId> = Vec::new();
+        let mut declared_consts: Vec<NodeId> = Vec::new();
+        let mut if_else_blocks: Vec<NodeId> = Vec::new();
 
         // First phase, record all sections, files, and the output.
         // These are defined only at top level so no need for recursion.
@@ -1887,7 +2070,23 @@ impl<'toks> AstDb<'toks> {
                 && match tinfo.tok {
                     LexToken::Section => Self::record_section(diags, nid, ast, &mut sections),
                     LexToken::Output => Self::record_output(diags, nid, ast, &mut output),
-                    LexToken::Const => Self::record_const(diags, nid, ast, &mut consts),
+                    LexToken::Const => {
+                        // Distinguish full definition (const NAME = expr;) from
+                        // declare-only (const NAME;) by checking the second child's token.
+                        let second_child_tok = nid
+                            .children(&ast.arena)
+                            .nth(1)
+                            .map(|c| ast.get_tinfo(c).tok);
+                        if second_child_tok == Some(LexToken::Eq) {
+                            // Full definition: const NAME = expr;
+                            Self::record_const(diags, nid, ast, &mut consts)
+                        } else {
+                            // Declare-only: const NAME;
+                            declared_consts.push(nid);
+                            true
+                        }
+                    }
+                    LexToken::If => { if_else_blocks.push(nid); true }
                     // Global asserts are collected here and linearized later.
                     // They have no name to record in any map.
                     LexToken::Assert => { global_asserts.push(nid); true }
@@ -1922,6 +2121,32 @@ impl<'toks> AstDb<'toks> {
             }
         }
 
+        // Validate declared-only const names (reserved-word and duplicate checks).
+        let mut all_const_names: HashSet<&str> = consts.keys().copied().collect();
+        for &dc_nid in &declared_consts {
+            let name_nid = dc_nid.children(&ast.arena).next().unwrap();
+            let name_tinfo = ast.get_tinfo(name_nid);
+            let name = name_tinfo.val;
+            if is_reserved_identifier(name) {
+                let m = format!(
+                    "'{}' is a reserved identifier and cannot be used as a const name",
+                    name
+                );
+                diags.err1("AST_55", &m, name_tinfo.span());
+                result = false;
+            } else if all_const_names.contains(name) {
+                let m = format!("Duplicate const name '{}'", name);
+                diags.err1("AST_56", &m, name_tinfo.span());
+                result = false;
+            } else if let Some(sec_item) = sections.get(name) {
+                let m = format!("Const name '{}' conflicts with a section name", name);
+                diags.err2("AST_57", &m, name_tinfo.span(), sec_item.tinfo.span());
+                result = false;
+            } else {
+                all_const_names.insert(name);
+            }
+        }
+
         if !result {
             bail!("AST construction failed");
         }
@@ -1933,6 +2158,8 @@ impl<'toks> AstDb<'toks> {
             consts,
             output: output.unwrap(),
             global_asserts,
+            declared_consts,
+            if_else_blocks,
         };
 
         if !ast_db.validate_section_name(0, output_nid, ast, diags) {

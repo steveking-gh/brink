@@ -1,0 +1,9 @@
+// Declared-only const that is never assigned and never used:
+// should produce no SYMTAB_1 warning (declare-only consts are exempt).
+const NEVER_ASSIGNED;
+
+section foo {
+    wr32 1;
+}
+
+output foo;

@@ -123,6 +123,8 @@ impl IRDb {
             | ast::LexToken::NEq
             | ast::LexToken::GEq
             | ast::LexToken::LEq
+            | ast::LexToken::Gt
+            | ast::LexToken::Lt
             | ast::LexToken::Addr
             | ast::LexToken::AddrOffset
             | ast::LexToken::SecOffset
@@ -252,6 +254,8 @@ impl IRDb {
             | ast::LexToken::Wrf
             | ast::LexToken::Output
             | ast::LexToken::Eq
+            | ast::LexToken::If
+            | ast::LexToken::Else
             | ast::LexToken::Unknown => {
                 panic!("Token '{:?}' has no associated data type.", lop.tok);
             }
@@ -661,6 +665,8 @@ impl IRDb {
             IRKind::NEq
             | IRKind::LEq
             | IRKind::GEq
+            | IRKind::Gt
+            | IRKind::Lt
             | IRKind::DoubleEq
             | IRKind::LeftShift
             | IRKind::RightShift
@@ -691,7 +697,13 @@ impl IRDb {
             | IRKind::AddrOffset
             | IRKind::Eq
             | IRKind::SecOffset
-            | IRKind::FileOffset => true,
+            | IRKind::FileOffset
+            // if/else and deferred-assignment IR — validated during sequential const walk
+            | IRKind::ConstDeclare
+            | IRKind::IfBegin
+            | IRKind::ElseBegin
+            | IRKind::IfEnd
+            | IRKind::BareAssign => true,
         }
     }
 
@@ -806,7 +818,9 @@ impl IRDb {
     /// Resolve all const declarations in `lin_db.const_map`, storing each
     /// resolved value in `self.symbol_table`.  Must be called before
     /// `process_lin_operands` so that const references can be substituted.
+    /// Also walks `const_ir_vec` sequentially to process ConstDeclare and if/else IR.
     fn resolve_all_consts(&mut self, lin_db: &LinearDb, diags: &mut Diags) -> bool {
+        // Pass 1: resolve all regular `const NAME = expr;` declarations (order-independent).
         let names: Vec<String> = lin_db.const_map.keys().cloned().collect();
         let mut result = true;
         for name in names {
@@ -817,6 +831,166 @@ impl IRDb {
             {
                 result = false;
             }
+        }
+
+        // Pass 2: sequential walk of const_ir_vec to handle ConstDeclare and if/else IR.
+        if result {
+            result = self.exec_if_else_ir(lin_db, diags);
+        }
+        result
+    }
+
+    /// Sequential walk of `const_ir_vec` that handles the if/else IR kinds:
+    /// `ConstDeclare`, `IfBegin`, `ElseBegin`, `IfEnd`, `BareAssign`,
+    /// and `Print`/`Assert` emitted inside if/else bodies.
+    /// Regular `Const` IR entries are skipped (already resolved in pass 1).
+    fn exec_if_else_ir(&mut self, lin_db: &LinearDb, diags: &mut Diags) -> bool {
+        /// Skip state for branches not taken.
+        #[derive(Clone, Copy)]
+        enum SkipState {
+            /// Skip the then-body (condition was false); stop at ElseBegin (depth 0)
+            /// or IfEnd (depth 0, meaning no else clause).
+            SkipThen { depth: usize },
+            /// Skip the else-body (condition was true); stop at IfEnd (depth 0).
+            SkipElse { depth: usize },
+        }
+
+        let mut result = true;
+        let mut skip_stack: Vec<SkipState> = Vec::new();
+
+        let n = lin_db.const_ir_vec.len();
+        let mut idx = 0;
+        while idx < n {
+            let ir = &lin_db.const_ir_vec[idx];
+            let op = ir.op;
+            let src_loc = ir.src_loc.clone();
+
+            // If we're in a skip state, handle structural tokens to track depth.
+            if let Some(&skip) = skip_stack.last() {
+                match (skip, op) {
+                    (SkipState::SkipThen { depth }, IRKind::IfBegin) => {
+                        *skip_stack.last_mut().unwrap() = SkipState::SkipThen { depth: depth + 1 };
+                    }
+                    (SkipState::SkipThen { depth: 0 }, IRKind::ElseBegin) => {
+                        // Found the else of the if we're skipping — resume active processing.
+                        skip_stack.pop();
+                    }
+                    (SkipState::SkipThen { depth }, IRKind::ElseBegin) => {
+                        // Nested if's ElseBegin — no depth change (it's inside a nested if).
+                        let _ = depth; // depth > 0, we're still skipping
+                    }
+                    (SkipState::SkipThen { depth: 0 }, IRKind::IfEnd) => {
+                        // No else clause — resume active processing past IfEnd.
+                        skip_stack.pop();
+                    }
+                    (SkipState::SkipThen { depth }, IRKind::IfEnd) => {
+                        *skip_stack.last_mut().unwrap() = SkipState::SkipThen { depth: depth - 1 };
+                    }
+                    (SkipState::SkipElse { depth }, IRKind::IfBegin) => {
+                        *skip_stack.last_mut().unwrap() = SkipState::SkipElse { depth: depth + 1 };
+                    }
+                    (SkipState::SkipElse { depth: 0 }, IRKind::IfEnd) => {
+                        // Found the IfEnd matching the if whose else-body we're skipping.
+                        skip_stack.pop();
+                    }
+                    (SkipState::SkipElse { depth }, IRKind::IfEnd) => {
+                        *skip_stack.last_mut().unwrap() = SkipState::SkipElse { depth: depth - 1 };
+                    }
+                    _ => { /* any other IR inside a skipped block: ignore */ }
+                }
+                idx += 1;
+                continue;
+            }
+
+            // Active processing.
+            match op {
+                IRKind::Const => { /* already resolved in pass 1 */ }
+                IRKind::ConstDeclare => {
+                    let name_lop = &lin_db.const_operand_vec[ir.operand_vec[0]];
+                    let name = name_lop.sval.clone();
+                    self.symbol_table.declare(name, src_loc);
+                }
+                IRKind::IfBegin => {
+                    // Evaluate the condition operand.
+                    let cond_lop_num = ir.operand_vec[0];
+                    let mut in_progress = HashSet::new();
+                    let cond_val = self.eval_lin_const_expr(
+                        cond_lop_num, lin_db, &mut in_progress, diags, &src_loc,
+                    );
+                    match cond_val {
+                        Some(v) if v.to_bool() => {
+                            // Condition true: process then-body (no skip needed)
+                        }
+                        Some(_) => {
+                            // Condition false: skip then-body
+                            skip_stack.push(SkipState::SkipThen { depth: 0 });
+                        }
+                        None => {
+                            result = false;
+                            // Skip entire if/else to avoid cascading errors
+                            skip_stack.push(SkipState::SkipThen { depth: 0 });
+                        }
+                    }
+                }
+                IRKind::ElseBegin => {
+                    // Reached the else separator while in active then-body: skip else-body.
+                    skip_stack.push(SkipState::SkipElse { depth: 0 });
+                }
+                IRKind::IfEnd => {
+                    // End of an if/else we fully processed (no skip): nothing to do.
+                }
+                IRKind::BareAssign => {
+                    let name_lop = &lin_db.const_operand_vec[ir.operand_vec[0]];
+                    let name = name_lop.sval.clone();
+                    let rhs_lop_num = ir.operand_vec[1];
+                    let mut in_progress = HashSet::new();
+                    let rhs_val = self.eval_lin_const_expr(
+                        rhs_lop_num, lin_db, &mut in_progress, diags, &src_loc,
+                    );
+                    match rhs_val {
+                        Some(v) => {
+                            result &= self.symbol_table.assign(&name, v, &src_loc, diags);
+                        }
+                        None => { result = false; }
+                    }
+                }
+                IRKind::Print => {
+                    // Evaluate and print each operand as a string.
+                    if !diags.noprint {
+                        let mut s = String::new();
+                        for &lop_idx in &ir.operand_vec {
+                            let mut in_progress = HashSet::new();
+                            match self.eval_lin_const_expr(lop_idx, lin_db, &mut in_progress, diags, &src_loc) {
+                                Some(ParameterValue::QuotedString(ref v)) => s.push_str(v),
+                                Some(ParameterValue::U64(v)) => s.push_str(&format!("{:#X}", v)),
+                                Some(ParameterValue::I64(v) | ParameterValue::Integer(v)) => {
+                                    s.push_str(&format!("{}", v));
+                                }
+                                Some(_) => {
+                                    diags.err1("IRDB_31", "Cannot print this value type in a const context", src_loc.clone());
+                                    result = false;
+                                }
+                                None => { result = false; }
+                            }
+                        }
+                        if result { print!("{}", s); }
+                    }
+                }
+                IRKind::Assert => {
+                    let cond_lop_num = ir.operand_vec[0];
+                    let mut in_progress = HashSet::new();
+                    match self.eval_lin_const_expr(cond_lop_num, lin_db, &mut in_progress, diags, &src_loc) {
+                        Some(v) if !v.to_bool() => {
+                            diags.err1("IRDB_32", "Assert expression failed in if/else body", src_loc);
+                            result = false;
+                        }
+                        None => { result = false; }
+                        _ => {}
+                    }
+                }
+                _ => { /* other IR kinds are not emitted into const_ir_vec */ }
+            }
+            idx += 1;
         }
         result
     }
@@ -915,6 +1089,10 @@ impl IRDb {
                         self.symbol_table.mark_used(&sval);
                     }
                     result
+                } else if let Some(val) = self.symbol_table.get_value(sval.as_str()) {
+                    // Deferred const already assigned via BareAssign in the current if/else walk.
+                    self.symbol_table.mark_used(sval.as_str());
+                    Some(val)
                 } else {
                     let m = format!(
                         "Unknown identifier '{}' in const expression.  \
@@ -975,7 +1153,9 @@ impl IRDb {
             ast::LexToken::DoubleEq
             | ast::LexToken::NEq
             | ast::LexToken::GEq
-            | ast::LexToken::LEq => {
+            | ast::LexToken::LEq
+            | ast::LexToken::Gt
+            | ast::LexToken::Lt => {
                 let ir_lid = ir_lid_opt.unwrap();
                 let lhs_lop = lin_db.const_ir_vec[ir_lid].operand_vec[0];
                 let rhs_lop = lin_db.const_ir_vec[ir_lid].operand_vec[1];
@@ -985,6 +1165,23 @@ impl IRDb {
                 let rhs_val =
                     self.eval_lin_const_expr(rhs_lop, lin_db, in_progress, diags, err_loc)?;
                 Self::apply_comparison_op(tok, lhs_val, rhs_val, &op_loc, diags)
+            }
+            ast::LexToken::DoubleAmpersand | ast::LexToken::DoublePipe => {
+                let ir_lid = ir_lid_opt.unwrap();
+                let lhs_lop = lin_db.const_ir_vec[ir_lid].operand_vec[0];
+                let rhs_lop = lin_db.const_ir_vec[ir_lid].operand_vec[1];
+                let lhs_val =
+                    self.eval_lin_const_expr(lhs_lop, lin_db, in_progress, diags, err_loc)?;
+                let rhs_val =
+                    self.eval_lin_const_expr(rhs_lop, lin_db, in_progress, diags, err_loc)?;
+                let lhs_bool = lhs_val.to_bool();
+                let rhs_bool = rhs_val.to_bool();
+                let result = if tok == ast::LexToken::DoubleAmpersand {
+                    lhs_bool && rhs_bool
+                } else {
+                    lhs_bool || rhs_bool
+                };
+                Some(ParameterValue::U64(if result { 1 } else { 0 }))
             }
             _ => {
                 let m = format!(
@@ -1089,6 +1286,19 @@ impl IRDb {
         diags: &mut Diags,
     ) -> Option<ParameterValue> {
         use ParameterValue::*;
+        // String equality/inequality: supported for == and != only.
+        if let (QuotedString(a), QuotedString(b)) = (&lhs, &rhs) {
+            let result = match tok {
+                ast::LexToken::DoubleEq => a == b,
+                ast::LexToken::NEq => a != b,
+                _ => {
+                    let m = "Ordered comparison (>=, <=) is not supported for strings.".to_string();
+                    diags.err1("IRDB_30", &m, src_loc.clone());
+                    return None;
+                }
+            };
+            return Some(U64(if result { 1 } else { 0 }));
+        }
         // Reconcile Integer with a typed value; reject non-numeric types.
         let (lhs, rhs) = match (&lhs, &rhs) {
             (U64(_), U64(_)) | (I64(_), I64(_)) | (Integer(_), Integer(_)) => (lhs, rhs),
@@ -1115,6 +1325,8 @@ impl IRDb {
                     ast::LexToken::NEq => a != b,
                     ast::LexToken::GEq => a >= b,
                     ast::LexToken::LEq => a <= b,
+                    ast::LexToken::Gt => a > b,
+                    ast::LexToken::Lt => a < b,
                     _ => unreachable!(),
                 }
             }
@@ -1125,6 +1337,8 @@ impl IRDb {
                     ast::LexToken::NEq => a != b,
                     ast::LexToken::GEq => a >= b,
                     ast::LexToken::LEq => a <= b,
+                    ast::LexToken::Gt => a > b,
+                    ast::LexToken::Lt => a < b,
                     _ => unreachable!(),
                 }
             }

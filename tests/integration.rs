@@ -1544,11 +1544,10 @@ mod tests {
         );
     }
 
-    /// A const expression uses == which is not supported at compile time.
-    /// Expected: IRDB_21.
+    /// A const expression uses &&, which is now supported (added with if/else).
     #[test]
     fn const_bad_op_1() {
-        assert_brink_failure("tests/const_bad_op_1.brink", &["[IRDB_21]"]);
+        assert_brink_success("tests/const_bad_op_1.brink", None, None);
     }
 
     /// A const integer literal overflows i64.
@@ -2257,5 +2256,77 @@ mod tests {
     #[test]
     fn addr_no_overwrite_2() {
         assert_brink_no_warning("tests/addr_no_overwrite_2.brink", &["EXEC_55"]);
+    }
+
+    // ── if/else tests ────────────────────────────────────────────────────────
+
+    /// Condition true: then-branch value written to output.
+    #[test]
+    fn if_else_true_branch() {
+        assert_brink_success("tests/if_else_true_branch.brink", None, None);
+    }
+
+    /// Condition false: else-branch value written to output.
+    #[test]
+    fn if_else_false_branch() {
+        assert_brink_success("tests/if_else_false_branch.brink", None, None);
+    }
+
+    /// No else clause, condition true: assigned const used successfully.
+    #[test]
+    fn if_no_else() {
+        assert_brink_success("tests/if_no_else.brink", None, None);
+    }
+
+    /// else-if chain: correct branch selected.
+    #[test]
+    fn if_else_if_chain() {
+        assert_brink_success("tests/if_else_if_chain.brink", None, None);
+    }
+
+    /// String comparison in if condition.
+    #[test]
+    fn if_string_compare() {
+        assert_brink_success("tests/if_string_compare.brink", None, None);
+    }
+
+    /// print and assert inside an if/else body.
+    #[test]
+    fn if_print_assert() {
+        assert_brink_success("tests/if_print_assert.brink", None, None);
+    }
+
+    /// Bare assignment to an undeclared name emits SYMTAB_3.
+    #[test]
+    fn if_bare_assign_undeclared() {
+        assert_brink_failure("tests/if_bare_assign_undeclared.brink", &["SYMTAB_3"]);
+    }
+
+    /// Declared-only const never assigned and never used: no SYMTAB_1 warning.
+    #[test]
+    fn if_unused_declared() {
+        assert_brink_no_warning("tests/if_unused_declared.brink", &["SYMTAB_1"]);
+    }
+
+    /// A deferred assignment inside an if-block targets a const declared later
+    /// in source.  The assignment must fail with SYMTAB_3 because the const
+    /// has not been declared at the point the if-block executes.
+    #[test]
+    fn if_interleaved_order() {
+        assert_brink_failure("tests/if_interleaved_order.brink", &["SYMTAB_3"]);
+    }
+
+    /// An if-block condition references a const defined later in source order.
+    /// The const must not be visible to the if-block; expected IRDB_20.
+    #[test]
+    fn if_full_const_after_if() {
+        assert_brink_failure("tests/if_full_const_after_if.brink", &["IRDB_20"]);
+    }
+
+    /// A top-level assert after an if-block that performs a deferred assignment
+    /// must see the assigned value and pass.
+    #[test]
+    fn if_top_level_assert_phase() {
+        assert_brink_success("tests/if_top_level_assert_phase.brink", None, None);
     }
 } // mod tests

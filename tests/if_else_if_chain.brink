@@ -1,0 +1,17 @@
+// else-if chain: only the matching branch assigns VAL.
+const PLATFORM = 2;
+const VAL;
+
+if PLATFORM == 1 {
+    VAL = 100;
+} else if PLATFORM == 2 {
+    VAL = 200;
+} else {
+    VAL = 300;
+}
+
+section foo {
+    wr32 VAL;
+}
+
+output foo;

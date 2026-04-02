@@ -52,6 +52,37 @@ impl SymbolTable {
         );
     }
 
+    /// Declare a const with no value (for `const NAME;` deferred assignment).
+    /// Ignored if the name is already in the table (e.g. from a `-D` command-line define).
+    pub fn declare(&mut self, name: String, loc: SourceSpan) {
+        if !self.entries.contains_key(&name) {
+            self.entries.insert(
+                name,
+                ConstEntry {
+                    value: None,
+                    used: false,
+                    decl_loc: Some(loc),
+                },
+            );
+        }
+    }
+
+    /// Assign a value to a previously-declared const (bare assignment inside an if/else body).
+    /// Returns false and emits SYMTAB_3 if the name was not declared.
+    pub fn assign(&mut self, name: &str, value: ParameterValue, loc: &SourceSpan, diags: &Diags) -> bool {
+        if let Some(entry) = self.entries.get_mut(name) {
+            entry.value = Some(value);
+            true
+        } else {
+            let m = format!(
+                "Assignment to '{}' which was not pre-declared with 'const {};'.",
+                name, name
+            );
+            diags.err1("SYMTAB_3", &m, loc.clone());
+            false
+        }
+    }
+
     /// Returns a reference to the value if the const has one, or `None`
     /// if the name is unknown or declared but not yet assigned.
     pub fn get(&self, name: &str) -> Option<&ParameterValue> {
@@ -72,6 +103,11 @@ impl SymbolTable {
     /// Returns true if the name is present in the table (any state).
     pub fn contains_key(&self, name: &str) -> bool {
         self.entries.contains_key(name)
+    }
+
+    /// Returns the resolved value for a name, if it has one.
+    pub fn get_value(&self, name: &str) -> Option<ParameterValue> {
+        self.entries.get(name)?.value.clone()
     }
 
     /// Iterates over all entries with a value, yielding `(name, &ParameterValue, used)`.

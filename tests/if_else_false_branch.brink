@@ -1,0 +1,14 @@
+// Condition is false: else-branch value used.
+const VAL;
+
+if 1 == 2 {
+    VAL = 99;
+} else {
+    VAL = 42;
+}
+
+section foo {
+    wr32 VAL;
+}
+
+output foo;

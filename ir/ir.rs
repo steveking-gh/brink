@@ -39,6 +39,21 @@ pub enum IRKind {
     Divide,
     DoubleEq,
     Eq,
+    /// Declares a const with no value: `const NAME;`.
+    /// Operands: [name_identifier]
+    ConstDeclare,
+    /// Marks the start of an `if` block.
+    /// Operands: [condition_expr_output]
+    IfBegin,
+    /// Marks the transition from the then-body to the else-body.
+    /// Operands: []
+    ElseBegin,
+    /// Marks the end of an if/else construct.
+    /// Operands: []
+    IfEnd,
+    /// Bare assignment inside an if/else body: `NAME = expr;`
+    /// Operands: [name_identifier, rhs_expr_output]
+    BareAssign,
     /// Operands: [name, arg0..., output]
     ExtensionCall,
     /// Operands: [name, range_start, range_length, arg0..., output]
@@ -49,11 +64,13 @@ pub enum IRKind {
     /// (file_offset, size) from wr_dispatches at runtime.
     ExtensionCallSection,
     GEq,
+    Gt,
     I64,
     AddrOffset,
     Label,
     LeftShift,
     LEq,
+    Lt,
     LogicalAnd,
     LogicalOr,
     Modulo,

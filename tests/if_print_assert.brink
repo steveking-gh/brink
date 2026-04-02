@@ -1,0 +1,15 @@
+// print and assert inside an if/else body.
+const VAL;
+
+if 1 == 1 {
+    VAL = 55;
+    assert VAL == 55;
+} else {
+    VAL = 0;
+}
+
+section foo {
+    wr32 VAL;
+}
+
+output foo;

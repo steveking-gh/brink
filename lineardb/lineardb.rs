@@ -98,8 +98,10 @@ fn tok_to_irkind(tok: LexToken) -> IRKind {
         LexToken::Eq => IRKind::Eq,
         LexToken::FSlash => IRKind::Divide,
         LexToken::GEq => IRKind::GEq,
+        LexToken::Gt => IRKind::Gt,
         LexToken::AddrOffset => IRKind::AddrOffset,
         LexToken::LEq => IRKind::LEq,
+        LexToken::Lt => IRKind::Lt,
         LexToken::Minus => IRKind::Subtract,
         LexToken::NEq => IRKind::NEq,
         LexToken::Percent => IRKind::Modulo,
@@ -132,7 +134,7 @@ fn tok_to_irkind(tok: LexToken) -> IRKind {
         LexToken::Wrf => IRKind::Wrf,
         LexToken::Wrs => IRKind::Wrs,
         bug => {
-            panic!("Failed to convert LexToken to IRKind for {:?}", bug);
+            panic!("Failed to convert LexToken to IRKind for {:?} — this token should not reach tok_to_irkind", bug);
         }
     }
 }
@@ -740,6 +742,8 @@ impl<'toks> LinearDb {
             | LexToken::NEq
             | LexToken::LEq
             | LexToken::GEq
+            | LexToken::Lt
+            | LexToken::Gt
             | LexToken::DoubleEq
             | LexToken::DoubleGreater
             | LexToken::DoubleLess
@@ -837,6 +841,13 @@ impl<'toks> LinearDb {
                 diags.err1("LINEAR_4", &m, tinfo.span());
                 result = false;
             }
+            // if/else is handled by record_if_else, not record_r.
+            // Else is a syntactic child of if-nodes and is skipped during record_if_else.
+            LexToken::If | LexToken::Else => {
+                let m = format!("Unexpected '{}' in linearization context.", tinfo.val);
+                diags.err1("LINEAR_16", &m, tinfo.span());
+                result = false;
+            }
         }
 
         debug!(
@@ -903,6 +914,164 @@ impl<'toks> LinearDb {
         self.const_map.insert(name_tinfo.val.to_string(), ir_lid);
 
         true
+    }
+
+    /// Converts a `const NAME;` declare-only statement into a `ConstDeclare` IR entry.
+    ///
+    /// Produces one `IRKind::ConstDeclare` entry in `const_ir_vec` with one operand:
+    ///   `[name_identifier]`
+    /// The name is NOT added to `const_map` (it has no RHS to resolve); instead the
+    /// IRDb sequential walker calls `symbol_table.declare()` when it encounters this IR.
+    fn record_const_declare(
+        &mut self,
+        const_nid: NodeId,
+        ast: &'toks Ast,
+    ) -> bool {
+        let mut children = ast.children(const_nid);
+        let name_nid = children.next().unwrap();
+        let name_tinfo = ast.get_tinfo(name_nid);
+
+        let ir_lid = self.new_ir(const_nid, ast, IRKind::ConstDeclare, true);
+        self.add_new_operand_to_ir(ir_lid, LinOperand::new(None, name_tinfo), true);
+        true
+    }
+
+    /// Converts a bare assignment `IDENT = expr ;` (inside an if/else body) into a
+    /// `BareAssign` IR entry.  The Eq node is the root; its children are [IDENT, expr].
+    ///
+    /// Operands: `[name_identifier, rhs_expr_output]`
+    fn record_deferred_assign(
+        &mut self,
+        eq_nid: NodeId,
+        rdepth: usize,
+        diags: &mut Diags,
+        ast: &'toks Ast,
+        ast_db: &AstDb,
+    ) -> bool {
+        let mut children = ast.children(eq_nid);
+        let ident_nid = children.next().unwrap();
+        let expr_nid = children.next().unwrap();
+
+        let ident_tinfo = ast.get_tinfo(ident_nid);
+
+        let ir_lid = self.new_ir(eq_nid, ast, IRKind::BareAssign, true);
+
+        // Operand 0: name (immediate identifier)
+        self.add_new_operand_to_ir(ir_lid, LinOperand::new(None, ident_tinfo), true);
+
+        // Operand 1: RHS expression result
+        let mut rhs_lops = Vec::new();
+        if !self.record_r(rdepth + 1, expr_nid, &mut rhs_lops, diags, ast, ast_db, true) {
+            return false;
+        }
+        if rhs_lops.len() != 1 {
+            let m = format!(
+                "Deferred assignment RHS produced {} result(s), expected 1",
+                rhs_lops.len()
+            );
+            let tinfo = ast.get_tinfo(eq_nid);
+            diags.err1("LINEAR_14", &m, tinfo.span());
+            return false;
+        }
+        self.add_existing_operand_to_ir(ir_lid, rhs_lops[0], true);
+        true
+    }
+
+    /// Converts an `if/else` block into a linear sequence of
+    /// `IfBegin … [ElseBegin] … IfEnd` IR entries in `const_ir_vec`.
+    ///
+    /// Children of the if-node (in order):
+    ///   condition_expr, {, then_stmts…, }, [else, ({, else_stmts…, } | nested_if)]
+    fn record_if_else(
+        &mut self,
+        if_nid: NodeId,
+        rdepth: usize,
+        diags: &mut Diags,
+        ast: &'toks Ast,
+        ast_db: &AstDb,
+    ) -> bool {
+        // Collect children into a Vec so we can index into them.
+        let children: Vec<NodeId> = ast.children(if_nid).collect();
+        let mut i = 0;
+        let mut result = true;
+
+        // Child 0: condition expression
+        let cond_nid = children[i]; i += 1;
+        let mut cond_lops = Vec::new();
+        if !self.record_r(rdepth + 1, cond_nid, &mut cond_lops, diags, ast, ast_db, true) {
+            return false;
+        }
+        if cond_lops.len() != 1 {
+            let tinfo = ast.get_tinfo(if_nid);
+            diags.err1("LINEAR_15", "if condition must produce exactly one value", tinfo.span());
+            return false;
+        }
+
+        // Emit IfBegin with the condition operand
+        let ifbegin_lid = self.new_ir(if_nid, ast, IRKind::IfBegin, true);
+        self.add_existing_operand_to_ir(ifbegin_lid, cond_lops[0], true);
+
+        // Child 1: '{' — skip
+        i += 1;
+
+        // Then-body: children until we hit '}'
+        while i < children.len() {
+            let tok = ast.get_tinfo(children[i]).tok;
+            if tok == LexToken::CloseBrace { i += 1; break; }
+            result &= self.record_if_body_stmt(children[i], rdepth + 1, diags, ast, ast_db);
+            i += 1;
+        }
+
+        // Check for else clause
+        if i < children.len() && ast.get_tinfo(children[i]).tok == LexToken::Else {
+            i += 1; // consume 'else'
+
+            // Emit ElseBegin
+            let else_nid = children[i - 1]; // the 'else' node
+            self.new_ir(else_nid, ast, IRKind::ElseBegin, true);
+
+            if i < children.len() {
+                let next_tok = ast.get_tinfo(children[i]).tok;
+                if next_tok == LexToken::If {
+                    // else if: recursively process the nested if node
+                    result &= self.record_if_else(children[i], rdepth + 1, diags, ast, ast_db);
+                } else if next_tok == LexToken::OpenBrace {
+                    i += 1; // skip '{'
+                    while i < children.len() {
+                        let tok = ast.get_tinfo(children[i]).tok;
+                        if tok == LexToken::CloseBrace { break; }
+                        result &= self.record_if_body_stmt(children[i], rdepth + 1, diags, ast, ast_db);
+                        i += 1;
+                    }
+                }
+            }
+        }
+
+        // Emit IfEnd
+        self.new_ir(if_nid, ast, IRKind::IfEnd, true);
+
+        result
+    }
+
+    /// Dispatches a single statement node that lives inside an if/else body.
+    fn record_if_body_stmt(
+        &mut self,
+        stmt_nid: NodeId,
+        rdepth: usize,
+        diags: &mut Diags,
+        ast: &'toks Ast,
+        ast_db: &AstDb,
+    ) -> bool {
+        let tinfo = ast.get_tinfo(stmt_nid);
+        match tinfo.tok {
+            LexToken::Eq => self.record_deferred_assign(stmt_nid, rdepth, diags, ast, ast_db),
+            LexToken::Print | LexToken::Assert => {
+                let mut lops = Vec::new();
+                self.record_r(rdepth, stmt_nid, &mut lops, diags, ast, ast_db, true)
+            }
+            LexToken::If => self.record_if_else(stmt_nid, rdepth, diags, ast, ast_db),
+            _ => true, // syntactic tokens (already filtered by parser)
+        }
     }
 
     /// The LinearDb object must start with an output statement.
@@ -979,6 +1148,20 @@ impl<'toks> LinearDb {
         // created during this loop go into const_ir_vec and const_operand_vec.
         for const_item in ast_db.consts.values() {
             if !linear_db.record_const_decl(const_item.nid, diags, ast, ast_db) {
+                anyhow::bail!("LinearDb construction failed.");
+            }
+        }
+
+        // Linearize declare-only consts (`const NAME;`).
+        for &dc_nid in &ast_db.declared_consts {
+            if !linear_db.record_const_declare(dc_nid, ast) {
+                anyhow::bail!("LinearDb construction failed.");
+            }
+        }
+
+        // Linearize top-level if/else blocks in source order.
+        for &if_nid in &ast_db.if_else_blocks {
+            if !linear_db.record_if_else(if_nid, 1, diags, ast, ast_db) {
                 anyhow::bail!("LinearDb construction failed.");
             }
         }

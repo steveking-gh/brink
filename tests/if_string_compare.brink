@@ -1,0 +1,15 @@
+// String comparison in if condition.
+const MODE = "fast";
+const CYCLES;
+
+if MODE == "fast" {
+    CYCLES = 10;
+} else {
+    CYCLES = 100;
+}
+
+section foo {
+    wr32 CYCLES;
+}
+
+output foo;

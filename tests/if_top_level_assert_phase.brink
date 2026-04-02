@@ -1,0 +1,17 @@
+// A top-level assert appears after an if-block that performs a deferred
+// assignment.  The assert must see the value written by the if-block.
+// Expected: success (assert VAL == 7 passes).
+
+const VAL;
+
+if 1 == 1 {
+    VAL = 7;
+}
+
+assert VAL == 7;
+
+section foo {
+    wr32 VAL;
+}
+
+output foo;
