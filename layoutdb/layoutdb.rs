@@ -358,7 +358,6 @@ impl<'toks> LayoutDb {
         const_nid: NodeId,
         diags: &mut Diags,
         ast: &'toks Ast,
-        ast_db: &AstDb,
     ) -> bool {
         let ir_lid = clz.new_ir(const_nid, ast, IRKind::Const);
 
@@ -606,7 +605,6 @@ impl<'toks> LayoutDb {
                 const_item.nid,
                 diags,
                 ast,
-                ast_db,
             ) {
                 anyhow::bail!("LayoutDb construction failed.");
             }
