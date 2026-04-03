@@ -980,10 +980,7 @@ mod tests {
 
     #[test]
     fn set_sec_offset_after_set_addr() {
-        assert_brink_warning(
-            "tests/set_sec_offset_after_set_addr.brink",
-            &["[EXEC_54]"],
-        );
+        assert_brink_warning("tests/set_sec_offset_after_set_addr.brink", &["[EXEC_54]"]);
     }
 
     #[test]
@@ -1043,7 +1040,11 @@ mod tests {
     #[test]
     fn output_addr_root_anchors_with_output_base_after_set_addr() {
         // __OUTPUT_ADDR should remain output base when output has a base and first statement is set_addr.
-        assert_brink_success("tests/output_addr_section_set_addr_with_output_base.brink", None, None);
+        assert_brink_success(
+            "tests/output_addr_section_set_addr_with_output_base.brink",
+            None,
+            None,
+        );
     }
 
     #[test]
@@ -1098,10 +1099,10 @@ mod tests {
         //   file[16..20] "tail"
         let bytevec = fs::read("file_offset_1.bin").unwrap();
         let expected: Vec<u8> = vec![
-            b'h', b'e', b'a', b'd',                         // "head"
-            b'i', b'n', b'n',                               // "inn"
+            b'h', b'e', b'a', b'd', // "head"
+            b'i', b'n', b'n', // "inn"
             0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, // 9 pad bytes
-            b't', b'a', b'i', b'l',                         // "tail"
+            b't', b'a', b'i', b'l', // "tail"
         ];
         assert_eq!(bytevec.len(), 20);
         assert_eq!(bytevec, expected);
@@ -1201,7 +1202,11 @@ mod tests {
         assert_eq!(produced.len(), 12, "Expected 12 bytes total");
 
         // First 4 bytes: 0x01-0x04.
-        assert_eq!(&produced[..4], &[0x01, 0x02, 0x03, 0x04], "Data bytes mismatch");
+        assert_eq!(
+            &produced[..4],
+            &[0x01, 0x02, 0x03, 0x04],
+            "Data bytes mismatch"
+        );
 
         // Next 8 bytes: sum of 1+2+3+4 = 10 as little-endian u64.
         let sum = u64::from_le_bytes(produced[4..12].try_into().unwrap());
@@ -1227,9 +1232,17 @@ mod tests {
         let produced = fs::read("execute_extension_section_sum.bin")
             .expect("execute_extension_section_sum.bin not found");
 
-        assert_eq!(produced.len(), 12, "Expected 4 data bytes + 8-byte sum = 12 bytes");
+        assert_eq!(
+            produced.len(),
+            12,
+            "Expected 4 data bytes + 8-byte sum = 12 bytes"
+        );
 
-        assert_eq!(&produced[..4], &[0x01, 0x02, 0x03, 0x04], "Data bytes mismatch");
+        assert_eq!(
+            &produced[..4],
+            &[0x01, 0x02, 0x03, 0x04],
+            "Data bytes mismatch"
+        );
 
         // Sum of 1+2+3+4 = 10 (extension slot zeros do not affect the sum).
         let sum = u64::from_le_bytes(produced[4..12].try_into().unwrap());
@@ -1283,7 +1296,11 @@ mod tests {
             .assert()
             .success();
         let bytes = fs::read(out_path).expect("output file not found");
-        assert_eq!(bytes, vec![0u8; 8], "zero-length section sum must be all zeros");
+        assert_eq!(
+            bytes,
+            vec![0u8; 8],
+            "zero-length section sum must be all zeros"
+        );
         fs::remove_file(out_path).unwrap();
     }
 
@@ -1291,7 +1308,10 @@ mod tests {
     /// fails when the extension rejects empty input.
     #[test]
     fn execute_extension_zero_length_section_failure() {
-        assert_brink_failure("tests/test_extension_zero_length_section_failure.brink", &[]);
+        assert_brink_failure(
+            "tests/test_extension_zero_length_section_failure.brink",
+            &[],
+        );
     }
 
     /// Global asserts (outside any section) pass through the validation phase
@@ -1318,7 +1338,7 @@ mod tests {
         let source_files = &[
             "ast/ast.rs",
             "ir/ir.rs",
-            "lineardb/lineardb.rs",
+            "layoutdb/layoutdb.rs",
             "irdb/irdb.rs",
             "engine/engine.rs",
             "process/process.rs",
@@ -1488,10 +1508,7 @@ mod tests {
     /// Consts must be resolvable before the engine runs.  Expected: IRDB_19.
     #[test]
     fn test_output_builtin_const_fail() {
-        assert_brink_failure(
-            "tests/test_output_builtin_const_fail.brink",
-            &["[IRDB_19]"],
-        );
+        assert_brink_failure("tests/test_output_builtin_const_fail.brink", &["[IRDB_19]"]);
     }
 
     /// A const expression depends on addr(), which requires engine-time addressing.

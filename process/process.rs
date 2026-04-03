@@ -1,7 +1,7 @@
 // Top-level pipeline orchestrator for brink.
 //
 // The process function is the single entry point that drives the entire
-// compiler pipeline.  It sequences the four stages in order — Ast, LinearDb,
+// compiler pipeline.  It sequences the four stages in order — Ast, LayoutDb,
 // IRDb and Engine — passing each stage's output as input to the next, and
 // converting any stage-level Err(()) result into an anyhow error so that the
 // caller receives a descriptive failure message.  It also handles the output
@@ -23,7 +23,7 @@ use engine::Engine;
 use ext::{ExtensionRegistry, test_mocks::register_test_extensions};
 use ir::{ConstBuiltins, ParameterValue};
 use irdb::IRDb;
-use lineardb::LinearDb;
+use layoutdb::LayoutDb;
 use map::{MapDb, format_c99, format_csv, format_json};
 
 #[allow(unused_imports)]
@@ -125,17 +125,17 @@ pub fn process(
     }
 
     let ast_db = AstDb::new(&mut diags, &ast)?;
-    let linear_db =
-        LinearDb::new(&mut diags, &ast, &ast_db).context("[PROC_2]: Error detected, halting.")?;
+    let layout_db =
+        LayoutDb::new(&mut diags, &ast, &ast_db).context("[PROC_2]: Error detected, halting.")?;
     if verbosity > 2 {
-        linear_db.dump();
+        layout_db.dump();
     }
 
     let mut ext_registry = ExtensionRegistry::new();
     register_test_extensions(&mut ext_registry);
     extensions::register_all(&mut ext_registry);
 
-    let ir_db = IRDb::new(&linear_db, &mut diags, &const_defines, &ext_registry)
+    let ir_db = IRDb::new(&layout_db, &mut diags, &const_defines, &ext_registry)
         .context("[PROC_3]: Error detected, halting.")?;
 
     debug!("Dumping ir_db");

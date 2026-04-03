@@ -566,7 +566,10 @@ mod tests {
             }],
         };
         let out = format_csv(&map);
-        assert!(out.contains("no"), "used column 'no' missing for unused const");
+        assert!(
+            out.contains("no"),
+            "used column 'no' missing for unused const"
+        );
     }
 
     #[test]

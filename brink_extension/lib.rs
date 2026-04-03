@@ -107,5 +107,5 @@ pub trait BrinkRangedExtension {
     ///
     /// Return `Err(message)` to abort compilation with a diagnostic.
     fn execute(&self, args: &[u64], img_buffer: &[u8], out_buffer: &mut [u8])
-        -> Result<(), String>;
+    -> Result<(), String>;
 }

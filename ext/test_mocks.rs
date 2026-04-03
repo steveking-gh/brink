@@ -1,5 +1,5 @@
-use std::cell::Cell;
 use super::*;
+use std::cell::Cell;
 
 pub struct MockCrc {
     size_call_count: Cell<usize>,
@@ -7,7 +7,9 @@ pub struct MockCrc {
 
 impl MockCrc {
     pub fn new() -> Self {
-        Self { size_call_count: Cell::new(0) }
+        Self {
+            size_call_count: Cell::new(0),
+        }
     }
 }
 
@@ -48,7 +50,9 @@ pub struct MockLogger {
 
 impl MockLogger {
     pub fn new() -> Self {
-        Self { size_call_count: Cell::new(0) }
+        Self {
+            size_call_count: Cell::new(0),
+        }
     }
 }
 
@@ -85,7 +89,9 @@ pub struct MockIncrement {
 
 impl MockIncrement {
     pub fn new() -> Self {
-        Self { size_call_count: Cell::new(0) }
+        Self {
+            size_call_count: Cell::new(0),
+        }
     }
 }
 
@@ -107,7 +113,12 @@ impl BrinkRangedExtension for MockIncrement {
         16
     }
 
-    fn execute(&self, _args: &[u64], img_buffer: &[u8], out_buffer: &mut [u8]) -> Result<(), String> {
+    fn execute(
+        &self,
+        _args: &[u64],
+        img_buffer: &[u8],
+        out_buffer: &mut [u8],
+    ) -> Result<(), String> {
         assert!(
             img_buffer.len() >= out_buffer.len(),
             "MockIncrement: img_buffer must be at least as large as out_buffer (got {} vs {})",
@@ -129,7 +140,9 @@ pub struct MockRangedSum {
 
 impl MockRangedSum {
     pub fn new() -> Self {
-        Self { size_call_count: Cell::new(0) }
+        Self {
+            size_call_count: Cell::new(0),
+        }
     }
 }
 
@@ -151,8 +164,17 @@ impl BrinkRangedExtension for MockRangedSum {
         8
     }
 
-    fn execute(&self, _args: &[u64], img_buffer: &[u8], out_buffer: &mut [u8]) -> Result<(), String> {
-        assert_eq!(out_buffer.len(), 8, "MockRangedSum: out_buffer must be exactly 8 bytes");
+    fn execute(
+        &self,
+        _args: &[u64],
+        img_buffer: &[u8],
+        out_buffer: &mut [u8],
+    ) -> Result<(), String> {
+        assert_eq!(
+            out_buffer.len(),
+            8,
+            "MockRangedSum: out_buffer must be exactly 8 bytes"
+        );
         let sum: u64 = img_buffer.iter().map(|&b| b as u64).sum();
         out_buffer.copy_from_slice(&sum.to_le_bytes());
         Ok(())
@@ -167,7 +189,9 @@ pub struct MockRejectEmpty {
 
 impl MockRejectEmpty {
     pub fn new() -> Self {
-        Self { size_call_count: Cell::new(0) }
+        Self {
+            size_call_count: Cell::new(0),
+        }
     }
 }
 
@@ -189,7 +213,12 @@ impl BrinkRangedExtension for MockRejectEmpty {
         4
     }
 
-    fn execute(&self, _args: &[u64], img_buffer: &[u8], out_buffer: &mut [u8]) -> Result<(), String> {
+    fn execute(
+        &self,
+        _args: &[u64],
+        img_buffer: &[u8],
+        out_buffer: &mut [u8],
+    ) -> Result<(), String> {
         if img_buffer.is_empty() {
             return Err("brink::test_reject_empty: input range must not be empty".to_string());
         }

@@ -69,7 +69,13 @@ impl SymbolTable {
 
     /// Assign a value to a previously-declared const (bare assignment inside an if/else body).
     /// Returns false and emits SYMTAB_3 if the name was not declared.
-    pub fn assign(&mut self, name: &str, value: ParameterValue, loc: &SourceSpan, diags: &Diags) -> bool {
+    pub fn assign(
+        &mut self,
+        name: &str,
+        value: ParameterValue,
+        loc: &SourceSpan,
+        diags: &Diags,
+    ) -> bool {
         if let Some(entry) = self.entries.get_mut(name) {
             entry.value = Some(value);
             true
@@ -112,9 +118,9 @@ impl SymbolTable {
 
     /// Iterates over all entries with a value, yielding `(name, &ParameterValue, used)`.
     pub fn iter_defined_with_used(&self) -> impl Iterator<Item = (&str, &ParameterValue, bool)> {
-        self.entries.iter().filter_map(|(k, e)| {
-            e.value.as_ref().map(|v| (k.as_str(), v, e.used))
-        })
+        self.entries
+            .iter()
+            .filter_map(|(k, e)| e.value.as_ref().map(|v| (k.as_str(), v, e.used)))
     }
 
     /// Emit `SYMTAB_1` warnings for every const with a value that was never used.

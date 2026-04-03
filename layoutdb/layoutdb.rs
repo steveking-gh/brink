@@ -1,0 +1,895 @@
+// AST to linear IR lowering for layout-time statements.
+//
+// LayoutDb walks the AST and flattens the tree into two parallel vectors: a
+// sequence of LinIR instructions and a sequence of LinOperand operands. During
+// this pass, Brink resolves section nesting and expression structure into
+// linear order. Values are still stored as raw strings at this point.  Type
+// conversion and expression evaluation happens later.
+//
+// Expression lowering (atoms, operators, extension calls) calls into the
+// shared `linearizer` crate.
+
+use diags::Diags;
+use diags::SourceSpan;
+use indextree::NodeId;
+
+#[allow(unused_imports)]
+use tracing::{debug, trace};
+
+use ast::{Ast, AstDb, LexToken, is_reserved_identifier};
+use ir::IRKind;
+use std::collections::{HashMap, HashSet};
+
+use linearizer::{LinIR, LinOperand, Linearizer, tok_to_irkind};
+
+// ── LayoutDb ──────────────────────────────────────────────────────────────────
+
+pub struct LayoutDb {
+    /// Flat, ordered sequence of layout-time IR instructions.
+    pub ir_vec: Vec<LinIR>,
+
+    /// Flat sequence of IR instructions for const-time expressions.
+    pub const_ir_vec: Vec<LinIR>,
+
+    /// Operands referenced by ir_vec instructions.
+    pub operand_vec: Vec<LinOperand>,
+
+    /// Operands referenced by const_ir_vec instructions.
+    pub const_operand_vec: Vec<LinOperand>,
+
+    /// Maps each const identifier name to its const_ir_vec index.
+    pub const_map: HashMap<String, usize>,
+
+    pub output_sec_str: String,
+    pub output_sec_loc: SourceSpan,
+    pub output_addr_str: Option<String>,
+    pub output_addr_loc: Option<SourceSpan>,
+
+    /// Names of every section declared in the source (used by irdb).
+    pub section_names: HashSet<String>,
+}
+
+impl LayoutDb {
+    pub fn dump(&self) {
+        for (idx, ir) in self.ir_vec.iter().enumerate() {
+            let mut op = format!("lid {}: nid {} is {:?}", idx, ir.nid, ir.op);
+            let mut first = true;
+            for child in &ir.operand_vec {
+                let operand = &self.operand_vec[*child];
+                if !first {
+                    op.push(',');
+                } else {
+                    first = false;
+                }
+                if let Some(ir_lid) = operand.is_output_of() {
+                    op.push_str(&format!(" tmp{}, output of lid {}", *child, ir_lid));
+                } else {
+                    op.push_str(&format!(" {}", operand.sval));
+                }
+            }
+            debug!("LayoutDb: {}", op);
+        }
+        for (idx, ir) in self.const_ir_vec.iter().enumerate() {
+            let mut op = format!("const lid {}: nid {} is {:?}", idx, ir.nid, ir.op);
+            let mut first = true;
+            for child in &ir.operand_vec {
+                let operand = &self.const_operand_vec[*child];
+                if !first {
+                    op.push(',');
+                } else {
+                    first = false;
+                }
+                if let Some(ir_lid) = operand.is_output_of() {
+                    op.push_str(&format!(" tmp{}, output of lid {}", *child, ir_lid));
+                } else {
+                    op.push_str(&format!(" {}", operand.sval));
+                }
+            }
+            debug!("LayoutDb: {}", op);
+        }
+    }
+}
+
+// ── Static linearization helpers ─────────────────────────────────────────────
+//
+// All record_* functions are associated functions (no &mut self).  Each takes
+// a &mut Linearizer for the relevant IR target (layout or const) plus any
+// other context needed.  This eliminates the former in_const_expr: bool
+// flag and the self-borrow tension that flag caused.
+
+impl<'toks> LayoutDb {
+    // ── Layout: section-body recursion ───────────────────────────────────────
+
+    /// Recurse over each child of parent_nid calling record_r.
+    fn record_children_r(
+        lz: &mut Linearizer,
+        rdepth: usize,
+        parent_nid: NodeId,
+        lops: &mut Vec<usize>,
+        diags: &mut Diags,
+        ast: &'toks Ast,
+        ast_db: &AstDb,
+    ) -> bool {
+        let mut result = true;
+        for nid in ast.children(parent_nid) {
+            result &= Self::record_r(lz, rdepth, nid, lops, diags, ast, ast_db);
+        }
+        result
+    }
+
+    /// Lower one layout-time AST node.
+    ///
+    /// Expression tokens are delegated to `lz.record_expr_r()`.
+    /// Layout statement tokens (section, wr*, align, etc.) are handled here.
+    #[allow(clippy::too_many_arguments)]
+    fn record_r(
+        lz: &mut Linearizer,
+        rdepth: usize,
+        parent_nid: NodeId,
+        returned_operands: &mut Vec<usize>,
+        diags: &mut Diags,
+        ast: &'toks Ast,
+        ast_db: &AstDb,
+    ) -> bool {
+        debug!(
+            "LayoutDb::record_r: ENTER at depth {} for parent nid: {}",
+            rdepth, parent_nid
+        );
+
+        if !lz.depth_sanity(rdepth, parent_nid, diags, ast) {
+            return false;
+        }
+
+        let tinfo = ast.get_tinfo(parent_nid);
+        let tok = tinfo.tok;
+        let mut result = true;
+
+        match tok {
+            // ── Const reference operand ───────────────────────────────────
+            // Handles the case where `const` appears as a child operand.
+            LexToken::Const => {
+                let idx = lz.operand_vec.len();
+                lz.operand_vec.push(LinOperand::new(None, tinfo));
+                returned_operands.push(idx);
+            }
+
+            // ── Generic wr: section write or extension write ───────────────
+            LexToken::Wr => {
+                let mut lops = Vec::new();
+                let child_nid = ast.children(parent_nid).next().unwrap();
+                let child_tinfo = ast.get_tinfo(child_nid);
+
+                if child_tinfo.tok == LexToken::Identifier && !ast.has_children(child_nid) {
+                    let sec_name_str = child_tinfo.val;
+                    let section = ast_db.sections.get(sec_name_str).unwrap();
+                    let sec_nid = section.nid;
+                    result &=
+                        Self::record_r(lz, rdepth + 1, sec_nid, &mut lops, diags, ast, ast_db);
+                    result &= lz.operand_count_is_valid(0, &lops, diags, tinfo);
+                } else {
+                    let ir_lid = lz.new_ir(parent_nid, ast, IRKind::WrExt);
+                    result &= Self::record_children_r(
+                        lz,
+                        rdepth + 1,
+                        parent_nid,
+                        &mut lops,
+                        diags,
+                        ast,
+                        ast_db,
+                    );
+                    result &= lz.operand_count_is_valid(1, &lops, diags, tinfo);
+                    for idx in lops {
+                        lz.add_existing_operand_to_ir(ir_lid, idx);
+                    }
+                }
+            }
+
+            // ── sizeof(section) or sizeof(namespace::ext) ─────────────────
+            LexToken::Sizeof => {
+                let first_child = ast.children(parent_nid).next().unwrap();
+                let first_child_tinfo = ast.get_tinfo(first_child);
+
+                if first_child_tinfo.tok == LexToken::Namespace {
+                    let ns_children: Vec<_> = ast.children(first_child).collect();
+                    let ext_id_tinfo = ast.get_tinfo(ns_children[0]);
+                    let full_name = format!("{}{}", first_child_tinfo.val, ext_id_tinfo.val);
+
+                    let ir_lid = lz.new_ir(parent_nid, ast, IRKind::SizeofExt);
+                    let mut name_op = LinOperand::new(None, first_child_tinfo);
+                    name_op.sval = full_name;
+                    lz.add_new_operand_to_ir(ir_lid, name_op);
+
+                    let idx =
+                        lz.add_new_operand_to_ir(ir_lid, LinOperand::new(Some(ir_lid), tinfo));
+                    returned_operands.push(idx);
+                } else {
+                    let mut lops = Vec::new();
+                    let ir_lid = lz.new_ir(parent_nid, ast, IRKind::Sizeof);
+                    result &=
+                        lz.record_expr_children_r(rdepth + 1, parent_nid, &mut lops, diags, ast);
+                    result &= lz.process_operands(1, &mut lops, ir_lid, diags, tinfo);
+                    let idx =
+                        lz.add_new_operand_to_ir(ir_lid, LinOperand::new(Some(ir_lid), tinfo));
+                    returned_operands.push(idx);
+                }
+            }
+
+            // ── Address queries ───────────────────────────────────────────
+            LexToken::Addr | LexToken::AddrOffset | LexToken::SecOffset | LexToken::FileOffset => {
+                let mut lops = Vec::new();
+                let ir_lid = lz.new_ir(parent_nid, ast, tok_to_irkind(tok));
+                result &= lz.record_expr_children_r(rdepth + 1, parent_nid, &mut lops, diags, ast);
+                result &= lz.process_optional_operands(1, &mut lops, ir_lid, diags, tinfo);
+                let idx = lz.add_new_operand_to_ir(ir_lid, LinOperand::new(Some(ir_lid), tinfo));
+                returned_operands.push(idx);
+            }
+
+            // ── Alignment and address directives ──────────────────────────
+            LexToken::SetSecOffset
+            | LexToken::SetAddrOffset
+            | LexToken::SetAddr
+            | LexToken::SetFileOffset
+            | LexToken::Align => {
+                let mut lops = Vec::new();
+                let ir_lid = lz.new_ir(parent_nid, ast, tok_to_irkind(tok));
+                result &= lz.record_expr_children_r(rdepth + 1, parent_nid, &mut lops, diags, ast);
+
+                if lops.len() != 1 && lops.len() != 2 {
+                    let m = format!(
+                        "{:?} requires 1 or 2 operands, but found {}",
+                        tok,
+                        lops.len()
+                    );
+                    diags.err1("LINEAR_8", &m, tinfo.span());
+                    return false;
+                }
+
+                lz.add_existing_operand_to_ir(ir_lid, lops[0]);
+                let count_output =
+                    lz.add_new_operand_to_ir(ir_lid, LinOperand::new(Some(ir_lid), tinfo));
+
+                let mut wr8_tinfo = tinfo.clone();
+                wr8_tinfo.tok = LexToken::Wr8;
+                let wr8_lid = lz.new_ir(parent_nid, ast, tok_to_irkind(wr8_tinfo.tok));
+
+                if lops.len() == 2 {
+                    lz.add_existing_operand_to_ir(wr8_lid, lops[1]);
+                } else {
+                    let mut pad_tinfo = tinfo.clone();
+                    pad_tinfo.tok = LexToken::Integer;
+                    pad_tinfo.val = "0";
+                    lz.add_new_operand_to_ir(wr8_lid, LinOperand::new(None, &pad_tinfo));
+                }
+                lz.add_existing_operand_to_ir(wr8_lid, count_output);
+            }
+
+            // ── Write and print statements ────────────────────────────────
+            LexToken::Assert
+            | LexToken::Wr8
+            | LexToken::Wr16
+            | LexToken::Wr24
+            | LexToken::Wr32
+            | LexToken::Wr40
+            | LexToken::Wr48
+            | LexToken::Wr56
+            | LexToken::Wr64
+            | LexToken::Wrs
+            | LexToken::Wrf
+            | LexToken::Print => {
+                let mut lops = Vec::new();
+                result &= lz.record_expr_children_r(rdepth + 1, parent_nid, &mut lops, diags, ast);
+                let ir_lid = lz.new_ir(parent_nid, ast, tok_to_irkind(tok));
+                for idx in lops {
+                    lz.add_existing_operand_to_ir(ir_lid, idx);
+                }
+            }
+
+            // ── Section block ─────────────────────────────────────────────
+            LexToken::Section => {
+                let mut lops = Vec::new();
+                let start_lid = lz.new_ir(parent_nid, ast, IRKind::SectionStart);
+                result &= Self::record_children_r(
+                    lz,
+                    rdepth + 1,
+                    parent_nid,
+                    &mut lops,
+                    diags,
+                    ast,
+                    ast_db,
+                );
+                let end_lid = lz.new_ir(parent_nid, ast, IRKind::SectionEnd);
+                if lz.operand_count_is_valid(1, &lops, diags, tinfo) {
+                    let sec_id_lid = lops.pop().unwrap();
+                    lz.add_existing_operand_to_ir(start_lid, sec_id_lid);
+                    lz.add_existing_operand_to_ir(end_lid, sec_id_lid);
+                } else {
+                    result = false;
+                }
+            }
+
+            // ── Label declaration ─────────────────────────────────────────
+            LexToken::Label => {
+                let ir_lid = lz.new_ir(parent_nid, ast, IRKind::Label);
+                let name_without_colon = tinfo.val[..tinfo.val.len() - 1].to_string();
+                let operand = LinOperand {
+                    ir_lid: Some(ir_lid),
+                    src_loc: tinfo.loc.clone(),
+                    sval: name_without_colon,
+                    tok,
+                };
+                lz.add_new_operand_to_ir(ir_lid, operand);
+            }
+
+            // ── Error arms ────────────────────────────────────────────────
+            LexToken::Unknown => {
+                diags.err1("LINEAR_3", "Unexpected character.", tinfo.span());
+                result = false;
+            }
+            LexToken::Output => {
+                let m = format!("Unexpected '{}' expression not allowed here.", tinfo.val);
+                diags.err1("LINEAR_4", &m, tinfo.span());
+                result = false;
+            }
+            LexToken::If | LexToken::Else => {
+                let m = format!("Unexpected '{}' in linearization context.", tinfo.val);
+                diags.err1("LINEAR_16", &m, tinfo.span());
+                result = false;
+            }
+
+            // ── All expression tokens: delegate to the shared linearizer ──
+            _ => {
+                result = lz.record_expr_r(rdepth, parent_nid, returned_operands, diags, ast);
+            }
+        }
+
+        debug!(
+            "LayoutDb::record_r: EXIT({}) at depth {} for nid: {}",
+            result, rdepth, parent_nid
+        );
+        result
+    }
+
+    // ── Const-time linearization ──────────────────────────────────────────────
+
+    /// Lower a `const NAME = <expr>` full definition into const_ir_vec.
+    fn record_const_decl(
+        clz: &mut Linearizer,
+        const_map: &mut HashMap<String, usize>,
+        const_nid: NodeId,
+        diags: &mut Diags,
+        ast: &'toks Ast,
+        ast_db: &AstDb,
+    ) -> bool {
+        let ir_lid = clz.new_ir(const_nid, ast, IRKind::Const);
+
+        let mut children = ast.children(const_nid);
+
+        // Child 0: name identifier
+        let name_nid = children.next().unwrap();
+        let name_tinfo = ast.get_tinfo(name_nid);
+        let name_idx = clz.operand_vec.len();
+        clz.operand_vec.push(LinOperand::new(None, name_tinfo));
+        clz.add_existing_operand_to_ir(ir_lid, name_idx);
+
+        // Child 1: `=` sign
+        let eq_nid = children.next().unwrap();
+        let eq_tinfo = ast.get_tinfo(eq_nid);
+
+        // Child 2: RHS expression
+        let rhs_nid = children.next().unwrap();
+        let mut rhs_lops = Vec::new();
+        if !clz.record_expr_r(1, rhs_nid, &mut rhs_lops, diags, ast) {
+            return false;
+        }
+        if rhs_lops.len() != 1 {
+            let m = format!(
+                "Const expression RHS produced {} results, expected 1",
+                rhs_lops.len()
+            );
+            diags.err1("LINEAR_12", &m, name_tinfo.span());
+            return false;
+        }
+        clz.add_existing_operand_to_ir(ir_lid, rhs_lops[0]);
+
+        // Output slot: the Eq token carries the output type info
+        clz.add_new_operand_to_ir(ir_lid, LinOperand::new(Some(ir_lid), eq_tinfo));
+
+        const_map.insert(name_tinfo.val.to_string(), ir_lid);
+        true
+    }
+
+    /// Lower a `const NAME;` declare-only statement into const_ir_vec.
+    fn record_const_declare(clz: &mut Linearizer, const_nid: NodeId, ast: &'toks Ast) -> bool {
+        let mut children = ast.children(const_nid);
+        let name_nid = children.next().unwrap();
+        let name_tinfo = ast.get_tinfo(name_nid);
+        let ir_lid = clz.new_ir(const_nid, ast, IRKind::ConstDeclare);
+        clz.add_new_operand_to_ir(ir_lid, LinOperand::new(None, name_tinfo));
+        true
+    }
+
+    /// Lower a deferred assignment `IDENT = expr;` (inside an if/else body).
+    fn record_deferred_assign(
+        clz: &mut Linearizer,
+        eq_nid: NodeId,
+        rdepth: usize,
+        diags: &mut Diags,
+        ast: &'toks Ast,
+        ast_db: &AstDb,
+    ) -> bool {
+        let _ = ast_db; // reserved for future use (e.g. section-scoped const validation)
+        let mut children = ast.children(eq_nid);
+        let ident_nid = children.next().unwrap();
+        let expr_nid = children.next().unwrap();
+        let ident_tinfo = ast.get_tinfo(ident_nid);
+
+        let ir_lid = clz.new_ir(eq_nid, ast, IRKind::BareAssign);
+        clz.add_new_operand_to_ir(ir_lid, LinOperand::new(None, ident_tinfo));
+
+        let mut rhs_lops = Vec::new();
+        if !clz.record_expr_r(rdepth + 1, expr_nid, &mut rhs_lops, diags, ast) {
+            return false;
+        }
+        if rhs_lops.len() != 1 {
+            let m = format!(
+                "Deferred assignment RHS produced {} result(s), expected 1",
+                rhs_lops.len()
+            );
+            diags.err1("LINEAR_14", &m, ast.get_tinfo(eq_nid).span());
+            return false;
+        }
+        clz.add_existing_operand_to_ir(ir_lid, rhs_lops[0]);
+        true
+    }
+
+    /// Dispatch a single statement inside an if/else body.
+    fn record_if_body_stmt(
+        clz: &mut Linearizer,
+        stmt_nid: NodeId,
+        rdepth: usize,
+        diags: &mut Diags,
+        ast: &'toks Ast,
+        ast_db: &AstDb,
+    ) -> bool {
+        let tinfo = ast.get_tinfo(stmt_nid);
+        match tinfo.tok {
+            LexToken::Eq => Self::record_deferred_assign(clz, stmt_nid, rdepth, diags, ast, ast_db),
+            LexToken::Print | LexToken::Assert => {
+                let mut lops = Vec::new();
+                clz.record_expr_children_r(rdepth, stmt_nid, &mut lops, diags, ast);
+                let ir_lid = clz.new_ir(stmt_nid, ast, tok_to_irkind(tinfo.tok));
+                for idx in lops {
+                    clz.add_existing_operand_to_ir(ir_lid, idx);
+                }
+                true
+            }
+            LexToken::If => Self::record_if_else(clz, stmt_nid, rdepth, diags, ast, ast_db),
+            _ => true, // syntactic tokens already filtered by parser
+        }
+    }
+
+    /// Lower an `if/else` block into const_ir_vec.
+    fn record_if_else(
+        clz: &mut Linearizer,
+        if_nid: NodeId,
+        rdepth: usize,
+        diags: &mut Diags,
+        ast: &'toks Ast,
+        ast_db: &AstDb,
+    ) -> bool {
+        let children: Vec<NodeId> = ast.children(if_nid).collect();
+        let mut i = 0;
+        let mut result = true;
+
+        // Child 0: condition expression
+        let cond_nid = children[i];
+        i += 1;
+        let mut cond_lops = Vec::new();
+        if !clz.record_expr_r(rdepth + 1, cond_nid, &mut cond_lops, diags, ast) {
+            return false;
+        }
+        if cond_lops.len() != 1 {
+            let tinfo = ast.get_tinfo(if_nid);
+            diags.err1(
+                "LINEAR_15",
+                "if condition must produce exactly one value",
+                tinfo.span(),
+            );
+            return false;
+        }
+
+        let ifbegin_lid = clz.new_ir(if_nid, ast, IRKind::IfBegin);
+        clz.add_existing_operand_to_ir(ifbegin_lid, cond_lops[0]);
+
+        // Child 1: '{' — skip
+        i += 1;
+
+        // Then-body: children until '}'
+        while i < children.len() {
+            let tok = ast.get_tinfo(children[i]).tok;
+            if tok == LexToken::CloseBrace {
+                i += 1;
+                break;
+            }
+            result &= Self::record_if_body_stmt(clz, children[i], rdepth + 1, diags, ast, ast_db);
+            i += 1;
+        }
+
+        // Optional else clause
+        if i < children.len() && ast.get_tinfo(children[i]).tok == LexToken::Else {
+            let else_nid = children[i];
+            i += 1;
+            clz.new_ir(else_nid, ast, IRKind::ElseBegin);
+
+            if i < children.len() {
+                let next_tok = ast.get_tinfo(children[i]).tok;
+                if next_tok == LexToken::If {
+                    result &=
+                        Self::record_if_else(clz, children[i], rdepth + 1, diags, ast, ast_db);
+                } else if next_tok == LexToken::OpenBrace {
+                    i += 1; // skip '{'
+                    while i < children.len() {
+                        let tok = ast.get_tinfo(children[i]).tok;
+                        if tok == LexToken::CloseBrace {
+                            break;
+                        }
+                        result &= Self::record_if_body_stmt(
+                            clz,
+                            children[i],
+                            rdepth + 1,
+                            diags,
+                            ast,
+                            ast_db,
+                        );
+                        i += 1;
+                    }
+                }
+            }
+        }
+
+        clz.new_ir(if_nid, ast, IRKind::IfEnd);
+        result
+    }
+
+    // ── Constructor ───────────────────────────────────────────────────────────
+
+    pub fn new(diags: &mut Diags, ast: &'toks Ast, ast_db: &'toks AstDb) -> anyhow::Result<Self> {
+        debug!("LayoutDb::new: ENTER");
+
+        let output_nid = ast_db.output.nid;
+        let output_sec_tinfo = ast.get_tinfo(ast_db.output.sec_nid);
+        let output_sec_str = output_sec_tinfo.val.to_string();
+        let output_sec_loc = output_sec_tinfo.loc.clone();
+        debug!("LayoutDb::new: Output section name is {}", output_sec_str);
+
+        let output_addr_nid = ast_db.output.addr_nid;
+        let mut output_addr_str = None;
+        let mut output_addr_loc = None;
+        if output_addr_nid.is_some() {
+            let output_addr_tinfo = ast.get_tinfo(ast_db.output.addr_nid.unwrap());
+            if [LexToken::U64, LexToken::Integer, LexToken::Identifier]
+                .contains(&output_addr_tinfo.tok)
+            {
+                output_addr_str = Some(output_addr_tinfo.val.to_string());
+                output_addr_loc = Some(output_addr_tinfo.loc.clone());
+                debug!(
+                    "LayoutDb::new: Output address is {}",
+                    output_addr_str.as_ref().unwrap()
+                );
+            } else {
+                assert!(output_addr_tinfo.tok == LexToken::Semicolon);
+            }
+        }
+
+        let section_names: HashSet<String> =
+            ast_db.sections.keys().map(|s| s.to_string()).collect();
+
+        // Two independent Linearizer instances — one for layout-time IR,
+        // one for const-time IR.  Neither shares state with the other.
+        let mut layout_lz = Linearizer::new();
+        let mut const_lz = Linearizer::new();
+        let mut const_map: HashMap<String, usize> = HashMap::new();
+
+        // Linearize the output section body (layout-time IR).
+        let section = ast_db.sections.get(output_sec_str.as_str()).unwrap();
+        let sec_nid = section.nid;
+        let mut lops = Vec::new();
+        if !Self::record_r(&mut layout_lz, 1, sec_nid, &mut lops, diags, ast, ast_db) {
+            anyhow::bail!("LayoutDb construction failed.");
+        }
+
+        // Linearize all top-level full const definitions (const_ir_vec).
+        for const_item in ast_db.consts.values() {
+            if !Self::record_const_decl(
+                &mut const_lz,
+                &mut const_map,
+                const_item.nid,
+                diags,
+                ast,
+                ast_db,
+            ) {
+                anyhow::bail!("LayoutDb construction failed.");
+            }
+        }
+
+        // Linearize declare-only consts (const NAME;).
+        for &dc_nid in &ast_db.declared_consts {
+            if !Self::record_const_declare(&mut const_lz, dc_nid, ast) {
+                anyhow::bail!("LayoutDb construction failed.");
+            }
+        }
+
+        // Linearize top-level if/else blocks in source order.
+        for &if_nid in &ast_db.if_else_blocks {
+            if !Self::record_if_else(&mut const_lz, if_nid, 1, diags, ast, ast_db) {
+                anyhow::bail!("LayoutDb construction failed.");
+            }
+        }
+
+        // Linearize top-level assert statements into layout-time IR.
+        for &nid in &ast_db.global_asserts {
+            let mut lops = Vec::new();
+            if !Self::record_r(&mut layout_lz, 1, nid, &mut lops, diags, ast, ast_db) {
+                anyhow::bail!("LayoutDb construction failed.");
+            }
+        }
+
+        // Extract the vectors from the Linearizer instances into LayoutDb.
+        let layout_db = LayoutDb {
+            ir_vec: layout_lz.ir_vec,
+            operand_vec: layout_lz.operand_vec,
+            const_ir_vec: const_lz.ir_vec,
+            const_operand_vec: const_lz.operand_vec,
+            const_map,
+            output_sec_str,
+            output_sec_loc,
+            output_addr_str,
+            output_addr_loc,
+            section_names,
+        };
+
+        layout_db.dump();
+
+        if !IdentDb::check_globals(&layout_db, diags) {
+            anyhow::bail!("LayoutDb construction failed.");
+        }
+        if !IdentDb::check_locals(&layout_db, diags) {
+            anyhow::bail!("LayoutDb construction failed.");
+        }
+
+        debug!("LayoutDb::new: EXIT for nid: {}", output_nid);
+        Ok(layout_db)
+    }
+}
+
+// ── IdentDb ───────────────────────────────────────────────────────────────────
+
+struct IdentDb {
+    label_idents: HashMap<String, SourceSpan>,
+    section_count: HashMap<String, usize>,
+}
+
+impl IdentDb {
+    pub fn new() -> IdentDb {
+        IdentDb {
+            label_idents: HashMap::new(),
+            section_count: HashMap::new(),
+        }
+    }
+
+    pub fn check_globals(lindb: &LayoutDb, diags: &mut Diags) -> bool {
+        let mut idb = IdentDb::new();
+        if !idb.inventory_global_identifiers(lindb, diags) {
+            return false;
+        }
+        if !idb.verify_global_refs(lindb, diags) {
+            return false;
+        }
+        true
+    }
+
+    pub fn check_locals(lindb: &LayoutDb, diags: &mut Diags) -> bool {
+        debug!("IdentDb::check_locals: ENTER");
+        let mut result = true;
+        let mut lid = 0;
+        let len = lindb.ir_vec.len();
+        while lid < len && lindb.ir_vec[lid].op != IRKind::SectionStart {
+            lid += 1;
+        }
+        lid += 1;
+        result &= IdentDb::check_locals_r(&mut lid, lindb, diags);
+        debug!("IdentDb::check_locals: EXIT({})", result);
+        result
+    }
+
+    fn check_locals_r(lid: &mut usize, lindb: &LayoutDb, diags: &mut Diags) -> bool {
+        debug!("IdentDb::check_locals_r: ENTER at lid {}", *lid);
+        let mut result = true;
+        let mut idb = IdentDb::new();
+        let start_lid = *lid;
+        loop {
+            let lir = &lindb.ir_vec[*lid];
+            *lid += 1;
+            match lir.op {
+                IRKind::SectionStart => {
+                    idb.inventory_section_identifiers(lir, lindb);
+                    result &= IdentDb::check_locals_r(lid, lindb, diags);
+                }
+                IRKind::Label => {
+                    idb.inventory_label_identifiers(0, lir, lindb, diags);
+                }
+                IRKind::SectionEnd => break,
+                _ => {}
+            }
+        }
+        if result {
+            result &= idb.verify_local_refs(start_lid, lindb, diags);
+        }
+        debug!("IdentDb::check_locals_r: EXIT at lid {}", *lid);
+        result
+    }
+
+    fn skip_nested_sections_r(start_lid: usize, lindb: &LayoutDb) -> usize {
+        let mut lid = start_lid;
+        loop {
+            let lir = &lindb.ir_vec[lid];
+            lid += 1;
+            match lir.op {
+                IRKind::SectionStart => {
+                    lid = Self::skip_nested_sections_r(lid, lindb);
+                }
+                IRKind::SectionEnd => break,
+                _ => {}
+            }
+        }
+        lid
+    }
+
+    fn verify_local_refs(&self, start_lid: usize, lindb: &LayoutDb, diags: &mut Diags) -> bool {
+        let mut result = true;
+        let mut lid = start_lid;
+        loop {
+            let lir = &lindb.ir_vec[lid];
+            lid += 1;
+            match lir.op {
+                IRKind::SecOffset => {
+                    result &= self.verify_operand_refs(lir, lindb, diags);
+                }
+                IRKind::SectionStart => {
+                    lid = Self::skip_nested_sections_r(lid, lindb);
+                }
+                IRKind::SectionEnd => break,
+                _ => {}
+            }
+        }
+        result
+    }
+
+    fn inventory_label_identifiers(
+        &mut self,
+        op_num: usize,
+        lir: &LinIR,
+        lindb: &LayoutDb,
+        diags: &mut Diags,
+    ) -> bool {
+        let mut result = true;
+        let name_operand_num = lir.operand_vec[op_num];
+        let name_operand = lindb.operand_vec.get(name_operand_num).unwrap();
+        let name = &name_operand.sval;
+        if is_reserved_identifier(name) {
+            let m = format!(
+                "'{}' is a reserved identifier and cannot be used as a label name",
+                name
+            );
+            diags.err1("LINEAR_13", &m, name_operand.src_loc.clone());
+            return false;
+        }
+        if self.label_idents.contains_key(name) {
+            let orig_loc = self.label_idents.get(name).unwrap();
+            let msg = format!("Duplicate label name {}", name);
+            diags.err2(
+                "LINEAR_2",
+                &msg,
+                name_operand.src_loc.clone(),
+                orig_loc.clone(),
+            );
+            result = false;
+        } else {
+            self.label_idents
+                .insert(name.clone(), name_operand.src_loc.clone());
+        }
+        result
+    }
+
+    fn inventory_section_identifiers(&mut self, lir: &LinIR, lindb: &LayoutDb) {
+        trace!("IdentDb::inventory_section_identifiers: ENTER");
+        let name_operand_num = lir.operand_vec[0];
+        let name_operand = lindb.operand_vec.get(name_operand_num).unwrap();
+        let name = &name_operand.sval;
+        debug!(
+            "IdentDb::inventory_section_identifiers: Adding section name {} to inventory.",
+            name
+        );
+        *self.section_count.entry(name.to_string()).or_insert(0) += 1;
+        trace!("IdentDb::inventory_section_identifiers: EXIT");
+    }
+
+    fn inventory_global_identifiers(&mut self, lindb: &LayoutDb, diags: &mut Diags) -> bool {
+        let mut result = true;
+        for lir in &lindb.ir_vec {
+            result &= match lir.op {
+                IRKind::Label => self.inventory_label_identifiers(0, lir, lindb, diags),
+                IRKind::SectionStart => {
+                    self.inventory_section_identifiers(lir, lindb);
+                    true
+                }
+                _ => true,
+            }
+        }
+        debug!("IdentDb::inventory_global_identifiers:");
+        for name in self.label_idents.keys() {
+            debug!("    {}", name);
+        }
+        result
+    }
+
+    fn verify_global_refs(&self, lindb: &LayoutDb, diags: &mut Diags) -> bool {
+        let mut result = true;
+        for lir in &lindb.ir_vec {
+            result &= match lir.op {
+                IRKind::Addr | IRKind::AddrOffset | IRKind::FileOffset | IRKind::Sizeof => {
+                    self.verify_operand_refs(lir, lindb, diags)
+                }
+                _ => true,
+            }
+        }
+        result
+    }
+
+    fn is_valid_section_ref(&self, lop: &LinOperand, diags: &mut Diags) -> bool {
+        if let Some(count) = self.section_count.get(&lop.sval) {
+            if *count == 1 {
+                return true;
+            }
+            let msg = format!(
+                "Reference to section '{}' is ambiguous. This section occurs {} times in the output",
+                lop.sval, *count
+            );
+            diags.err1("LINEAR_7", &msg, lop.src_loc.clone());
+        }
+        false
+    }
+
+    fn is_valid_label_ref(&self, lop: &LinOperand) -> bool {
+        self.label_idents.contains_key(&lop.sval)
+    }
+
+    fn verify_operand_refs(&self, lir: &LinIR, lindb: &LayoutDb, diags: &mut Diags) -> bool {
+        let mut result = true;
+        for &lop_num in &lir.operand_vec {
+            let lop = &lindb.operand_vec[lop_num];
+            if lop.tok == LexToken::Identifier {
+                debug!(
+                    "IdentDb::verify_identifier_refs: Verifying reference to '{}'",
+                    lop.sval
+                );
+                if self.is_valid_section_ref(lop, diags) {
+                    continue;
+                }
+                if self.is_valid_label_ref(lop) {
+                    if lir.op == IRKind::Sizeof {
+                        let msg = "Sizeof cannot refer to a label name.  Labels have no size."
+                            .to_string();
+                        diags.err1("LINEAR_9", &msg, lop.src_loc.clone());
+                        result = false;
+                    }
+                    continue;
+                }
+                let msg = format!("Unknown or unreachable identifier {}", lop.sval);
+                diags.err1("LINEAR_6", &msg, lop.src_loc.clone());
+                result = false;
+            }
+        }
+        result
+    }
+}

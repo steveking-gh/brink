@@ -11,7 +11,10 @@ fn main() {
                 2 => "patch",
                 _ => "unknown",
             };
-            println!("cargo:warning=CARGO_PKG_VERSION '{}' has non-digit {} field ('{}').", version, field, part);
+            println!(
+                "cargo:warning=CARGO_PKG_VERSION '{}' has non-digit {} field ('{}').",
+                version, field, part
+            );
         }
     }
 }

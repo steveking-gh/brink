@@ -129,7 +129,11 @@ impl Engine {
     /// section nesting more readable.
     fn trace(&self, msg: &str) {
         let sec_depth = self.scope_stack.len();
-        let sec_name = self.scope_stack.last().map(|f| f.sec_name.as_str()).unwrap_or("");
+        let sec_name = self
+            .scope_stack
+            .last()
+            .map(|f| f.sec_name.as_str())
+            .unwrap_or("");
         trace!("{}{}: {}", "    ".repeat(sec_depth), sec_name, msg);
     }
 
@@ -232,7 +236,10 @@ impl Engine {
 
         diags.err1(
             "EXEC_50",
-            &format!("Failed to resolve extension '{}' size during layout.", ext_name_for_diag),
+            &format!(
+                "Failed to resolve extension '{}' size during layout.",
+                ext_name_for_diag
+            ),
             ir.src_loc.clone(),
         );
         false
@@ -975,7 +982,10 @@ impl Engine {
 
         let ir_num = irdb.addressed_locs.get(sec_name);
         if ir_num.is_none() {
-            let msg = format!("__OUTPUT_ADDR: output section '{}' not reachable.", sec_name);
+            let msg = format!(
+                "__OUTPUT_ADDR: output section '{}' not reachable.",
+                sec_name
+            );
             diags.err1("EXEC_58", &msg, ir.src_loc.clone());
             return false;
         }
@@ -983,7 +993,11 @@ impl Engine {
         let start_loc = &self.ir_locs[*ir_num];
 
         let Some(val) = start_loc.addr_base.checked_add(start_loc.addr_offset) else {
-            diags.err1("EXEC_59", "__OUTPUT_ADDR: address overflow.", ir.src_loc.clone());
+            diags.err1(
+                "EXEC_59",
+                "__OUTPUT_ADDR: address overflow.",
+                ir.src_loc.clone(),
+            );
             return false;
         };
         *self.parms[out_parm_num].to_u64_mut() = val;
@@ -992,7 +1006,8 @@ impl Engine {
 
     fn iterate_builtin_version_string(&mut self, ir: &IR) -> bool {
         assert!(ir.operands.len() == 1);
-        self.parms[ir.operands[0]] = ParameterValue::QuotedString(ConstBuiltins::get().brink_version_string.to_string());
+        self.parms[ir.operands[0]] =
+            ParameterValue::QuotedString(ConstBuiltins::get().brink_version_string.to_string());
         true
     }
 
@@ -1385,7 +1400,12 @@ impl Engine {
         // The first iterate loop may access any IR location, so initialize all
         // ir_locs locations to zero.
         let ir_locs = vec![
-            Location { file_offset: 0, addr_offset: 0, sec_offset: 0, addr_base: irdb.start_addr };
+            Location {
+                file_offset: 0,
+                addr_offset: 0,
+                sec_offset: 0,
+                addr_base: irdb.start_addr
+            };
             irdb.ir_vec.len()
         ];
 
@@ -1455,8 +1475,12 @@ impl Engine {
                     let file_offset = loc.file_offset;
                     let addr_offset = loc.addr_offset;
                     let addr = loc.addr_base.saturating_add(addr_offset);
-                    self.label_dispatches
-                        .push(LabelDispatch { name, file_offset, addr_offset, addr });
+                    self.label_dispatches.push(LabelDispatch {
+                        name,
+                        file_offset,
+                        addr_offset,
+                        addr,
+                    });
                 }
                 _ => {}
             }
@@ -1493,7 +1517,12 @@ impl Engine {
         while result && !stable {
             self.trace(format!("Engine::iterate: Iteration count {}", iter_count).as_str());
             iter_count += 1;
-            let mut current = Location { file_offset: 0, addr_offset: 0, sec_offset: 0, addr_base: self.start_addr };
+            let mut current = Location {
+                file_offset: 0,
+                addr_offset: 0,
+                sec_offset: 0,
+                addr_base: self.start_addr,
+            };
 
             // make sure we exited as many sections as we entered on each iteration
             assert!(self.scope_stack.is_empty());
@@ -1650,9 +1679,7 @@ impl Engine {
         self.trace("Engine::execute_validation:");
         let mut error_count = 0;
         for ir in &irdb.ir_vec {
-            if ir.kind == IRKind::Assert
-                && self.execute_assert(ir, irdb, diags).is_err()
-            {
+            if ir.kind == IRKind::Assert && self.execute_assert(ir, irdb, diags).is_err() {
                 error_count += 1;
                 if error_count > 10 {
                     break;
@@ -1708,7 +1735,15 @@ impl Engine {
         Ok(())
     }
 
-    fn execute_wrs(&self, written_ranges: &mut WrittenRanges, lid: usize, ir: &IR, irdb: &IRDb, diags: &mut Diags, file: &mut File) -> Result<()> {
+    fn execute_wrs(
+        &self,
+        written_ranges: &mut WrittenRanges,
+        lid: usize,
+        ir: &IR,
+        irdb: &IRDb,
+        diags: &mut Diags,
+        file: &mut File,
+    ) -> Result<()> {
         self.trace("Engine::execute_wrs:");
         let xstr_opt = self.evaluate_string_expr(ir, irdb, diags);
         if xstr_opt.is_none() {
@@ -1736,7 +1771,15 @@ impl Engine {
         result
     }
 
-    fn execute_wrf(&self, written_ranges: &mut WrittenRanges, lid: usize, ir: &IR, irdb: &IRDb, diags: &mut Diags, file: &mut File) -> Result<()> {
+    fn execute_wrf(
+        &self,
+        written_ranges: &mut WrittenRanges,
+        lid: usize,
+        ir: &IR,
+        irdb: &IRDb,
+        diags: &mut Diags,
+        file: &mut File,
+    ) -> Result<()> {
         self.trace("Engine::execute_wrf:");
 
         let path = self.parms[ir.operands[0]].to_str().to_owned();
@@ -1747,7 +1790,8 @@ impl Engine {
 
         let loc = &self.ir_locs[lid];
         let addr = loc.addr_base + loc.addr_offset;
-        if !Self::check_and_record_range(written_ranges, addr, file_size, ir.src_loc.clone(), diags) {
+        if !Self::check_and_record_range(written_ranges, addr, file_size, ir.src_loc.clone(), diags)
+        {
             return Err(anyhow!("Address overwrite detected"));
         }
 
@@ -1801,7 +1845,15 @@ impl Engine {
         Ok(())
     }
 
-    fn execute_wrx(&self, written_ranges: &mut WrittenRanges, lid: usize, ir: &IR, _irdb: &IRDb, diags: &mut Diags, file: &mut File) -> Result<()> {
+    fn execute_wrx(
+        &self,
+        written_ranges: &mut WrittenRanges,
+        lid: usize,
+        ir: &IR,
+        _irdb: &IRDb,
+        diags: &mut Diags,
+        file: &mut File,
+    ) -> Result<()> {
         self.trace(format!("Engine::execute_wrx: {:?}", ir.kind).as_str());
         let byte_size = get_wrx_byte_width(ir);
 
@@ -1840,7 +1892,13 @@ impl Engine {
         let total_size = (byte_size as u64) * repeat_count;
         let loc = &self.ir_locs[lid];
         let addr = loc.addr_base + loc.addr_offset;
-        if !Self::check_and_record_range(written_ranges, addr, total_size, ir.src_loc.clone(), diags) {
+        if !Self::check_and_record_range(
+            written_ranges,
+            addr,
+            total_size,
+            ir.src_loc.clone(),
+            diags,
+        ) {
             return Err(anyhow!("Address overwrite detected"));
         }
 
@@ -2071,9 +2129,7 @@ impl Engine {
         for (idx, ir) in irdb.ir_vec.iter().enumerate() {
             if matches!(
                 ir.kind,
-                IRKind::ExtensionCall
-                    | IRKind::ExtensionCallRanged
-                    | IRKind::ExtensionCallSection
+                IRKind::ExtensionCall | IRKind::ExtensionCallRanged | IRKind::ExtensionCallSection
             ) {
                 extension_nodes.push(idx);
             }
@@ -2165,13 +2221,17 @@ impl Engine {
             let (img_slice_range, arg_operand_range) = match ir.kind {
                 IRKind::ExtensionCall => (0..0, 1..last),
                 IRKind::ExtensionCallRanged => {
-                    let start  = self.parms[ir.operands[1]].to_u64() as usize;
+                    let start = self.parms[ir.operands[1]].to_u64() as usize;
                     let length = self.parms[ir.operands[2]].to_u64() as usize;
                     (start..start + length, 3..last)
                 }
                 IRKind::ExtensionCallSection => {
                     let sec_name = self.parms[ir.operands[1]].to_identifier();
-                    let count = self.wr_dispatches.iter().filter(|d| d.name == sec_name).count();
+                    let count = self
+                        .wr_dispatches
+                        .iter()
+                        .filter(|d| d.name == sec_name)
+                        .count();
                     if count > 1 {
                         diags.err1(
                             "EXEC_56",
@@ -2192,7 +2252,8 @@ impl Engine {
                         return Err(anyhow!(
                             "Extension '{}': section '{}' not found in dispatch table. \
                              This is a compiler bug.",
-                            name, sec_name
+                            name,
+                            sec_name
                         ));
                     };
                     let start = d.file_offset as usize;

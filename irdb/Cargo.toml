@@ -19,6 +19,7 @@ diags = { path = "../diags" }
 ast = { path = "../ast" }
 ir = { path = "../ir" }
 symtable = { path = "../symtable" }
-lineardb = { path = "../lineardb" }
+layoutdb = { path = "../layoutdb" }
+linearizer = { path = "../linearizer" }
 ext = { path = "../ext" }
 tracing = "0.1.44"

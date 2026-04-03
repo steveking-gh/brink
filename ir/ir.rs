@@ -422,4 +422,3 @@ mod tests {
         assert_eq!(b.brink_version_patch, 0);
     }
 }
-

@@ -1,7 +1,7 @@
 // Typed IR construction and validation for brink.
 //
 // IRDb is the third stage of the compiler pipeline.  It consumes the flat
-// LinIR and LinOperand records from LinearDb and converts them into fully
+// LinIR and LinOperand records from LayoutDb and converts them into fully
 // typed IR and IROperand values.  String operand values are parsed into their
 // native Rust types (u64, i64, etc.) and each operand's DataType is resolved
 // by recursively inspecting the expression tree.  IRDb also validates operand
@@ -13,14 +13,14 @@
 
 use diags::Diags;
 use diags::SourceSpan;
-use lineardb::{LinIR, LinearDb};
+use layoutdb::LayoutDb;
+use linearizer::LinIR;
 
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
 
 use ext::ExtensionRegistry;
 use ir::{ConstBuiltins, DataType, IR, IRKind, IROperand, ParameterValue};
-use symtable::SymbolTable;
 use parse_int::parse;
 use std::{
     collections::{HashMap, HashSet},
@@ -29,6 +29,7 @@ use std::{
     path::Path,
     path::PathBuf,
 };
+use symtable::SymbolTable;
 
 pub struct FileInfo {
     pub path: String,
@@ -91,7 +92,7 @@ impl IRDb {
     fn get_operand_data_type_r(
         depth: usize,
         lop_num: usize,
-        lin_db: &LinearDb,
+        lin_db: &LayoutDb,
         symbol_table: &SymbolTable,
         diags: &mut Diags,
     ) -> Option<DataType> {
@@ -104,9 +105,7 @@ impl IRDb {
         if let Some(lin_ir_lid) = lop.ir_lid
             && matches!(
                 lin_db.ir_vec[lin_ir_lid].op,
-                IRKind::ExtensionCall
-                    | IRKind::ExtensionCallRanged
-                    | IRKind::ExtensionCallSection
+                IRKind::ExtensionCall | IRKind::ExtensionCallRanged | IRKind::ExtensionCallSection
             )
         {
             return Some(DataType::Extension);
@@ -259,6 +258,12 @@ impl IRDb {
             | ast::LexToken::Unknown => {
                 panic!("Token '{:?}' has no associated data type.", lop.tok);
             }
+            // OutputSlot operands are intercepted above before reaching this
+            // match: those with ir_lid pointing to an extension IR return early
+            // as DataType::Extension.  An OutputSlot with no ir_lid is a bug.
+            ast::LexToken::OutputSlot => {
+                panic!("OutputSlot operand reached data-type match — ir_lid must be Some");
+            }
         };
 
         trace!(
@@ -269,7 +274,7 @@ impl IRDb {
     }
 
     /// Process untyped linear operands into real IR operands
-    fn process_lin_operands(&mut self, lin_db: &LinearDb, diags: &mut Diags) -> bool {
+    fn process_lin_operands(&mut self, lin_db: &LayoutDb, diags: &mut Diags) -> bool {
         trace!("IRDb::process_lin_operands: Enter");
 
         let mut result = true;
@@ -711,11 +716,11 @@ impl IRDb {
     /// which is a hassle we don't want to deal with during linearization of the AST.
     fn process_linear_ir(
         &mut self,
-        lin_db: &LinearDb,
+        lin_db: &LayoutDb,
         diags: &mut Diags,
         ext_registry: &ExtensionRegistry,
     ) -> bool {
-        // Section names come from LinearDb, which collected them from ast_db.sections
+        // Section names come from LayoutDb, which collected them from ast_db.sections
         // at construction time.  This covers all declared sections, including non-output
         // sections that are never linearized into ir_vec.
         let section_names = &lin_db.section_names;
@@ -784,7 +789,7 @@ impl IRDb {
     fn disambiguate_extension_call(
         &self,
         lir: &LinIR,
-        lin_db: &LinearDb,
+        lin_db: &LayoutDb,
         ext_registry: &ExtensionRegistry,
         section_names: &HashSet<String>,
     ) -> IRKind {
@@ -819,7 +824,7 @@ impl IRDb {
     /// resolved value in `self.symbol_table`.  Must be called before
     /// `process_lin_operands` so that const references can be substituted.
     /// Also walks `const_ir_vec` sequentially to process ConstDeclare and if/else IR.
-    fn resolve_all_consts(&mut self, lin_db: &LinearDb, diags: &mut Diags) -> bool {
+    fn resolve_all_consts(&mut self, lin_db: &LayoutDb, diags: &mut Diags) -> bool {
         // Pass 1: resolve all regular `const NAME = expr;` declarations (order-independent).
         let names: Vec<String> = lin_db.const_map.keys().cloned().collect();
         let mut result = true;
@@ -844,7 +849,7 @@ impl IRDb {
     /// `ConstDeclare`, `IfBegin`, `ElseBegin`, `IfEnd`, `BareAssign`,
     /// and `Print`/`Assert` emitted inside if/else bodies.
     /// Regular `Const` IR entries are skipped (already resolved in pass 1).
-    fn exec_if_else_ir(&mut self, lin_db: &LinearDb, diags: &mut Diags) -> bool {
+    fn exec_if_else_ir(&mut self, lin_db: &LayoutDb, diags: &mut Diags) -> bool {
         /// Skip state for branches not taken.
         #[derive(Clone, Copy)]
         enum SkipState {
@@ -915,7 +920,11 @@ impl IRDb {
                     let cond_lop_num = ir.operand_vec[0];
                     let mut in_progress = HashSet::new();
                     let cond_val = self.eval_lin_const_expr(
-                        cond_lop_num, lin_db, &mut in_progress, diags, &src_loc,
+                        cond_lop_num,
+                        lin_db,
+                        &mut in_progress,
+                        diags,
+                        &src_loc,
                     );
                     match cond_val {
                         Some(v) if v.to_bool() => {
@@ -945,13 +954,19 @@ impl IRDb {
                     let rhs_lop_num = ir.operand_vec[1];
                     let mut in_progress = HashSet::new();
                     let rhs_val = self.eval_lin_const_expr(
-                        rhs_lop_num, lin_db, &mut in_progress, diags, &src_loc,
+                        rhs_lop_num,
+                        lin_db,
+                        &mut in_progress,
+                        diags,
+                        &src_loc,
                     );
                     match rhs_val {
                         Some(v) => {
                             result &= self.symbol_table.assign(&name, v, &src_loc, diags);
                         }
-                        None => { result = false; }
+                        None => {
+                            result = false;
+                        }
                     }
                 }
                 IRKind::Print => {
@@ -960,31 +975,57 @@ impl IRDb {
                         let mut s = String::new();
                         for &lop_idx in &ir.operand_vec {
                             let mut in_progress = HashSet::new();
-                            match self.eval_lin_const_expr(lop_idx, lin_db, &mut in_progress, diags, &src_loc) {
+                            match self.eval_lin_const_expr(
+                                lop_idx,
+                                lin_db,
+                                &mut in_progress,
+                                diags,
+                                &src_loc,
+                            ) {
                                 Some(ParameterValue::QuotedString(ref v)) => s.push_str(v),
                                 Some(ParameterValue::U64(v)) => s.push_str(&format!("{:#X}", v)),
                                 Some(ParameterValue::I64(v) | ParameterValue::Integer(v)) => {
                                     s.push_str(&format!("{}", v));
                                 }
                                 Some(_) => {
-                                    diags.err1("IRDB_31", "Cannot print this value type in a const context", src_loc.clone());
+                                    diags.err1(
+                                        "IRDB_31",
+                                        "Cannot print this value type in a const context",
+                                        src_loc.clone(),
+                                    );
                                     result = false;
                                 }
-                                None => { result = false; }
+                                None => {
+                                    result = false;
+                                }
                             }
                         }
-                        if result { print!("{}", s); }
+                        if result {
+                            print!("{}", s);
+                        }
                     }
                 }
                 IRKind::Assert => {
                     let cond_lop_num = ir.operand_vec[0];
                     let mut in_progress = HashSet::new();
-                    match self.eval_lin_const_expr(cond_lop_num, lin_db, &mut in_progress, diags, &src_loc) {
+                    match self.eval_lin_const_expr(
+                        cond_lop_num,
+                        lin_db,
+                        &mut in_progress,
+                        diags,
+                        &src_loc,
+                    ) {
                         Some(v) if !v.to_bool() => {
-                            diags.err1("IRDB_32", "Assert expression failed in if/else body", src_loc);
+                            diags.err1(
+                                "IRDB_32",
+                                "Assert expression failed in if/else body",
+                                src_loc,
+                            );
                             result = false;
                         }
-                        None => { result = false; }
+                        None => {
+                            result = false;
+                        }
                         _ => {}
                     }
                 }
@@ -1000,7 +1041,7 @@ impl IRDb {
     fn resolve_const_by_name(
         &mut self,
         name: &str,
-        lin_db: &LinearDb,
+        lin_db: &LayoutDb,
         in_progress: &mut HashSet<String>,
         diags: &mut Diags,
     ) -> Option<ParameterValue> {
@@ -1026,7 +1067,8 @@ impl IRDb {
         let val = self.eval_lin_const_expr(rhs_lop_num, lin_db, in_progress, diags, &src_loc)?;
         in_progress.remove(name);
 
-        self.symbol_table.define(name.to_string(), val.clone(), Some(src_loc));
+        self.symbol_table
+            .define(name.to_string(), val.clone(), Some(src_loc));
         Some(val)
     }
 
@@ -1035,7 +1077,7 @@ impl IRDb {
     fn eval_lin_const_expr(
         &mut self,
         lop_num: usize,
-        lin_db: &LinearDb,
+        lin_db: &LayoutDb,
         in_progress: &mut HashSet<String>,
         diags: &mut Diags,
         err_loc: &SourceSpan,
@@ -1104,18 +1146,18 @@ impl IRDb {
                 }
             }
             // Version builtins are compile-time constants; resolve them directly.
-            ast::LexToken::BuiltinVersionString => {
-                Some(ParameterValue::QuotedString(ConstBuiltins::get().brink_version_string.to_string()))
-            }
-            ast::LexToken::BuiltinVersionMajor => {
-                Some(ParameterValue::U64(ConstBuiltins::get().brink_version_major))
-            }
-            ast::LexToken::BuiltinVersionMinor => {
-                Some(ParameterValue::U64(ConstBuiltins::get().brink_version_minor))
-            }
-            ast::LexToken::BuiltinVersionPatch => {
-                Some(ParameterValue::U64(ConstBuiltins::get().brink_version_patch))
-            }
+            ast::LexToken::BuiltinVersionString => Some(ParameterValue::QuotedString(
+                ConstBuiltins::get().brink_version_string.to_string(),
+            )),
+            ast::LexToken::BuiltinVersionMajor => Some(ParameterValue::U64(
+                ConstBuiltins::get().brink_version_major,
+            )),
+            ast::LexToken::BuiltinVersionMinor => Some(ParameterValue::U64(
+                ConstBuiltins::get().brink_version_minor,
+            )),
+            ast::LexToken::BuiltinVersionPatch => Some(ParameterValue::U64(
+                ConstBuiltins::get().brink_version_patch,
+            )),
             ast::LexToken::Sizeof
             | ast::LexToken::BuiltinOutputSize
             | ast::LexToken::BuiltinOutputAddr
@@ -1427,7 +1469,7 @@ impl IRDb {
     }
 
     pub fn new(
-        lin_db: &LinearDb,
+        lin_db: &LayoutDb,
         diags: &mut Diags,
         defines: &HashMap<String, ParameterValue>,
         ext_registry: &ExtensionRegistry,

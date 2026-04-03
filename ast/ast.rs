@@ -186,6 +186,12 @@ pub enum LexToken {
     #[regex(r#"/\*([^*]|\*[^/])+\*/"#, logos::skip)] // block comments
     #[regex(r#"//[^\r\n]*(\r\n|\n)?"#, logos::skip)] // line comments
     #[regex(r#"[ \t\n\f]+"#, logos::skip)] // whitespace
+    /// Synthetic token used only in linearized IR output operands.
+    /// Never produced by the lexer.  Marks a LinOperand as a computed result
+    /// slot rather than a literal parsed from source.  Code that switches on
+    /// tok can distinguish output slots from real tokens without guessing.
+    OutputSlot,
+    /// Catch-all for unrecognized input; produced by the logos lexer on error.
     #[error]
     Unknown,
 }
@@ -923,7 +929,12 @@ impl<'toks> Ast<'toks> {
             LexToken::DoubleLess | LexToken::DoubleGreater => Some((15, 16)),
             LexToken::Ampersand => Some((13, 14)),
             LexToken::Pipe => Some((11, 12)),
-            LexToken::DoubleEq | LexToken::NEq | LexToken::LEq | LexToken::GEq | LexToken::Lt | LexToken::Gt => Some((9, 10)),
+            LexToken::DoubleEq
+            | LexToken::NEq
+            | LexToken::LEq
+            | LexToken::GEq
+            | LexToken::Lt
+            | LexToken::Gt => Some((9, 10)),
             LexToken::DoubleAmpersand => Some((7, 8)),
             LexToken::DoublePipe => Some((5, 6)),
             _ => None,
@@ -1503,7 +1514,13 @@ impl<'toks> Ast<'toks> {
 
         // Expect opening brace for then-body
         let brace_toknum = self.tok_num;
-        if !self.expect_leaf(diags, if_nid, LexToken::OpenBrace, "AST_51", "Expected '{' after if condition") {
+        if !self.expect_leaf(
+            diags,
+            if_nid,
+            LexToken::OpenBrace,
+            "AST_51",
+            "Expected '{' after if condition",
+        ) {
             return self.dbg_exit("parse_if", false);
         }
         if !self.parse_if_body(if_nid, diags, brace_toknum) {
@@ -1523,7 +1540,11 @@ impl<'toks> Ast<'toks> {
                         self.add_to_parent_and_advance(if_nid); // consume '{'
                         self.parse_if_body(if_nid, diags, else_brace)
                     } else {
-                        self.err_expected_after(diags, "AST_52", "Expected '{' or 'if' after 'else'");
+                        self.err_expected_after(
+                            diags,
+                            "AST_52",
+                            "Expected '{' or 'if' after 'else'",
+                        );
                         false
                     }
                 } else {
@@ -1598,7 +1619,10 @@ impl<'toks> Ast<'toks> {
         if next_tok != Some(LexToken::Eq) {
             let msg = format!(
                 "Expected '=' after identifier in if/else body, found '{}'",
-                self.tv.get(self.tok_num + 1).map(|t| t.val).unwrap_or("<end of input>")
+                self.tv
+                    .get(self.tok_num + 1)
+                    .map(|t| t.val)
+                    .unwrap_or("<end of input>")
             );
             diags.err1("AST_54", &msg, self.tv[self.tok_num].span());
             return self.dbg_exit("parse_deferred_assign", false);
@@ -2086,10 +2110,16 @@ impl<'toks> AstDb<'toks> {
                             true
                         }
                     }
-                    LexToken::If => { if_else_blocks.push(nid); true }
+                    LexToken::If => {
+                        if_else_blocks.push(nid);
+                        true
+                    }
                     // Global asserts are collected here and linearized later.
                     // They have no name to record in any map.
-                    LexToken::Assert => { global_asserts.push(nid); true }
+                    LexToken::Assert => {
+                        global_asserts.push(nid);
+                        true
+                    }
                     _ => {
                         let msg = format!("Invalid top-level expression {}", tinfo.val);
                         diags.err1("AST_24", &msg, tinfo.span().clone());

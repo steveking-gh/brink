@@ -1,17 +1,14 @@
 [package]
-name = "lineardb"
+name = "linearizer"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
-path = "lineardb.rs"
+path = "linearizer.rs"
 
 [dependencies]
 indextree = "4.3.1"
-codespan-reporting = "0.9.5"
-anyhow = "1.0.34"
 
 diags = { path = "../diags" }
 ast = { path = "../ast" }
