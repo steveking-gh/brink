@@ -186,11 +186,6 @@ pub enum LexToken {
     #[regex(r#"/\*([^*]|\*[^/])+\*/"#, logos::skip)] // block comments
     #[regex(r#"//[^\r\n]*(\r\n|\n)?"#, logos::skip)] // line comments
     #[regex(r#"[ \t\n\f]+"#, logos::skip)] // whitespace
-    /// Synthetic token used only in linearized IR output operands.
-    /// Never produced by the lexer.  Marks a LinOperand as a computed result
-    /// slot rather than a literal parsed from source.  Code that switches on
-    /// tok can distinguish output slots from real tokens without guessing.
-    OutputSlot,
     /// Catch-all for unrecognized input; produced by the logos lexer on error.
     #[error]
     Unknown,

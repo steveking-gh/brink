@@ -13,6 +13,7 @@
         "fname",
         "fstr",
         "idents",
+        "idx",
         "indextree",
         "irdb",
         "irkind",

@@ -14,7 +14,7 @@
 use diags::Diags;
 use diags::SourceSpan;
 use layoutdb::LayoutDb;
-use linearizer::LinIR;
+use linearizer::{LinIR, LinOperand};
 
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
@@ -102,167 +102,109 @@ impl IRDb {
         );
         let lop = &lin_db.operand_vec[lop_num];
         let mut data_type = None;
-        if let Some(lin_ir_lid) = lop.ir_lid
-            && matches!(
-                lin_db.ir_vec[lin_ir_lid].op,
-                IRKind::ExtensionCall | IRKind::ExtensionCallRanged | IRKind::ExtensionCallSection
-            )
-        {
-            return Some(DataType::Extension);
-        }
 
-        match lop.tok {
-            // The following produce a boolean regardless of input data types
-            ast::LexToken::Align
-            | ast::LexToken::SetSecOffset
-            | ast::LexToken::SetAddrOffset
-            | ast::LexToken::SetAddr
-            | ast::LexToken::SetFileOffset
-            | ast::LexToken::DoubleEq
-            | ast::LexToken::NEq
-            | ast::LexToken::GEq
-            | ast::LexToken::LEq
-            | ast::LexToken::Gt
-            | ast::LexToken::Lt
-            | ast::LexToken::Addr
-            | ast::LexToken::AddrOffset
-            | ast::LexToken::SecOffset
-            | ast::LexToken::FileOffset
-            | ast::LexToken::DoublePipe
-            | ast::LexToken::DoubleAmpersand
-            | ast::LexToken::Sizeof
-            | ast::LexToken::BuiltinOutputSize
-            | ast::LexToken::BuiltinOutputAddr
-            | ast::LexToken::BuiltinVersionMajor
-            | ast::LexToken::BuiltinVersionMinor
-            | ast::LexToken::BuiltinVersionPatch
-            | ast::LexToken::ToU64
-            | ast::LexToken::U64 => data_type = Some(DataType::U64), // TODO: this will be I64 when we convert bool
-            ast::LexToken::BuiltinVersionString => data_type = Some(DataType::QuotedString),
-            ast::LexToken::ToI64 | ast::LexToken::I64 => data_type = Some(DataType::I64),
-            ast::LexToken::Integer => data_type = Some(DataType::Integer),
-            ast::LexToken::QuotedString => data_type = Some(DataType::QuotedString),
-            ast::LexToken::Label => data_type = Some(DataType::Identifier),
-            ast::LexToken::Namespace => data_type = Some(DataType::Identifier),
-            ast::LexToken::Identifier => {
-                // If this identifier is a resolved const, return the const's type.
-                if let Some(cv) = symbol_table.get(lop.sval.as_str()) {
-                    data_type = Some(cv.data_type());
-                } else {
-                    data_type = Some(DataType::Identifier);
-                }
-            }
+        match lop {
+            linearizer::LinOperand::Output { ir_lid, .. } => {
+                let lin_ir = &lin_db.ir_vec[*ir_lid];
+                match lin_ir.op {
+                    IRKind::ExtensionCall
+                    | IRKind::ExtensionCallRanged
+                    | IRKind::ExtensionCallSection => return Some(DataType::Extension),
 
-            // The following produce an output type that depends on inputs
-            ast::LexToken::DoubleLess
-            | ast::LexToken::DoubleGreater
-            | ast::LexToken::Pipe
-            | ast::LexToken::Ampersand
-            | ast::LexToken::Plus
-            | ast::LexToken::Minus
-            | ast::LexToken::Asterisk
-            | ast::LexToken::Percent
-            | ast::LexToken::FSlash => {
-                // These operations have the same data type as their two inputs
-                // The data type must be numeric.
-                if lop.ir_lid.is_none() {
-                    panic!("Output operand '{:?}' does not have a source lid", lop.tok);
-                }
+                    // Arithmetic and bitwise ops: output type matches input types.
+                    IRKind::Add
+                    | IRKind::Subtract
+                    | IRKind::Multiply
+                    | IRKind::Divide
+                    | IRKind::Modulo
+                    | IRKind::BitOr
+                    | IRKind::BitAnd
+                    | IRKind::LeftShift
+                    | IRKind::RightShift => {
+                        // Expect 2 input operands and 1 output operand.
+                        assert!(lin_ir.operand_vec.len() == 3);
+                        assert!(lin_ir.operand_vec[2] == lop_num);
+                        let lhs_num = lin_ir.operand_vec[0];
+                        let rhs_num = lin_ir.operand_vec[1];
 
-                let lin_ir_lid = lop.ir_lid.unwrap();
-                let lin_ir = &lin_db.ir_vec[lin_ir_lid];
-                // We expect 2 input and 1 output operand.
-                assert!(lin_ir.operand_vec.len() == 3);
-                // The lop this function was called with *is* the output operand
-                assert!(lin_ir.operand_vec[2] == lop_num);
-                let lhs_num = lin_ir.operand_vec[0];
-                let rhs_num = lin_ir.operand_vec[1];
-
-                let lhs_opt =
-                    Self::get_operand_data_type_r(depth + 1, lhs_num, lin_db, symbol_table, diags);
-                if let Some(lhs_dt) = lhs_opt {
-                    let rhs_opt = Self::get_operand_data_type_r(
-                        depth + 1,
-                        rhs_num,
-                        lin_db,
-                        symbol_table,
-                        diags,
-                    );
-                    if let Some(rhs_dt) = rhs_opt {
-                        // We now have both lhs and rhs data types
-                        if lhs_dt == rhs_dt {
-                            let allowed = [DataType::I64, DataType::U64, DataType::Integer];
-                            if !allowed.contains(&lhs_dt) {
-                                let msg = format!(
-                                    "Error, found data type '{:?}', but operation '{:?}' requires one of {:?}.",
-                                    lhs_dt, lop.tok, allowed
-                                );
-                                diags.err1("IRDB_2", &msg, lin_ir.src_loc.clone());
-                            } else {
-                                data_type = Some(lhs_dt);
-                            }
-                        } else {
-                            let mut dt_ok = false;
-                            // Attempt to reconcile the data types
-                            if rhs_dt == DataType::Integer {
-                                if [DataType::I64, DataType::U64, DataType::Integer]
-                                    .contains(&lhs_dt)
-                                {
-                                    dt_ok = true; // Integers work with s/u types
-                                    data_type = Some(lhs_dt);
+                        let lhs_opt = Self::get_operand_data_type_r(
+                            depth + 1, lhs_num, lin_db, symbol_table, diags,
+                        );
+                        if let Some(lhs_dt) = lhs_opt {
+                            let rhs_opt = Self::get_operand_data_type_r(
+                                depth + 1, rhs_num, lin_db, symbol_table, diags,
+                            );
+                            if let Some(rhs_dt) = rhs_opt {
+                                if lhs_dt == rhs_dt {
+                                    let allowed = [DataType::I64, DataType::U64, DataType::Integer];
+                                    if !allowed.contains(&lhs_dt) {
+                                        let msg = format!(
+                                            "Error, found data type '{:?}', but operation '{:?}' requires one of {:?}.",
+                                            lhs_dt, lin_ir.op, allowed
+                                        );
+                                        diags.err1("IRDB_2", &msg, lin_ir.src_loc.clone());
+                                    } else {
+                                        data_type = Some(lhs_dt);
+                                    }
+                                } else {
+                                    let mut dt_ok = false;
+                                    // Attempt to reconcile Integer with a typed value.
+                                    if rhs_dt == DataType::Integer {
+                                        if [DataType::I64, DataType::U64, DataType::Integer]
+                                            .contains(&lhs_dt)
+                                        {
+                                            dt_ok = true;
+                                            data_type = Some(lhs_dt);
+                                        }
+                                    } else if lhs_dt == DataType::Integer
+                                        && [DataType::I64, DataType::U64].contains(&rhs_dt)
+                                    {
+                                        dt_ok = true;
+                                        data_type = Some(rhs_dt);
+                                    }
+                                    if !dt_ok {
+                                        let msg = format!(
+                                            "Error, data type mismatch in input operands.  Left is {:?}, right is {:?}.",
+                                            lhs_dt, rhs_dt
+                                        );
+                                        diags.err1("IRDB_1", &msg, lin_ir.src_loc.clone());
+                                    }
                                 }
-                            } else if lhs_dt == DataType::Integer
-                                && [DataType::I64, DataType::U64].contains(&rhs_dt)
-                            {
-                                dt_ok = true; // Integers work with s/u types
-                                data_type = Some(rhs_dt);
-                            }
-
-                            if !dt_ok {
-                                let msg = format!(
-                                    "Error, data type mismatch in input operands.  Left is {:?}, right is {:?}.",
-                                    lhs_dt, rhs_dt
-                                );
-                                diags.err1("IRDB_1", &msg, lin_ir.src_loc.clone());
                             }
                         }
                     }
+
+                    IRKind::ToI64 => return Some(DataType::I64),
+                    IRKind::BuiltinVersionString => return Some(DataType::QuotedString),
+                    // All other output-producing ops yield U64.
+                    _ => return Some(DataType::U64),
                 }
             }
 
-            ast::LexToken::Wr8
-            | ast::LexToken::Wr16
-            | ast::LexToken::Wr24
-            | ast::LexToken::Wr32
-            | ast::LexToken::Wr40
-            | ast::LexToken::Wr48
-            | ast::LexToken::Wr56
-            | ast::LexToken::Wr64
-            | ast::LexToken::Assert
-            | ast::LexToken::Const
-            | ast::LexToken::Print
-            | ast::LexToken::Section
-            | ast::LexToken::OpenBrace
-            | ast::LexToken::CloseBrace
-            | ast::LexToken::Comma
-            | ast::LexToken::OpenParen
-            | ast::LexToken::CloseParen
-            | ast::LexToken::Semicolon
-            | ast::LexToken::Wrs
-            | ast::LexToken::Wr
-            | ast::LexToken::Wrf
-            | ast::LexToken::Output
-            | ast::LexToken::Eq
-            | ast::LexToken::If
-            | ast::LexToken::Else
-            | ast::LexToken::Unknown => {
-                panic!("Token '{:?}' has no associated data type.", lop.tok);
-            }
-            // OutputSlot operands are intercepted above before reaching this
-            // match: those with ir_lid pointing to an extension IR return early
-            // as DataType::Extension.  An OutputSlot with no ir_lid is a bug.
-            ast::LexToken::OutputSlot => {
-                panic!("OutputSlot operand reached data-type match — ir_lid must be Some");
+            linearizer::LinOperand::Literal { tok, sval, .. } => {
+                match tok {
+                    // Literals typed directly at the site of the token.
+                    ast::LexToken::U64 => data_type = Some(DataType::U64),
+                    ast::LexToken::I64 => data_type = Some(DataType::I64),
+                    ast::LexToken::Integer => data_type = Some(DataType::Integer),
+                    ast::LexToken::QuotedString => data_type = Some(DataType::QuotedString),
+                    ast::LexToken::Label => data_type = Some(DataType::Identifier),
+                    ast::LexToken::Namespace => data_type = Some(DataType::Identifier),
+                    ast::LexToken::BuiltinVersionString => {
+                        data_type = Some(DataType::QuotedString)
+                    }
+                    ast::LexToken::Identifier => {
+                        // If this identifier is a resolved const, return the const's type.
+                        if let Some(cv) = symbol_table.get(sval.as_str()) {
+                            data_type = Some(cv.data_type());
+                        } else {
+                            data_type = Some(DataType::Identifier);
+                        }
+                    }
+                    _ => {
+                        panic!("Literal operand with unexpected token {:?}", tok);
+                    }
+                }
             }
         };
 
@@ -279,15 +221,20 @@ impl IRDb {
 
         let mut result = true;
         for (lop_num, lop) in lin_db.operand_vec.iter().enumerate() {
-            // If this identifier operand is a const reference, substitute the resolved
-            // const value directly instead of keeping it as a bare Identifier.
-            #[allow(clippy::collapsible_if)]
-            if lop.tok == ast::LexToken::Identifier {
-                if let Some(const_val) = self.symbol_table.get(lop.sval.as_str()).cloned() {
-                    self.symbol_table.mark_used(lop.sval.as_str());
+            // Const substitution: replace Identifier literals that name a resolved const
+            // with the const's typed value so irdb never sees bare Identifier operands
+            // for consts.
+            if let linearizer::LinOperand::Literal {
+                tok: ast::LexToken::Identifier,
+                sval,
+                src_loc,
+            } = lop
+            {
+                if let Some(const_val) = self.symbol_table.get(sval.as_str()).cloned() {
+                    self.symbol_table.mark_used(sval.as_str());
                     self.parms.push(IROperand {
                         ir_lid: None,
-                        src_loc: lop.src_loc.clone(),
+                        src_loc: src_loc.clone(),
                         is_immediate: true,
                         val: const_val,
                     });
@@ -303,16 +250,22 @@ impl IRDb {
 
             let data_type = dt_opt.unwrap();
 
-            // Determine if this operand is a constant value.  If so, operand construction
-            // will convert the string representation to its native value.
-            let is_immediate = lop.ir_lid.is_none();
+            // Destructure fields needed by IROperand::new.  Output operands carry no
+            // sval (the engine initializes their value at execution time), so pass "".
+            let (ir_lid, sval, src_loc, is_immediate) = match lop {
+                linearizer::LinOperand::Literal { sval, src_loc, .. } => {
+                    (None, sval.as_str(), src_loc, true)
+                }
+                linearizer::LinOperand::Output { ir_lid, src_loc } => {
+                    (Some(*ir_lid), "", src_loc, false)
+                }
+            };
 
-            // During construction of the IROperand, the string in the linear operand is converted
-            // to an actual typed value, which can fail, e.g. integer out of range
+            // Convert the string literal to a typed value; fails on malformed input.
             let opnd = IROperand::new(
-                lop.ir_lid,
-                &lop.sval,
-                &lop.src_loc,
+                ir_lid,
+                sval,
+                src_loc,
                 data_type,
                 is_immediate,
                 diags,
@@ -798,7 +751,10 @@ impl IRDb {
         let has_user_args = lir.operand_vec.len() > 2;
 
         // Resolve the extension name from the name operand (always operands[0]).
-        let name_sval = &lin_db.operand_vec[lir.operand_vec[0]].sval;
+        let name_op = &lin_db.operand_vec[lir.operand_vec[0]];
+        let LinOperand::Literal { sval: name_sval, .. } = name_op else {
+            panic!("Extension call name operand must be a Literal");
+        };
         let Some(entry) = ext_registry.get(name_sval) else {
             return IRKind::ExtensionCall; // validate_operands will emit IRDB_40
         };
@@ -810,10 +766,10 @@ impl IRDb {
         // Ranged extension: check whether the first user arg is a section name.
         if has_user_args {
             let first_user_lop = &lin_db.operand_vec[lir.operand_vec[1]];
-            if first_user_lop.tok == ast::LexToken::Identifier
-                && section_names.contains(first_user_lop.sval.as_str())
-            {
-                return IRKind::ExtensionCallSection;
+            if let LinOperand::Literal { tok: ast::LexToken::Identifier, sval, .. } = first_user_lop {
+                if section_names.contains(sval.as_str()) {
+                    return IRKind::ExtensionCallSection;
+                }
             }
         }
 
@@ -912,8 +868,10 @@ impl IRDb {
                 IRKind::Const => { /* already resolved in pass 1 */ }
                 IRKind::ConstDeclare => {
                     let name_lop = &lin_db.const_operand_vec[ir.operand_vec[0]];
-                    let name = name_lop.sval.clone();
-                    self.symbol_table.declare(name, src_loc);
+                    let LinOperand::Literal { sval: name, .. } = name_lop else {
+                        panic!("ConstDeclare name operand must be a Literal");
+                    };
+                    self.symbol_table.declare(name.clone(), src_loc);
                 }
                 IRKind::IfBegin => {
                     // Evaluate the condition operand.
@@ -950,7 +908,10 @@ impl IRDb {
                 }
                 IRKind::BareAssign => {
                     let name_lop = &lin_db.const_operand_vec[ir.operand_vec[0]];
-                    let name = name_lop.sval.clone();
+                    let LinOperand::Literal { sval: name, .. } = name_lop else {
+                        panic!("BareAssign name operand must be a Literal");
+                    };
+                    let name = name.clone();
                     let rhs_lop_num = ir.operand_vec[1];
                     let mut in_progress = HashSet::new();
                     let rhs_val = self.eval_lin_const_expr(
@@ -1082,10 +1043,99 @@ impl IRDb {
         diags: &mut Diags,
         err_loc: &SourceSpan,
     ) -> Option<ParameterValue> {
-        let tok = lin_db.const_operand_vec[lop_num].tok;
-        let sval = lin_db.const_operand_vec[lop_num].sval.clone();
-        let src_loc = lin_db.const_operand_vec[lop_num].src_loc.clone();
-        let ir_lid_opt = lin_db.const_operand_vec[lop_num].ir_lid;
+        let lop = &lin_db.const_operand_vec[lop_num];
+
+        // Output operands: evaluate by looking up the producing instruction's IRKind.
+        if let LinOperand::Output { ir_lid, .. } = lop {
+            let ir_lid = *ir_lid;
+            let lin_ir = &lin_db.const_ir_vec[ir_lid];
+            let op = lin_ir.op;
+            let op_loc = lin_ir.src_loc.clone();
+
+            // Reject layout-time ops before evaluating any operands.
+            match op {
+                IRKind::Sizeof
+                | IRKind::SizeofExt
+                | IRKind::BuiltinOutputSize
+                | IRKind::BuiltinOutputAddr
+                | IRKind::Addr
+                | IRKind::AddrOffset
+                | IRKind::SecOffset
+                | IRKind::FileOffset => {
+                    let m = format!(
+                        "Operation '{:?}' cannot be used in a const expression \
+                         because it requires engine-time layout or addressing.",
+                        op
+                    );
+                    diags.err1("IRDB_19", &m, op_loc);
+                    return None;
+                }
+                _ => {}
+            }
+
+            // Version builtins are compile-time constants; resolve directly without operands.
+            match op {
+                IRKind::BuiltinVersionString => {
+                    return Some(ParameterValue::QuotedString(
+                        ConstBuiltins::get().brink_version_string.to_string(),
+                    ));
+                }
+                IRKind::BuiltinVersionMajor => {
+                    return Some(ParameterValue::U64(ConstBuiltins::get().brink_version_major));
+                }
+                IRKind::BuiltinVersionMinor => {
+                    return Some(ParameterValue::U64(ConstBuiltins::get().brink_version_minor));
+                }
+                IRKind::BuiltinVersionPatch => {
+                    return Some(ParameterValue::U64(ConstBuiltins::get().brink_version_patch));
+                }
+                _ => {}
+            }
+
+            // Binary, comparison, and logical ops: evaluate both input operands.
+            let lhs_lop = lin_ir.operand_vec[0];
+            let rhs_lop = lin_ir.operand_vec[1];
+            let lhs_val = self.eval_lin_const_expr(lhs_lop, lin_db, in_progress, diags, err_loc)?;
+            let rhs_val = self.eval_lin_const_expr(rhs_lop, lin_db, in_progress, diags, err_loc)?;
+            return match op {
+                IRKind::Add
+                | IRKind::Subtract
+                | IRKind::Multiply
+                | IRKind::Divide
+                | IRKind::Modulo
+                | IRKind::BitAnd
+                | IRKind::BitOr
+                | IRKind::LeftShift
+                | IRKind::RightShift => Self::apply_binary_op(op, lhs_val, rhs_val, &op_loc, diags),
+                IRKind::DoubleEq
+                | IRKind::NEq
+                | IRKind::GEq
+                | IRKind::LEq
+                | IRKind::Gt
+                | IRKind::Lt => Self::apply_comparison_op(op, lhs_val, rhs_val, &op_loc, diags),
+                IRKind::LogicalAnd | IRKind::LogicalOr => {
+                    let lhs_bool = lhs_val.to_bool();
+                    let rhs_bool = rhs_val.to_bool();
+                    let result = if op == IRKind::LogicalAnd {
+                        lhs_bool && rhs_bool
+                    } else {
+                        lhs_bool || rhs_bool
+                    };
+                    Some(ParameterValue::U64(if result { 1 } else { 0 }))
+                }
+                _ => {
+                    let m = format!("Operation '{:?}' is not supported in a const expression.", op);
+                    diags.err1("IRDB_21", &m, err_loc.clone());
+                    None
+                }
+            };
+        }
+
+        // Literal operands: evaluate directly from tok and sval.
+        let LinOperand::Literal { tok, sval, src_loc } = lop else { unreachable!() };
+        let tok = *tok;
+        let sval = sval.clone();
+        let src_loc = src_loc.clone();
 
         match tok {
             ast::LexToken::Integer => {
@@ -1145,93 +1195,8 @@ impl IRDb {
                     None
                 }
             }
-            // Version builtins are compile-time constants; resolve them directly.
-            ast::LexToken::BuiltinVersionString => Some(ParameterValue::QuotedString(
-                ConstBuiltins::get().brink_version_string.to_string(),
-            )),
-            ast::LexToken::BuiltinVersionMajor => Some(ParameterValue::U64(
-                ConstBuiltins::get().brink_version_major,
-            )),
-            ast::LexToken::BuiltinVersionMinor => Some(ParameterValue::U64(
-                ConstBuiltins::get().brink_version_minor,
-            )),
-            ast::LexToken::BuiltinVersionPatch => Some(ParameterValue::U64(
-                ConstBuiltins::get().brink_version_patch,
-            )),
-            ast::LexToken::Sizeof
-            | ast::LexToken::BuiltinOutputSize
-            | ast::LexToken::BuiltinOutputAddr
-            | ast::LexToken::Addr
-            | ast::LexToken::AddrOffset
-            | ast::LexToken::SecOffset
-            | ast::LexToken::FileOffset => {
-                let m = format!(
-                    "Operation '{:?}' cannot be used in a const expression \
-                     because it requires engine-time layout or addressing.",
-                    tok
-                );
-                diags.err1("IRDB_19", &m, src_loc);
-                None
-            }
-            ast::LexToken::Plus
-            | ast::LexToken::Minus
-            | ast::LexToken::Asterisk
-            | ast::LexToken::FSlash
-            | ast::LexToken::Percent
-            | ast::LexToken::Ampersand
-            | ast::LexToken::Pipe
-            | ast::LexToken::DoubleLess
-            | ast::LexToken::DoubleGreater => {
-                let ir_lid = ir_lid_opt.unwrap();
-                let lhs_lop = lin_db.const_ir_vec[ir_lid].operand_vec[0];
-                let rhs_lop = lin_db.const_ir_vec[ir_lid].operand_vec[1];
-                let op_loc = lin_db.const_ir_vec[ir_lid].src_loc.clone();
-                let lhs_val =
-                    self.eval_lin_const_expr(lhs_lop, lin_db, in_progress, diags, err_loc)?;
-                let rhs_val =
-                    self.eval_lin_const_expr(rhs_lop, lin_db, in_progress, diags, err_loc)?;
-                Self::apply_binary_op(tok, lhs_val, rhs_val, &op_loc, diags)
-            }
-            ast::LexToken::DoubleEq
-            | ast::LexToken::NEq
-            | ast::LexToken::GEq
-            | ast::LexToken::LEq
-            | ast::LexToken::Gt
-            | ast::LexToken::Lt => {
-                let ir_lid = ir_lid_opt.unwrap();
-                let lhs_lop = lin_db.const_ir_vec[ir_lid].operand_vec[0];
-                let rhs_lop = lin_db.const_ir_vec[ir_lid].operand_vec[1];
-                let op_loc = lin_db.const_ir_vec[ir_lid].src_loc.clone();
-                let lhs_val =
-                    self.eval_lin_const_expr(lhs_lop, lin_db, in_progress, diags, err_loc)?;
-                let rhs_val =
-                    self.eval_lin_const_expr(rhs_lop, lin_db, in_progress, diags, err_loc)?;
-                Self::apply_comparison_op(tok, lhs_val, rhs_val, &op_loc, diags)
-            }
-            ast::LexToken::DoubleAmpersand | ast::LexToken::DoublePipe => {
-                let ir_lid = ir_lid_opt.unwrap();
-                let lhs_lop = lin_db.const_ir_vec[ir_lid].operand_vec[0];
-                let rhs_lop = lin_db.const_ir_vec[ir_lid].operand_vec[1];
-                let lhs_val =
-                    self.eval_lin_const_expr(lhs_lop, lin_db, in_progress, diags, err_loc)?;
-                let rhs_val =
-                    self.eval_lin_const_expr(rhs_lop, lin_db, in_progress, diags, err_loc)?;
-                let lhs_bool = lhs_val.to_bool();
-                let rhs_bool = rhs_val.to_bool();
-                let result = if tok == ast::LexToken::DoubleAmpersand {
-                    lhs_bool && rhs_bool
-                } else {
-                    lhs_bool || rhs_bool
-                };
-                Some(ParameterValue::U64(if result { 1 } else { 0 }))
-            }
             _ => {
-                let m = format!(
-                    "Operation '{:?}' is not supported in a const expression.",
-                    tok
-                );
-                diags.err1("IRDB_21", &m, err_loc.clone());
-                None
+                panic!("Literal operand with unexpected token {:?} in const expression", tok);
             }
         }
     }
@@ -1239,7 +1204,7 @@ impl IRDb {
     /// Apply a binary arithmetic operator to two resolved const values.
     /// Promotes `Integer` to match a `U64` or `I64` operand when needed.
     fn apply_binary_op(
-        tok: ast::LexToken,
+        op: IRKind,
         lhs: ParameterValue,
         rhs: ParameterValue,
         src_loc: &SourceSpan,
@@ -1287,21 +1252,21 @@ impl IRDb {
         match lhs {
             U64(a) => {
                 let b = rhs.to_u64();
-                match Self::calc_u64_op(tok, a, b) {
+                match Self::calc_u64_op(op, a, b) {
                     Ok(r) => Some(U64(r)),
                     Err(e) => emit(e, diags),
                 }
             }
             I64(a) => {
                 let b = rhs.to_i64();
-                match Self::calc_i64_op(tok, a, b) {
+                match Self::calc_i64_op(op, a, b) {
                     Ok(r) => Some(I64(r)),
                     Err(e) => emit(e, diags),
                 }
             }
             Integer(a) => {
                 let b = rhs.to_i64();
-                match Self::calc_i64_op(tok, a, b) {
+                match Self::calc_i64_op(op, a, b) {
                     Ok(r) => Some(Integer(r)),
                     Err(e) => emit(e, diags),
                 }
@@ -1321,7 +1286,7 @@ impl IRDb {
     /// Returns U64(1) for true, U64(0) for false.
     /// Promotes `Integer` to match a `U64` or `I64` operand when needed.
     fn apply_comparison_op(
-        tok: ast::LexToken,
+        op: IRKind,
         lhs: ParameterValue,
         rhs: ParameterValue,
         src_loc: &SourceSpan,
@@ -1330,9 +1295,9 @@ impl IRDb {
         use ParameterValue::*;
         // String equality/inequality: supported for == and != only.
         if let (QuotedString(a), QuotedString(b)) = (&lhs, &rhs) {
-            let result = match tok {
-                ast::LexToken::DoubleEq => a == b,
-                ast::LexToken::NEq => a != b,
+            let result = match op {
+                IRKind::DoubleEq => a == b,
+                IRKind::NEq => a != b,
                 _ => {
                     let m = "Ordered comparison (>=, <=) is not supported for strings.".to_string();
                     diags.err1("IRDB_30", &m, src_loc.clone());
@@ -1362,25 +1327,25 @@ impl IRDb {
         let result = match lhs {
             U64(a) => {
                 let b = rhs.to_u64();
-                match tok {
-                    ast::LexToken::DoubleEq => a == b,
-                    ast::LexToken::NEq => a != b,
-                    ast::LexToken::GEq => a >= b,
-                    ast::LexToken::LEq => a <= b,
-                    ast::LexToken::Gt => a > b,
-                    ast::LexToken::Lt => a < b,
+                match op {
+                    IRKind::DoubleEq => a == b,
+                    IRKind::NEq => a != b,
+                    IRKind::GEq => a >= b,
+                    IRKind::LEq => a <= b,
+                    IRKind::Gt => a > b,
+                    IRKind::Lt => a < b,
                     _ => unreachable!(),
                 }
             }
             I64(a) | Integer(a) => {
                 let b = rhs.to_i64();
-                match tok {
-                    ast::LexToken::DoubleEq => a == b,
-                    ast::LexToken::NEq => a != b,
-                    ast::LexToken::GEq => a >= b,
-                    ast::LexToken::LEq => a <= b,
-                    ast::LexToken::Gt => a > b,
-                    ast::LexToken::Lt => a < b,
+                match op {
+                    IRKind::DoubleEq => a == b,
+                    IRKind::NEq => a != b,
+                    IRKind::GEq => a >= b,
+                    IRKind::LEq => a <= b,
+                    IRKind::Gt => a > b,
+                    IRKind::Lt => a < b,
                     _ => unreachable!(),
                 }
             }
@@ -1390,78 +1355,62 @@ impl IRDb {
         Some(U64(if result { 1 } else { 0 }))
     }
 
-    fn calc_u64_op(tok: ast::LexToken, a: u64, b: u64) -> Result<u64, CalcErr> {
-        match tok {
-            ast::LexToken::Plus => a.checked_add(b).ok_or_else(|| {
+    fn calc_u64_op(op: IRKind, a: u64, b: u64) -> Result<u64, CalcErr> {
+        match op {
+            IRKind::Add => a.checked_add(b).ok_or_else(|| {
                 CalcErr::Overflow(format!("Add expression '{a} + {b}' will overflow type U64"))
             }),
-            ast::LexToken::Minus => a.checked_sub(b).ok_or_else(|| {
+            IRKind::Subtract => a.checked_sub(b).ok_or_else(|| {
                 CalcErr::Overflow(format!(
                     "Subtract expression '{a} - {b}' will underflow type U64"
                 ))
             }),
-            ast::LexToken::Asterisk => a.checked_mul(b).ok_or_else(|| {
+            IRKind::Multiply => a.checked_mul(b).ok_or_else(|| {
                 CalcErr::Overflow(format!(
                     "Multiply expression '{a} * {b}' will overflow type U64"
                 ))
             }),
-            ast::LexToken::FSlash => {
-                if b == 0 {
-                    Err(CalcErr::DivByZero)
-                } else {
-                    Ok(a / b)
-                }
+            IRKind::Divide => {
+                if b == 0 { Err(CalcErr::DivByZero) } else { Ok(a / b) }
             }
-            ast::LexToken::Percent => {
-                if b == 0 {
-                    Err(CalcErr::DivByZero)
-                } else {
-                    Ok(a % b)
-                }
+            IRKind::Modulo => {
+                if b == 0 { Err(CalcErr::DivByZero) } else { Ok(a % b) }
             }
-            ast::LexToken::Ampersand => Ok(a & b),
-            ast::LexToken::Pipe => Ok(a | b),
-            ast::LexToken::DoubleLess => Ok(a << (b & 63)),
-            ast::LexToken::DoubleGreater => Ok(a >> (b & 63)),
+            IRKind::BitAnd => Ok(a & b),
+            IRKind::BitOr => Ok(a | b),
+            IRKind::LeftShift => Ok(a << (b & 63)),
+            IRKind::RightShift => Ok(a >> (b & 63)),
             _ => Err(CalcErr::Overflow(
                 "Unknown operator in U64 const expression".to_string(),
             )),
         }
     }
 
-    fn calc_i64_op(tok: ast::LexToken, a: i64, b: i64) -> Result<i64, CalcErr> {
-        match tok {
-            ast::LexToken::Plus => a.checked_add(b).ok_or_else(|| {
+    fn calc_i64_op(op: IRKind, a: i64, b: i64) -> Result<i64, CalcErr> {
+        match op {
+            IRKind::Add => a.checked_add(b).ok_or_else(|| {
                 CalcErr::Overflow(format!("Add expression '{a} + {b}' will overflow type I64"))
             }),
-            ast::LexToken::Minus => a.checked_sub(b).ok_or_else(|| {
+            IRKind::Subtract => a.checked_sub(b).ok_or_else(|| {
                 CalcErr::Overflow(format!(
                     "Subtract expression '{a} - {b}' will underflow type I64"
                 ))
             }),
-            ast::LexToken::Asterisk => a.checked_mul(b).ok_or_else(|| {
+            IRKind::Multiply => a.checked_mul(b).ok_or_else(|| {
                 CalcErr::Overflow(format!(
                     "Multiply expression '{a} * {b}' will overflow type I64"
                 ))
             }),
-            ast::LexToken::FSlash => {
-                if b == 0 {
-                    Err(CalcErr::DivByZero)
-                } else {
-                    Ok(a / b)
-                }
+            IRKind::Divide => {
+                if b == 0 { Err(CalcErr::DivByZero) } else { Ok(a / b) }
             }
-            ast::LexToken::Percent => {
-                if b == 0 {
-                    Err(CalcErr::DivByZero)
-                } else {
-                    Ok(a % b)
-                }
+            IRKind::Modulo => {
+                if b == 0 { Err(CalcErr::DivByZero) } else { Ok(a % b) }
             }
-            ast::LexToken::Ampersand => Ok(a & b),
-            ast::LexToken::Pipe => Ok(a | b),
-            ast::LexToken::DoubleLess => Ok(a << (b & 63)),
-            ast::LexToken::DoubleGreater => Ok(a >> (b & 63)),
+            IRKind::BitAnd => Ok(a & b),
+            IRKind::BitOr => Ok(a | b),
+            IRKind::LeftShift => Ok(a << (b & 63)),
+            IRKind::RightShift => Ok(a >> (b & 63)),
             _ => Err(CalcErr::Overflow(
                 "Unknown operator in I64 const expression".to_string(),
             )),

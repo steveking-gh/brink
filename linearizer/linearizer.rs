@@ -20,20 +20,33 @@ use ir::IRKind;
 /// * Callers hold indices into the Linearizer's operand_vec, not direct reference
 ///   to these structs.
 /// * LinOperand owns its own data.
-pub struct LinOperand {
-    /// IR index that produced this operand; None for immediate (leaf) operands.
-    pub ir_lid: Option<usize>,
-    pub src_loc: SourceSpan,
-    pub tok: LexToken,
-    pub sval: String,
+/// We have two types of operands:
+/// * Literal: integer and string literals, identifiers, etc.
+///   These have a source token defining their type and value.
+/// * Output: outputs of IR instructions and extension calls.
+///   These have no source token since they computed values.
+pub enum LinOperand {
+    Literal {
+        /// Source location for diagnostics.
+        src_loc: SourceSpan,
+        /// Token kind for the literal's type, e.g. U64, QuotedString, etc.
+        tok: LexToken,
+        /// Token text as parsed from source.
+        sval: String,
+    },
+    Output {
+        /// Source location for diagnostics.
+        src_loc: SourceSpan,
+        /// Index of this output in the owning Linearizer's ir_vec.
+        ir_lid: usize,
+    },
 }
 
 impl LinOperand {
     /// Construct a LinOperand from a token.  Pass `ir_lid` as `Some(lid)` for
     /// output slots produced by an IR instruction, or `None` for leaf literals.
-    pub fn new(ir_lid: Option<usize>, tinfo: &TokenInfo<'_>) -> LinOperand {
-        LinOperand {
-            ir_lid,
+    pub fn new_literal(tinfo: &TokenInfo<'_>) -> Self {
+        LinOperand::Literal {
             src_loc: tinfo.loc.clone(),
             sval: tinfo.val.to_string(),
             tok: tinfo.tok,
@@ -44,18 +57,11 @@ impl LinOperand {
     /// Use this instead of `new` when no source token describes the output type —
     /// only the source location is meaningful.  Sets `tok` to `LexToken::OutputSlot`
     /// and `sval` to an empty string.
-    pub fn new_output(ir_lid: usize, src_loc: SourceSpan) -> LinOperand {
-        LinOperand {
-            ir_lid: Some(ir_lid),
+    pub fn new_output(ir_lid: usize, src_loc: SourceSpan) -> Self {
+        LinOperand::Output {
             src_loc,
-            tok: LexToken::OutputSlot,
-            sval: String::new(),
+            ir_lid,
         }
-    }
-
-    /// Return the IR index that produced this operand, or None for leaf literals.
-    pub fn is_output_of(&self) -> Option<usize> {
-        self.ir_lid
     }
 }
 
@@ -326,7 +332,7 @@ impl Linearizer {
             LexToken::U64 | LexToken::I64 | LexToken::Integer | LexToken::QuotedString => {
                 // parent_nid is a literal.  Recursion bottom.
                 let idx = self.operand_vec.len();
-                self.operand_vec.push(LinOperand::new(None, tinfo));
+                self.operand_vec.push(LinOperand::new_literal(tinfo));
                 returned_operands.push(idx);
             }
 
@@ -335,7 +341,9 @@ impl Linearizer {
                 if ast.has_children(parent_nid) {
                     // An identifier with children means this is an extension call.
                     let ir_lid = self.new_ir(parent_nid, ast, IRKind::ExtensionCall);
-                    self.add_new_operand_to_ir(ir_lid, LinOperand::new(None, tinfo));
+                    // Add the extension's name identifier as the first operand,
+                    // so the backend can look up the extension.
+                    self.add_new_operand_to_ir(ir_lid, LinOperand::new_literal(tinfo));
 
                     // Now recursively add operands for the extension call arguments.
                     let mut lops = Vec::new();
@@ -355,12 +363,12 @@ impl Linearizer {
                 } else {
                     // Leaf identifier — const ref, section name, etc.
                     let idx = self.operand_vec.len();
-                    self.operand_vec.push(LinOperand::new(None, tinfo));
+                    self.operand_vec.push(LinOperand::new_literal(tinfo));
                     returned_operands.push(idx);
                 }
             }
 
-            // ── Namespace extension call: custom::foo(args…) ───────────────
+            // Namespace extension call: custom::foo(args…)
             LexToken::Namespace => {
                 let mut children = ast.children(parent_nid);
                 let id_child = children.next().unwrap();
@@ -368,9 +376,14 @@ impl Linearizer {
                 let extension_name = format!("{}{}", tinfo.val, id_tinfo.val);
 
                 let ir_lid = self.new_ir(parent_nid, ast, IRKind::ExtensionCall);
-                let mut name_op = LinOperand::new(None, tinfo);
-                name_op.sval = extension_name;
-                self.add_new_operand_to_ir(ir_lid, name_op);
+                // Store the full qualified name (e.g. "custom::foo") in sval.
+                // tok is Identifier to match the simple foo(args) case in the
+                // Identifier arm above, making irdb handling uniform.
+                self.add_new_operand_to_ir(ir_lid, LinOperand::Literal {
+                    src_loc: tinfo.loc.clone(),
+                    tok: LexToken::Identifier,
+                    sval: extension_name,
+                });
 
                 let mut lops = Vec::new();
                 for child in children {
@@ -395,7 +408,7 @@ impl Linearizer {
             | LexToken::BuiltinVersionMinor
             | LexToken::BuiltinVersionPatch => {
                 let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tok));
-                let idx = self.add_new_operand_to_ir(ir_lid, LinOperand::new(Some(ir_lid), tinfo));
+                let idx = self.add_new_operand_to_ir(ir_lid, LinOperand::new_output(ir_lid, tinfo.loc.clone()));
                 returned_operands.push(idx);
             }
 
@@ -406,7 +419,7 @@ impl Linearizer {
                     self.record_expr_children_r(rdepth + 1, parent_nid, &mut lops, diags, ast);
                 let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tok));
                 result &= self.process_operands(1, &mut lops, ir_lid, diags, tinfo);
-                let idx = self.add_new_operand_to_ir(ir_lid, LinOperand::new(Some(ir_lid), tinfo));
+                let idx = self.add_new_operand_to_ir(ir_lid, LinOperand::new_output(ir_lid, tinfo.loc.clone()));
                 returned_operands.push(idx);
             }
 
@@ -434,7 +447,7 @@ impl Linearizer {
                     self.record_expr_children_r(rdepth + 1, parent_nid, &mut lops, diags, ast);
                 let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tok));
                 result &= self.process_operands(2, &mut lops, ir_lid, diags, tinfo);
-                let idx = self.add_new_operand_to_ir(ir_lid, LinOperand::new(Some(ir_lid), tinfo));
+                let idx = self.add_new_operand_to_ir(ir_lid, LinOperand::new_output(ir_lid, tinfo.loc.clone()));
                 returned_operands.push(idx);
             }
 
@@ -447,14 +460,16 @@ impl Linearizer {
                     let ns_children: Vec<_> = ast.children(first_child).collect();
                     let ext_id_tinfo = ast.get_tinfo(ns_children[0]);
                     let full_name = format!("{}{}", first_child_tinfo.val, ext_id_tinfo.val);
-
                     let ir_lid = self.new_ir(parent_nid, ast, IRKind::SizeofExt);
-                    let mut name_op = LinOperand::new(None, first_child_tinfo);
-                    name_op.sval = full_name;
-                    self.add_new_operand_to_ir(ir_lid, name_op);
-
+                    // Store the full qualified name (e.g. "custom::foo") in sval.
+                    // tok is Identifier to match the simple sizeof(section) case below.
+                    self.add_new_operand_to_ir(ir_lid, LinOperand::Literal {
+                        src_loc: first_child_tinfo.loc.clone(),
+                        tok: LexToken::Identifier,
+                        sval: full_name,
+                    });
                     let idx =
-                        self.add_new_operand_to_ir(ir_lid, LinOperand::new(Some(ir_lid), tinfo));
+                        self.add_new_operand_to_ir(ir_lid, LinOperand::new_output(ir_lid, tinfo.loc.clone()));
                     returned_operands.push(idx);
                 } else {
                     let mut lops = Vec::new();
@@ -463,7 +478,7 @@ impl Linearizer {
                         self.record_expr_children_r(rdepth + 1, parent_nid, &mut lops, diags, ast);
                     result &= self.process_operands(1, &mut lops, ir_lid, diags, tinfo);
                     let idx =
-                        self.add_new_operand_to_ir(ir_lid, LinOperand::new(Some(ir_lid), tinfo));
+                        self.add_new_operand_to_ir(ir_lid, LinOperand::new_output(ir_lid, tinfo.loc.clone()));
                     returned_operands.push(idx);
                 }
             }
@@ -475,7 +490,7 @@ impl Linearizer {
                 result &=
                     self.record_expr_children_r(rdepth + 1, parent_nid, &mut lops, diags, ast);
                 result &= self.process_optional_operands(1, &mut lops, ir_lid, diags, tinfo);
-                let idx = self.add_new_operand_to_ir(ir_lid, LinOperand::new(Some(ir_lid), tinfo));
+                let idx = self.add_new_operand_to_ir(ir_lid, LinOperand::new_output(ir_lid, tinfo.loc.clone()));
                 returned_operands.push(idx);
             }
 
