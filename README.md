@@ -19,12 +19,12 @@ Brink is written in rust, which works on all major operating systems.  Installin
 
 From a command prompt, clone Brink and change directory to your clone.  For example:
 
-    $ git clone https://github.com/steveking-gh/brink.git
-    $ cd brink
+    git clone https://github.com/steveking-gh/brink.git
+    cd brink
 
 ### Step 3: Build and Run Self-Tests
 
-    $ cargo test --release --all
+    cargo test --release --all
 
 All tests should pass, 0 tests should fail.
 
@@ -32,7 +32,7 @@ All tests should pass, 0 tests should fail.
 
 The previous build step created the Brink binary as `./target/release/brink`.  You can install the Brink binary anywhere on your system.  As a convenience, cargo provides a per-user installation as `$HOME/.cargo/bin/brink`.
 
-    $ cargo install --path ./
+    cargo install --path ./
 
 # Command Line Options Reference
 
@@ -324,11 +324,6 @@ This section provides an overview of Brink's internal output creation phases.
 
 ---
 
-# Managing Firmware Configuration
-
-Brink allows users to manage firmware configuration using [`const`](#const-identifier--expr) variable definitions in their source code and on the command line.  Brink also allows, [`include`](#include-file) files and
----
-
 # Brink Language Reference
 
 ## Comments
@@ -357,6 +352,8 @@ Brink reports an error for under/overflow on arithmetic operations on U64, I64 a
 ## Identifiers
 
 An identifier begins with a letter (A–Z, a–z) or an underscore (_), followed by zero or more letters, digits (0–9), or underscores.  Identifiers are case-sensitive.
+
+### Reserved Identifiers
 
 Brink reserves certain identifiers and rejects their use as section names, const names, or label names at compile time.
 
@@ -452,6 +449,7 @@ Brink considers a zero value false and all non-zero values true.
 ### Quoted Strings
 
 Brink allows utf-8 quoted strings with the following escape characters:
+
 | Escape Character | UTF-8 Value | Name           |
 | ---------------- | ----------- | -------------- |
 | \\0              | 0x00        | Null           |
@@ -663,7 +661,7 @@ A const value expression cannot depend on addresses, sizes, offsets or any other
     ...
     IO_START = 0xF000_0000_0000_0000;
 
-Deferred assignment is primarily useful in [`if/else`](#if-expression----else---expression) statements, which allow users to conditionally determine the value to assign.
+Deferred assignment is primarily useful in [`if/else`](#if-expression----else---) statements, which allow users to conditionally determine the value to assign.
 
 To provide errors and warnings, Brink tracks the defined/undefined and used/unused state of each variable.
 
@@ -674,7 +672,7 @@ To provide errors and warnings, Brink tracks the defined/undefined and used/unus
 Allows conditional execution of other statements.
 
 > [!IMPORTANT]
-> Brink evaluates *all* `if/else` statements before starting layout of the output.  Therefore, an `if/else` expression may only depend on `const` variables and literal values.  In other words, `if/else` statements cannot depend on dynamic addresses, sizes, offsets or any other layout dependent aspect of the output file.
+> Brink evaluates *all* `if/else` statements before starting layout of the output.  Therefore, an `if/else` expression must only depend on `const` variables and literal values.  In other words, `if/else` statements must not depend on dynamic addresses, sizes, offsets or any other layout dependent aspect of the output file.
 
 Brink currently limits the conditional blocks of an `if/else` to the following statement types:
 
@@ -719,6 +717,13 @@ Users must pre-declare `const` variables before conditionally assigning values t
 
 If the taken path in an `if/else` statement does not assign a value to a predeclared `const` variable, then Brink reports an error if any later program statement uses that variable.
 
+For compactness, user's may omit braces around an `else/if` block.  For example:
+
+    if MEM_CONFIG == "BIG" { include "big_config.brink"; }
+    else if MEM_CONFIG == "MEDIUM" { include "medium_config.brink"; }
+    else if MEM_CONFIG == "SMALL" { include "small_config.brink"; }
+    else { assert(0); }
+
 ---
 
 ## `include "<file>";`
@@ -752,6 +757,7 @@ Example:
 ---
 
 ## Labels
+
 Labels assign an identifier to a specific location in the output file.  Programs can then refer to the location of the label by name.  Labels names have global scope and label names must be globally unique.  Multiple different labels can refer to the same location.
 
 Labels have the form `<label identifier>:` and can prefix most statement types.
@@ -782,7 +788,9 @@ An output statement specifies the top section to write to the output file and an
 An `include` file may contain an output statement.  Brink will enforce that the entire program after include file resolution contains only one output statement.
 
 ---
+
 ## `print <expression> [, <expression>, ...];`
+
 The print statement evaluates the comma separated list of expressions and prints them to the console.  For expressions, print displays unsigned values in hex and signed values in decimal.  If needed, the `to_u64` and `to_i64` functions can control the output style.
 
 Brink executes a given print statement for each instance found in the output file.  In other words, a print statement in a section written multiple times will execute multiple times in the order found.
@@ -874,7 +882,7 @@ When a section offset specifies an identifier, the identifier must be in the sco
 
 A section is a named, reusable block of content.  Sections are the primary building block of a Brink program.  Each section defines a sequence of bytes, built up from write statements and location counter operations such as `align`.  Sections may also contain labels, assertions, print statements and so on.  Sections may write other sections into themselves so long as the nesting does not create a cycle.
 
-Section names must be valid [identifiers](#identifiers), must be globally unique, and must not conflict with const names, label names, or [reserved identifiers](#reserved-identifiers).
+Section names must be valid [identifiers](#identifiers), must be globally unique, and must not conflict with const names, label names, or [reserved identifiers](#rserved-identifiers).
 
 Sections have their own section-relative location counter which resets to zero at the start of each section.  Sections can read and advance the section location counter with [`sec_offset()`](#sec-identifier----u64) and [`set_sec_offset()`](#set_sec_offset-expression--pad-byte-value) statements respectively.
 
@@ -908,7 +916,6 @@ Example:
 The `set_addr` command forces the current address to the specified value and resets the current `addr_offset` to zero.  These changes happen within the scope of the containing section.  Child sections inherit the new `addr` and `addr_offset` values unless they call `set_addr` themselves.
 
 Using `set_addr` *does not* change the value of the section offset nor file offset.  A `set_addr` command *does not* add pad bytes to the output.
-
 
 The `set_addr` command may move the address forward or backwards.  However, Brink tracks every output byte by address and reports an error if a program tries to write to the same address more than once.
 
@@ -975,9 +982,42 @@ Example:
 ---
 
 ## `set_file_offset <expression> [, <pad byte value>];`
+
+The set_file_offset command pads the output file until the *file offset* reaches the specified value.  Users may specify an optional pad byte value or use the default value of 0.
+
+If the specified offset is less the current offset, Brink reports an error.
+
+Example:
+
+    section foo {
+        wr8 1;
+        wr8 2;
+        wr8 3;
+        wr8 4;
+        wr8 5;
+        set_sec_offset 16;
+        assert addr() == 16;
+        assert file_offset() == 16;
+        assert sec_offset() == 16;
+        wr8 0xAA, 3;
+        set_sec_offset 24, 0xFF;
+        assert addr() == 24;
+        assert file_offset() == 24;
+        assert sec_offset() == 24;
+        set_sec_offset 24, 0xEE; // should do Nothing
+        wr8 0xAA, 3;
+        set_sec_offset 27, 0x33; // should do nothing
+        set_sec_offset 28, 0x77; // should pad to 28
+        assert sizeof(foo) == 28;
+    }
+
+    output foo;
+
+---
+
 ## `set_sec_offset <expression> [, <pad byte value>];`
 
-The set_sec_offset and set_file_offset commands pad the output until the respective offset reaches the specified value.  Users may specify an optional pad byte value or use the default value of 0.
+The set_sec_offset command pads the current section until the *section offset* reaches the specified value.  Users may specify an optional pad byte value or use the default value of 0.
 
 If the specified offset is less the current offset, Brink reports an error.
 
@@ -1278,7 +1318,6 @@ The command line option `--list-extensions` outputs the names of all available e
 
 ---
 
-
 ## Extensions Are A Compile-Time Feature
 
 Extensions build and link to Brink at compile time as controlled by Cargo feature flags.  Because Rust does not guarantee a stable ABI between versions, Brink requires compile time construction to eliminate ABI incompatibilities and enable the use of safe Rust.  The following bullets provide an overview of how extensions work:
@@ -1417,19 +1456,18 @@ ext\ext.rs                        292                18    93.84%          20   
 ext\test_mocks.rs                 174                23    86.78%          27                 5    81.48%         147                20    86.39%           0                 0         -
 extensions\src\lib.rs               4                 0   100.00%           1                 0   100.00%           3                 0   100.00%           0                 0         -
 ir\ir.rs                          225                25    88.89%          22                 0   100.00%         171                15    91.23%           0                 0         -
-irdb\irdb.rs                     1526               459    69.92%          32                 7    78.12%         949               276    70.92%           0                 0         -
+irdb\irdb.rs                     1526               390    74.44%          32                 7    78.12%         949               247    73.97%           0                 0         -
 layoutdb\layoutdb.rs              784               159    79.72%          18                 0   100.00%         432                71    83.56%           0                 0         -
 linearizer\linearizer.rs          526                76    85.55%          17                 0   100.00%         311                32    89.71%           0                 0         -
 map\map.rs                        860                13    98.49%          58                 0   100.00%         579                 9    98.45%           0                 0         -
-process\process.rs                355                26    92.68%          22                 5    77.27%         197                10    94.92%           0                 0         -
+process\process.rs                355                25    92.96%          22                 5    77.27%         197                10    94.92%           0                 0         -
 src\main.rs                       123                 6    95.12%           8                 1    87.50%          84                 5    94.05%           0                 0         -
 std\crc32c\src\crc32c.rs           20                 0   100.00%           4                 0   100.00%          19                 0   100.00%           0                 0         -
 symtable\symtable.rs              116                 5    95.69%          14                 2    85.71%          81                 5    93.83%           0                 0         -
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-TOTAL                            9936              1753    82.36%         381                32    91.60%        6056               957    84.20%           0                 0         -
+TOTAL                            9936              1683    83.06%         381                32    91.60%        6056               928    84.68%           0                 0         -
 ```
 <!-- COVERAGE_END -->
-
 
 ## Brink Source Code Overview
 
@@ -1447,6 +1485,7 @@ TOTAL                            9936              1753    82.36%         381   
 | brink_extension/lib.rs | Extensions    | Public API for extension authors                                            |
 | ext/ext.rs             | Extensions    | Runtime extension registry and dispatch wrapper                             |
 | std/crc32c/src/lib.rs  | std extension | CRC-32C (Castagnoli) hash over caller-specified output region               |
+
 
 
 

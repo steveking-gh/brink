@@ -1,0 +1,10 @@
+// IRDB_46: ranged extension called with a non-numeric first range argument.
+// brink::test_ranged_sum expects (start_offset, length) as integers.
+// Passing a quoted string as start_offset must produce IRDB_46.
+
+section foo {
+    wr8 0x01; wr8 0x02; wr8 0x03; wr8 0x04;
+    wr brink::test_ranged_sum("start", 4);
+}
+
+output foo;

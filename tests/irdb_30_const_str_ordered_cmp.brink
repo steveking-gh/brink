@@ -1,0 +1,10 @@
+// IRDB_30: ordered comparison (>=) applied to two string operands in a const expression.
+// String operands may only be compared with == or != — IRDB_30 must fire for >=.
+
+const X = "abc" >= "def";
+
+section foo {
+    wr8 0;
+}
+
+output foo;

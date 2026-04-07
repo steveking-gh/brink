@@ -1,0 +1,8 @@
+// IRDB_9: wr8 operand is a quoted string, not a numeric value.
+// validate_numeric_1_or_2 rejects non-integer first operands — IRDB_9 must fire.
+
+section foo {
+    wr8 "hello";
+}
+
+output foo;

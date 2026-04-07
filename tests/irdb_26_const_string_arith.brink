@@ -1,0 +1,11 @@
+// IRDB_26: arithmetic operator in a const expression applied to a non-numeric type.
+// Both operands are QuotedString, which passes the reconciliation check but fails
+// the numeric dispatch in apply_binary_op — IRDB_26 must fire.
+
+const X = "hello" + "world";
+
+section foo {
+    wr8 0;
+}
+
+output foo;

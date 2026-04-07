@@ -2473,4 +2473,65 @@ mod tests {
     fn if_top_level_assert_phase() {
         assert_brink_success("tests/if_top_level_assert_phase.brink", None, None);
     }
+
+    // ── IRDB error path coverage ──────────────────────────────────────────────
+
+    /// IRDB_1: binary operator applied to two typed but incompatible operands
+    /// (U64 and I64) in the layout IR; neither is the untyped Integer class so
+    /// get_operand_data_type_r cannot reconcile them.
+    #[test]
+    fn irdb_1_type_mismatch() {
+        assert_brink_failure("tests/irdb_1_type_mismatch.brink", &["[IRDB_1]"]);
+    }
+
+    /// IRDB_9: wr8 operand is a quoted string rather than a numeric value.
+    /// validate_numeric_1_or_2 must reject the non-integer first operand.
+    #[test]
+    fn irdb_9_wr_bad_type() {
+        assert_brink_failure("tests/irdb_9_wr_bad_type.brink", &["[IRDB_9]"]);
+    }
+
+    /// IRDB_14: wrf path exists but is a directory, not a regular file.
+    /// The is_file() check in validate_wrf_operands must reject it.
+    #[test]
+    fn irdb_14_wrf_dir() {
+        assert_brink_failure("tests/irdb_14_wrf_dir.brink", &["[IRDB_14]"]);
+    }
+
+    /// IRDB_26: arithmetic operator applied to a non-numeric type (QuotedString)
+    /// in a const expression.  apply_binary_op catches string operands in the
+    /// final match arm after the reconciliation step passes.
+    #[test]
+    fn irdb_26_const_string_arith() {
+        assert_brink_failure("tests/irdb_26_const_string_arith.brink", &["[IRDB_26]"]);
+    }
+
+    /// IRDB_30: ordered comparison (>=) applied to two string operands in a
+    /// const expression.  Strings support only == and !=; apply_comparison_op
+    /// must reject >= with IRDB_30.
+    #[test]
+    fn irdb_30_const_str_ordered_cmp() {
+        assert_brink_failure("tests/irdb_30_const_str_ordered_cmp.brink", &["[IRDB_30]"]);
+    }
+
+    /// IRDB_32: assert expression evaluates to false inside a const if/else body.
+    /// exec_const_statements must emit IRDB_32 when the assert condition is 0.
+    #[test]
+    fn irdb_32_const_assert_fails() {
+        assert_brink_failure("tests/irdb_32_const_assert_fails.brink", &["[IRDB_32]"]);
+    }
+
+    /// IRDB_44: sizeof() applied to a namespace-qualified name not in the
+    /// extension registry.  validate_operands must reject unknown SizeofExt names.
+    #[test]
+    fn irdb_44_unknown_sizeof_ext() {
+        assert_brink_failure("tests/irdb_44_unknown_sizeof_ext.brink", &["[IRDB_44]"]);
+    }
+
+    /// IRDB_46: ranged extension called with a non-numeric first range argument.
+    /// validate_operands must reject the QuotedString start-offset operand.
+    #[test]
+    fn irdb_46_ranged_ext_bad_range() {
+        assert_brink_failure("tests/irdb_46_ranged_ext_bad_range.brink", &["[IRDB_46]"]);
+    }
 } // mod tests
