@@ -53,6 +53,9 @@ The required input file contains the brink source code to compile and build the 
 | `--map-json`        | Writes a JSON format map file `<stem>.map.json` to the current directory.<br>For example: `firmware.brink` → `firmware.map.json`. |
 | `--map-json=<file>` | Writes a JSON map to the specified file.                                                                                          |
 | `--map-json=-`      | Writes a JSON map to stdout.                                                                                                      |
+| `--map-rs`          | Writes a Rust module file `<stem>.map.rs` to the current directory.<br>For example: `firmware.brink` → `firmware.map.rs`.         |
+| `--map-rs=<file>`   | Writes a Rust module map to the specified file.                                                                                   |
+| `--map-rs=-`        | Writes a Rust module map to stdout.                                                                                               |
 | `--noprint`         | Suppress `print` statement output from the source program.                                                                        |
 | `-o <file>`         | Output file name. Defaults to `output.bin`.                                                                                       |
 | `-q`, `--quiet`     | Suppress all console output, including errors. Overrides `-v`. Useful for fuzz testing.                                           |

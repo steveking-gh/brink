@@ -2268,6 +2268,66 @@ mod tests {
     }
 
     #[test]
+    fn map_rs_default_filename() {
+        let mut cmd = Command::cargo_bin("brink").unwrap();
+        fs::copy("tests/map_default.brink", "tests/map_rs_default.brink").unwrap();
+
+        cmd.arg("tests/map_rs_default.brink")
+            .arg("-o")
+            .arg("map_rs_default.bin")
+            .arg("--map-rs");
+        cmd.assert().success();
+
+        let map = fs::read_to_string("map_rs_default.map.rs")
+            .expect("Failed to open expected default map file map_rs_default.map.rs");
+
+        assert!(map.contains("pub mod map_rs_default_map {"));
+        assert!(map.contains("pub const FOO_ADDR: u64 = "));
+        assert!(map.contains("pub const TOTAL_SIZE: u64 = "));
+
+        fs::remove_file("map_rs_default.bin").ok();
+        fs::remove_file("map_rs_default.map.rs").ok();
+        fs::remove_file("tests/map_rs_default.brink").ok();
+    }
+
+    /// --map-rs=- writes map content to stdout.
+    #[test]
+    fn map_rs_stdout() {
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/map_sections.brink")
+            .arg("-o")
+            .arg("map_rs_stdout.bin")
+            .arg("--map-rs=-")
+            .assert()
+            .success()
+            .stdout(predicates::str::contains("pub mod map_rs_stdout_map {"))
+            .stdout(predicates::str::contains("pub const HDR_ADDR: u64 = "))
+            .stdout(predicates::str::contains("pub const BODY_SIZE: u64 = "))
+            .stdout(predicates::str::contains("0x0000000000002000;"));
+        fs::remove_file("map_rs_stdout.bin").ok();
+    }
+
+    /// --map-rs=- correctly parses user-defined compilation labels.
+    #[test]
+    fn map_rs_labels() {
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/map_labels.brink")
+            .arg("-o")
+            .arg("map_rs_labels.bin")
+            .arg("--map-rs=-")
+            .assert()
+            .success()
+            .stdout(predicates::str::contains("pub mod map_rs_labels_map {"))
+            .stdout(predicates::str::contains("pub const ENTRY_ADDR: u64 = "))
+            .stdout(predicates::str::contains("pub const DONE_ADDR: u64 = "))
+            .stdout(predicates::str::contains("0x0000000000005000;"))
+            .stdout(predicates::str::contains("0x0000000000005003;"));
+        fs::remove_file("map_rs_labels.bin").ok();
+    }
+
+    #[test]
     fn invalid_namespace() {
         assert_brink_failure("tests/invalid_namespace.brink", &["IRDB_40"]);
     }

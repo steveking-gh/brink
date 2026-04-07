@@ -358,6 +358,84 @@ pub fn format_json(map: &MapDb) -> String {
     serde_json::to_string_pretty(&root).expect("JSON serialization failed")
 }
 
+// ── Rust formatter ────────────────────────────────────────────────────────────
+
+/// Produces a Rust module format output containing static address mappings natively.
+pub fn format_rs(map: &MapDb) -> String {
+    use std::fmt::Write;
+    let mut out = String::new();
+
+    let stem = std::path::Path::new(&map.output_file)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("OUTPUT")
+        .replace(|c: char| !c.is_ascii_alphanumeric(), "_");
+
+    writeln!(out, "// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!").unwrap();
+    writeln!(out, "// Automatically generated file! Do not edit!").unwrap();
+    writeln!(out, "// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!").unwrap();
+    writeln!(out, "pub mod {}_map {{", stem).unwrap();
+    writeln!(out, "    #![allow(dead_code)]\n").unwrap(); // Prevent compilation warnings if endpoints are unused
+
+    writeln!(
+        out,
+        "    pub const BASE_ADDR: u64 = 0x{:016x};",
+        map.base_addr
+    )
+    .unwrap();
+    writeln!(out, "    pub const TOTAL_SIZE: u64 = {};", map.total_size).unwrap();
+
+    if !map.consts.is_empty() {
+        writeln!(out, "\n    // Constants").unwrap();
+        for c in &map.consts {
+            let rs_val = match &c.value {
+                ParameterValue::U64(v) => format!("0x{:016x}", v),
+                ParameterValue::I64(v) => format!("{}", v),
+                ParameterValue::Integer(v) => format!("{}", v),
+                ParameterValue::QuotedString(s) => format!("\"{}\"", s),
+                _ => continue,
+            };
+            
+            let rs_type = match &c.value {
+                ParameterValue::U64(_) => "u64",
+                ParameterValue::I64(_) => "i64",
+                ParameterValue::Integer(_) => "i64", // default generic integers to signed equivalent to standard C mappings unless explicit
+                ParameterValue::QuotedString(_) => "&str",
+                _ => continue,
+            };
+
+            let name = c.name.replace(|c: char| !c.is_ascii_alphanumeric(), "_").to_uppercase();
+            writeln!(out, "    pub const {}: {} = {};", name, rs_type, rs_val).unwrap();
+        }
+    }
+
+    if !map.sections.is_empty() {
+        writeln!(out, "\n    // Sections").unwrap();
+        for sec in &map.sections {
+            let sec_name = sec.name.replace(|c: char| !c.is_ascii_alphanumeric(), "_").to_uppercase();
+            writeln!(out, "    pub const {}_ADDR: u64 = 0x{:016x};", sec_name, sec.abs_start).unwrap();
+            writeln!(out, "    pub const {}_OFFSET: u64 = 0x{:016x};", sec_name, sec.off).unwrap();
+            writeln!(out, "    pub const {}_FILE_OFFSET: u64 = 0x{:016x};", sec_name, sec.file_offset).unwrap();
+            writeln!(out, "    pub const {}_SIZE: u64 = {};", sec_name, sec.size).unwrap();
+            writeln!(out).unwrap();
+        }
+    }
+
+    if !map.labels.is_empty() {
+        writeln!(out, "    // Labels").unwrap();
+        for lab in &map.labels {
+            let lab_name = lab.name.replace(|c: char| !c.is_ascii_alphanumeric(), "_").to_uppercase();
+            writeln!(out, "    pub const {}_ADDR: u64 = 0x{:016x};", lab_name, lab.abs_addr).unwrap();
+            writeln!(out, "    pub const {}_OFFSET: u64 = 0x{:016x};", lab_name, lab.off).unwrap();
+            writeln!(out, "    pub const {}_FILE_OFFSET: u64 = 0x{:016x};", lab_name, lab.file_offset).unwrap();
+            writeln!(out).unwrap();
+        }
+    }
+
+    writeln!(out, "}}").unwrap();
+    out
+}
+
 // ── MapDb construction ────────────────────────────────────────────────────────
 
 impl MapDb {
@@ -741,5 +819,37 @@ mod tests {
         let out = format_json(&map);
         let v: serde_json::Value = serde_json::from_str(&out).unwrap();
         assert_eq!(v["sections"].as_array().unwrap().len(), 2);
+    }
+
+    // ── format_rs tests ───────────────────────────────────────────────────────
+
+    #[test]
+    fn rs_is_valid_and_contains_output_file() {
+        let out = format_rs(&make_map());
+        assert!(out.contains("pub mod out_map {"));
+        assert!(out.contains("pub const BASE_ADDR: u64 = 0x0000000000001000;"));
+    }
+
+    #[test]
+    fn rs_sections_contain_names_and_addresses() {
+        let out = format_rs(&make_map());
+        assert!(out.contains("pub const TEXT_ADDR: u64 = 0x0000000000001000;"));
+        assert!(out.contains("pub const TEXT_SIZE: u64 = 64;"));
+        assert!(out.contains("pub const DATA_ADDR: u64 = 0x0000000000001040;"));
+        assert!(out.contains("pub const DATA_SIZE: u64 = 64;"));
+    }
+
+    #[test]
+    fn rs_labels_contain_names_and_addresses() {
+        let out = format_rs(&make_map());
+        assert!(out.contains("pub const START_ADDR: u64 = 0x0000000000001000;"));
+        assert!(out.contains("pub const END_MARKER_ADDR: u64 = 0x000000000000107f;"));
+    }
+
+    #[test]
+    fn rs_consts_contain_names_and_values() {
+        let out = format_rs(&make_map());
+        assert!(out.contains("pub const BASE: u64 = 0x0000000000001000;"));
+        assert!(out.contains("pub const COUNT: i64 = 42;"));
     }
 }

@@ -79,6 +79,11 @@ pub struct Cli {
     /// (e.g. firmware.brink -> firmware.map.h).  Use FILE=- for stdout.
     #[arg(long = "map-c99", value_name = "FILE", num_args(0..=1), default_missing_value = "", require_equals = true)]
     pub map_c99: Option<String>,
+
+    /// Write a Rust module map file.  Omit FILE to derive name from input
+    /// (e.g. firmware.brink -> firmware.map.rs).  Use FILE=- for stdout.
+    #[arg(long = "map-rs", value_name = "FILE", num_args(0..=1), default_missing_value = "", require_equals = true)]
+    pub map_rs: Option<String>,
 }
 
 fn main() -> Result<()> {
@@ -149,6 +154,19 @@ fn main() -> Result<()> {
         other => other,
     };
 
+    let map_rs_resolved;
+    let map_rs = match cli.map_rs.as_deref() {
+        Some("") => {
+            let stem = Path::new(in_file_name)
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("output");
+            map_rs_resolved = format!("{stem}.map.rs");
+            Some(map_rs_resolved.as_str())
+        }
+        other => other,
+    };
+
     process(
         in_file_name,
         &str_in,
@@ -159,5 +177,6 @@ fn main() -> Result<()> {
         map_csv,
         map_json,
         map_c99,
+        map_rs,
     )
 }
