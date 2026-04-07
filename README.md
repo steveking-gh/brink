@@ -675,20 +675,20 @@ Allows conditional execution of other statements.
 
 Brink currently limits the conditional blocks of an `if/else` to the following statement types:
 
-* `const` variable assignment
-* `include`
-* `print`
-* `assert`
-* Nested `if/else` statements
+* `const` assignments
+* `include` directives
+* `print` statements
+* `assert` statements
+* Nested `if`/`else` blocks
 
-Files inserted using `include` must follow the same restrictions as above.
+Any files the program loads via `include` must also follow these restrictions.
 
-Users must pre-declare `const` variables assigned in a conditional block of an `if/else`.  For example:
+Users must pre-declare `const` variables before conditionally assigning values to them. For example:
 
-    // Suppose the command line specified -DMEM_CONFIG="BIG"
+    // Assume the user specified -DMEM_CONFIG="BIG" on the command line.
 
-    // Declare const variables ahead of conditional assignment.
-    // Brink keeps careful track of variables that are undefined or unused.
+    // Pre-declare variables prior to conditional assignment in an if/else.
+    // Brink strictly tracks variable definitions to prevent use of uninitialized variables.
     const FLASH_SIZE;
     const RAM_SIZE;
 
@@ -696,20 +696,20 @@ Users must pre-declare `const` variables assigned in a conditional block of an `
     if MEM_CONFIG == "BIG" {
         FLASH_SIZE = 0x8_0000;
         RAM_SIZE = 0x80_0000;
-        include "big_config.brink"
+        include "big_config.brink";
     } else {
         if MEM_CONFIG == "MEDIUM" {
             FLASH_SIZE = 0x4_0000;
             RAM_SIZE = 0x40_0000;
-            include "medium_config.brink"
+            include "medium_config.brink";
         } else {
             if MEM_CONFIG == "SMALL" {
                 FLASH_SIZE = 0x2_0000;
                 RAM_SIZE = 0x20_0000;
-                include "small_config.brink"
+                include "small_config.brink";
             } else {
-                print "Invalid memory configuration.  MEM_CONFIG must be BIG, MEDIUM or SMALL\n";
-                assert(0);  // Stop
+                print "Invalid configuration. MEM_CONFIG must be BIG, MEDIUM, or SMALL.\n";
+                assert(0);  // Halt execution
             }
         }
     }
