@@ -1226,11 +1226,10 @@ impl Engine {
 
         // Record that set_addr was called mid-section if sec_offset is non-zero.
         // This arms the warning for any subsequent set_sec_offset in this scope.
-        if current.sec_offset != 0 {
-            if let Some(frame) = self.scope_stack.last_mut() {
+        if current.sec_offset != 0
+            && let Some(frame) = self.scope_stack.last_mut() {
                 frame.set_addr_seen = true;
             }
-        }
 
         current.addr_base = set_val;
         current.addr_offset = 0;
@@ -1583,9 +1582,9 @@ impl Engine {
                     }
                     IRKind::Align => self.iterate_align(ir, irdb, diags, &current),
                     IRKind::SetSecOffset | IRKind::SetAddrOffset | IRKind::SetFileOffset => {
-                        if ir.kind != IRKind::SetFileOffset {
-                            if let Some(true) = self.scope_stack.last().map(|f| &f.set_addr_seen) {
-                                if self.warned_lids.insert((lid, "EXEC_54")) {
+                        if ir.kind != IRKind::SetFileOffset
+                            && let Some(true) = self.scope_stack.last().map(|f| &f.set_addr_seen)
+                                && self.warned_lids.insert((lid, "EXEC_54")) {
                                     let cmd = if ir.kind == IRKind::SetSecOffset {
                                         "set_sec_offset"
                                     } else {
@@ -1600,8 +1599,6 @@ impl Engine {
                                     );
                                     diags.warn1("EXEC_54", &msg, ir.src_loc.clone());
                                 }
-                            }
-                        }
                         self.iterate_set(ir, irdb, diags, &current)
                     }
                     IRKind::SetAddr => self.iterate_set_addr(ir, &mut current),

@@ -1,0 +1,10 @@
+// String const used as a wrs operand.
+const GREETING;
+GREETING = "Hello!\n";
+section foo {
+    wrs GREETING;
+}
+
+// GREETING was already assigned, so this is an error.
+GREETING = "Hello!\n";
+output foo;

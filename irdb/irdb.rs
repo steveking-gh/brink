@@ -11,6 +11,7 @@
 // Order of operations: irdb runs after lineardb.  Its output — an IRDb
 // containing ir_vec, parms and file metadata — is consumed by engine.
 
+use constdb::ConstDb;
 use diags::Diags;
 use diags::SourceSpan;
 use layoutdb::LayoutDb;
@@ -128,11 +129,19 @@ impl IRDb {
                         let rhs_num = lin_ir.operand_vec[1];
 
                         let lhs_opt = Self::get_operand_data_type_r(
-                            depth + 1, lhs_num, lin_db, symbol_table, diags,
+                            depth + 1,
+                            lhs_num,
+                            lin_db,
+                            symbol_table,
+                            diags,
                         );
                         if let Some(lhs_dt) = lhs_opt {
                             let rhs_opt = Self::get_operand_data_type_r(
-                                depth + 1, rhs_num, lin_db, symbol_table, diags,
+                                depth + 1,
+                                rhs_num,
+                                lin_db,
+                                symbol_table,
+                                diags,
                             );
                             if let Some(rhs_dt) = rhs_opt {
                                 if lhs_dt == rhs_dt {
@@ -190,9 +199,7 @@ impl IRDb {
                     ast::LexToken::QuotedString => data_type = Some(DataType::QuotedString),
                     ast::LexToken::Label => data_type = Some(DataType::Identifier),
                     ast::LexToken::Namespace => data_type = Some(DataType::Identifier),
-                    ast::LexToken::BuiltinVersionString => {
-                        data_type = Some(DataType::QuotedString)
-                    }
+                    ast::LexToken::BuiltinVersionString => data_type = Some(DataType::QuotedString),
                     ast::LexToken::Identifier => {
                         // If this identifier is a resolved const, return the const's type.
                         if let Some(cv) = symbol_table.get(sval.as_str()) {
@@ -229,17 +236,16 @@ impl IRDb {
                 sval,
                 src_loc,
             } = lop
+                && let Some(const_val) = self.symbol_table.get(sval.as_str()).cloned()
             {
-                if let Some(const_val) = self.symbol_table.get(sval.as_str()).cloned() {
-                    self.symbol_table.mark_used(sval.as_str());
-                    self.parms.push(IROperand {
-                        ir_lid: None,
-                        src_loc: src_loc.clone(),
-                        is_immediate: true,
-                        val: const_val,
-                    });
-                    continue;
-                }
+                self.symbol_table.mark_used(sval.as_str());
+                self.parms.push(IROperand {
+                    ir_lid: None,
+                    src_loc: src_loc.clone(),
+                    is_immediate: true,
+                    val: const_val,
+                });
+                continue;
             }
 
             let dt_opt =
@@ -262,14 +268,7 @@ impl IRDb {
             };
 
             // Convert the string literal to a typed value; fails on malformed input.
-            let opnd = IROperand::new(
-                ir_lid,
-                sval,
-                src_loc,
-                data_type,
-                is_immediate,
-                diags,
-            );
+            let opnd = IROperand::new(ir_lid, sval, src_loc, data_type, is_immediate, diags);
             if let Some(opnd) = opnd {
                 self.parms.push(opnd);
             } else {
@@ -752,7 +751,10 @@ impl IRDb {
 
         // Resolve the extension name from the name operand (always operands[0]).
         let name_op = &lin_db.operand_vec[lir.operand_vec[0]];
-        let LinOperand::Literal { sval: name_sval, .. } = name_op else {
+        let LinOperand::Literal {
+            sval: name_sval, ..
+        } = name_op
+        else {
             panic!("Extension call name operand must be a Literal");
         };
         let Some(entry) = ext_registry.get(name_sval) else {
@@ -766,46 +768,32 @@ impl IRDb {
         // Ranged extension: check whether the first user arg is a section name.
         if has_user_args {
             let first_user_lop = &lin_db.operand_vec[lir.operand_vec[1]];
-            if let LinOperand::Literal { tok: ast::LexToken::Identifier, sval, .. } = first_user_lop {
-                if section_names.contains(sval.as_str()) {
-                    return IRKind::ExtensionCallSection;
-                }
+            if let LinOperand::Literal {
+                tok: ast::LexToken::Identifier,
+                sval,
+                ..
+            } = first_user_lop
+                && section_names.contains(sval.as_str())
+            {
+                return IRKind::ExtensionCallSection;
             }
         }
 
         IRKind::ExtensionCallRanged
     }
 
-    /// Resolve all const declarations in `lin_db.const_map`, storing each
+    /// Resolve all const declarations in `const_db.const_map`, storing each
     /// resolved value in `self.symbol_table`.  Must be called before
     /// `process_lin_operands` so that const references can be substituted.
     /// Also walks `const_ir_vec` sequentially to process ConstDeclare and if/else IR.
-    fn resolve_all_consts(&mut self, lin_db: &LayoutDb, diags: &mut Diags) -> bool {
-        // Pass 1: resolve all regular `const NAME = expr;` declarations (order-independent).
-        let names: Vec<String> = lin_db.const_map.keys().cloned().collect();
-        let mut result = true;
-        for name in names {
-            let mut in_progress = HashSet::new();
-            if self
-                .resolve_const_by_name(&name, lin_db, &mut in_progress, diags)
-                .is_none()
-            {
-                result = false;
-            }
-        }
-
-        // Pass 2: sequential walk of const_ir_vec to handle ConstDeclare and if/else IR.
-        if result {
-            result = self.exec_if_else_ir(lin_db, diags);
-        }
-        result
+    fn resolve_all_consts(&mut self, const_db: &ConstDb, diags: &mut Diags) -> bool {
+        self.exec_const_statements(const_db, diags)
     }
 
-    /// Sequential walk of `const_ir_vec` that handles the if/else IR kinds:
-    /// `ConstDeclare`, `IfBegin`, `ElseBegin`, `IfEnd`, `BareAssign`,
+    /// Sequential walk of `const_ir_vec` that handles all ConstDb IR kinds:
+    /// `Const`, `ConstDeclare`, `IfBegin`, `ElseBegin`, `IfEnd`, `BareAssign`,
     /// and `Print`/`Assert` emitted inside if/else bodies.
-    /// Regular `Const` IR entries are skipped (already resolved in pass 1).
-    fn exec_if_else_ir(&mut self, lin_db: &LayoutDb, diags: &mut Diags) -> bool {
+    fn exec_const_statements(&mut self, const_db: &ConstDb, diags: &mut Diags) -> bool {
         /// Skip state for branches not taken.
         #[derive(Clone, Copy)]
         enum SkipState {
@@ -819,10 +807,10 @@ impl IRDb {
         let mut result = true;
         let mut skip_stack: Vec<SkipState> = Vec::new();
 
-        let n = lin_db.const_ir_vec.len();
+        let n = const_db.ir_vec.len();
         let mut idx = 0;
         while idx < n {
-            let ir = &lin_db.const_ir_vec[idx];
+            let ir = &const_db.ir_vec[idx];
             let op = ir.op;
             let src_loc = ir.src_loc.clone();
 
@@ -865,9 +853,31 @@ impl IRDb {
 
             // Active processing.
             match op {
-                IRKind::Const => { /* already resolved in pass 1 */ }
+                IRKind::Const => {
+                    let name_lop = &const_db.operand_vec[ir.operand_vec[0]];
+                    let LinOperand::Literal { sval: name, .. } = name_lop else {
+                        panic!("Const name operand must be a Literal");
+                    };
+                    let rhs_lop_num = ir.operand_vec[1];
+                    let mut in_progress = HashSet::new();
+                    let val = self.eval_const_expr_r(
+                        rhs_lop_num,
+                        const_db,
+                        &mut in_progress,
+                        diags,
+                        &src_loc,
+                    );
+                    if let Some(v) = val {
+                        if !self.symbol_table.contains_key(name) {
+                            self.symbol_table
+                                .define(name.to_string(), v, Some(src_loc.clone()));
+                        }
+                    } else {
+                        result = false;
+                    }
+                }
                 IRKind::ConstDeclare => {
-                    let name_lop = &lin_db.const_operand_vec[ir.operand_vec[0]];
+                    let name_lop = &const_db.operand_vec[ir.operand_vec[0]];
                     let LinOperand::Literal { sval: name, .. } = name_lop else {
                         panic!("ConstDeclare name operand must be a Literal");
                     };
@@ -877,9 +887,9 @@ impl IRDb {
                     // Evaluate the condition operand.
                     let cond_lop_num = ir.operand_vec[0];
                     let mut in_progress = HashSet::new();
-                    let cond_val = self.eval_lin_const_expr(
+                    let cond_val = self.eval_const_expr_r(
                         cond_lop_num,
-                        lin_db,
+                        const_db,
                         &mut in_progress,
                         diags,
                         &src_loc,
@@ -907,16 +917,16 @@ impl IRDb {
                     // End of an if/else we fully processed (no skip): nothing to do.
                 }
                 IRKind::BareAssign => {
-                    let name_lop = &lin_db.const_operand_vec[ir.operand_vec[0]];
+                    let name_lop = &const_db.operand_vec[ir.operand_vec[0]];
                     let LinOperand::Literal { sval: name, .. } = name_lop else {
                         panic!("BareAssign name operand must be a Literal");
                     };
                     let name = name.clone();
                     let rhs_lop_num = ir.operand_vec[1];
                     let mut in_progress = HashSet::new();
-                    let rhs_val = self.eval_lin_const_expr(
+                    let rhs_val = self.eval_const_expr_r(
                         rhs_lop_num,
-                        lin_db,
+                        const_db,
                         &mut in_progress,
                         diags,
                         &src_loc,
@@ -936,9 +946,9 @@ impl IRDb {
                         let mut s = String::new();
                         for &lop_idx in &ir.operand_vec {
                             let mut in_progress = HashSet::new();
-                            match self.eval_lin_const_expr(
+                            match self.eval_const_expr_r(
                                 lop_idx,
-                                lin_db,
+                                const_db,
                                 &mut in_progress,
                                 diags,
                                 &src_loc,
@@ -969,9 +979,9 @@ impl IRDb {
                 IRKind::Assert => {
                     let cond_lop_num = ir.operand_vec[0];
                     let mut in_progress = HashSet::new();
-                    match self.eval_lin_const_expr(
+                    match self.eval_const_expr_r(
                         cond_lop_num,
-                        lin_db,
+                        const_db,
                         &mut in_progress,
                         diags,
                         &src_loc,
@@ -997,58 +1007,21 @@ impl IRDb {
         result
     }
 
-    /// Resolve a single const by name, recursing into its dependencies.
-    /// `in_progress` tracks names currently being evaluated to detect cycles.
-    fn resolve_const_by_name(
-        &mut self,
-        name: &str,
-        lin_db: &LayoutDb,
-        in_progress: &mut HashSet<String>,
-        diags: &mut Diags,
-    ) -> Option<ParameterValue> {
-        // Already resolved — return the cached value.
-        if let Some(val) = self.symbol_table.get(name) {
-            return Some(val.clone());
-        }
-
-        // Cycle detected.
-        if in_progress.contains(name) {
-            let ir_lid = lin_db.const_map[name];
-            let src_loc = lin_db.const_ir_vec[ir_lid].src_loc.clone();
-            let m = format!("Circular dependency detected for const '{}'", name);
-            diags.err1("IRDB_18", &m, src_loc);
-            return None;
-        }
-
-        let ir_lid = lin_db.const_map[name];
-        let src_loc = lin_db.const_ir_vec[ir_lid].src_loc.clone();
-        let rhs_lop_num = lin_db.const_ir_vec[ir_lid].operand_vec[1];
-
-        in_progress.insert(name.to_string());
-        let val = self.eval_lin_const_expr(rhs_lop_num, lin_db, in_progress, diags, &src_loc)?;
-        in_progress.remove(name);
-
-        self.symbol_table
-            .define(name.to_string(), val.clone(), Some(src_loc));
-        Some(val)
-    }
-
     /// Evaluate a const expression operand recursively.
     /// Returns the computed `ParameterValue`, or `None` on error.
-    fn eval_lin_const_expr(
+    fn eval_const_expr_r(
         &mut self,
         lop_num: usize,
-        lin_db: &LayoutDb,
-        in_progress: &mut HashSet<String>,
+        const_db: &ConstDb,
+        _in_progress: &mut HashSet<String>,
         diags: &mut Diags,
         err_loc: &SourceSpan,
     ) -> Option<ParameterValue> {
-        let lop = &lin_db.const_operand_vec[lop_num];
+        let lop = &const_db.operand_vec[lop_num];
 
         // Output operands: evaluate by looking up the producing instruction's IRKind.
-        if let LinOperand::Output { ir_lid, .. } = lop {
-            let ir_lid = *ir_lid;
-            let lin_ir = &lin_db.const_ir_vec[ir_lid];
+        if let &LinOperand::Output { ir_lid, .. } = lop {
+            let lin_ir = &const_db.ir_vec[ir_lid];
             let op = lin_ir.op;
             let op_loc = lin_ir.src_loc.clone();
 
@@ -1081,13 +1054,19 @@ impl IRDb {
                     ));
                 }
                 IRKind::BuiltinVersionMajor => {
-                    return Some(ParameterValue::U64(ConstBuiltins::get().brink_version_major));
+                    return Some(ParameterValue::U64(
+                        ConstBuiltins::get().brink_version_major,
+                    ));
                 }
                 IRKind::BuiltinVersionMinor => {
-                    return Some(ParameterValue::U64(ConstBuiltins::get().brink_version_minor));
+                    return Some(ParameterValue::U64(
+                        ConstBuiltins::get().brink_version_minor,
+                    ));
                 }
                 IRKind::BuiltinVersionPatch => {
-                    return Some(ParameterValue::U64(ConstBuiltins::get().brink_version_patch));
+                    return Some(ParameterValue::U64(
+                        ConstBuiltins::get().brink_version_patch,
+                    ));
                 }
                 _ => {}
             }
@@ -1095,8 +1074,10 @@ impl IRDb {
             // Binary, comparison, and logical ops: evaluate both input operands.
             let lhs_lop = lin_ir.operand_vec[0];
             let rhs_lop = lin_ir.operand_vec[1];
-            let lhs_val = self.eval_lin_const_expr(lhs_lop, lin_db, in_progress, diags, err_loc)?;
-            let rhs_val = self.eval_lin_const_expr(rhs_lop, lin_db, in_progress, diags, err_loc)?;
+            let lhs_val =
+                self.eval_const_expr_r(lhs_lop, const_db, _in_progress, diags, err_loc)?;
+            let rhs_val =
+                self.eval_const_expr_r(rhs_lop, const_db, _in_progress, diags, err_loc)?;
             return match op {
                 IRKind::Add
                 | IRKind::Subtract
@@ -1124,7 +1105,10 @@ impl IRDb {
                     Some(ParameterValue::U64(if result { 1 } else { 0 }))
                 }
                 _ => {
-                    let m = format!("Operation '{:?}' is not supported in a const expression.", op);
+                    let m = format!(
+                        "Operation '{:?}' is not supported in a const expression.",
+                        op
+                    );
                     diags.err1("IRDB_21", &m, err_loc.clone());
                     None
                 }
@@ -1132,8 +1116,9 @@ impl IRDb {
         }
 
         // Literal operands: evaluate directly from tok and sval.
-        let LinOperand::Literal { tok, sval, src_loc } = lop else { unreachable!() };
-        let tok = *tok;
+        let LinOperand::Literal { tok, sval, src_loc } = lop else {
+            unreachable!()
+        };
         let sval = sval.clone();
         let src_loc = src_loc.clone();
 
@@ -1175,20 +1160,13 @@ impl IRDb {
             }
             ast::LexToken::Identifier => {
                 // Reference to another const.
-                if lin_db.const_map.contains_key(sval.as_str()) {
-                    let result = self.resolve_const_by_name(&sval, lin_db, in_progress, diags);
-                    if result.is_some() {
-                        self.symbol_table.mark_used(&sval);
-                    }
-                    result
-                } else if let Some(val) = self.symbol_table.get_value(sval.as_str()) {
-                    // Deferred const already assigned via BareAssign in the current if/else walk.
+                if let Some(val) = self.symbol_table.get_value(sval.as_str()) {
                     self.symbol_table.mark_used(sval.as_str());
                     Some(val)
                 } else {
                     let m = format!(
-                        "Unknown identifier '{}' in const expression.  \
-                         Only const names may be referenced from const expressions.",
+                        "Unknown or uninitialized identifier '{}' in const expression. \
+                         Constants must be defined before use.",
                         sval
                     );
                     diags.err1("IRDB_20", &m, src_loc);
@@ -1196,7 +1174,10 @@ impl IRDb {
                 }
             }
             _ => {
-                panic!("Literal operand with unexpected token {:?} in const expression", tok);
+                panic!(
+                    "Literal operand with unexpected token {:?} in const expression",
+                    tok
+                );
             }
         }
     }
@@ -1371,10 +1352,18 @@ impl IRDb {
                 ))
             }),
             IRKind::Divide => {
-                if b == 0 { Err(CalcErr::DivByZero) } else { Ok(a / b) }
+                if b == 0 {
+                    Err(CalcErr::DivByZero)
+                } else {
+                    Ok(a / b)
+                }
             }
             IRKind::Modulo => {
-                if b == 0 { Err(CalcErr::DivByZero) } else { Ok(a % b) }
+                if b == 0 {
+                    Err(CalcErr::DivByZero)
+                } else {
+                    Ok(a % b)
+                }
             }
             IRKind::BitAnd => Ok(a & b),
             IRKind::BitOr => Ok(a | b),
@@ -1402,10 +1391,18 @@ impl IRDb {
                 ))
             }),
             IRKind::Divide => {
-                if b == 0 { Err(CalcErr::DivByZero) } else { Ok(a / b) }
+                if b == 0 {
+                    Err(CalcErr::DivByZero)
+                } else {
+                    Ok(a / b)
+                }
             }
             IRKind::Modulo => {
-                if b == 0 { Err(CalcErr::DivByZero) } else { Ok(a % b) }
+                if b == 0 {
+                    Err(CalcErr::DivByZero)
+                } else {
+                    Ok(a % b)
+                }
             }
             IRKind::BitAnd => Ok(a & b),
             IRKind::BitOr => Ok(a | b),
@@ -1418,6 +1415,7 @@ impl IRDb {
     }
 
     pub fn new(
+        const_db: &ConstDb,
         lin_db: &LayoutDb,
         diags: &mut Diags,
         defines: &HashMap<String, ParameterValue>,
@@ -1442,7 +1440,7 @@ impl IRDb {
 
         // Resolve all const declarations before anything else so their values
         // are available for substitution in operands and the output address.
-        if !ir_db.resolve_all_consts(lin_db, diags) {
+        if !ir_db.resolve_all_consts(const_db, diags) {
             anyhow::bail!("IRDb construction failed.");
         }
 

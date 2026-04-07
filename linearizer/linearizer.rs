@@ -20,11 +20,12 @@ use ir::IRKind;
 /// * Callers hold indices into the Linearizer's operand_vec, not direct reference
 ///   to these structs.
 /// * LinOperand owns its own data.
+///
 /// We have two types of operands:
-/// * Literal: integer and string literals, identifiers, etc.
-///   These have a source token defining their type and value.
-/// * Output: outputs of IR instructions and extension calls.
-///   These have no source token since they computed values.
+///   * Literal: integer and string literals, identifiers, etc.
+///     These have a source token defining their type and value.
+///   * Output: outputs of IR instructions and extension calls.
+///     These have no source token since they computed values.
 pub enum LinOperand {
     Literal {
         /// Source location for diagnostics.
@@ -167,6 +168,12 @@ pub fn tok_to_irkind(tok: LexToken) -> IRKind {
 pub struct Linearizer {
     pub ir_vec: Vec<LinIR>,
     pub operand_vec: Vec<LinOperand>,
+}
+
+impl Default for Linearizer {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Linearizer {

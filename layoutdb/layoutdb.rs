@@ -28,17 +28,8 @@ pub struct LayoutDb {
     /// Flat, ordered sequence of layout-time IR instructions.
     pub ir_vec: Vec<LinIR>,
 
-    /// Flat sequence of IR instructions for const-time expressions.
-    pub const_ir_vec: Vec<LinIR>,
-
     /// Operands referenced by ir_vec instructions.
     pub operand_vec: Vec<LinOperand>,
-
-    /// Operands referenced by const_ir_vec instructions.
-    pub const_operand_vec: Vec<LinOperand>,
-
-    /// Maps each const identifier name to its const_ir_vec index.
-    pub const_map: HashMap<String, usize>,
 
     pub output_sec_str: String,
     pub output_sec_loc: SourceSpan,
@@ -69,27 +60,7 @@ impl LayoutDb {
                     }
                 }
             }
-            debug!("LayoutDb: {}", op);
-        }
-        for (idx, ir) in self.const_ir_vec.iter().enumerate() {
-            let mut op = format!("const lid {}: nid {} is {:?}", idx, ir.nid, ir.op);
-            let mut first = true;
-            for child in &ir.operand_vec {
-                let operand = &self.const_operand_vec[*child];
-                if !first {
-                    op.push(',');
-                } else {
-                    first = false;
-                }
-                match operand {
-                    LinOperand::Literal { sval, .. } =>
-                        op.push_str(&format!(" {}", sval)),
-                    LinOperand::Output { ir_lid, .. } => {
-                        op.push_str(&format!(" tmp{}, output of lid {}", *child, ir_lid))
-                    }
-                }
-            }
-            debug!("LayoutDb: {}", op);
+             debug!("LayoutDb: {}", op);
         }
     }
 }
@@ -353,206 +324,7 @@ impl<'toks> LayoutDb {
         result
     }
 
-    // ── Const-time linearization ──────────────────────────────────────────────
 
-    /// Lower a `const NAME = <expr>` full definition into const_ir_vec.
-    fn record_const_decl(
-        clz: &mut Linearizer,
-        const_map: &mut HashMap<String, usize>,
-        const_nid: NodeId,
-        diags: &mut Diags,
-        ast: &'toks Ast,
-    ) -> bool {
-        let ir_lid = clz.new_ir(const_nid, ast, IRKind::Const);
-
-        let mut children = ast.children(const_nid);
-
-        // Child 0: name identifier
-        let name_nid = children.next().unwrap();
-        let name_tinfo = ast.get_tinfo(name_nid);
-        let name_idx = clz.operand_vec.len();
-        clz.operand_vec.push(LinOperand::new_literal(name_tinfo));
-        clz.add_existing_operand_to_ir(ir_lid, name_idx);
-
-        // Child 1: `=` sign
-        let eq_nid = children.next().unwrap();
-        let eq_tinfo = ast.get_tinfo(eq_nid);
-
-        // Child 2: RHS expression
-        let rhs_nid = children.next().unwrap();
-        let mut rhs_lops = Vec::new();
-        if !clz.record_expr_r(1, rhs_nid, &mut rhs_lops, diags, ast) {
-            return false;
-        }
-        if rhs_lops.len() != 1 {
-            let m = format!(
-                "Const expression RHS produced {} results, expected 1",
-                rhs_lops.len()
-            );
-            diags.err1("LINEAR_12", &m, name_tinfo.span());
-            return false;
-        }
-        clz.add_existing_operand_to_ir(ir_lid, rhs_lops[0]);
-
-        // Output slot: the Eq token carries the output type info
-        clz.add_new_operand_to_ir(ir_lid, LinOperand::new_output(ir_lid, eq_tinfo.loc.clone()));
-
-        const_map.insert(name_tinfo.val.to_string(), ir_lid);
-        true
-    }
-
-    /// Lower a `const NAME;` declare-only statement into const_ir_vec.
-    fn record_const_declare(clz: &mut Linearizer, const_nid: NodeId, ast: &'toks Ast) -> bool {
-        let mut children = ast.children(const_nid);
-        let name_nid = children.next().unwrap();
-        let name_tinfo = ast.get_tinfo(name_nid);
-        let ir_lid = clz.new_ir(const_nid, ast, IRKind::ConstDeclare);
-        clz.add_new_operand_to_ir(ir_lid, LinOperand::new_literal(name_tinfo));
-        true
-    }
-
-    /// Lower a deferred assignment `IDENT = expr;` (inside an if/else body).
-    fn record_deferred_assign(
-        clz: &mut Linearizer,
-        eq_nid: NodeId,
-        rdepth: usize,
-        diags: &mut Diags,
-        ast: &'toks Ast,
-        ast_db: &AstDb,
-    ) -> bool {
-        let _ = ast_db; // reserved for future use (e.g. section-scoped const validation)
-        let mut children = ast.children(eq_nid);
-        let ident_nid = children.next().unwrap();
-        let expr_nid = children.next().unwrap();
-        let ident_tinfo = ast.get_tinfo(ident_nid);
-
-        let ir_lid = clz.new_ir(eq_nid, ast, IRKind::BareAssign);
-        clz.add_new_operand_to_ir(ir_lid, LinOperand::new_literal(ident_tinfo));
-
-        let mut rhs_lops = Vec::new();
-        if !clz.record_expr_r(rdepth + 1, expr_nid, &mut rhs_lops, diags, ast) {
-            return false;
-        }
-        if rhs_lops.len() != 1 {
-            let m = format!(
-                "Deferred assignment RHS produced {} result(s), expected 1",
-                rhs_lops.len()
-            );
-            diags.err1("LINEAR_14", &m, ast.get_tinfo(eq_nid).span());
-            return false;
-        }
-        clz.add_existing_operand_to_ir(ir_lid, rhs_lops[0]);
-        true
-    }
-
-    /// Dispatch a single statement inside an if/else body.
-    fn record_if_body_stmt(
-        clz: &mut Linearizer,
-        stmt_nid: NodeId,
-        rdepth: usize,
-        diags: &mut Diags,
-        ast: &'toks Ast,
-        ast_db: &AstDb,
-    ) -> bool {
-        let tinfo = ast.get_tinfo(stmt_nid);
-        match tinfo.tok {
-            LexToken::Eq => Self::record_deferred_assign(clz, stmt_nid, rdepth, diags, ast, ast_db),
-            LexToken::Print | LexToken::Assert => {
-                let mut lops = Vec::new();
-                clz.record_expr_children_r(rdepth, stmt_nid, &mut lops, diags, ast);
-                let ir_lid = clz.new_ir(stmt_nid, ast, tok_to_irkind(tinfo.tok));
-                for idx in lops {
-                    clz.add_existing_operand_to_ir(ir_lid, idx);
-                }
-                true
-            }
-            LexToken::If => Self::record_if_else(clz, stmt_nid, rdepth, diags, ast, ast_db),
-            _ => true, // syntactic tokens already filtered by parser
-        }
-    }
-
-    /// Lower an `if/else` block into const_ir_vec.
-    fn record_if_else(
-        clz: &mut Linearizer,
-        if_nid: NodeId,
-        rdepth: usize,
-        diags: &mut Diags,
-        ast: &'toks Ast,
-        ast_db: &AstDb,
-    ) -> bool {
-        let children: Vec<NodeId> = ast.children(if_nid).collect();
-        let mut i = 0;
-        let mut result = true;
-
-        // Child 0: condition expression
-        let cond_nid = children[i];
-        i += 1;
-        let mut cond_lops = Vec::new();
-        if !clz.record_expr_r(rdepth + 1, cond_nid, &mut cond_lops, diags, ast) {
-            return false;
-        }
-        if cond_lops.len() != 1 {
-            let tinfo = ast.get_tinfo(if_nid);
-            diags.err1(
-                "LINEAR_15",
-                "if condition must produce exactly one value",
-                tinfo.span(),
-            );
-            return false;
-        }
-
-        let ifbegin_lid = clz.new_ir(if_nid, ast, IRKind::IfBegin);
-        clz.add_existing_operand_to_ir(ifbegin_lid, cond_lops[0]);
-
-        // Child 1: '{' — skip
-        i += 1;
-
-        // Then-body: children until '}'
-        while i < children.len() {
-            let tok = ast.get_tinfo(children[i]).tok;
-            if tok == LexToken::CloseBrace {
-                i += 1;
-                break;
-            }
-            result &= Self::record_if_body_stmt(clz, children[i], rdepth + 1, diags, ast, ast_db);
-            i += 1;
-        }
-
-        // Optional else clause
-        if i < children.len() && ast.get_tinfo(children[i]).tok == LexToken::Else {
-            let else_nid = children[i];
-            i += 1;
-            clz.new_ir(else_nid, ast, IRKind::ElseBegin);
-
-            if i < children.len() {
-                let next_tok = ast.get_tinfo(children[i]).tok;
-                if next_tok == LexToken::If {
-                    result &=
-                        Self::record_if_else(clz, children[i], rdepth + 1, diags, ast, ast_db);
-                } else if next_tok == LexToken::OpenBrace {
-                    i += 1; // skip '{'
-                    while i < children.len() {
-                        let tok = ast.get_tinfo(children[i]).tok;
-                        if tok == LexToken::CloseBrace {
-                            break;
-                        }
-                        result &= Self::record_if_body_stmt(
-                            clz,
-                            children[i],
-                            rdepth + 1,
-                            diags,
-                            ast,
-                            ast_db,
-                        );
-                        i += 1;
-                    }
-                }
-            }
-        }
-
-        clz.new_ir(if_nid, ast, IRKind::IfEnd);
-        result
-    }
 
     // ── Constructor ───────────────────────────────────────────────────────────
 
@@ -587,11 +359,7 @@ impl<'toks> LayoutDb {
         let section_names: HashSet<String> =
             ast_db.sections.keys().map(|s| s.to_string()).collect();
 
-        // Two independent Linearizer instances — one for layout-time IR,
-        // one for const-time IR.  Neither shares state with the other.
         let mut layout_lz = Linearizer::new();
-        let mut const_lz = Linearizer::new();
-        let mut const_map: HashMap<String, usize> = HashMap::new();
 
         // Linearize the output section body (layout-time IR).
         let section = ast_db.sections.get(output_sec_str.as_str()).unwrap();
@@ -599,27 +367,6 @@ impl<'toks> LayoutDb {
         let mut lops = Vec::new();
         if !Self::record_r(&mut layout_lz, 1, sec_nid, &mut lops, diags, ast, ast_db) {
             anyhow::bail!("LayoutDb construction failed.");
-        }
-
-        // Linearize all top-level full const definitions (const_ir_vec).
-        for const_item in ast_db.consts.values() {
-            if !Self::record_const_decl(&mut const_lz, &mut const_map, const_item.nid, diags, ast) {
-                anyhow::bail!("LayoutDb construction failed.");
-            }
-        }
-
-        // Linearize declare-only consts (const NAME;).
-        for &dc_nid in &ast_db.declared_consts {
-            if !Self::record_const_declare(&mut const_lz, dc_nid, ast) {
-                anyhow::bail!("LayoutDb construction failed.");
-            }
-        }
-
-        // Linearize top-level if/else blocks in source order.
-        for &if_nid in &ast_db.if_else_blocks {
-            if !Self::record_if_else(&mut const_lz, if_nid, 1, diags, ast, ast_db) {
-                anyhow::bail!("LayoutDb construction failed.");
-            }
         }
 
         // Linearize top-level assert statements into layout-time IR.
@@ -634,9 +381,6 @@ impl<'toks> LayoutDb {
         let layout_db = LayoutDb {
             ir_vec: layout_lz.ir_vec,
             operand_vec: layout_lz.operand_vec,
-            const_ir_vec: const_lz.ir_vec,
-            const_operand_vec: const_lz.operand_vec,
-            const_map,
             output_sec_str,
             output_sec_loc,
             output_addr_str,

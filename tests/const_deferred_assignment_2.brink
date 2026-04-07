@@ -1,0 +1,11 @@
+// String const used as a wrs operand.
+const GREETING;
+section foo {
+    wrs GREETING;
+}
+
+// Greeting is assigned after use in a wrs expression,
+// but that's fine since we evaluate all consts before
+// generating the output image.
+GREETING = "Hello!\n";
+output foo;

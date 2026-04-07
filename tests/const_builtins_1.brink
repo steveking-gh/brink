@@ -1,0 +1,13 @@
+// Dynamic built-ins cannot be used in const expressions.
+const GOOD_CONST1 = __BRINK_VERSION_STRING;
+const GOOD_CONST2 = __BRINK_VERSION_MAJOR;
+const GOOD_CONST3 = __BRINK_VERSION_MINOR;
+const GOOD_CONST4 = __BRINK_VERSION_PATCH;
+section foo {
+    wrs GOOD_CONST1;
+    wr64 GOOD_CONST2;
+    wr64 GOOD_CONST3;
+    wr64 GOOD_CONST4;
+}
+
+output foo;

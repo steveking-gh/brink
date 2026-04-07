@@ -1,0 +1,7 @@
+// Const expression references an identifier that is never defined.
+// Expected: IRDB_20.
+const A = 1 = 2;
+section foo {
+    wr8 A;
+}
+output foo;

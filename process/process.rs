@@ -21,6 +21,7 @@ use ast::{Ast, AstDb};
 use diags::Diags;
 use engine::Engine;
 use ext::{ExtensionRegistry, test_mocks::register_test_extensions};
+use constdb::ConstDb;
 use ir::{ConstBuiltins, ParameterValue};
 use irdb::IRDb;
 use layoutdb::LayoutDb;
@@ -125,8 +126,15 @@ pub fn process(
     }
 
     let ast_db = AstDb::new(&mut diags, &ast)?;
+    
+    let const_db = ConstDb::new(&mut diags, &ast, &ast_db)
+        .context("[PROC_2]: Error detected, halting.")?;
+    if verbosity > 2 {
+        const_db.dump();
+    }
+
     let layout_db =
-        LayoutDb::new(&mut diags, &ast, &ast_db).context("[PROC_2]: Error detected, halting.")?;
+        LayoutDb::new(&mut diags, &ast, &ast_db).context("[PROC_3]: Error detected, halting.")?;
     if verbosity > 2 {
         layout_db.dump();
     }
@@ -135,8 +143,8 @@ pub fn process(
     register_test_extensions(&mut ext_registry);
     extensions::register_all(&mut ext_registry);
 
-    let ir_db = IRDb::new(&layout_db, &mut diags, &const_defines, &ext_registry)
-        .context("[PROC_3]: Error detected, halting.")?;
+    let ir_db = IRDb::new(&const_db, &layout_db, &mut diags, &const_defines, &ext_registry)
+        .context("[PROC_4]: Error detected, halting.")?;
 
     debug!("Dumping ir_db");
     if verbosity > 2 {

@@ -1,0 +1,43 @@
+   Compiling brink v4.0.0 (C:\Users\kings\Documents\projects\brink)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.99s
+     Running tests\integration.rs (target\debug\deps\integration-dda116533f231323.exe)
+
+running 10 tests
+
+thread 'tests::fuzz_found_1' (40860) panicked at C:\Users\kings\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\assert_cmd-1.0.8\src\assert.rs:124:9:
+Unexpected stderr, failed var.contains("[PROC_1]")
+└── var as str: [31m[AST_54] Error:[0m Expected '=' after identifier in if/else body, found '<end of input>'
+       [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0mtests/fuzz_found_1.brink:1:1[38;5;246m][0m
+       [38;5;246m│[0m
+     [38;5;246m1 │[0m [31mX[0m
+    [38;5;246m───╯[0m
+    
+    thread 'main' (94400) panicked at ast\ast.rs:617:9:
+    assertion failed: self.tok_num > 0
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+command=`"C:\\Users\\kings\\Documents\\projects\\brink\\target\\debug\\brink.exe" "tests/fuzz_found_1.brink"`
+code=101
+stdout=```""```
+stderr=```"\u{1b}[31m[AST_54] Error:\u{1b}[0m Expected \'=\' after identifier in if/else body, found \'<end of input>\'\n   \u{1b}[38;5;246m╭\u{1b}[0m\u{1b}[38;5;246m─\u{1b}[0m\u{1b}[38;5;246m[\u{1b}[0mtests/fuzz_found_1.brink:1:1\u{1b}[38;5;246m]\u{1b}[0m\n   \u{1b}[38;5;246m│\u{1b}[0m\n \u{1b}[38;5;246m1 │\u{1b}[0m \u{1b}[31mX\u{1b}[0m\n\u{1b}[38;5;246m───╯\u{1b}[0m\n\nthread \'main\' (94400) panicked at ast\\ast.rs:617:9:\nassertion failed: self.tok_num > 0\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n"```
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test tests::fuzz_found_1 ... FAILED
+test tests::fuzz_found_12 ... ok
+test tests::fuzz_found_14 ... ok
+test tests::fuzz_found_10 ... ok
+test tests::fuzz_found_13 ... ok
+test tests::fuzz_found_11 ... ok
+test tests::fuzz_found_15 ... ok
+test tests::fuzz_found_17 ... ok
+test tests::fuzz_found_18 ... ok
+test tests::fuzz_found_16 ... ok
+
+failures:
+
+failures:
+    tests::fuzz_found_1
+
+test result: FAILED. 9 passed; 1 failed; 0 ignored; 0 measured; 249 filtered out; finished in 0.03s
+
+error: test failed, to rerun pass `--test integration`

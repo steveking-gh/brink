@@ -1432,21 +1432,67 @@ mod tests {
         assert_brink_success("tests/const_expr_1.brink", Some("const_expr_1.bin"), None);
     }
 
+    /// A const is defined as an arithmetic expression composed of two other consts.
+    #[test]
+    fn const_builtins_1() {
+        assert_brink_success(
+            "tests/const_builtins_1.brink",
+            Some("const_builtins_1.bin"),
+            None,
+        );
+    }
+
     /// A three-deep const chain: C depends on B which depends on A.
     #[test]
     fn const_chain_1() {
         assert_brink_success("tests/const_chain_1.brink", Some("const_chain_1.bin"), None);
     }
 
+    #[test]
+    fn const_deferred_assignment_1() {
+        assert_brink_success(
+            "tests/const_deferred_assignment_1.brink",
+            Some("const_deferred_assignment_1.bin"),
+            None,
+        );
+    }
+
+    #[test]
+    fn const_deferred_assignment_2() {
+        assert_brink_success(
+            "tests/const_deferred_assignment_2.brink",
+            Some("const_deferred_assignment_2.bin"),
+            None,
+        );
+    }
+
+    #[test]
+    fn const_deferred_assignment_3() {
+        assert_brink_failure("tests/const_deferred_assignment_3.brink", &["[SYMTAB_4]"]);
+    }
+
+    #[test]
+    fn const_deferred_assignment_4() {
+        assert_brink_failure("tests/const_deferred_assignment_4.brink", &["[SYMTAB_4]"]);
+    }
+
     /// A const is declared before the consts it depends on in source order.
     /// Resolution must be order-independent since consts have global scope.
     #[test]
     fn const_rev_decl_1() {
-        assert_brink_success(
-            "tests/const_rev_decl_1.brink",
-            Some("const_rev_decl_1.bin"),
-            None,
-        );
+        assert_brink_failure("tests/const_rev_decl_1.brink", &["[IRDB_20]"]);
+    }
+
+    /// A malformed const expression.
+    #[test]
+    fn const_malformed_1() {
+        assert_brink_failure("tests/const_malformed_1.brink", &["[AST_9]"]);
+    }
+
+    /// No dynamic built-ins allowed in const
+    #[test]
+    fn const_builtins_2() {
+        assert_brink_failure("tests/const_builtins_2.brink", &["[IRDB_19]"]);
     }
 
     /// A const is used as one operand of an assert expression inside a section.
@@ -1494,7 +1540,7 @@ mod tests {
     /// Two consts mutually depend on each other, forming a cycle.  Expected: IRDB_18.
     #[test]
     fn const_circular_1() {
-        assert_brink_failure("tests/const_circular_1.brink", &["[IRDB_18]"]);
+        assert_brink_failure("tests/const_circular_1.brink", &["[IRDB_20]"]);
     }
 
     /// A const expression depends on sizeof(), which requires engine-time layout.

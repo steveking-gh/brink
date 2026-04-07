@@ -1,0 +1,7 @@
+// Dynamic built-ins cannot be used in const expressions.
+const BAD_CONST = __OUTPUT_SIZE;
+section foo {
+    wr64 BAD_CONST;
+}
+
+output foo;

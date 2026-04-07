@@ -209,10 +209,10 @@ pub enum LexToken {
 ///   - "fill"                     — fill/pad byte ranges
 pub fn is_reserved_identifier(name: &str) -> bool {
     // "wr" followed by at least one digit reserves the numeric write variants.
-    if let Some(rest) = name.strip_prefix("wr") {
-        if rest.starts_with(|c: char| c.is_ascii_digit()) {
-            return true;
-        }
+    if let Some(rest) = name.strip_prefix("wr")
+        && rest.starts_with(|c: char| c.is_ascii_digit())
+    {
+        return true;
     }
     if name.starts_with("set_") || name.starts_with("__") {
         return true;
@@ -550,6 +550,17 @@ impl<'toks> Ast<'toks> {
                 LexToken::Output => self.parse_output(self.root, diags),
                 LexToken::Const => self.parse_const(self.root, diags),
                 LexToken::If => self.parse_if(self.root, diags),
+                LexToken::Identifier => {
+                    let ok = self.parse_deferred_assign(self.root, diags);
+                    if !ok {
+                        // If parsing of an identifier fails, consume the whole statement
+                        // to avoid sending bad tokens to later phases.  Reason being
+                        // an unknown identifier can be all sort of arbitrary chars and
+                        // is hard to make sense of later on.
+                        self.advance_past_semicolon();
+                    }
+                    ok
+                }
                 LexToken::Assert => {
                     // Global assert: evaluated in the validation phase after all
                     // sections and extensions are written.
@@ -1460,10 +1471,10 @@ impl<'toks> Ast<'toks> {
             if let Some(tinfo) = self.peek() {
                 if tinfo.tok == LexToken::Eq {
                     // Full definition: const NAME = expr;
-                    if self.expect_token(LexToken::Eq, diags, const_nid) {
-                        if self.expect_expr(const_nid, diags) {
-                            result = self.expect_semi(diags, const_nid);
-                        }
+                    if self.expect_token(LexToken::Eq, diags, const_nid)
+                        && self.expect_expr(const_nid, diags)
+                    {
+                        result = self.expect_semi(diags, const_nid);
                     }
                 } else if tinfo.tok == LexToken::Semicolon {
                     // Declare-only: const NAME;  (value assigned later in an if/else body)
@@ -1613,13 +1624,16 @@ impl<'toks> Ast<'toks> {
         let next_tok = self.tv.get(self.tok_num + 1).map(|t| t.tok);
         if next_tok != Some(LexToken::Eq) {
             let msg = format!(
-                "Expected '=' after identifier in if/else body, found '{}'",
+                "Expected '=' after identifier in deferred const assignment, found '{}'",
                 self.tv
                     .get(self.tok_num + 1)
                     .map(|t| t.val)
                     .unwrap_or("<end of input>")
             );
             diags.err1("AST_54", &msg, self.tv[self.tok_num].span());
+            // We don't want the arbitrary chars in an unknown identifier to
+            // propogate any further, so eat the identifier here.
+            self.tok_num += 1;
             return self.dbg_exit("parse_deferred_assign", false);
         }
 
@@ -1761,24 +1775,6 @@ impl<'toks> Section<'toks> {
 }
 
 /*******************************
- * Const
- ******************************/
-#[derive(Debug)]
-pub struct Const<'toks> {
-    pub tinfo: &'toks TokenInfo<'toks>,
-    pub nid: NodeId,
-}
-
-impl<'toks> Const<'toks> {
-    pub fn new(ast: &'toks Ast, nid: NodeId) -> Const<'toks> {
-        Const {
-            tinfo: ast.get_tinfo(nid),
-            nid,
-        }
-    }
-}
-
-/*******************************
  * Label
  ******************************/
 #[derive(Debug)]
@@ -1828,15 +1824,13 @@ impl<'toks> Output<'toks> {
 pub struct AstDb<'toks> {
     pub sections: HashMap<&'toks str, Section<'toks>>,
     pub labels: HashMap<&'toks str, Label>,
-    /// Full `const NAME = expr;` definitions, keyed by name.
-    pub consts: HashMap<&'toks str, Const<'toks>>,
     pub output: Output<'toks>,
     pub global_asserts: Vec<NodeId>,
-    /// Declare-only `const NAME;` nodes, in source order.
-    pub declared_consts: Vec<NodeId>,
-    /// Top-level `if/else` block nodes, in source order.
-    pub if_else_blocks: Vec<NodeId>,
-    //pub properties: HashMap<NodeId, NodeProperty>
+    /// All top-level const definitions, const declarations, and if/else blocks
+    /// in their original source token order.
+    pub const_statements: Vec<NodeId>,
+    /// Set of all const names for collision detection.
+    pub const_names: HashMap<&'toks str, SourceSpan>,
 }
 
 impl<'toks> AstDb<'toks> {
@@ -1878,37 +1872,34 @@ impl<'toks> AstDb<'toks> {
         true
     }
 
-    /// Processes a const in the AST
+    /// Records a const identifier in the AST.
+    /// Checks for duplicate names and reserved words.
     fn record_const(
         diags: &mut Diags,
-        sec_nid: NodeId,
+        const_nid: NodeId,
         ast: &'toks Ast,
-        consts: &mut HashMap<&'toks str, Const<'toks>>,
+        consts: &mut HashMap<&'toks str, SourceSpan>,
     ) -> bool {
-        debug!("AstDb::record_const: NodeId {}", sec_nid);
+        debug!("AstDb::record_const: NodeId {}", const_nid);
 
-        let mut children = sec_nid.children(&ast.arena);
-        let sec_name_nid = children.next().unwrap();
-        let sec_tinfo = ast.get_tinfo(sec_name_nid);
-        let sec_str = sec_tinfo.val;
-        if is_reserved_identifier(sec_str) {
+        let mut children = const_nid.children(&ast.arena);
+        let const_name_nid = children.next().unwrap();
+        let const_tinfo = ast.get_tinfo(const_name_nid);
+        let const_str = const_tinfo.val;
+        if is_reserved_identifier(const_str) {
             let m = format!(
                 "'{}' is a reserved identifier and cannot be used as a const name",
-                sec_str
+                const_str
             );
-            diags.err1("AST_33", &m, sec_tinfo.span());
+            diags.err1("AST_33", &m, const_tinfo.span());
             return false;
         }
-        if consts.contains_key(sec_str) {
-            // error, duplicate const names
-            // We know the const exists, so unwrap is fine.
-            let orig_const = consts.get(sec_str).unwrap();
-            let orig_tinfo = orig_const.tinfo;
-            let m = format!("Duplicate const name '{}'", sec_str);
-            diags.err2("AST_30", &m, sec_tinfo.span(), orig_tinfo.span());
+        if let Some(orig_span) = consts.get(const_str) {
+            let m = format!("Duplicate const name '{}'", const_str);
+            diags.err2("AST_30", &m, const_tinfo.span(), orig_span.clone());
             return false;
         }
-        consts.insert(sec_str, Const::new(ast, sec_nid));
+        consts.insert(const_str, const_tinfo.span());
         true
     }
 
@@ -2074,12 +2065,16 @@ impl<'toks> AstDb<'toks> {
         // Populate the AST database of critical structures.
         let mut result = true;
 
+        // All sections, mapping section name to AST node.
         let mut sections: HashMap<&'toks str, Section<'toks>> = HashMap::new();
+        // The single required output statement.
         let mut output: Option<Output<'toks>> = None;
-        let mut consts: HashMap<&'toks str, Const<'toks>> = HashMap::new();
+        // All top-level assert statements.
         let mut global_asserts: Vec<NodeId> = Vec::new();
-        let mut declared_consts: Vec<NodeId> = Vec::new();
-        let mut if_else_blocks: Vec<NodeId> = Vec::new();
+        // All const declarations and conditional blocks in source code order.
+        let mut const_statements: Vec<NodeId> = Vec::new();
+        // All declared const names and their locations for duplicate detection.
+        let mut const_names: HashMap<&'toks str, SourceSpan> = HashMap::new();
 
         // First phase, record all sections, files, and the output.
         // These are defined only at top level so no need for recursion.
@@ -2090,23 +2085,17 @@ impl<'toks> AstDb<'toks> {
                     LexToken::Section => Self::record_section(diags, nid, ast, &mut sections),
                     LexToken::Output => Self::record_output(diags, nid, ast, &mut output),
                     LexToken::Const => {
-                        // Distinguish full definition (const NAME = expr;) from
-                        // declare-only (const NAME;) by checking the second child's token.
-                        let second_child_tok = nid
-                            .children(&ast.arena)
-                            .nth(1)
-                            .map(|c| ast.get_tinfo(c).tok);
-                        if second_child_tok == Some(LexToken::Eq) {
-                            // Full definition: const NAME = expr;
-                            Self::record_const(diags, nid, ast, &mut consts)
-                        } else {
-                            // Declare-only: const NAME;
-                            declared_consts.push(nid);
-                            true
-                        }
+                        const_statements.push(nid);
+                        Self::record_const(diags, nid, ast, &mut const_names)
                     }
                     LexToken::If => {
-                        if_else_blocks.push(nid);
+                        // We evaluate if statements a const-time, so expect
+                        // only const-compatible statements inside.
+                        const_statements.push(nid);
+                        true
+                    }
+                    LexToken::Eq => {
+                        const_statements.push(nid);
                         true
                     }
                     // Global asserts are collected here and linearized later.
@@ -2138,37 +2127,11 @@ impl<'toks> AstDb<'toks> {
         }
 
         // Check for const names that conflict with section names.
-        for (name, const_item) in &consts {
-            if let Some(sec_item) = sections.get(name) {
-                let m = format!("Const name '{}' conflicts with a section name", name);
-                diags.err2("AST_31", &m, const_item.tinfo.span(), sec_item.tinfo.span());
+        for (const_name, const_span) in &const_names {
+            if let Some(sec_item) = sections.get(const_name) {
+                let m = format!("Const name '{}' conflicts with a section name", const_name);
+                diags.err2("AST_31", &m, const_span.clone(), sec_item.tinfo.span());
                 result = false;
-            }
-        }
-
-        // Validate declared-only const names (reserved-word and duplicate checks).
-        let mut all_const_names: HashSet<&str> = consts.keys().copied().collect();
-        for &dc_nid in &declared_consts {
-            let name_nid = dc_nid.children(&ast.arena).next().unwrap();
-            let name_tinfo = ast.get_tinfo(name_nid);
-            let name = name_tinfo.val;
-            if is_reserved_identifier(name) {
-                let m = format!(
-                    "'{}' is a reserved identifier and cannot be used as a const name",
-                    name
-                );
-                diags.err1("AST_55", &m, name_tinfo.span());
-                result = false;
-            } else if all_const_names.contains(name) {
-                let m = format!("Duplicate const name '{}'", name);
-                diags.err1("AST_56", &m, name_tinfo.span());
-                result = false;
-            } else if let Some(sec_item) = sections.get(name) {
-                let m = format!("Const name '{}' conflicts with a section name", name);
-                diags.err2("AST_57", &m, name_tinfo.span(), sec_item.tinfo.span());
-                result = false;
-            } else {
-                all_const_names.insert(name);
             }
         }
 
@@ -2180,11 +2143,10 @@ impl<'toks> AstDb<'toks> {
         let mut ast_db = AstDb {
             sections,
             labels: HashMap::new(),
-            consts,
             output: output.unwrap(),
             global_asserts,
-            declared_consts,
-            if_else_blocks,
+            const_statements,
+            const_names,
         };
 
         if !ast_db.validate_section_name(0, output_nid, ast, diags) {

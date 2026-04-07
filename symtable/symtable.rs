@@ -31,6 +31,12 @@ pub struct SymbolTable {
     entries: HashMap<String, ConstEntry>,
 }
 
+impl Default for SymbolTable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SymbolTable {
     pub fn new() -> Self {
         SymbolTable {
@@ -55,16 +61,11 @@ impl SymbolTable {
     /// Declare a const with no value (for `const NAME;` deferred assignment).
     /// Ignored if the name is already in the table (e.g. from a `-D` command-line define).
     pub fn declare(&mut self, name: String, loc: SourceSpan) {
-        if !self.entries.contains_key(&name) {
-            self.entries.insert(
-                name,
-                ConstEntry {
+        self.entries.entry(name).or_insert(ConstEntry {
                     value: None,
                     used: false,
                     decl_loc: Some(loc),
-                },
-            );
-        }
+                });
     }
 
     /// Assign a value to a previously-declared const (bare assignment inside an if/else body).
@@ -77,6 +78,19 @@ impl SymbolTable {
         diags: &Diags,
     ) -> bool {
         if let Some(entry) = self.entries.get_mut(name) {
+            if entry.value.is_some() {
+                if entry.decl_loc.is_none() {
+                    return true;
+                }
+                let m = format!("Const '{}' cannot be assigned more than once.", name);
+                diags.err2(
+                    "SYMTAB_4",
+                    &m,
+                    loc.clone(),
+                    entry.decl_loc.as_ref().unwrap().clone(),
+                );
+                return false;
+            }
             entry.value = Some(value);
             true
         } else {

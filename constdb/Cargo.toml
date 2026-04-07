@@ -1,26 +1,20 @@
 [package]
-name = "process"
+name = "constdb"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
-path = "process.rs"
+path = "constdb.rs"
 
 [dependencies]
 anyhow = "1.0.34"
-parse_int = "0.5.0"
+indextree = "4.6.1"
 
 # local dependencies
 ast = { path = "../ast" }
 diags = { path = "../diags" }
 ir = { path = "../ir" }
-layoutdb = { path = "../layoutdb" }
-constdb = { path = "../constdb" }
-irdb = { path = "../irdb" }
-engine = { path = "../engine" }
-map = { path = "../map" }
-ext = { path = "../ext" }
-extensions = { path = "../extensions" }
+linearizer = { path = "../linearizer" }
 tracing = "0.1.44"

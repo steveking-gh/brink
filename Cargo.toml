@@ -11,6 +11,7 @@ members = [
     "diags",
     "map",
     "ext",
+    "constdb",
     "brink_extension",
     "std/crc32c",
     "extensions",
