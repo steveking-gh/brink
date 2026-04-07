@@ -524,3 +524,15 @@ impl Linearizer {
         result
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_linearizer_default() {
+        let lz = Linearizer::default();
+        assert_eq!(lz.ir_vec.len(), 0);
+        assert_eq!(lz.operand_vec.len(), 0);
+    }
+}

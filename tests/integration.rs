@@ -2333,6 +2333,27 @@ mod tests {
     }
 
     #[test]
+    fn invalid_cli_define() {
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/map_default.brink")
+            .arg("-D")
+            .arg("=")
+            .assert()
+            .failure()
+            .stderr(predicates::str::contains("Empty name in define"));
+
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/map_default.brink")
+            .arg("-D")
+            .arg("=42")
+            .assert()
+            .failure()
+            .stderr(predicates::str::contains("Empty name in define"));
+    }
+
+    #[test]
     fn execute_extension_crc() {
         Command::cargo_bin("brink")
             .unwrap()

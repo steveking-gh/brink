@@ -42,6 +42,9 @@ use tracing::{debug, error, info, trace, warn};
 /// - Starts with `0x`/`0b`/`0o`     → `U64` (matches source const behaviour)
 /// - Otherwise                       → `Integer`
 fn parse_define(s: &str) -> Result<(String, ParameterValue)> {
+    if s.is_empty() {
+        return Err(anyhow!("Empty name in define '{}'", s));
+    }
     let (name, val_str) = match s.find('=') {
         None => return Ok((s.to_string(), ParameterValue::Integer(1))),
         Some(pos) => (&s[..pos], &s[pos + 1..]),
@@ -299,6 +302,19 @@ mod tests {
 
     #[test]
     fn empty_name_is_error() {
+        assert!(parse_define("").is_err());
+        assert!(parse_define("=").is_err());
         assert!(parse_define("=42").is_err());
+    }
+
+    #[test]
+    fn quoted_string_is_parsed() {
+        let (n, v) = name_val("VERSION=\"1.0\"");
+        assert_eq!(n, "VERSION");
+        assert_eq!(v, ParameterValue::QuotedString("1.0".to_string()));
+
+        let (n2, v2) = name_val("LABEL='stable'");
+        assert_eq!(n2, "LABEL");
+        assert_eq!(v2, ParameterValue::QuotedString("stable".to_string()));
     }
 }

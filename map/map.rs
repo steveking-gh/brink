@@ -551,6 +551,16 @@ mod tests {
                     value: ParameterValue::Integer(42),
                     used: true,
                 },
+                ConstEntry {
+                    name: "VERSION".to_string(),
+                    value: ParameterValue::QuotedString("v1.0".to_string()),
+                    used: true,
+                },
+                ConstEntry {
+                    name: "OFFSET".to_string(),
+                    value: ParameterValue::I64(-10),
+                    used: true,
+                },
             ],
         }
     }
@@ -618,6 +628,8 @@ mod tests {
         let out = format_csv(&make_map());
         assert!(out.contains("BASE"), "const name 'BASE' missing");
         assert!(out.contains("COUNT"), "const name 'COUNT' missing");
+        assert!(out.contains("OFFSET"), "const name 'OFFSET' missing");
+        assert!(out.contains("VERSION"), "const name 'VERSION' missing");
         // U64 renders as hex
         assert!(
             out.contains("0x0000000000001000"),
@@ -625,6 +637,10 @@ mod tests {
         );
         // Integer renders as decimal
         assert!(out.contains("42"), "const Integer decimal value missing");
+        // I64 renders as negative decimal string
+        assert!(out.contains("-10"), "const I64 neg value missing");
+        // String renders inside quotes
+        assert!(out.contains("\"v1.0\""), "const QuotedString value missing");
         // used consts show "yes"
         assert!(out.contains("yes"), "used column 'yes' missing");
     }
@@ -772,6 +788,10 @@ mod tests {
         let count = consts.iter().find(|c| c["name"] == "COUNT").unwrap();
         assert_eq!(count["value"], "42");
         assert_eq!(count["used"], true);
+        let offset = consts.iter().find(|c| c["name"] == "OFFSET").unwrap();
+        assert_eq!(offset["value"], "-10");
+        let version = consts.iter().find(|c| c["name"] == "VERSION").unwrap();
+        assert_eq!(version["value"], "\"v1.0\"");
     }
 
     #[test]
@@ -851,5 +871,7 @@ mod tests {
         let out = format_rs(&make_map());
         assert!(out.contains("pub const BASE: u64 = 0x0000000000001000;"));
         assert!(out.contains("pub const COUNT: i64 = 42;"));
+        assert!(out.contains("pub const OFFSET: i64 = -10;"));
+        assert!(out.contains("pub const VERSION: &str = \"v1.0\";"));
     }
 }

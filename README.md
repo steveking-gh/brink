@@ -1,4 +1,4 @@
-[![Rust](https://github.com/steveking-gh/brink/actions/workflows/rust.yml/badge.svg)](https://github.com/steveking-gh/brink/actions/workflows/rust.yml)
+﻿[![Rust](https://github.com/steveking-gh/brink/actions/workflows/rust.yml/badge.svg)](https://github.com/steveking-gh/brink/actions/workflows/rust.yml)
 
 # Brink
 
@@ -1392,6 +1392,44 @@ a corpus of random inputs and then further randomizes those inputs to try to
 cause crashes and hangs.  At the time of writing, fuzz testing
 **requires the nightly build**.  See `fuzz_help.txt` in the source repo for more information.
 
+## Checking Test Code Coverage
+
+If you're using Windows as a development platform, then this worked for me to install the llvm-cov tool.  I have the free version of Microsoft Visual Studio installed.
+
+    rustup component add llvm-tools
+    cargo install cargo-llvm-cov --locked
+
+To generate an ASCII table of coverage stats to the terminal:
+
+    cargo llvm-cov --all-features --workspace
+
+To update the coverage table in this README from Windows, run `.\update_coverage.ps1`.
+
+<!-- COVERAGE_START -->
+```text
+Filename                      Regions    Missed Regions     Cover   Functions  Missed Functions  Executed       Lines      Missed Lines     Cover    Branches   Missed Branches     Cover
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ast\ast.rs                       2002               417    79.17%          53                 3    94.34%        1123               204    81.83%           0                 0         -
+constdb\constdb.rs                397                51    87.15%           8                 0   100.00%         195                26    86.67%           0                 0         -
+diags\diags.rs                    209                25    88.04%          10                 1    90.00%         106                19    82.08%           0                 0         -
+engine\engine.rs                 2323               450    80.63%          67                 5    92.54%        1506               249    83.47%           0                 0         -
+ext\ext.rs                        292                18    93.84%          20                 3    85.00%         153                16    89.54%           0                 0         -
+ext\test_mocks.rs                 174                23    86.78%          27                 5    81.48%         147                20    86.39%           0                 0         -
+extensions\src\lib.rs               4                 0   100.00%           1                 0   100.00%           3                 0   100.00%           0                 0         -
+ir\ir.rs                          225                25    88.89%          22                 0   100.00%         171                15    91.23%           0                 0         -
+irdb\irdb.rs                     1526               459    69.92%          32                 7    78.12%         949               276    70.92%           0                 0         -
+layoutdb\layoutdb.rs              784               159    79.72%          18                 0   100.00%         432                71    83.56%           0                 0         -
+linearizer\linearizer.rs          526                76    85.55%          17                 0   100.00%         311                32    89.71%           0                 0         -
+map\map.rs                        860                13    98.49%          58                 0   100.00%         579                 9    98.45%           0                 0         -
+process\process.rs                355                26    92.68%          22                 5    77.27%         197                10    94.92%           0                 0         -
+src\main.rs                       123                 6    95.12%           8                 1    87.50%          84                 5    94.05%           0                 0         -
+std\crc32c\src\crc32c.rs           20                 0   100.00%           4                 0   100.00%          19                 0   100.00%           0                 0         -
+symtable\symtable.rs              116                 5    95.69%          14                 2    85.71%          81                 5    93.83%           0                 0         -
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+TOTAL                            9936              1753    82.36%         381                32    91.60%        6056               957    84.20%           0                 0         -
+```
+<!-- COVERAGE_END -->
+
 
 ## Brink Source Code Overview
 
@@ -1409,4 +1447,7 @@ cause crashes and hangs.  At the time of writing, fuzz testing
 | brink_extension/lib.rs | Extensions    | Public API for extension authors                                            |
 | ext/ext.rs             | Extensions    | Runtime extension registry and dispatch wrapper                             |
 | std/crc32c/src/lib.rs  | std extension | CRC-32C (Castagnoli) hash over caller-specified output region               |
+
+
+
 
