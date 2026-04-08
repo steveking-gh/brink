@@ -1,3 +1,7 @@
+// This code validates that CARGO_PKG_VERSION contains only digit characters in the
+// major/minor/patch fields.  You get a warning at build time if you set
+// a pre-release suffix like 4.0.0-beta that would break the version builtins
+// (__BRINK_VERSION_MAJOR etc.).
 fn main() {
     let version = env!("CARGO_PKG_VERSION");
 
