@@ -11,7 +11,6 @@
 // Order of operations: irdb runs after lineardb.  Its output — an IRDb
 // containing ir_vec, parms and file metadata — is consumed by engine.
 
-use constdb::ConstDb;
 use diags::Diags;
 use diags::SourceSpan;
 use layoutdb::LayoutDb;
@@ -21,7 +20,7 @@ use linearizer::{LinIR, LinOperand};
 use tracing::{debug, error, info, trace, warn};
 
 use ext::ExtensionRegistry;
-use ir::{ConstBuiltins, DataType, IR, IRKind, IROperand, ParameterValue};
+use ir::{DataType, IR, IRKind, IROperand, ParameterValue};
 use parse_int::parse;
 use std::{
     collections::{HashMap, HashSet},
@@ -63,14 +62,6 @@ pub struct IRDb {
     /// Name of the section designated by the `output` statement.
     /// Used by the engine to evaluate `__OUTPUT_SIZE` and `__OUTPUT_ADDR`.
     pub output_sec_str: String,
-}
-
-/// Error returned by `calc_u64_op` / `calc_i64_op` before a diagnostic is emitted.
-enum CalcErr {
-    /// Arithmetic overflow or underflow; carries a human-readable message.
-    Overflow(String),
-    /// Division or modulo by zero.
-    DivByZero,
 }
 
 impl IRDb {
@@ -287,34 +278,6 @@ impl IRDb {
         true
     }
 
-    fn validate_const_operands(&self, ir: &IR, diags: &mut Diags) -> bool {
-        let len = ir.operands.len();
-        if len != 3 {
-            let m = format!(
-                "'{:?}' expressions must have 3 operands (identifier, =, value), but found {}.",
-                ir.kind, len
-            );
-            diags.err1("IRDB_16", &m, ir.src_loc.clone());
-            return false;
-        }
-        let identifier_opnd = &self.parms[ir.operands[0]];
-        if identifier_opnd.val.data_type() != DataType::Identifier {
-            let m = format!(
-                "'{:?}' First const operand must be an identifier, found '{:?}'.",
-                ir.kind,
-                identifier_opnd.val.data_type()
-            );
-            diags.err2(
-                "IRDB_17",
-                &m,
-                ir.src_loc.clone(),
-                identifier_opnd.src_loc.clone(),
-            );
-            return false;
-        }
-        true
-    }
-
     // Validate write file operands
     fn validate_wrf_operands(&mut self, ir: &IR, diags: &mut Diags) -> bool {
         let len = ir.operands.len();
@@ -498,7 +461,6 @@ impl IRDb {
             IRKind::Assert => self.validate_numeric_1(ir, diags),
             IRKind::Wrf => self.validate_wrf_operands(ir, diags),
             IRKind::Wrs | IRKind::Print => self.validate_string_expr_operands(ir, diags),
-            IRKind::Const => self.validate_const_operands(ir, diags),
             IRKind::ExtensionCall => {
                 let name = self.get_opnd_as_identifier(ir, 0);
                 if ext_registry.get(name).is_none() {
@@ -654,13 +616,16 @@ impl IRDb {
             | IRKind::AddrOffset
             | IRKind::Eq
             | IRKind::SecOffset
-            | IRKind::FileOffset
-            // if/else and deferred-assignment IR — validated during sequential const walk
+            | IRKind::FileOffset => true,
+            // These kinds are emitted only into ConstDb's internal IR vector and
+            // are fully consumed during const evaluation.  They never enter the
+            // layout IR vector that process_linear_ir iterates.
+            IRKind::Const
             | IRKind::ConstDeclare
             | IRKind::IfBegin
             | IRKind::ElseBegin
             | IRKind::IfEnd
-            | IRKind::BareAssign => true,
+            | IRKind::BareAssign => unreachable!("const-only IR kind in layout IR"),
         }
     }
 
@@ -782,643 +747,10 @@ impl IRDb {
         IRKind::ExtensionCallRanged
     }
 
-    /// Resolve all const declarations in `const_db.const_map`, storing each
-    /// resolved value in `self.symbol_table`.  Must be called before
-    /// `process_lin_operands` so that const references can be substituted.
-    /// Also walks `const_ir_vec` sequentially to process ConstDeclare and if/else IR.
-    fn resolve_all_consts(&mut self, const_db: &ConstDb, diags: &mut Diags) -> bool {
-        self.exec_const_statements(const_db, diags)
-    }
-
-    /// Sequential walk of `const_ir_vec` that handles all ConstDb IR kinds:
-    /// `Const`, `ConstDeclare`, `IfBegin`, `ElseBegin`, `IfEnd`, `BareAssign`,
-    /// and `Print`/`Assert` emitted inside if/else bodies.
-    fn exec_const_statements(&mut self, const_db: &ConstDb, diags: &mut Diags) -> bool {
-        /// Skip state for branches not taken.
-        #[derive(Clone, Copy)]
-        enum SkipState {
-            /// Skip the then-body (condition was false); stop at ElseBegin (depth 0)
-            /// or IfEnd (depth 0, meaning no else clause).
-            SkipThen { depth: usize },
-            /// Skip the else-body (condition was true); stop at IfEnd (depth 0).
-            SkipElse { depth: usize },
-        }
-
-        let mut result = true;
-        let mut skip_stack: Vec<SkipState> = Vec::new();
-
-        let n = const_db.ir_vec.len();
-        let mut idx = 0;
-        while idx < n {
-            let ir = &const_db.ir_vec[idx];
-            let op = ir.op;
-            let src_loc = ir.src_loc.clone();
-
-            // If we're in a skip state, handle structural tokens to track depth.
-            if let Some(&skip) = skip_stack.last() {
-                match (skip, op) {
-                    (SkipState::SkipThen { depth }, IRKind::IfBegin) => {
-                        *skip_stack.last_mut().unwrap() = SkipState::SkipThen { depth: depth + 1 };
-                    }
-                    (SkipState::SkipThen { depth: 0 }, IRKind::ElseBegin) => {
-                        // Found the else of the if we're skipping — resume active processing.
-                        skip_stack.pop();
-                    }
-                    (SkipState::SkipThen { depth }, IRKind::ElseBegin) => {
-                        // Nested if's ElseBegin — no depth change (it's inside a nested if).
-                        let _ = depth; // depth > 0, we're still skipping
-                    }
-                    (SkipState::SkipThen { depth: 0 }, IRKind::IfEnd) => {
-                        // No else clause — resume active processing past IfEnd.
-                        skip_stack.pop();
-                    }
-                    (SkipState::SkipThen { depth }, IRKind::IfEnd) => {
-                        *skip_stack.last_mut().unwrap() = SkipState::SkipThen { depth: depth - 1 };
-                    }
-                    (SkipState::SkipElse { depth }, IRKind::IfBegin) => {
-                        *skip_stack.last_mut().unwrap() = SkipState::SkipElse { depth: depth + 1 };
-                    }
-                    (SkipState::SkipElse { depth: 0 }, IRKind::IfEnd) => {
-                        // Found the IfEnd matching the if whose else-body we're skipping.
-                        skip_stack.pop();
-                    }
-                    (SkipState::SkipElse { depth }, IRKind::IfEnd) => {
-                        *skip_stack.last_mut().unwrap() = SkipState::SkipElse { depth: depth - 1 };
-                    }
-                    _ => { /* any other IR inside a skipped block: ignore */ }
-                }
-                idx += 1;
-                continue;
-            }
-
-            // Active processing.
-            match op {
-                IRKind::Const => {
-                    let name_lop = &const_db.operand_vec[ir.operand_vec[0]];
-                    let LinOperand::Literal { sval: name, .. } = name_lop else {
-                        panic!("Const name operand must be a Literal");
-                    };
-                    let rhs_lop_num = ir.operand_vec[1];
-                    let mut in_progress = HashSet::new();
-                    let val = self.eval_const_expr_r(
-                        rhs_lop_num,
-                        const_db,
-                        &mut in_progress,
-                        diags,
-                        &src_loc,
-                    );
-                    if let Some(v) = val {
-                        if !self.symbol_table.contains_key(name) {
-                            self.symbol_table
-                                .define(name.to_string(), v, Some(src_loc.clone()));
-                        }
-                    } else {
-                        result = false;
-                    }
-                }
-                IRKind::ConstDeclare => {
-                    let name_lop = &const_db.operand_vec[ir.operand_vec[0]];
-                    let LinOperand::Literal { sval: name, .. } = name_lop else {
-                        panic!("ConstDeclare name operand must be a Literal");
-                    };
-                    self.symbol_table.declare(name.clone(), src_loc);
-                }
-                IRKind::IfBegin => {
-                    // Evaluate the condition operand.
-                    let cond_lop_num = ir.operand_vec[0];
-                    let mut in_progress = HashSet::new();
-                    let cond_val = self.eval_const_expr_r(
-                        cond_lop_num,
-                        const_db,
-                        &mut in_progress,
-                        diags,
-                        &src_loc,
-                    );
-                    match cond_val {
-                        Some(v) if v.to_bool() => {
-                            // Condition true: process then-body (no skip needed)
-                        }
-                        Some(_) => {
-                            // Condition false: skip then-body
-                            skip_stack.push(SkipState::SkipThen { depth: 0 });
-                        }
-                        None => {
-                            result = false;
-                            // Skip entire if/else to avoid cascading errors
-                            skip_stack.push(SkipState::SkipThen { depth: 0 });
-                        }
-                    }
-                }
-                IRKind::ElseBegin => {
-                    // Reached the else separator while in active then-body: skip else-body.
-                    skip_stack.push(SkipState::SkipElse { depth: 0 });
-                }
-                IRKind::IfEnd => {
-                    // End of an if/else we fully processed (no skip): nothing to do.
-                }
-                IRKind::BareAssign => {
-                    let name_lop = &const_db.operand_vec[ir.operand_vec[0]];
-                    let LinOperand::Literal { sval: name, .. } = name_lop else {
-                        panic!("BareAssign name operand must be a Literal");
-                    };
-                    let name = name.clone();
-                    let rhs_lop_num = ir.operand_vec[1];
-                    let mut in_progress = HashSet::new();
-                    let rhs_val = self.eval_const_expr_r(
-                        rhs_lop_num,
-                        const_db,
-                        &mut in_progress,
-                        diags,
-                        &src_loc,
-                    );
-                    match rhs_val {
-                        Some(v) => {
-                            result &= self.symbol_table.assign(&name, v, &src_loc, diags);
-                        }
-                        None => {
-                            result = false;
-                        }
-                    }
-                }
-                IRKind::Print => {
-                    // Evaluate and print each operand as a string.
-                    if !diags.noprint {
-                        let mut s = String::new();
-                        for &lop_idx in &ir.operand_vec {
-                            let mut in_progress = HashSet::new();
-                            match self.eval_const_expr_r(
-                                lop_idx,
-                                const_db,
-                                &mut in_progress,
-                                diags,
-                                &src_loc,
-                            ) {
-                                Some(ParameterValue::QuotedString(ref v)) => s.push_str(v),
-                                Some(ParameterValue::U64(v)) => s.push_str(&format!("{:#X}", v)),
-                                Some(ParameterValue::I64(v) | ParameterValue::Integer(v)) => {
-                                    s.push_str(&format!("{}", v));
-                                }
-                                Some(_) => {
-                                    diags.err1(
-                                        "IRDB_31",
-                                        "Cannot print this value type in a const context",
-                                        src_loc.clone(),
-                                    );
-                                    result = false;
-                                }
-                                None => {
-                                    result = false;
-                                }
-                            }
-                        }
-                        if result {
-                            print!("{}", s);
-                        }
-                    }
-                }
-                IRKind::Assert => {
-                    let cond_lop_num = ir.operand_vec[0];
-                    let mut in_progress = HashSet::new();
-                    match self.eval_const_expr_r(
-                        cond_lop_num,
-                        const_db,
-                        &mut in_progress,
-                        diags,
-                        &src_loc,
-                    ) {
-                        Some(v) if !v.to_bool() => {
-                            diags.err1(
-                                "IRDB_32",
-                                "Assert expression failed in if/else body",
-                                src_loc,
-                            );
-                            result = false;
-                        }
-                        None => {
-                            result = false;
-                        }
-                        _ => {}
-                    }
-                }
-                _ => { /* other IR kinds are not emitted into const_ir_vec */ }
-            }
-            idx += 1;
-        }
-        result
-    }
-
-    /// Evaluate a const expression operand recursively.
-    /// Returns the computed `ParameterValue`, or `None` on error.
-    fn eval_const_expr_r(
-        &mut self,
-        lop_num: usize,
-        const_db: &ConstDb,
-        _in_progress: &mut HashSet<String>,
-        diags: &mut Diags,
-        err_loc: &SourceSpan,
-    ) -> Option<ParameterValue> {
-        let lop = &const_db.operand_vec[lop_num];
-
-        // Output operands: evaluate by looking up the producing instruction's IRKind.
-        if let &LinOperand::Output { ir_lid, .. } = lop {
-            let lin_ir = &const_db.ir_vec[ir_lid];
-            let op = lin_ir.op;
-            let op_loc = lin_ir.src_loc.clone();
-
-            // Reject layout-time ops before evaluating any operands.
-            match op {
-                IRKind::Sizeof
-                | IRKind::SizeofExt
-                | IRKind::BuiltinOutputSize
-                | IRKind::BuiltinOutputAddr
-                | IRKind::Addr
-                | IRKind::AddrOffset
-                | IRKind::SecOffset
-                | IRKind::FileOffset => {
-                    let m = format!(
-                        "Operation '{:?}' cannot be used in a const expression \
-                         because it requires engine-time layout or addressing.",
-                        op
-                    );
-                    diags.err1("IRDB_19", &m, op_loc);
-                    return None;
-                }
-                _ => {}
-            }
-
-            // Version builtins are compile-time constants; resolve directly without operands.
-            match op {
-                IRKind::BuiltinVersionString => {
-                    return Some(ParameterValue::QuotedString(
-                        ConstBuiltins::get().brink_version_string.to_string(),
-                    ));
-                }
-                IRKind::BuiltinVersionMajor => {
-                    return Some(ParameterValue::U64(
-                        ConstBuiltins::get().brink_version_major,
-                    ));
-                }
-                IRKind::BuiltinVersionMinor => {
-                    return Some(ParameterValue::U64(
-                        ConstBuiltins::get().brink_version_minor,
-                    ));
-                }
-                IRKind::BuiltinVersionPatch => {
-                    return Some(ParameterValue::U64(
-                        ConstBuiltins::get().brink_version_patch,
-                    ));
-                }
-                _ => {}
-            }
-
-            // Binary, comparison, and logical ops: evaluate both input operands.
-            let lhs_lop = lin_ir.operand_vec[0];
-            let rhs_lop = lin_ir.operand_vec[1];
-            let lhs_val =
-                self.eval_const_expr_r(lhs_lop, const_db, _in_progress, diags, err_loc)?;
-            let rhs_val =
-                self.eval_const_expr_r(rhs_lop, const_db, _in_progress, diags, err_loc)?;
-            return match op {
-                IRKind::Add
-                | IRKind::Subtract
-                | IRKind::Multiply
-                | IRKind::Divide
-                | IRKind::Modulo
-                | IRKind::BitAnd
-                | IRKind::BitOr
-                | IRKind::LeftShift
-                | IRKind::RightShift => Self::apply_binary_op(op, lhs_val, rhs_val, &op_loc, diags),
-                IRKind::DoubleEq
-                | IRKind::NEq
-                | IRKind::GEq
-                | IRKind::LEq
-                | IRKind::Gt
-                | IRKind::Lt => Self::apply_comparison_op(op, lhs_val, rhs_val, &op_loc, diags),
-                IRKind::LogicalAnd | IRKind::LogicalOr => {
-                    let lhs_bool = lhs_val.to_bool();
-                    let rhs_bool = rhs_val.to_bool();
-                    let result = if op == IRKind::LogicalAnd {
-                        lhs_bool && rhs_bool
-                    } else {
-                        lhs_bool || rhs_bool
-                    };
-                    Some(ParameterValue::U64(if result { 1 } else { 0 }))
-                }
-                _ => {
-                    let m = format!(
-                        "Operation '{:?}' is not supported in a const expression.",
-                        op
-                    );
-                    diags.err1("IRDB_21", &m, err_loc.clone());
-                    None
-                }
-            };
-        }
-
-        // Literal operands: evaluate directly from tok and sval.
-        let LinOperand::Literal { tok, sval, src_loc } = lop else {
-            unreachable!()
-        };
-        let sval = sval.clone();
-        let src_loc = src_loc.clone();
-
-        match tok {
-            ast::LexToken::Integer => {
-                let v: i64 = parse(&sval).ok().or_else(|| {
-                    let m = format!("Malformed integer in const expression: {}", sval);
-                    diags.err1("IRDB_22", &m, src_loc);
-                    None
-                })?;
-                Some(ParameterValue::Integer(v))
-            }
-            ast::LexToken::U64 => {
-                let s = sval.strip_suffix('u').unwrap_or(&sval).to_string();
-                let v: u64 = parse(&s).ok().or_else(|| {
-                    let m = format!("Malformed U64 in const expression: {}", sval);
-                    diags.err1("IRDB_23", &m, src_loc);
-                    None
-                })?;
-                Some(ParameterValue::U64(v))
-            }
-            ast::LexToken::I64 => {
-                let s = sval.strip_suffix('i').unwrap_or(&sval).to_string();
-                let v: i64 = parse(&s).ok().or_else(|| {
-                    let m = format!("Malformed I64 in const expression: {}", sval);
-                    diags.err1("IRDB_24", &m, src_loc);
-                    None
-                })?;
-                Some(ParameterValue::I64(v))
-            }
-            ast::LexToken::QuotedString => {
-                let trimmed = sval
-                    .strip_prefix('"')
-                    .unwrap_or(&sval)
-                    .strip_suffix('"')
-                    .unwrap_or(&sval)
-                    .to_string();
-                Some(ParameterValue::QuotedString(trimmed))
-            }
-            ast::LexToken::Identifier => {
-                // Reference to another const.
-                if let Some(val) = self.symbol_table.get_value(sval.as_str()) {
-                    self.symbol_table.mark_used(sval.as_str());
-                    Some(val)
-                } else {
-                    let m = format!(
-                        "Unknown or uninitialized identifier '{}' in const expression. \
-                         Constants must be defined before use.",
-                        sval
-                    );
-                    diags.err1("IRDB_20", &m, src_loc);
-                    None
-                }
-            }
-            _ => {
-                panic!(
-                    "Literal operand with unexpected token {:?} in const expression",
-                    tok
-                );
-            }
-        }
-    }
-
-    /// Apply a binary arithmetic operator to two resolved const values.
-    /// Promotes `Integer` to match a `U64` or `I64` operand when needed.
-    fn apply_binary_op(
-        op: IRKind,
-        lhs: ParameterValue,
-        rhs: ParameterValue,
-        src_loc: &SourceSpan,
-        diags: &mut Diags,
-    ) -> Option<ParameterValue> {
-        use ParameterValue::*;
-        // Reconcile Integer with a typed value; reject all other mismatches.
-        let (lhs, rhs) = match (&lhs, &rhs) {
-            (U64(_), U64(_))
-            | (I64(_), I64(_))
-            | (Integer(_), Integer(_))
-            | (QuotedString(_), QuotedString(_)) => (lhs, rhs),
-            (U64(_), Integer(v)) => (lhs, U64(*v as u64)),
-            (Integer(v), U64(_)) => (U64(*v as u64), rhs),
-            (I64(_), Integer(v)) => (lhs, I64(*v)),
-            (Integer(v), I64(_)) => (I64(*v), rhs),
-            _ => {
-                let m = format!(
-                    "Type mismatch in const expression: {:?} and {:?}.",
-                    lhs.data_type(),
-                    rhs.data_type()
-                );
-                diags.err1("IRDB_25", &m, src_loc.clone());
-                return None;
-            }
-        };
-
-        // Helper to emit the right diagnostic for a CalcErr and return None.
-        let emit = |err: CalcErr, diags: &mut Diags| -> Option<ParameterValue> {
-            match err {
-                CalcErr::Overflow(msg) => {
-                    diags.err1("IRDB_27", &msg, src_loc.clone());
-                }
-                CalcErr::DivByZero => {
-                    diags.err1(
-                        "IRDB_28",
-                        "Division by zero in const expression",
-                        src_loc.clone(),
-                    );
-                }
-            }
-            None
-        };
-
-        match lhs {
-            U64(a) => {
-                let b = rhs.to_u64();
-                match Self::calc_u64_op(op, a, b) {
-                    Ok(r) => Some(U64(r)),
-                    Err(e) => emit(e, diags),
-                }
-            }
-            I64(a) => {
-                let b = rhs.to_i64();
-                match Self::calc_i64_op(op, a, b) {
-                    Ok(r) => Some(I64(r)),
-                    Err(e) => emit(e, diags),
-                }
-            }
-            Integer(a) => {
-                let b = rhs.to_i64();
-                match Self::calc_i64_op(op, a, b) {
-                    Ok(r) => Some(Integer(r)),
-                    Err(e) => emit(e, diags),
-                }
-            }
-            _ => {
-                let m = format!(
-                    "Non-numeric type {:?} in arithmetic const expression.",
-                    lhs.data_type()
-                );
-                diags.err1("IRDB_26", &m, src_loc.clone());
-                None
-            }
-        }
-    }
-
-    /// Apply a comparison operator (==, !=, >=, <=) to two resolved const values.
-    /// Returns U64(1) for true, U64(0) for false.
-    /// Promotes `Integer` to match a `U64` or `I64` operand when needed.
-    fn apply_comparison_op(
-        op: IRKind,
-        lhs: ParameterValue,
-        rhs: ParameterValue,
-        src_loc: &SourceSpan,
-        diags: &mut Diags,
-    ) -> Option<ParameterValue> {
-        use ParameterValue::*;
-        // String equality/inequality: supported for == and != only.
-        if let (QuotedString(a), QuotedString(b)) = (&lhs, &rhs) {
-            let result = match op {
-                IRKind::DoubleEq => a == b,
-                IRKind::NEq => a != b,
-                _ => {
-                    let m = "Ordered comparison (>=, <=) is not supported for strings.".to_string();
-                    diags.err1("IRDB_30", &m, src_loc.clone());
-                    return None;
-                }
-            };
-            return Some(U64(if result { 1 } else { 0 }));
-        }
-        // Reconcile Integer with a typed value; reject non-numeric types.
-        let (lhs, rhs) = match (&lhs, &rhs) {
-            (U64(_), U64(_)) | (I64(_), I64(_)) | (Integer(_), Integer(_)) => (lhs, rhs),
-            (U64(_), Integer(v)) => (lhs, U64(*v as u64)),
-            (Integer(v), U64(_)) => (U64(*v as u64), rhs),
-            (I64(_), Integer(v)) => (lhs, I64(*v)),
-            (Integer(v), I64(_)) => (I64(*v), rhs),
-            _ => {
-                let m = format!(
-                    "Non-numeric or mismatched types in const comparison: {:?} and {:?}.",
-                    lhs.data_type(),
-                    rhs.data_type()
-                );
-                diags.err1("IRDB_29", &m, src_loc.clone());
-                return None;
-            }
-        };
-
-        let result = match lhs {
-            U64(a) => {
-                let b = rhs.to_u64();
-                match op {
-                    IRKind::DoubleEq => a == b,
-                    IRKind::NEq => a != b,
-                    IRKind::GEq => a >= b,
-                    IRKind::LEq => a <= b,
-                    IRKind::Gt => a > b,
-                    IRKind::Lt => a < b,
-                    _ => unreachable!(),
-                }
-            }
-            I64(a) | Integer(a) => {
-                let b = rhs.to_i64();
-                match op {
-                    IRKind::DoubleEq => a == b,
-                    IRKind::NEq => a != b,
-                    IRKind::GEq => a >= b,
-                    IRKind::LEq => a <= b,
-                    IRKind::Gt => a > b,
-                    IRKind::Lt => a < b,
-                    _ => unreachable!(),
-                }
-            }
-            _ => unreachable!(),
-        };
-
-        Some(U64(if result { 1 } else { 0 }))
-    }
-
-    fn calc_u64_op(op: IRKind, a: u64, b: u64) -> Result<u64, CalcErr> {
-        match op {
-            IRKind::Add => a.checked_add(b).ok_or_else(|| {
-                CalcErr::Overflow(format!("Add expression '{a} + {b}' will overflow type U64"))
-            }),
-            IRKind::Subtract => a.checked_sub(b).ok_or_else(|| {
-                CalcErr::Overflow(format!(
-                    "Subtract expression '{a} - {b}' will underflow type U64"
-                ))
-            }),
-            IRKind::Multiply => a.checked_mul(b).ok_or_else(|| {
-                CalcErr::Overflow(format!(
-                    "Multiply expression '{a} * {b}' will overflow type U64"
-                ))
-            }),
-            IRKind::Divide => {
-                if b == 0 {
-                    Err(CalcErr::DivByZero)
-                } else {
-                    Ok(a / b)
-                }
-            }
-            IRKind::Modulo => {
-                if b == 0 {
-                    Err(CalcErr::DivByZero)
-                } else {
-                    Ok(a % b)
-                }
-            }
-            IRKind::BitAnd => Ok(a & b),
-            IRKind::BitOr => Ok(a | b),
-            IRKind::LeftShift => Ok(a << (b & 63)),
-            IRKind::RightShift => Ok(a >> (b & 63)),
-            _ => Err(CalcErr::Overflow(
-                "Unknown operator in U64 const expression".to_string(),
-            )),
-        }
-    }
-
-    fn calc_i64_op(op: IRKind, a: i64, b: i64) -> Result<i64, CalcErr> {
-        match op {
-            IRKind::Add => a.checked_add(b).ok_or_else(|| {
-                CalcErr::Overflow(format!("Add expression '{a} + {b}' will overflow type I64"))
-            }),
-            IRKind::Subtract => a.checked_sub(b).ok_or_else(|| {
-                CalcErr::Overflow(format!(
-                    "Subtract expression '{a} - {b}' will underflow type I64"
-                ))
-            }),
-            IRKind::Multiply => a.checked_mul(b).ok_or_else(|| {
-                CalcErr::Overflow(format!(
-                    "Multiply expression '{a} * {b}' will overflow type I64"
-                ))
-            }),
-            IRKind::Divide => {
-                if b == 0 {
-                    Err(CalcErr::DivByZero)
-                } else {
-                    Ok(a / b)
-                }
-            }
-            IRKind::Modulo => {
-                if b == 0 {
-                    Err(CalcErr::DivByZero)
-                } else {
-                    Ok(a % b)
-                }
-            }
-            IRKind::BitAnd => Ok(a & b),
-            IRKind::BitOr => Ok(a | b),
-            IRKind::LeftShift => Ok(a << (b & 63)),
-            IRKind::RightShift => Ok(a >> (b & 63)),
-            _ => Err(CalcErr::Overflow(
-                "Unknown operator in I64 const expression".to_string(),
-            )),
-        }
-    }
-
     pub fn new(
-        const_db: &ConstDb,
+        symbol_table: SymbolTable,
         lin_db: &LayoutDb,
         diags: &mut Diags,
-        defines: &HashMap<String, ParameterValue>,
         ext_registry: &ExtensionRegistry,
     ) -> anyhow::Result<Self> {
         let mut ir_db = IRDb {
@@ -1428,21 +760,9 @@ impl IRDb {
             addressed_locs: HashMap::new(),
             start_addr: 0,
             files: HashMap::new(),
-            symbol_table: SymbolTable::new(),
+            symbol_table,
             output_sec_str: lin_db.output_sec_str.clone(),
         };
-
-        // Pre-populate the symbol table with command-line defines so they are
-        // available to source const expressions and can override source consts.
-        for (name, value) in defines {
-            ir_db.symbol_table.define(name.clone(), value.clone(), None);
-        }
-
-        // Resolve all const declarations before anything else so their values
-        // are available for substitution in operands and the output address.
-        if !ir_db.resolve_all_consts(const_db, diags) {
-            anyhow::bail!("IRDb construction failed.");
-        }
 
         // Parse the optional output starting address.  If it is a const name,
         // look it up in the now-resolved symbol table.
@@ -1467,6 +787,8 @@ impl IRDb {
             anyhow::bail!("IRDb construction failed");
         }
 
+        // Warn about consts defined but never referenced by any operand.
+        // Must run after process_lin_operands so all use-sites have called mark_used.
         ir_db.symbol_table.warn_unused(diags);
 
         // To avoid panic, don't proceed into IR if the operands are bad.

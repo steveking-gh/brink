@@ -17,7 +17,7 @@ ast = { path = "../ast" }
 diags = { path = "../diags" }
 ir = { path = "../ir" }
 layoutdb = { path = "../layoutdb" }
-constdb = { path = "../constdb" }
+const_eval = { path = "../const_eval" }
 irdb = { path = "../irdb" }
 engine = { path = "../engine" }
 map = { path = "../map" }
