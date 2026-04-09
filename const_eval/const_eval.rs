@@ -105,12 +105,11 @@ impl<'toks> ConstIR {
             return false;
         }
         if rhs_lops.len() != 1 {
-            let m = format!(
-                "Const expression RHS produced {} results, expected 1",
+            unreachable!(
+                "record_expr_r returned {} results for const RHS; \
+                 parser guarantees exactly one expression node",
                 rhs_lops.len()
             );
-            diags.err1("LINEAR_12", &m, name_tinfo.span());
-            return false;
         }
         lz.add_existing_operand_to_ir(ir_lid, rhs_lops[0]);
 
@@ -151,12 +150,11 @@ impl<'toks> ConstIR {
             return false;
         }
         if rhs_lops.len() != 1 {
-            let m = format!(
-                "Deferred assignment RHS produced {} result(s), expected 1",
+            unreachable!(
+                "record_expr_r returned {} results for deferred-assign RHS; \
+                 parser guarantees exactly one expression node",
                 rhs_lops.len()
             );
-            diags.err1("LINEAR_14", &m, ast.get_tinfo(eq_nid).span());
-            return false;
         }
         lz.add_existing_operand_to_ir(ir_lid, rhs_lops[0]);
         true
@@ -207,13 +205,11 @@ impl<'toks> ConstIR {
             return false;
         }
         if cond_lops.len() != 1 {
-            let tinfo = ast.get_tinfo(if_nid);
-            diags.err1(
-                "LINEAR_15",
-                "if condition must produce exactly one value",
-                tinfo.span(),
+            unreachable!(
+                "record_expr_r returned {} results for if condition; \
+                 parser guarantees exactly one expression node",
+                cond_lops.len()
             );
-            return false;
         }
 
         let ifbegin_lid = lz.new_ir(if_nid, ast, IRKind::IfBegin);
