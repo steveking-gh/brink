@@ -280,15 +280,9 @@ impl IRDb {
 
     // Validate write file operands
     fn validate_wrf_operands(&mut self, ir: &IR, diags: &mut Diags) -> bool {
-        let len = ir.operands.len();
-        if len != 1 {
-            let m = format!(
-                "'{:?}' statements must have 1 operand, but found {}.",
-                ir.kind, len
-            );
-            diags.err1("IRDB_10", &m, ir.src_loc.clone());
-            return false;
-        }
+        // The parser always emits exactly one operand for wrf; a different count
+        // indicates a linearizer bug, not a user error.
+        assert!(ir.operands.len() == 1, "wrf must have exactly 1 operand");
 
         let path_opnd = &self.parms[ir.operands[0]];
         if path_opnd.val.data_type() != DataType::QuotedString {
@@ -377,45 +371,12 @@ impl IRDb {
         true
     }
 
-    // Expect 2 operand which are int or bool
-    fn validate_numeric_2(&self, ir: &IR, diags: &mut Diags) -> bool {
-        let len = ir.operands.len();
-        if len != 3 {
-            let m = format!(
-                "'{:?}' expression requires 2 input and one output \
-                                    operands, but found {} total operands.",
-                ir.kind, len
-            );
-            diags.err1("IRDB_6", &m, ir.src_loc.clone());
-            return false;
-        }
-        for op_num in 0..2 {
-            let opnd = &self.parms[ir.operands[op_num]];
-            if ![DataType::Integer, DataType::I64, DataType::U64].contains(&opnd.val.data_type()) {
-                let m = format!(
-                    "'{:?}' expression requires an integer, found '{:?}'.",
-                    ir.kind,
-                    opnd.val.data_type()
-                );
-                diags.err2("IRDB_7", &m, ir.src_loc.clone(), opnd.src_loc.clone());
-                return false;
-            }
-        }
-        true
-    }
-
     // Expect 1 numeric operand (value) followed by one optional numeric operand (repeat count)
     fn validate_numeric_1_or_2(&self, ir: &IR, diags: &mut Diags) -> bool {
         let len = ir.operands.len();
-        if len != 1 && len != 2 {
-            let m = format!(
-                "'{:?}' requires 1 or 2 input operands, \
-                                  but found {} total operands.",
-                ir.kind, len
-            );
-            diags.err1("IRDB_8", &m, ir.src_loc.clone());
-            return false;
-        }
+        // The linearizer always emits 1 or 2 operands for these instructions;
+        // any other count indicates a linearizer bug, not a user error.
+        assert!(len == 1 || len == 2, "{:?} must have 1 or 2 operands", ir.kind);
 
         // First operand must be numeric
         let opnd = &self.parms[ir.operands[0]];
@@ -597,7 +558,7 @@ impl IRDb {
             | IRKind::BitOr
             | IRKind::LogicalOr
             | IRKind::Subtract
-            | IRKind::Add => self.validate_numeric_2(ir, diags),
+            | IRKind::Add => true, // operand count and types enforced by linearizer
             IRKind::ToI64
             | IRKind::ToU64
             | IRKind::U64
