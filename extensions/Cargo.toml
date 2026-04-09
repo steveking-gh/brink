@@ -7,6 +7,9 @@ edition.workspace = true
 [lib]
 path = "src/lib.rs"
 
+[features]
+std-crc32c = ["dep:std_crc32c"]
+
 [dependencies]
 ext = { path = "../ext" }
-std_crc32c = { path = "../std/crc32c" }
+std_crc32c = { path = "../std/crc32c", optional = true }

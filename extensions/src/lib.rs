@@ -16,5 +16,6 @@ use ext::ExtensionRegistry;
 /// Registers all compiled-in extensions into `registry`.
 /// Call once before compiling any Brink scripts.
 pub fn register_all(registry: &mut ExtensionRegistry) {
+    #[cfg(feature = "std-crc32c")]
     std_crc32c::register(registry);
 }

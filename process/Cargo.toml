@@ -5,6 +5,9 @@ authors.workspace = true
 edition.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+std-crc32c = ["extensions/std-crc32c"]
+
 [lib]
 path = "process.rs"
 
