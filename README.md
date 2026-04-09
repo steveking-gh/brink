@@ -1455,25 +1455,26 @@ diags\diags.rs                    209                25    88.04%          10   
 engine\engine.rs                 2323               450    80.63%          67                 5    92.54%        1506               249    83.47%           0                 0         -
 ext\ext.rs                        292                18    93.84%          20                 3    85.00%         153                16    89.54%           0                 0         -
 ext\test_mocks.rs                 174                23    86.78%          27                 5    81.48%         147                20    86.39%           0                 0         -
-extensions\src\lib.rs               4                 0   100.00%           1                 0   100.00%           3                 0   100.00%           0                 0         -
+extensions\src\lib.rs               6                 0   100.00%           1                 0   100.00%           4                 0   100.00%           0                 0         -
 ir\ir.rs                          225                25    88.89%          22                 0   100.00%         171                15    91.23%           0                 0         -
 irdb\irdb.rs                      703                81    88.48%          13                 1    92.31%         430                56    86.98%           0                 0         -
 layoutdb\layoutdb.rs              784               159    79.72%          18                 0   100.00%         432                71    83.56%           0                 0         -
 linearizer\linearizer.rs          526                76    85.55%          17                 0   100.00%         311                32    89.71%           0                 0         -
 map\map.rs                        860                13    98.49%          58                 0   100.00%         579                 9    98.45%           0                 0         -
-process\process.rs                352                23    93.47%          22                 5    77.27%         194                 9    95.36%           0                 0         -
+process\process.rs                352                24    93.18%          22                 5    77.27%         194                 9    95.36%           0                 0         -
 src\main.rs                       123                 6    95.12%           8                 1    87.50%          84                 5    94.05%           0                 0         -
 std\crc32c\src\crc32c.rs           20                 0   100.00%           4                 0   100.00%          19                 0   100.00%           0                 0         -
+std\sha256\src\sha256.rs           20                 0   100.00%           4                 0   100.00%          19                 0   100.00%           0                 0         -
 symtable\symtable.rs              116                 5    95.69%          14                 2    85.71%          81                 5    93.83%           0                 0         -
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-TOTAL                            9735              1500    84.59%         378                31    91.80%        5980               859    85.64%           0                 0         -
+TOTAL                            9757              1501    84.62%         382                31    91.88%        6000               859    85.68%           0                 0         -
 ```
 <!-- COVERAGE_END -->
 
 ## Brink Source Code Overview
 
 | File                     | Stage         | Summary                                                                       |
-| -------------------------| ------------- | ----------------------------------------------------------------------------- |
+| ------------------------ | ------------- | ----------------------------------------------------------------------------- |
 | ast/ast.rs               | Stage 1       | Logos lexer → token stream → arena AST → AstDb validation                     |
 | const_eval/const_eval.rs | Stage 2       | Lowers const AST statements to LinIR, evaluates them, returns a SymbolTable   |
 | layoutdb/layoutdb.rs     | Stage 3       | AST flattening into linear IR and operand vectors; values are still strings   |
@@ -1489,11 +1490,5 @@ TOTAL                            9735              1500    84.59%         378   
 | brink_extension/lib.rs   | Extensions    | Public API for extension authors                                              |
 | ext/ext.rs               | Extensions    | Runtime extension registry and dispatch wrapper                               |
 | std/crc32c/src/lib.rs    | std extension | CRC-32C (Castagnoli) hash over caller-specified output region                 |
-
-
-
-
-
-
-
+| std/sha256/src/lib.rs    | std extension | SHA256 hash over caller-specified output region                               |
 
