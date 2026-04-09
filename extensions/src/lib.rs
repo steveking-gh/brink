@@ -18,4 +18,6 @@ use ext::ExtensionRegistry;
 pub fn register_all(registry: &mut ExtensionRegistry) {
     #[cfg(feature = "std-crc32c")]
     std_crc32c::register(registry);
+    #[cfg(feature = "std-sha256")]
+    std_sha256::register(registry);
 }

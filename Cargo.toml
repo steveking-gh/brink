@@ -14,6 +14,7 @@ members = [
     "const_eval",
     "brink_extension",
     "std/crc32c",
+    "std/sha256",
     "extensions",
 ]
 
@@ -53,8 +54,9 @@ codegen-units = 16
 rpath = false
 
 [features]
-default = ["std-crc32c"]
+default = ["std-crc32c", "std-sha256"]
 std-crc32c = ["process/std-crc32c"]
+std-sha256  = ["process/std-sha256"]
 
 [dependencies]
 indextree = "4.3.1"

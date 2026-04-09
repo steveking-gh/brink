@@ -1,0 +1,25 @@
+// Computes SHA-256 using the section-name form.
+//
+// The section-name form slices the entire section from the output image,
+// including the 32 zeroed placeholder bytes pre-allocated for the digest
+// field itself.  Input to the hash is therefore 36 bytes:
+//   [0x01, 0x02, 0x03, 0x04, 0x00 * 32]
+//
+// SHA-256 of those 36 bytes:
+//   [0x0C, 0xD7, 0xDB, 0x9E, 0xEE, 0x47, 0x56, 0x54,
+//    0xB6, 0x55, 0xAB, 0xF1, 0x48, 0xDD, 0xBE, 0x05,
+//    0x63, 0xDC, 0xBE, 0xC0, 0xAB, 0x7E, 0xA3, 0xEC,
+//    0xD7, 0x25, 0x4B, 0x17, 0x51, 0x69, 0x95, 0x2D]
+// Total output: 36 bytes.
+//
+// To hash only the data bytes (excluding the digest field), use the explicit
+// range form instead: wr std::sha256(0, 4)
+section data {
+    wr8 0x01; wr8 0x02; wr8 0x03; wr8 0x04;
+    wr std::sha256(data);
+    assert sizeof(data) == 36;
+}
+
+assert sizeof(std::sha256) == 32;
+
+output data;

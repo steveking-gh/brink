@@ -9,7 +9,9 @@ path = "src/lib.rs"
 
 [features]
 std-crc32c = ["dep:std_crc32c"]
+std-sha256  = ["dep:std_sha256"]
 
 [dependencies]
-ext = { path = "../ext" }
-std_crc32c = { path = "../std/crc32c", optional = true }
+ext        = { path = "../ext" }
+std_crc32c = { path = "../std/crc32c",   optional = true }
+std_sha256  = { path = "../std/sha256",  optional = true }
