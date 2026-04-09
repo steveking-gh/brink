@@ -2534,4 +2534,12 @@ mod tests {
     fn irdb_46_ranged_ext_bad_range() {
         assert_brink_failure("tests/irdb_46_ranged_ext_bad_range.brink", &["[IRDB_46]"]);
     }
+
+    /// IRDB_15: wr repeat-count operand is a quoted string, not a numeric value.
+    /// validate_numeric_1_or_2 rejects a non-integer second operand.
+    #[test]
+    fn irdb_15_wr_bad_repeat_type() {
+        assert_brink_failure("tests/irdb_15_wr_bad_repeat_type.brink", &["[IRDB_15]"]);
+    }
+
 } // mod tests

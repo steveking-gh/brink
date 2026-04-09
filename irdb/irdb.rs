@@ -437,15 +437,10 @@ impl IRDb {
             }
             IRKind::ExtensionCallRanged => {
                 let name = self.get_opnd_as_identifier(ir, 0);
-                if ext_registry.get(name).is_none() {
-                    let m = if let Some(idx) = name.find("::") {
-                        format!("Unknown namespace '{}'", &name[..idx])
-                    } else {
-                        format!("Unknown function '{}'", name)
-                    };
-                    diags.err1("IRDB_50", &m, ir.src_loc.clone());
-                    return false;
-                }
+                // disambiguate_extension_call only produces ExtensionCallRanged for
+                // extensions that exist in the registry; unknown names become
+                // ExtensionCall and trigger IRDB_40 instead.
+                assert!(ext_registry.get(name).is_some(), "ExtensionCallRanged with unknown extension '{name}'");
                 // Need at least [name, start, length, output] = 4 operands.
                 if ir.operands.len() < 4 {
                     let m = format!(
