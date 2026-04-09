@@ -19,13 +19,13 @@ members = [
 ]
 
 [workspace.package]
-version = "4.0.0"
+version = "5.0.0"
 authors = ["Steve King <sk@metrokings.com>"]
 edition = "2024"
 
 [package]
 name = "brink"
-version = "4.0.0"
+version = "5.0.0"
 build = "build.rs"
 license-file = "LICENSE.txt"
 readme = "README.md"
@@ -52,6 +52,11 @@ panic = 'unwind'
 incremental = false
 codegen-units = 16
 rpath = false
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
 
 [features]
 default = ["std-crc32c", "std-sha256"]
