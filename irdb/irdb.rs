@@ -469,31 +469,23 @@ impl IRDb {
             }
             IRKind::ExtensionCallSection => {
                 let name = self.get_opnd_as_identifier(ir, 0);
-                if ext_registry.get(name).is_none() {
-                    let m = if let Some(idx) = name.find("::") {
-                        format!("Unknown namespace '{}'", &name[..idx])
-                    } else {
-                        format!("Unknown function '{}'", name)
-                    };
-                    diags.err1("IRDB_51", &m, ir.src_loc.clone());
-                    return false;
-                }
+                // disambiguate_extension_call only produces ExtensionCallSection for
+                // extensions confirmed present in the registry.  Unknown names cause
+                // ExtensionCall and trigger IRDB_40 instead.
+                assert!(ext_registry.get(name).is_some(), "ExtensionCallSection with unknown extension '{name}'");
                 // Need at least [name, section_id, output] = 3 operands.
                 assert!(
                     ir.operands.len() >= 3,
                     "ExtensionCallSection must have at least 3 operands"
                 );
                 // operands[1] must be an Identifier matching a known section.
+                // disambiguate_extension_call only emits ExtensionCallSection when the
+                // first user arg is a Literal{Identifier} contained in section_names.
+                // AST_31 prevents const/section name collisions, so process_lin_operands
+                // cannot substitute it away.  This arm is structurally always Identifier.
                 let sec_opnd = &self.parms[ir.operands[1]];
                 let ParameterValue::Identifier(ref sec_name) = sec_opnd.val else {
-                    let m = format!(
-                        "Extension '{}': first argument must be a section identifier, \
-                         found {:?}",
-                        name,
-                        sec_opnd.val.data_type()
-                    );
-                    diags.err2("IRDB_47", &m, ir.src_loc.clone(), sec_opnd.src_loc.clone());
-                    return false;
+                    unreachable!("ExtensionCallSection operand[1] must be a section Identifier")
                 };
                 if !section_names.contains(sec_name.as_str()) {
                     let m = format!(
