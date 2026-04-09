@@ -317,10 +317,11 @@ Within a section definition, output order and source code order are the same.  H
 
 This section provides an overview of Brink's internal output creation phases.
 
-1. **Layout Phase**: First, Brink iteratively evaluates all expressions that affect output size and layout.  For example, Brink evaluates `align` expressions and extension `size()` calls during this phase.  On the other hand, Brink mostly skips statements like `wr64`, since knowing the result is 64-bits long is sufficient to determine the layout.  This phase completes when successive layout iterations produce identical results.
-2. **Generate Phase 1**: Next, Brink begins populating data values into the output.  In this first generation phase, Brink first evaluates `wr` statements that do NOT call extensions.  Brink evaluates wr calls in output order.
-3. **Generate Phase 2**: Next, Brink evaluates `wr` statement that call an [extension](#brink-extensions).  Like before, brink evaluates extension calls in output order.  Brink executes all extension calls serially on the engine thread.
-4. **Validation Phase**: Finally, Brink evaluates `assert` statements, including those that call extensions.  Note that Brink may take an early exit in any phase if an `assert` statement will unambiguously fail.
+1. `const` **Evaluation Phase**: First, Brink evaluates all const expressions.  This phase includes evaluation of all `if/else` statements and the dependent const-time operations such as `include` statements in the taken path.
+2. **Layout Phase**: Next, Brink iteratively evaluates all expressions that affect output size and layout.  For example, Brink evaluates `align` expressions and extension `size()` calls during this phase.  Brink skips data generation, since knowing the size of operations suffices to determine the precise output structure.  This phase completes when successive layout iterations produce identical results.
+3. **Generate Phase 1**: Next, Brink begins populating data values into the output.  In this first generation phase, Brink first evaluates `wr` statements that do NOT call extensions.  Brink evaluates wr calls in output order.
+4. **Generate Phase 2**: Next, Brink evaluates `wr` statement that call an [extension](#brink-extensions).  Like before, brink evaluates extension calls in output order.  Brink executes all extension calls serially on the engine thread.
+5. **Validation Phase**: Finally, Brink evaluates `assert` statements, including those that call extensions.  Note that Brink may take an early exit in any phase if an `assert` statement will unambiguously fail.
 
 ---
 
@@ -672,7 +673,7 @@ To provide errors and warnings, Brink tracks the defined/undefined and used/unus
 Allows conditional execution of other statements.
 
 > [!IMPORTANT]
-> Brink evaluates *all* `if/else` statements before starting layout of the output.  Therefore, an `if/else` expression must only depend on `const` variables and literal values.  In other words, `if/else` statements must not depend on dynamic addresses, sizes, offsets or any other layout dependent aspect of the output file.
+> As described in [Output Creation Phases](#output-creation-phases), Brink evaluates all `if/else` statements before starting layout of the output.  Therefore, an `if/else` expression must only depend on `const` variables and literal values.  In other words, `if/else` statements must not depend on dynamic addresses, sizes, offsets or any other layout dependent aspect of the output file.
 
 Brink currently limits the conditional blocks of an `if/else` to the following statement types:
 
@@ -1449,7 +1450,7 @@ To update the coverage table in this README from Windows, run `.\update_coverage
 Filename                      Regions    Missed Regions     Cover   Functions  Missed Functions  Executed       Lines      Missed Lines     Cover    Branches   Missed Branches     Cover
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ast\ast.rs                       2002               417    79.17%          53                 3    94.34%        1123               204    81.83%           0                 0         -
-const_eval\const_eval.rs         1047               204    80.52%          24                 5    79.17%         649               157    75.81%           0                 0         -
+const_eval\const_eval.rs         1022               179    82.49%          24                 5    79.17%         641               149    76.76%           0                 0         -
 diags\diags.rs                    209                25    88.04%          10                 1    90.00%         106                19    82.08%           0                 0         -
 engine\engine.rs                 2323               450    80.63%          67                 5    92.54%        1506               249    83.47%           0                 0         -
 ext\ext.rs                        292                18    93.84%          20                 3    85.00%         153                16    89.54%           0                 0         -
@@ -1460,12 +1461,12 @@ irdb\irdb.rs                      703                81    88.48%          13   
 layoutdb\layoutdb.rs              784               159    79.72%          18                 0   100.00%         432                71    83.56%           0                 0         -
 linearizer\linearizer.rs          526                76    85.55%          17                 0   100.00%         311                32    89.71%           0                 0         -
 map\map.rs                        860                13    98.49%          58                 0   100.00%         579                 9    98.45%           0                 0         -
-process\process.rs                352                24    93.18%          22                 5    77.27%         194                 9    95.36%           0                 0         -
+process\process.rs                352                23    93.47%          22                 5    77.27%         194                 9    95.36%           0                 0         -
 src\main.rs                       123                 6    95.12%           8                 1    87.50%          84                 5    94.05%           0                 0         -
 std\crc32c\src\crc32c.rs           20                 0   100.00%           4                 0   100.00%          19                 0   100.00%           0                 0         -
 symtable\symtable.rs              116                 5    95.69%          14                 2    85.71%          81                 5    93.83%           0                 0         -
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-TOTAL                            9760              1526    84.36%         378                31    91.80%        5988               867    85.52%           0                 0         -
+TOTAL                            9735              1500    84.59%         378                31    91.80%        5980               859    85.64%           0                 0         -
 ```
 <!-- COVERAGE_END -->
 
@@ -1488,6 +1489,7 @@ TOTAL                            9760              1526    84.36%         378   
 | brink_extension/lib.rs   | Extensions    | Public API for extension authors                                              |
 | ext/ext.rs               | Extensions    | Runtime extension registry and dispatch wrapper                               |
 | std/crc32c/src/lib.rs    | std extension | CRC-32C (Castagnoli) hash over caller-specified output region                 |
+
 
 
 
