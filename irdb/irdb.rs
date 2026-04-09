@@ -487,14 +487,9 @@ impl IRDb {
                 let ParameterValue::Identifier(ref sec_name) = sec_opnd.val else {
                     unreachable!("ExtensionCallSection operand[1] must be a section Identifier")
                 };
-                if !section_names.contains(sec_name.as_str()) {
-                    let m = format!(
-                        "Extension '{}': unknown section '{}' in call",
-                        name, sec_name
-                    );
-                    diags.err2("IRDB_48", &m, ir.src_loc.clone(), sec_opnd.src_loc.clone());
-                    return false;
-                }
+                // disambiguate_extension_call only emits ExtensionCallSection when
+                // section_names.contains(sval) is already true.
+                assert!(section_names.contains(sec_name.as_str()), "ExtensionCallSection section '{sec_name}' not in section_names");
                 true
             }
             IRKind::SizeofExt => {
@@ -511,22 +506,18 @@ impl IRDb {
                 true
             }
             IRKind::WrExt => {
-                let len = ir.operands.len();
-                if len != 1 {
-                    let m = format!("'{:?}' requires exactly 1 input operand.", ir.kind);
-                    diags.err1("IRDB_43", &m, ir.src_loc.clone());
-                    return false;
-                }
+                // layoutdb emits WrExt with operand_count_is_valid(1) — any count
+                // other than 1 fails layout construction before reaching IRDb.
+                assert!(ir.operands.len() == 1, "WrExt must have exactly 1 operand");
                 let lop_idx = ir.operands[0];
                 let lop = &self.parms[lop_idx];
-                if lop.val.data_type() != DataType::Extension {
-                    diags.err1(
-                        "IRDB_41",
-                        "Expected generic 'wr' statement to output an extension result.",
-                        ir.src_loc.clone(),
-                    );
-                    return false;
-                }
+                // The single WrExt operand is the Output of an ExtensionCall IR;
+                // get_operand_data_type_r always assigns DataType::Extension to such
+                // outputs, so a non-Extension type here is a linearizer bug.
+                assert!(
+                    lop.val.data_type() == DataType::Extension,
+                    "WrExt operand must be DataType::Extension"
+                );
                 true
             }
             IRKind::NEq
