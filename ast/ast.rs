@@ -12,10 +12,12 @@
 // Its output — an Ast and an AstDb — is consumed by lineardb in the next
 // stage.
 
+mod lexer;
+use lexer::Lexer;
+
 use anyhow::{Context, bail};
 use diags::{Diags, SourceSpan};
 use indextree::{Arena, NodeId};
-use logos::Logos;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::prelude::*;
@@ -23,171 +25,79 @@ use std::io::prelude::*;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
 
-/// All tokens in brink created with the logos macro.
+/// All tokens in brink.
 /// Keep this simple and do not be tempted to attach
-/// unstructured values these enum.
-#[derive(Logos, Debug, Clone, Copy, PartialEq)]
+/// unstructured values to these enum variants.
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum LexToken {
-    #[token("const")]
     Const,
-    #[token("if")]
     If,
-    #[token("else")]
     Else,
-    // Built-in variables — must be listed before the Identifier regex so that
-    // logos gives them priority over the generic identifier pattern.
-    #[token("__OUTPUT_SIZE")]
     BuiltinOutputSize,
-    #[token("__OUTPUT_ADDR")]
     BuiltinOutputAddr,
-    #[token("__BRINK_VERSION_STRING")]
     BuiltinVersionString,
-    #[token("__BRINK_VERSION_MAJOR")]
     BuiltinVersionMajor,
-    #[token("__BRINK_VERSION_MINOR")]
     BuiltinVersionMinor,
-    #[token("__BRINK_VERSION_PATCH")]
     BuiltinVersionPatch,
-    #[token("section")]
     Section,
-    #[token("align")]
     Align,
-    #[token("set_sec_offset")]
     SetSecOffset,
-    #[token("set_addr_offset")]
     SetAddrOffset,
-    #[token("set_addr")]
     SetAddr,
-    #[token("set_file_offset")]
     SetFileOffset,
-    #[token("assert")]
     Assert,
-    #[token("sizeof")]
     Sizeof,
-    #[token("print")]
     Print,
-    #[token("to_u64")]
     ToU64,
-    #[token("to_i64")]
     ToI64,
-    #[token("addr")]
     Addr,
-    #[token("addr_offset")]
     AddrOffset,
-    #[token("sec_offset")]
     SecOffset,
-    #[token("file_offset")]
     FileOffset,
-    #[token("wrs")]
     Wrs,
-    #[token("wr8")]
     Wr8,
-    #[token("wr16")]
     Wr16,
-    #[token("wr24")]
     Wr24,
-    #[token("wr32")]
     Wr32,
-    #[token("wr40")]
     Wr40,
-    #[token("wr48")]
     Wr48,
-    #[token("wr56")]
     Wr56,
-    #[token("wr64")]
     Wr64,
-    #[token("wrf")]
     Wrf,
-    #[token("wr")]
     Wr,
-    #[token("output")]
     Output,
-    #[token("==")]
     DoubleEq,
-    #[token("!=")]
     NEq,
-    #[token(">=")]
     GEq,
-    #[token("<=")]
     LEq,
-    // Single '<' and '>' must be lexed after '<<', '>>', '>=', '<=' to avoid ambiguity.
-    #[token(">")]
     Gt,
-    #[token("<")]
     Lt,
-    // Single '=' must be lexed after all the multi-character operators
-    // that start with '=' to avoid ambiguity.
-    #[token("=")]
     Eq,
-    #[token("&&")]
     DoubleAmpersand,
-    #[token("||")]
     DoublePipe,
-    #[token("&")]
     Ampersand,
-    #[token("|")]
     Pipe,
-    #[token("+")]
     Plus,
-    #[token("-")]
     Minus,
-    #[token("*")]
     Asterisk,
-    #[token("/")]
     FSlash,
-    #[token("%")]
     Percent,
-    #[token(",")]
     Comma,
-    #[token("<<")]
     DoubleLess,
-    #[token(">>")]
     DoubleGreater,
-    #[token("{")]
     OpenBrace,
-    #[token("}")]
     CloseBrace,
-    #[token("(")]
     OpenParen,
-    #[token(")")]
     CloseParen,
-    #[token(";")]
     Semicolon,
-    #[regex("[_a-zA-Z][0-9a-zA-Z_]*:")]
     Label,
-    #[regex("[_a-zA-Z][0-9a-zA-Z_]*::")]
     Namespace,
-    #[regex("[_a-zA-Z][0-9a-zA-Z_]*")]
     Identifier,
-
-    // Plain vanilla numbers that are ambiguously signed or unsigned
-    #[regex("[1-9][_0-9]*|0")]
     Integer,
-
-    // Unsigned literals are suffixed with 'u'
-    // binary and hex numbers are unsigned by default and don't require u suffix
-    #[regex("0[bB][01][_01]*u?|0[xX][0-9a-fA-F][_0-9a-fA-F]*u?|[1-9][_0-9]*u|0u")]
     U64,
-
-    // Signed literals are suffixed with 'i' and/or start with a minus sign
-    #[regex("0[bB][01][_01]*i|0[xX][0-9a-fA-F][_0-9a-fA-F]*i|[1-9][_0-9]*i|-[1-9][_0-9]*i?|0i")]
     I64,
-
-    // Not only is \ special in strings and must be escaped, but also special in
-    // regex.  We use raw string here to avoid having the escape the \ for the
-    // string itself. The \\ in this raw string are escape \ for the regex
-    // engine underneath.
-    #[regex(r#""(\\"|\\.|[^"])*""#)]
     QuotedString,
-
-    // Comments and whitespace are stripped from user input during processing.
-    // This stripping happens *after* we record all the line/offset info
-    // with codespan for error reporting.
-    #[regex(r#"/\*([^*]|\*[^/])+\*/"#, logos::skip)] // block comments
-    #[regex(r#"//[^\r\n]*(\r\n|\n)?"#, logos::skip)] // line comments
-    #[regex(r#"[ \t\n\f]+"#, logos::skip)] // whitespace
-    /// Catch-all for unrecognized input; produced by the logos lexer on error.
-    #[error]
+    /// Catch-all for unrecognized input.
     Unknown,
 }
 
@@ -305,7 +215,7 @@ impl<'toks> Ast<'toks> {
         diags: &mut Diags,
         visited: &mut HashMap<String, SourceSpan>,
     ) -> anyhow::Result<()> {
-        let mut lex = LexToken::lexer(fstr);
+        let mut lex = Lexer::new(fstr);
         while let Some(tok) = lex.next() {
             let val = lex.slice();
             let span = lex.span();

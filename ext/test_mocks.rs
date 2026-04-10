@@ -81,7 +81,7 @@ impl BrinkExtension for MockLogger {
 }
 
 /// Reads the caller-specified image slice and writes each byte + 1 to the
-/// output buffer.  Verifies that `img_buffer` is correctly sliced before the
+/// output buffer.  Verifies that buffer is correctly sliced before the
 /// extension executes.
 pub struct MockIncrement {
     size_call_count: Cell<usize>,

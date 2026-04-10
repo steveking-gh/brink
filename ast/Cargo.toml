@@ -9,7 +9,6 @@ edition.workspace = true
 path = "ast.rs"
 
 [dependencies]
-logos = "0.11.4"
 indextree = "4.3.1"
 codespan-reporting = "0.9.5"
 anyhow = "1.0.34"

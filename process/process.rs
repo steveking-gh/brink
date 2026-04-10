@@ -38,7 +38,7 @@ use tracing::{debug, error, info, trace, warn};
 /// - Ends with `i`                   → `I64`
 /// - Starts with `"` / `'`          → `QuotedString` (strip surrounding quotes)
 /// - Starts with `-`                 → `I64`
-/// - Starts with `0x`/`0b`/`0o`     → `U64` (matches source const behaviour)
+/// - Starts with `0x`/`0b`     `     → `U64` (matches source const behavior)
 /// - Otherwise                       → `Integer`
 fn parse_define(s: &str) -> Result<(String, ParameterValue)> {
     if s.is_empty() {
@@ -71,8 +71,6 @@ fn parse_define(s: &str) -> Result<(String, ParameterValue)> {
         || val_str.starts_with("0X")
         || val_str.starts_with("0b")
         || val_str.starts_with("0B")
-        || val_str.starts_with("0o")
-        || val_str.starts_with("0O")
     {
         let v = parse::<u64>(val_str)
             .map_err(|_| anyhow!("Invalid U64 value in define '{}': '{}'", s, val_str))?;
