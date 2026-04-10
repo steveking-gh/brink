@@ -1,4 +1,6 @@
-﻿[![Rust](https://github.com/steveking-gh/brink/actions/workflows/rust.yml/badge.svg)](https://github.com/steveking-gh/brink/actions/workflows/rust.yml) [![codecov](https://codecov.io/gh/steveking-gh/brink/graph/badge.svg)](https://codecov.io/gh/steveking-gh/brink)
+﻿[![Rust](https://github.com/steveking-gh/brink/actions/workflows/rust.yml/badge.svg)](https://github.com/steveking-gh/brink/actions/workflows/rust.yml)
+[![codecov](https://codecov.io/gh/steveking-gh/brink/graph/badge.svg)](https://codecov.io/gh/steveking-gh/brink)
+[![rust report card](https://rust-reportcard.xuri.me/badge/github.com/steveking-gh/brink)](https://rust-reportcard.xuri.me/report/github.com/steveking-gh/brink)
 
 # Brink
 
