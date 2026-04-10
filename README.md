@@ -1,4 +1,4 @@
-﻿[![Rust](https://github.com/steveking-gh/brink/actions/workflows/rust.yml/badge.svg)](https://github.com/steveking-gh/brink/actions/workflows/rust.yml)
+﻿[![Rust](https://github.com/steveking-gh/brink/actions/workflows/rust.yml/badge.svg)](https://github.com/steveking-gh/brink/actions/workflows/rust.yml) [![codecov](https://codecov.io/gh/steveking-gh/brink/graph/badge.svg)](https://codecov.io/gh/steveking-gh/brink)
 
 # Brink
 
