@@ -1,7 +1,7 @@
 ﻿[![Rust](https://github.com/steveking-gh/brink/actions/workflows/rust.yml/badge.svg)](https://github.com/steveking-gh/brink/actions/workflows/rust.yml)
 [![codecov](https://codecov.io/gh/steveking-gh/brink/graph/badge.svg)](https://codecov.io/gh/steveking-gh/brink)
 [![rust report card](https://rust-reportcard.xuri.me/badge/github.com/steveking-gh/brink)](https://rust-reportcard.xuri.me/report/github.com/steveking-gh/brink)
-[![Security audit](https://github.com/steveking-gh/brink/workflows/workflows/audit-check.yml/badge.svg?branch=master)](https://github.com/steveking-gh/brink/actions?query=workflow%3Aaudit-check)
+[![Security audit](https://github.com/steveking-gh/brink/workflows/audit-check.yml/badge.svg?branch=master)](https://github.com/steveking-gh/brink/actions?query=workflow%3Aaudit-check)
 ![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)
 
 # Brink
