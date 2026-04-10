@@ -3,6 +3,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.0.0] - 2026-04-09
+- Support for if/else in const expressions
+- Support for Rust style map file output
+- Many more unit tests
+- std::crc32c extension
+- std::sha256 extension
+
 ## [3.0.0] - 2026-03-25
 - Large upgrade of Brink capability with many breaking changes.
 - Completed extension infrastructure
