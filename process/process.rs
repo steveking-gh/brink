@@ -21,7 +21,6 @@ use ast::{Ast, AstDb};
 use diags::Diags;
 use engine::Engine;
 use ext::{ExtensionRegistry, test_mocks::register_test_extensions};
-use const_eval;
 use ir::{ConstBuiltins, ParameterValue};
 use irdb::IRDb;
 use layoutdb::LayoutDb;
@@ -130,7 +129,7 @@ pub fn process(
     }
 
     let ast_db = AstDb::new(&mut diags, &ast)?;
-    
+
     let symbol_table = const_eval::evaluate(&mut diags, &ast, &ast_db, &const_defines)
         .context("[PROC_2]: Error detected, halting.")?;
 
