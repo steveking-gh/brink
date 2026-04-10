@@ -9,6 +9,16 @@ creating FLASH, ROM or other non-volatile memory images.
 
 # Quick Start
 
+## Install Prebuilt Binaries for Linux
+
+    curl --proto '=https' --tlsv1.2 -LsSf https://github.com/steveking-gh/brink/releases/download/5.0.4/brink-installer.sh | sh
+
+## Install Prebuilt Binaries for Windows
+
+Start a command prompt and execute the following:
+
+    powershell -ExecutionPolicy Bypass -c "irm https://github.com/steveking-gh/brink/releases/download/5.0.4/brink-installer.ps1 | iex"
+
 ## Build From Source
 
 ### Step 1: Install Rust
@@ -33,73 +43,6 @@ All tests should pass, 0 tests should fail.
 The previous build step created the Brink binary as `./target/release/brink`.  You can install the Brink binary anywhere on your system.  As a convenience, cargo provides a per-user installation as `$HOME/.cargo/bin/brink`.
 
     cargo install --path ./
-
-# Command Line Options Reference
-
-    brink [OPTIONS] <input>
-
-The required input file contains the brink source code to compile and build the output file.  Brink source files typically have a .brink file extension.
-
-| Option              | Description                                                                                                                       |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `-D<name>[=value]`  | Defines a `const` value from the command line.<br>See [Command-Line Const Defines](#command-line-const-defines) below.            |
-| `--list-extensions` | List all available extensions compiled into brink as controlled by Cargo feature flags.                                           |
-| `--map-csv`         | Writes a CSV format map file `<stem>.map.csv` to the current directory.<br>For example: `firmware.brink` → `firmware.map.csv`.    |
-| `--map-csv=<file>`  | Writes a CSV map file to the specified file.                                                                                      |
-| `--map-csv=-`       | Writes a CSV map file to stdout.                                                                                                  |
-| `--map-c99`         | Writes a C99 header file `<stem>.map.h` to the current directory.<br>For example: `firmware.brink` → `firmware.map.h`.            |
-| `--map-c99=<file>`  | Writes a C99 header to the specified file.                                                                                        |
-| `--map-c99=-`       | Writes a C99 header to stdout.                                                                                                    |
-| `--map-json`        | Writes a JSON format map file `<stem>.map.json` to the current directory.<br>For example: `firmware.brink` → `firmware.map.json`. |
-| `--map-json=<file>` | Writes a JSON map to the specified file.                                                                                          |
-| `--map-json=-`      | Writes a JSON map to stdout.                                                                                                      |
-| `--map-rs`          | Writes a Rust module file `<stem>.map.rs` to the current directory.<br>For example: `firmware.brink` → `firmware.map.rs`.         |
-| `--map-rs=<file>`   | Writes a Rust module map to the specified file.                                                                                   |
-| `--map-rs=-`        | Writes a Rust module map to stdout.                                                                                               |
-| `--noprint`         | Suppress `print` statement output from the source program.                                                                        |
-| `-o <file>`         | Output file name. Defaults to `output.bin`.                                                                                       |
-| `-q`, `--quiet`     | Suppress all console output, including errors. Overrides `-v`. Useful for fuzz testing.                                           |
-| `-v`                | Increase verbosity. Repeat up to four times (`-v -v -v -v`).                                                                      |
-
-When the user does not specify a path, Brink writes map file(s) and the output to the current working directory.
-
-## Command-Line Const Defines
-
-The `-D` option injects a [`const`](#const-identifier--expr) definition into the program from the command line.
-This option is modelled after the GCC `-D` preprocessor syntax.  You can specify `-D` multiple times, once per each definition.  For example:
-
-    brink -DBASE=0x8000 -DCOUNT=16 firmware.brink
-
-The `name` must be a valid Brink [identifier](#identifiers).  The `value` is optional; without a value, Brink sets the `const` to 1, with type `Integer`, following the GCC boolean-flag convention.
-
-`-D` **overrides** any same-named `const` definition in the source.
-
-Map output lists all `const` definitions including `-D` consts.
-
-### Value Type Inference
-
-Brink knows or infers the type from the value string using the same rules as source code for type inference.
-
-| Example          | Value  | Type      | Description                                |
-| ---------------- | ------ | --------- | ------------------------------------------ |
-| `-DFLAG`         | 1      | `Integer` | Defaults to true (1).                      |
-| `-DCOUNT=16`     | 16     | `Integer` | Plain decimal → `Integer`                  |
-| `-DBASE=0x1000`  | 0x1000 | `U64`     | Hex/binary without suffix → implicit `U64` |
-| `-DBASE=0x1000u` | 0x1000 | `U64`     | `u` suffix → explicit `U64`                |
-| `-DOFFSET=0x40i` | 0x40   | `I64`     | `i` suffix → explicit `I64`                |
-| `-DDELTA=-4`     | -4     | `I64`     | Negative decimal → implicit `I64`          |
-
-### Example
-
-Define a base address and section count at the command line:
-
-    brink -DBASE=0x0800_0000 firmware.brink -o firmware.bin
-
-The source can reference `BASE` as an ordinary const:
-
-    section entry { wr8 0x01; }
-    section top   { wr entry; }
-    output top BASE;
 
 ---
 
@@ -322,6 +265,75 @@ This section provides an overview of Brink's internal output creation phases.
 3. **Generate Phase 1**: Next, Brink begins populating data values into the output.  In this first generation phase, Brink first evaluates `wr` statements that do NOT call extensions.  Brink evaluates wr calls in output order.
 4. **Generate Phase 2**: Next, Brink evaluates `wr` statement that call an [extension](#brink-extensions).  Like before, brink evaluates extension calls in output order.  Brink executes all extension calls serially on the engine thread.
 5. **Validation Phase**: Finally, Brink evaluates `assert` statements, including those that call extensions.  Note that Brink may take an early exit in any phase if an `assert` statement will unambiguously fail.
+
+---
+
+# Command Line Options Reference
+
+    brink [OPTIONS] <input>
+
+The required input file contains the brink source code to compile and build the output file.  Brink source files typically have a .brink file extension.
+
+| Option              | Description                                                                                                                       |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `-D<name>[=value]`  | Defines a `const` value from the command line.<br>See [Command-Line Const Defines](#command-line-const-defines) below.            |
+| `--list-extensions` | List all available extensions compiled into brink as controlled by Cargo feature flags.                                           |
+| `--map-csv`         | Writes a CSV format map file `<stem>.map.csv` to the current directory.<br>For example: `firmware.brink` → `firmware.map.csv`.    |
+| `--map-csv=<file>`  | Writes a CSV map file to the specified file.                                                                                      |
+| `--map-csv=-`       | Writes a CSV map file to stdout.                                                                                                  |
+| `--map-c99`         | Writes a C99 header file `<stem>.map.h` to the current directory.<br>For example: `firmware.brink` → `firmware.map.h`.            |
+| `--map-c99=<file>`  | Writes a C99 header to the specified file.                                                                                        |
+| `--map-c99=-`       | Writes a C99 header to stdout.                                                                                                    |
+| `--map-json`        | Writes a JSON format map file `<stem>.map.json` to the current directory.<br>For example: `firmware.brink` → `firmware.map.json`. |
+| `--map-json=<file>` | Writes a JSON map to the specified file.                                                                                          |
+| `--map-json=-`      | Writes a JSON map to stdout.                                                                                                      |
+| `--map-rs`          | Writes a Rust module file `<stem>.map.rs` to the current directory.<br>For example: `firmware.brink` → `firmware.map.rs`.         |
+| `--map-rs=<file>`   | Writes a Rust module map to the specified file.                                                                                   |
+| `--map-rs=-`        | Writes a Rust module map to stdout.                                                                                               |
+| `--noprint`         | Suppress `print` statement output from the source program.                                                                        |
+| `-o <file>`         | Output file name. Defaults to `output.bin`.                                                                                       |
+| `-q`, `--quiet`     | Suppress all console output, including errors. Overrides `-v`. Useful for fuzz testing.                                           |
+| `-v`                | Increase verbosity. Repeat up to four times (`-v -v -v -v`).                                                                      |
+
+When the user does not specify a path, Brink writes map file(s) and the output to the current working directory.
+
+## Command-Line Const Defines
+
+The `-D` option injects a [`const`](#const-identifier--expr) definition into the program from the command line.
+This option is modelled after the GCC `-D` preprocessor syntax.  You can specify `-D` multiple times, once per each definition.  For example:
+
+    brink -DBASE=0x8000 -DCOUNT=16 firmware.brink
+
+The `name` must be a valid Brink [identifier](#identifiers).  The `value` is optional; without a value, Brink sets the `const` to 1, with type `Integer`, following the GCC boolean-flag convention.
+
+`-D` **overrides** any same-named `const` definition in the source.
+
+Map output lists all `const` definitions including `-D` consts.
+
+### Value Type Inference
+
+Brink knows or infers the type from the value string using the same rules as source code for type inference.
+
+| Example          | Value  | Type      | Description                                |
+| ---------------- | ------ | --------- | ------------------------------------------ |
+| `-DFLAG`         | 1      | `Integer` | Defaults to true (1).                      |
+| `-DCOUNT=16`     | 16     | `Integer` | Plain decimal → `Integer`                  |
+| `-DBASE=0x1000`  | 0x1000 | `U64`     | Hex/binary without suffix → implicit `U64` |
+| `-DBASE=0x1000u` | 0x1000 | `U64`     | `u` suffix → explicit `U64`                |
+| `-DOFFSET=0x40i` | 0x40   | `I64`     | `i` suffix → explicit `I64`                |
+| `-DDELTA=-4`     | -4     | `I64`     | Negative decimal → implicit `I64`          |
+
+### Example
+
+Define a base address and section count at the command line:
+
+    brink -DBASE=0x0800_0000 firmware.brink -o firmware.bin
+
+The source can reference `BASE` as an ordinary const:
+
+    section entry { wr8 0x01; }
+    section top   { wr entry; }
+    output top BASE;
 
 ---
 
