@@ -1,0 +1,61 @@
+std/md5/tests/md5_64_byte.brink
+  254257e5b3abdcc5 1-30
+vscode-brink/package.json
+  254257e5b3abdcc5 1-36
+vscode-brink/README.md
+  254257e5b3abdcc5 1-3
+Cargo.toml
+  254257e5b3abdcc5 18,63,66
+std/md5/Cargo.toml
+  254257e5b3abdcc5 1-17
+std/md5/tests/md5_1_byte.brink
+  254257e5b3abdcc5 1-14
+std/md5/tests/md5_section.brink
+  254257e5b3abdcc5 1-23
+vscode-brink/.vscodeignore
+  254257e5b3abdcc5 1-4
+std/md5/tests/md5_ambiguous_section.brink
+  254257e5b3abdcc5 1-11
+std/md5/tests/integration.rs
+  254257e5b3abdcc5 1-147
+std/md5/src/md5.rs
+  254257e5b3abdcc5 1-45
+std/md5/tests/md5_sizeof.brink
+  254257e5b3abdcc5 1-7
+extensions/Cargo.toml
+  254257e5b3abdcc5 13,19
+vscode-brink/language-configuration.json
+  254257e5b3abdcc5 1-36
+vscode-brink/syntaxes/brink.tmLanguage.json
+  254257e5b3abdcc5 1-209
+process/Cargo.toml
+  254257e5b3abdcc5 11
+vscode-brink/CHANGELOG.md
+  254257e5b3abdcc5 1-18
+vscode-brink/LICENSE.txt
+  254257e5b3abdcc5 1-21
+extensions/src/lib.rs
+  254257e5b3abdcc5 23-24
+std/md5/tests/md5_16_byte.brink
+  254257e5b3abdcc5 1-17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "e77388eb7800422da208c28e9b95d960003f6426",
+  "prompts": {
+    "254257e5b3abdcc5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "db90919e-a6ab-460d-a46a-03bd455a5e43",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Steve King",
+      "messages": [],
+      "total_additions": 1057,
+      "total_deletions": 1663,
+      "accepted_lines": 647,
+      "overriden_lines": 17
+    }
+  }
+}
