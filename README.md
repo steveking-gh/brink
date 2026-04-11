@@ -133,7 +133,7 @@ Produces output.bin containing the string `Hello World!\n`.
 
 # Basic Structure of a Brink Program
 
-A Brink source file consists of one or more section definitions and exactly one output statement.  Each section has a unique name.  The output statement specifies the name of the top level section.  Starting from the top section, Brink recursively evaluates each section and produces the output file.  For example, we can define a section with a write-string (wrs) expression:
+A Brink source file consists of one or more section definitions and exactly one output statement.  Each section has a unique name.  The output statement specifies the name of the top level section that defines the output file.  Starting from the top section, Brink recursively evaluates each section and produces the output file.  For example, we can define a section with a write-string (wrs) statement:
 
     section foo {        // Start a new section named 'foo'
         wrs "I'm foo";   // wrs writes a string into the section.
@@ -145,7 +145,6 @@ Produces a default output named `output.bin`.
 
     $ cat output.bin
     I'm foo
-
 
 Using a write (wr) statement, sections can write other sections:
 
@@ -1465,25 +1464,27 @@ To update the coverage table in this README from Windows, run `.\update_coverage
 ```text
 Filename                      Regions    Missed Regions     Cover   Functions  Missed Functions  Executed       Lines      Missed Lines     Cover    Branches   Missed Branches     Cover
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-ast\ast.rs                       2002               417    79.17%          53                 3    94.34%        1123               204    81.83%           0                 0         -
+ast\ast.rs                       2001               417    79.16%          52                 3    94.23%        1122               204    81.82%           0                 0         -
+ast\lexer.rs                      374                12    96.79%          16                 0   100.00%         233                 9    96.14%           0                 0         -
 const_eval\const_eval.rs         1022               179    82.49%          24                 5    79.17%         641               149    76.76%           0                 0         -
 diags\diags.rs                    209                25    88.04%          10                 1    90.00%         106                19    82.08%           0                 0         -
 engine\engine.rs                 2323               450    80.63%          67                 5    92.54%        1506               249    83.47%           0                 0         -
 ext\ext.rs                        292                18    93.84%          20                 3    85.00%         153                16    89.54%           0                 0         -
 ext\test_mocks.rs                 174                23    86.78%          27                 5    81.48%         147                20    86.39%           0                 0         -
-extensions\src\lib.rs               6                 0   100.00%           1                 0   100.00%           4                 0   100.00%           0                 0         -
+extensions\src\lib.rs               8                 0   100.00%           1                 0   100.00%           5                 0   100.00%           0                 0         -
 ir\ir.rs                          225                25    88.89%          22                 0   100.00%         171                15    91.23%           0                 0         -
 irdb\irdb.rs                      703                81    88.48%          13                 1    92.31%         430                56    86.98%           0                 0         -
 layoutdb\layoutdb.rs              784               159    79.72%          18                 0   100.00%         432                71    83.56%           0                 0         -
 linearizer\linearizer.rs          526                76    85.55%          17                 0   100.00%         311                32    89.71%           0                 0         -
 map\map.rs                        860                13    98.49%          58                 0   100.00%         579                 9    98.45%           0                 0         -
-process\process.rs                352                24    93.18%          22                 5    77.27%         194                 9    95.36%           0                 0         -
+process\process.rs                348                23    93.39%          22                 5    77.27%         192                 9    95.31%           0                 0         -
 src\main.rs                       123                 6    95.12%           8                 1    87.50%          84                 5    94.05%           0                 0         -
 std\crc32c\src\crc32c.rs           20                 0   100.00%           4                 0   100.00%          19                 0   100.00%           0                 0         -
+std\md5\src\md5.rs                 20                 0   100.00%           4                 0   100.00%          19                 0   100.00%           0                 0         -
 std\sha256\src\sha256.rs           20                 0   100.00%           4                 0   100.00%          19                 0   100.00%           0                 0         -
 symtable\symtable.rs              116                 5    95.69%          14                 2    85.71%          81                 5    93.83%           0                 0         -
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-TOTAL                            9757              1501    84.62%         382                31    91.88%        6000               859    85.68%           0                 0         -
+TOTAL                           10148              1512    85.10%         401                31    92.27%        6250               868    86.11%           0                 0         -
 ```
 <!-- COVERAGE_END -->
 
@@ -1507,4 +1508,23 @@ TOTAL                            9757              1501    84.62%         382   
 | ext/ext.rs               | Extensions    | Runtime extension registry and dispatch wrapper                               |
 | std/crc32c/src/lib.rs    | std extension | CRC-32C (Castagnoli) hash over caller-specified output region                 |
 | std/sha256/src/lib.rs    | std extension | SHA256 hash over caller-specified output region                               |
+
+## Rebuilding the vscode Syntax Highlighting Extension
+
+Rebuilding the extension require Node.js.  After you install Node.js, you may need to restart your command prompt.
+
+Building the extension requires Requires [vsce](https://github.com/microsoft/vscode-vsce).  One time, you'll need to use `npm` to install `vsce`
+
+    npm install -g @vscode/vsce
+
+No you're ready to rebuild the extension.
+
+    cd vscode-brink
+    vsce package
+
+To install the extension into vscode locally:
+
+    code --install-extension vscode-brink-0.1.0.vsix
+
+
 

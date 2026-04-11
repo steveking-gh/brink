@@ -1,0 +1,7 @@
+// Verifies that sizeof(std::md5) reports 16 (bytes).
+section data {
+    wr8 0x00;
+    assert sizeof(std::md5) == 16;
+}
+
+output data;

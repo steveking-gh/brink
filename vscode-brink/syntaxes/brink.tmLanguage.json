@@ -1,0 +1,209 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Brink",
+  "scopeName": "source.brink",
+  "fileTypes": ["brink"],
+  "patterns": [
+    { "include": "#comment-line" },
+    { "include": "#comment-block" },
+    { "include": "#string" },
+    { "include": "#numeric" },
+    { "include": "#builtin-constants" },
+    { "include": "#namespace-call" },
+    { "include": "#keywords" },
+    { "include": "#label" },
+    { "include": "#operators" },
+    { "include": "#punctuation" },
+    { "include": "#identifier" }
+  ],
+  "repository": {
+
+    "comment-line": {
+      "name": "comment.line.double-slash.brink",
+      "match": "//.*$"
+    },
+
+    "comment-block": {
+      "name": "comment.block.brink",
+      "begin": "/\\*",
+      "end": "\\*/",
+      "beginCaptures": {
+        "0": { "name": "punctuation.definition.comment.begin.brink" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.comment.end.brink" }
+      }
+    },
+
+    "string": {
+      "name": "string.quoted.double.brink",
+      "begin": "\"",
+      "end": "\"",
+      "beginCaptures": {
+        "0": { "name": "punctuation.definition.string.begin.brink" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.string.end.brink" }
+      },
+      "patterns": [
+        {
+          "name": "constant.character.escape.brink",
+          "match": "\\\\[\\\\ntr\"0]"
+        }
+      ]
+    },
+
+    "numeric": {
+      "patterns": [
+        {
+          "comment": "Negative I64: -[1-9][0-9_]*i? — must precede arithmetic minus rule",
+          "name": "constant.numeric.integer.brink",
+          "match": "-[1-9][0-9_]*i?\\b"
+        },
+        {
+          "comment": "Hexadecimal literal with optional u/i suffix",
+          "name": "constant.numeric.hex.brink",
+          "match": "\\b0[xX][0-9a-fA-F][0-9a-fA-F_]*(u|i)?\\b"
+        },
+        {
+          "comment": "Binary literal with optional u/i suffix",
+          "name": "constant.numeric.binary.brink",
+          "match": "\\b0[bB][01][01_]*(u|i)?\\b"
+        },
+        {
+          "comment": "Bare 0u or 0i",
+          "name": "constant.numeric.integer.brink",
+          "match": "\\b0(u|i)\\b"
+        },
+        {
+          "comment": "Decimal literal with explicit u/i suffix — before bare decimal",
+          "name": "constant.numeric.integer.brink",
+          "match": "\\b[0-9][0-9_]*(u|i)\\b"
+        },
+        {
+          "comment": "Bare decimal integer or zero",
+          "name": "constant.numeric.integer.brink",
+          "match": "\\b[0-9][0-9_]*\\b"
+        }
+      ]
+    },
+
+    "builtin-constants": {
+      "comment": "Compiler-provided built-in constants (__OUTPUT_SIZE, __BRINK_VERSION_*, etc.)",
+      "name": "variable.language.builtin.brink",
+      "match": "\\b(__OUTPUT_SIZE|__OUTPUT_ADDR|__BRINK_VERSION_STRING|__BRINK_VERSION_MAJOR|__BRINK_VERSION_MINOR|__BRINK_VERSION_PATCH)\\b"
+    },
+
+    "namespace-call": {
+      "comment": "Namespaced extension call: std::sha256, std::crc32c, std::md5",
+      "match": "([a-zA-Z_]\\w*)(::)([a-zA-Z_]\\w*)",
+      "captures": {
+        "1": { "name": "entity.name.namespace.brink" },
+        "2": { "name": "punctuation.accessor.brink" },
+        "3": { "name": "entity.name.function.extension.brink" }
+      }
+    },
+
+    "keywords": {
+      "patterns": [
+        {
+          "comment": "Layout/section directives — set_addr_offset before set_addr, set_sec_offset before sec_offset",
+          "name": "keyword.other.layout.brink",
+          "match": "\\b(section|align|set_addr_offset|set_sec_offset|set_file_offset|set_addr)\\b"
+        },
+        {
+          "comment": "Write/emit instructions — sized variants listed before bare wr",
+          "name": "keyword.other.write.brink",
+          "match": "\\b(wr64|wr56|wr48|wr40|wr32|wr24|wr16|wr8|wrs|wrf|wr|output)\\b"
+        },
+        {
+          "comment": "Control flow",
+          "name": "keyword.control.brink",
+          "match": "\\b(if|else|const)\\b"
+        },
+        {
+          "comment": "Type cast intrinsics",
+          "name": "keyword.other.intrinsic.brink",
+          "match": "\\b(sizeof|to_u64|to_i64)\\b"
+        },
+        {
+          "comment": "Address/offset query functions — addr_offset before addr",
+          "name": "support.function.builtin.brink",
+          "match": "\\b(addr_offset|addr|sec_offset|file_offset)\\b"
+        },
+        {
+          "comment": "Diagnostic keywords",
+          "name": "keyword.other.diagnostic.brink",
+          "match": "\\b(assert|print)\\b"
+        }
+      ]
+    },
+
+    "label": {
+      "comment": "Label definition: identifier followed by single colon, not double colon",
+      "match": "\\b([a-zA-Z_]\\w*)(:)(?!:)",
+      "captures": {
+        "1": { "name": "entity.name.label.brink" },
+        "2": { "name": "punctuation.definition.label.brink" }
+      }
+    },
+
+    "operators": {
+      "patterns": [
+        {
+          "comment": "Comparison operators — two-char variants before single-char < and >",
+          "name": "keyword.operator.comparison.brink",
+          "match": "==|!=|>=|<="
+        },
+        {
+          "comment": "Bit-shift operators",
+          "name": "keyword.operator.bitwise.brink",
+          "match": "<<|>>"
+        },
+        {
+          "comment": "Logical operators",
+          "name": "keyword.operator.logical.brink",
+          "match": "&&|\\|\\|"
+        },
+        {
+          "comment": "Arithmetic operators",
+          "name": "keyword.operator.arithmetic.brink",
+          "match": "[+\\-*/%]"
+        },
+        {
+          "comment": "Bitwise single-char operators",
+          "name": "keyword.operator.bitwise.brink",
+          "match": "[&|]"
+        },
+        {
+          "comment": "Relational single-char (after two-char variants consumed above)",
+          "name": "keyword.operator.comparison.brink",
+          "match": "[<>]"
+        },
+        {
+          "comment": "Assignment — not part of ==, !=, <=, >=",
+          "name": "keyword.operator.assignment.brink",
+          "match": "(?<![=!<>])=(?!=)"
+        }
+      ]
+    },
+
+    "punctuation": {
+      "patterns": [
+        { "name": "punctuation.curlybrace.open.brink",       "match": "\\{" },
+        { "name": "punctuation.curlybrace.close.brink",      "match": "\\}" },
+        { "name": "punctuation.parenthesis.open.brink",      "match": "\\(" },
+        { "name": "punctuation.parenthesis.close.brink",     "match": "\\)" },
+        { "name": "punctuation.separator.comma.brink",       "match": "," },
+        { "name": "punctuation.terminator.statement.brink",  "match": ";" }
+      ]
+    },
+
+    "identifier": {
+      "comment": "Plain identifier — catch-all, applied last",
+      "name": "variable.other.brink",
+      "match": "\\b[a-zA-Z_]\\w*\\b"
+    }
+
+  }
+}

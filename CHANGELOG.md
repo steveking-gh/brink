@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - Since Brink is an application, added cargo lock to github.
   The audit-check action on github requires the lockfile.
+- Added std::md5 extension.
+- Added a vscode syntax highlighting extension.  See the bottom of the README for instructions.
 
 ## [5.0.5] - 2026-04-09
 

@@ -15,17 +15,18 @@ members = [
     "brink_extension",
     "std/crc32c",
     "std/sha256",
+    "std/md5",
     "extensions",
 ]
 
 [workspace.package]
-version = "5.0.5"
+version = "5.0.6"
 authors = ["Steve King <sk@metrokings.com>"]
 edition = "2024"
 
 [package]
 name = "brink"
-version = "5.0.5"
+version = "5.0.6"
 build = "build.rs"
 license-file = "LICENSE.txt"
 readme = "README.md"
@@ -59,9 +60,10 @@ inherits = "release"
 lto = "thin"
 
 [features]
-default = ["std-crc32c", "std-sha256"]
+default = ["std-crc32c", "std-sha256", "std-md5"]
 std-crc32c = ["process/std-crc32c"]
 std-sha256  = ["process/std-sha256"]
+std-md5     = ["process/std-md5"]
 
 [dependencies]
 indextree = "4.3.1"

@@ -1,0 +1,36 @@
+{
+  "name": "vscode-brink",
+  "displayName": "Brink",
+  "description": "Syntax highlighting for the Brink binary image DSL (.brink files)",
+  "version": "0.1.0",
+  "publisher": "steveking-gh",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/steveking-gh/brink"
+  },
+  "homepage": "https://github.com/steveking-gh/brink",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "brink",
+        "aliases": ["Brink", "brink"],
+        "extensions": [".brink"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "brink",
+        "scopeName": "source.brink",
+        "path": "./syntaxes/brink.tmLanguage.json"
+      }
+    ]
+  }
+}

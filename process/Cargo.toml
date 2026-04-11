@@ -8,6 +8,7 @@ edition.workspace = true
 [features]
 std-crc32c = ["extensions/std-crc32c"]
 std-sha256  = ["extensions/std-sha256"]
+std-md5     = ["extensions/std-md5"]
 
 [lib]
 path = "process.rs"

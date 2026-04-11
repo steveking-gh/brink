@@ -20,4 +20,6 @@ pub fn register_all(registry: &mut ExtensionRegistry) {
     std_crc32c::register(registry);
     #[cfg(feature = "std-sha256")]
     std_sha256::register(registry);
+    #[cfg(feature = "std-md5")]
+    std_md5::register(registry);
 }

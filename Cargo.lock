@@ -93,7 +93,7 @@ dependencies = [
 
 [[package]]
 name = "ast"
-version = "5.0.5"
+version = "5.0.6"
 dependencies = [
  "anyhow",
  "codespan-reporting",
@@ -116,6 +116,15 @@ checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
 name = "block-buffer"
+version = "0.10.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3078c7629b62d3f0439517fa394996acacc5cbc91c5a20d8c658e77abd503a71"
+dependencies = [
+ "generic-array",
+]
+
+[[package]]
+name = "block-buffer"
 version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cdd35008169921d80bc60d3d0ab416eecb028c4cd653352907921d95084790be"
@@ -125,7 +134,7 @@ dependencies = [
 
 [[package]]
 name = "brink"
-version = "5.0.5"
+version = "5.0.6"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -141,7 +150,7 @@ dependencies = [
 
 [[package]]
 name = "brink_extension"
-version = "5.0.5"
+version = "5.0.6"
 
 [[package]]
 name = "bstr"
@@ -224,7 +233,7 @@ checksum = "a6ef517f0926dd24a1582492c791b6a4818a4d94e789a334894aa15b0d12f55c"
 
 [[package]]
 name = "const_eval"
-version = "5.0.5"
+version = "5.0.6"
 dependencies = [
  "anyhow",
  "ast",
@@ -257,6 +266,16 @@ dependencies = [
 
 [[package]]
 name = "crypto-common"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "78c8292055d1c1df0cce5d180393dc8cce0abec0a7102adb6c7b1eef6016d60a"
+dependencies = [
+ "generic-array",
+ "typenum",
+]
+
+[[package]]
+name = "crypto-common"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77727bb15fa921304124b128af125e7e3b968275d1b108b379190264f4423710"
@@ -266,7 +285,7 @@ dependencies = [
 
 [[package]]
 name = "diags"
-version = "5.0.5"
+version = "5.0.6"
 dependencies = [
  "ariadne",
 ]
@@ -285,13 +304,23 @@ checksum = "6184e33543162437515c2e2b48714794e37845ec9851711914eec9d308f6ebe8"
 
 [[package]]
 name = "digest"
+version = "0.10.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
+dependencies = [
+ "block-buffer 0.10.4",
+ "crypto-common 0.1.7",
+]
+
+[[package]]
+name = "digest"
 version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4850db49bf08e663084f7fb5c87d202ef91a3907271aff24a94eb97ff039153c"
 dependencies = [
- "block-buffer",
+ "block-buffer 0.12.0",
  "const-oid",
- "crypto-common",
+ "crypto-common 0.2.1",
 ]
 
 [[package]]
@@ -308,7 +337,7 @@ checksum = "48c757948c5ede0e46177b7add2e67155f70e33c07fea8284df6576da70b3719"
 
 [[package]]
 name = "engine"
-version = "5.0.5"
+version = "5.0.6"
 dependencies = [
  "anyhow",
  "ast",
@@ -323,7 +352,7 @@ dependencies = [
 
 [[package]]
 name = "ext"
-version = "5.0.5"
+version = "5.0.6"
 dependencies = [
  "brink_extension",
  "tracing",
@@ -332,10 +361,11 @@ dependencies = [
 
 [[package]]
 name = "extensions"
-version = "5.0.5"
+version = "5.0.6"
 dependencies = [
  "ext",
  "std_crc32c",
+ "std_md5",
  "std_sha256",
 ]
 
@@ -346,6 +376,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e1267f4ac4f343772758f7b1bdcbe767c218bbab93bb432acbf5162bbf85a6c4"
 dependencies = [
  "num-traits",
+]
+
+[[package]]
+name = "generic-array"
+version = "0.14.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "85649ca51fd72272d7821adaf274ad91c288277713d9c18820d8499a7ff69e9a"
+dependencies = [
+ "typenum",
+ "version_check",
 ]
 
 [[package]]
@@ -398,7 +438,7 @@ dependencies = [
 
 [[package]]
 name = "ir"
-version = "5.0.5"
+version = "5.0.6"
 dependencies = [
  "diags",
  "parse_int",
@@ -407,7 +447,7 @@ dependencies = [
 
 [[package]]
 name = "irdb"
-version = "5.0.5"
+version = "5.0.6"
 dependencies = [
  "anyhow",
  "ast",
@@ -455,7 +495,7 @@ checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
 name = "layoutdb"
-version = "5.0.5"
+version = "5.0.6"
 dependencies = [
  "anyhow",
  "ast",
@@ -481,7 +521,7 @@ checksum = "48f5d2a454e16a5ea0f4ced81bd44e4cfc7bd3a507b61887c99fd3538b28e4af"
 
 [[package]]
 name = "linearizer"
-version = "5.0.5"
+version = "5.0.6"
 dependencies = [
  "ast",
  "diags",
@@ -507,13 +547,23 @@ checksum = "5e5032e24019045c762d3c0f28f5b6b8bbf38563a65908389bf7978758920897"
 
 [[package]]
 name = "map"
-version = "5.0.5"
+version = "5.0.6"
 dependencies = [
  "engine",
  "ir",
  "irdb",
  "serde_json",
  "tracing",
+]
+
+[[package]]
+name = "md-5"
+version = "0.10.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d89e7ee0cfbedfc4da3340218492196241d89eefb6dab27de5df917a6d2e78cf"
+dependencies = [
+ "cfg-if",
+ "digest 0.10.7",
 ]
 
 [[package]]
@@ -658,7 +708,7 @@ dependencies = [
 
 [[package]]
 name = "process"
-version = "5.0.5"
+version = "5.0.6"
 dependencies = [
  "anyhow",
  "ast",
@@ -821,7 +871,7 @@ checksum = "446ba717509524cb3f22f17ecc096f10f4822d76ab5c0b9822c5f9c284e825f4"
 dependencies = [
  "cfg-if",
  "cpufeatures",
- "digest",
+ "digest 0.11.2",
 ]
 
 [[package]]
@@ -841,7 +891,7 @@ checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 
 [[package]]
 name = "std_crc32c"
-version = "5.0.5"
+version = "5.0.6"
 dependencies = [
  "assert_cmd",
  "brink_extension",
@@ -851,8 +901,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "std_md5"
+version = "5.0.6"
+dependencies = [
+ "assert_cmd",
+ "brink_extension",
+ "ext",
+ "md-5",
+ "predicates 1.0.8",
+]
+
+[[package]]
 name = "std_sha256"
-version = "5.0.5"
+version = "5.0.6"
 dependencies = [
  "assert_cmd",
  "brink_extension",
@@ -890,7 +951,7 @@ dependencies = [
 
 [[package]]
 name = "symtable"
-version = "5.0.5"
+version = "5.0.6"
 dependencies = [
  "diags",
  "ir",
@@ -1048,6 +1109,12 @@ name = "valuable"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
+
+[[package]]
+name = "version_check"
+version = "0.9.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "wait-timeout"

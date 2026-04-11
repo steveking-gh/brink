@@ -1,0 +1,17 @@
+[package]
+name = "std_md5"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[lib]
+path = "src/md5.rs"
+
+[dependencies]
+brink_extension = { path = "../../brink_extension" }
+md-5 = "0.10"
+ext = { path = "../../ext" }
+
+[dev-dependencies]
+assert_cmd = "1.0.1"
+predicates = "1.0.5"
