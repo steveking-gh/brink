@@ -1,0 +1,97 @@
+summary: >
+  Brink is a domain-specific language (DSL) compiler for composing binary
+  image files (ROM, FLASH, firmware, etc.).  Source files declare sections,
+  consts, and an output; the compiler resolves sizes, addresses, and offsets,
+  then writes a flat binary.
+
+pipeline:
+  # Each stage is a Cargo crate.  Data flows left to right.
+  stages:
+    - name: Lexer + Parser → AST
+      crate: ast
+      input: .brink source text
+      output: Ast (arena-based indextree), AstDb (index of sections/consts/output)
+      notes: Hand-rolled lexer (LexToken enum). Pratt parser for expressions.
+             ParseIfContext enum distinguishes TopLevel vs Section if/else.
+
+    - name: const_eval
+      crate: const_eval
+      input: Ast, AstDb.const_statements, -D defines
+      output: SymbolTable (fully resolved const values)
+      notes: Two-pass — lowering (AST → LinIR via Linearizer) then evaluation.
+             Handles top-level if/else for const-only statements.
+
+    - name: prune
+      crate: prune
+      input: Ast, SymbolTable
+      output: pruned Ast (clone with if/else nodes replaced by taken branch)
+      notes: Two steps.
+             Step 1 — prune root-level if/else, promote only Section+If nodes.
+             Step 2 — prune section-body if/else for all sections now at root.
+             keep filter (fn(LexToken)->bool) distinguishes the two steps.
+
+    - name: AstDb (second build)
+      crate: ast
+      input: pruned Ast
+      output: AstDb with validate=true (full nesting + circular-ref check)
+      notes: First AstDb uses validate=false (skips nesting) to avoid false
+             positives on sections inside top-level if blocks.
+
+    - name: LayoutDb
+      crate: layoutdb
+      input: pruned Ast, pruned AstDb
+      output: flat LinIR + LinOperand vectors
+      notes: Walks section body recursively, inlines wr-section references.
+
+    - name: IRDb
+      crate: irdb
+      input: LayoutDb, SymbolTable
+      output: typed IR (Vec<IRItem>)
+      notes: Validates types, resolves extensions, handles sizeof/addr builtins.
+
+    - name: Engine
+      crate: engine
+      input: IRDb, ExtensionRegistry
+      output: binary byte vector written to output file
+      notes: Iterative evaluator; reruns until sizes/addresses stabilize.
+
+  error_codes:
+    PROC_1: AST parse failure
+    PROC_2: const_eval failure
+    PROC_3: prune or second AstDb failure
+    PROC_4: LayoutDb failure
+    PROC_5: IRDb failure
+    PROC_6: Engine failure
+
+extensions:
+  api_crate: brink_extension
+  registry: ExtensionRegistry (built in process.rs, passed to IRDb + Engine)
+  bundled:
+    - std/crc32c  (feature: std-crc32c)
+    - std/sha256  (feature: std-sha256)
+    - std/md5     (feature: std-md5)
+  custom: implement BrinkExtension or BrinkRangedExtension traits
+
+language_features:
+  const: compile-time integer/string constants; arithmetic, comparison, logical ops
+  if_else:
+    top_level: conditions are const; body may contain section definitions or const assigns
+    section_body: conditions are const; body may contain layout-time statements (wr8, wr, etc.)
+  section: named block of layout-time statements
+  output: single required directive naming the root section to emit
+  wr: write a named section into the current section
+  wr8/wr16/.../wr64: write integer literals
+  wrs: write a string literal
+  wrf: write a binary file
+  align: pad to alignment boundary
+  set_addr / set_addr_offset / set_sec_offset / set_file_offset: address control
+  label: named location for map output
+  assert: compile-time or layout-time assertion
+  print: compile-time diagnostic output
+  sizeof / addr / addr_offset / sec_offset / file_offset: layout-time builtins
+  include: include another .brink file
+
+diagnostics:
+  crate: diags
+  backend: ariadne
+  format: richly formatted errors with source spans; two-location variants (err2)

@@ -1,0 +1,89 @@
+lessons_learned:
+
+  - id: L1
+    topic: Borrow checker — Copy NodeId
+    detail: >
+      NodeId is Copy, but capturing pruned.root() and passing &mut pruned in
+      the same function call still fails E0502.  The borrow checker sees the
+      immutable and mutable borrows as simultaneous.  Fix: assign root_nid
+      on a separate line before the mutable borrow.
+
+  - id: L2
+    topic: AstDb two-pass design
+    detail: >
+      First AstDb (validate=false) skips nesting validation so that wr
+      references to sections defined inside top-level if/else blocks do not
+      produce false-positive AST_16 errors.  Second AstDb (validate=true)
+      runs full validation on the pruned AST where those sections are at root.
+
+  - id: L3
+    topic: prune keep filter
+    detail: >
+      Root-level if/else must only promote Section and If nodes (not deferred
+      assigns, print, assert) because those were already evaluated by const_eval.
+      Promoting them to root causes the second AstDb to fail or double-evaluate.
+      Section-body if/else uses keep=|_|true (all statements are layout-time).
+
+  - id: L4
+    topic: eval_ast_condition — Strategy B
+    detail: >
+      Eliminated the parallel eval_ast_expr implementation by having
+      eval_ast_condition use Linearizer::record_expr_r + ConstIR::eval_const_expr_r.
+      SymbolTable parameter changed from &SymbolTable to &mut SymbolTable to
+      satisfy eval_const_expr_r (which calls mark_used).
+
+  - id: L5
+    topic: ParseIfContext enum placement
+    detail: >
+      ParseIfContext must be at module scope, not inside impl Ast.
+      Rust does not allow enum definitions inside trait impls or inherent impls.
+
+  - id: L6
+    topic: parse_if_body_r borrow conflict
+    detail: >
+      In the _ arm, tinfo (from self.peek()) must be fully consumed into owned
+      values (err_val, err_span, tok) before any call that takes &mut self.
+      NLL ends the tinfo borrow at the last use site.
+
+  - id: L7
+    topic: Unreachable vs bail! for parser invariants
+    detail: >
+      Structural if-node invariants (too few children, missing close brace)
+      cannot be triggered by user input — use unreachable!() not bail!().
+      bail!() is reserved for user-reachable failures that already emitted
+      a diags diagnostic (e.g., condition evaluation failure).
+
+active_risks:
+  - id: R1
+    risk: >
+      Fuzz target (layoutdb/fuzz/fuzz_targets/fuzz_target_1.rs) uses a two-arg
+      Ast::new signature that differs from the current three-arg production
+      signature.  Fuzz build is likely broken independently of our changes.
+    mitigation: Track but do not fix unless fuzzing is needed.
+
+  - id: R2
+    risk: >
+      const_eval ignores Section nodes inside top-level if bodies via _ => true.
+      If a future const_eval feature needs to distinguish section nodes from
+      unknown tokens inside if bodies, that silent fallthrough will mask bugs.
+    mitigation: Add a comment in record_if_body_stmt documenting the intent.
+
+open_debt:
+  - id: D1
+    item: >
+      First AstDb skips nesting validation globally, not only when top-level
+      if/else blocks are present.  For programs without conditional sections
+      this delays circular-reference detection by one pass.  No user impact
+      (second AstDb always catches it) but slightly less eager error reporting.
+
+  - id: D2
+    item: >
+      output statement inside a top-level if/else block is not supported.
+      The first AstDb requires output at root level.  Document this constraint
+      in user-facing docs if users ask.
+
+  - id: D3
+    item: const declarations (const X = V;) inside top-level if/else bodies
+      are not supported by the parser (fall to AST_53 error).  Only deferred
+      assigns (X = V;) work inside if bodies.  This is consistent but may
+      surprise users expecting const inside if.

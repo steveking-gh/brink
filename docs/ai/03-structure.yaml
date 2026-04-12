@@ -1,0 +1,125 @@
+repo_root: c:\Users\kings\Documents\projects\brink
+
+# ── Compiler pipeline crates ──────────────────────────────────────────────────
+crates:
+  ast:
+    path: ast/ast.rs
+    role: Lexer, parser, AST, AstDb
+    key_types: [Ast, AstDb, LexToken, Section, Output, ParseIfContext]
+    key_fns: [Ast::new, AstDb::new(validate:bool), parse_if_r, parse_if_body_r,
+              try_parse_section_stmt, is_section_expr_tok]
+    notes: >
+      AstDb::new validate=false skips nesting validation (used pre-prune).
+      ParseIfContext (TopLevel | Section) threads through parse_if_r and
+      parse_if_body_r.  Section token allowed in TopLevel if/else bodies.
+
+  const_eval:
+    path: const_eval/const_eval.rs
+    role: Const expression evaluation; produces SymbolTable
+    key_types: [ConstIR, LinIR, LinOperand]
+    key_fns: [evaluate, eval_ast_condition]
+    notes: >
+      eval_ast_condition linearizes the condition sub-tree via
+      Linearizer::record_expr_r, then evaluates with eval_const_expr_r.
+      No separate eval_ast_expr — eliminated by Strategy B refactor.
+
+  prune:
+    path: prune/prune.rs
+    role: Remove if/else nodes from pruned AST clone
+    key_fns: [prune, prune_body, prune_if_node]
+    notes: >
+      prune() takes no AstDb — walks root directly.
+      keep filter (fn(LexToken)->bool) controls which nodes promote.
+      Root step: keep Section|If only. Section-body step: keep all.
+      root_nid must be captured before &mut pruned borrow (NodeId is Copy
+      but borrow checker requires sequential borrows in separate statements).
+
+  layoutdb:
+    path: layoutdb/layoutdb.rs
+    role: Flatten pruned AST to LinIR + LinOperand vectors
+    key_types: [LayoutDb]
+    key_fns: [LayoutDb::new, record_r]
+
+  irdb:
+    path: irdb/irdb.rs (approx)
+    role: Typed IR construction and validation
+    key_types: [IRDb, IRItem]
+
+  engine:
+    path: engine/engine.rs (approx)
+    role: Iterative binary executor; writes output file
+    key_types: [Engine]
+
+  linearizer:
+    path: linearizer/linearizer.rs
+    role: Shared expression lowering (AST subtree → LinIR)
+    key_types: [Linearizer, LinIR, LinOperand]
+    key_fns: [record_expr_r, record_expr_children_r, tok_to_irkind]
+    notes: Shared by const_eval and layoutdb.
+
+  ir:
+    path: ir/
+    role: Shared IR type definitions
+    key_types: [IRKind, ParameterValue, ConstBuiltins]
+
+  symtable:
+    path: symtable/
+    role: Const symbol table (define, declare, assign, get_value, mark_used)
+    key_types: [SymbolTable]
+
+  diags:
+    path: diags/
+    role: Diagnostic formatting via ariadne
+    key_types: [Diags, SourceSpan]
+    key_fns: [err0, err1, err2, note0, warn1]
+
+  map:
+    path: map/
+    role: Map output (CSV, JSON, C99, Rust) after Engine completes
+
+  ext:
+    path: ext/
+    role: Extension dispatch wrapper (basic + ranged variants)
+
+  brink_extension:
+    path: brink_extension/
+    role: Public extension API traits
+    key_types: [BrinkExtension, BrinkRangedExtension]
+
+  process:
+    path: process/process.rs
+    role: Pipeline orchestrator; single entry point for the binary
+    notes: >
+      Calls stages in order: Ast → AstDb(false) → const_eval → prune →
+      AstDb(true) → LayoutDb → IRDb → Engine → map output.
+
+# ── Standard library extensions ───────────────────────────────────────────────
+std_extensions:
+  std/crc32c:  CRC-32C checksum extension
+  std/sha256:  SHA-256 hash extension
+  std/md5:     MD5 hash extension
+
+# ── Binary entry point ────────────────────────────────────────────────────────
+binary:
+  path: src/main.rs
+  role: CLI arg parsing (clap), tracing setup, calls process::process()
+
+# ── Tests ─────────────────────────────────────────────────────────────────────
+tests:
+  integration: tests/integration.rs   # 286 tests as of 2026-04-11
+  fixtures: tests/*.brink             # ~267 .brink source fixtures
+  helpers: [assert_brink_success, assert_brink_failure, assert_brink_warning,
+            assert_brink_no_warning]
+  binary_comparison: fs::read() → assert_eq!(bytevec, vec![...])
+
+# ── Fuzzing ───────────────────────────────────────────────────────────────────
+fuzz:
+  path: layoutdb/fuzz/fuzz_targets/fuzz_target_1.rs
+  notes: Uses AstDb::new(..., true).  Ast::new signature differs from main path.
+
+# ── Other dirs ────────────────────────────────────────────────────────────────
+other:
+  vscode-brink/: VSCode syntax highlighting extension
+  images/:       SVG diagrams for README
+  docs/ai/:      AI context files (this file and siblings)
+  .claude/:      CLAUDE.md workspace instructions

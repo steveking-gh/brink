@@ -1,0 +1,24 @@
+project: brink
+version: "5.0.6"
+language: Rust (edition 2024)
+workspace: Cargo workspace, single binary target (brink)
+repo: https://github.com/steveking-gh/brink
+author: Steve King <sk@metrokings.com>
+license: MIT
+
+mode: active development
+current_branch: master
+
+ai_context_files:
+  - docs/ai/01-meta.yaml       # this file — project identity and coordination
+  - docs/ai/02-system.yaml     # big-picture architecture and pipeline
+  - docs/ai/03-structure.yaml  # repo layout, crate ownership, file roles
+  - docs/ai/04-memory.yaml     # working memory: risks, debt, lessons
+  - docs/ai/05-update-tracker.md  # changelog for meaningful changes
+
+instructions:
+  - Read these files first at the start of every session.
+  - Search here before reading source for structural or contextual questions.
+  - Update relevant files after every session that changes code or design.
+  - Update 05-update-tracker.md only for meaningful changes.
+  - Keep all files concise, factual, active voice, no pronouns.
