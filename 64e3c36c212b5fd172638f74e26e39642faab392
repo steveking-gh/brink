@@ -1,0 +1,21 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "64e3c36c212b5fd172638f74e26e39642faab392",
+  "prompts": {
+    "254257e5b3abdcc5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "db90919e-a6ab-460d-a46a-03bd455a5e43",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Steve King",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 18,
+      "overriden_lines": 0
+    }
+  }
+}
