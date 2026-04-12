@@ -1,0 +1,31 @@
+docs/ai/01-meta.yaml
+  254257e5b3abdcc5 1-24
+docs/ai/03-structure.yaml
+  254257e5b3abdcc5 1-125
+docs/ai/05-update-tracker.md
+  254257e5b3abdcc5 1-43
+docs/ai/04-memory.yaml
+  254257e5b3abdcc5 1-89
+docs/ai/02-system.yaml
+  254257e5b3abdcc5 1-97
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "30c5bfbce5319284dadffbcc5ad9a169198119d9",
+  "prompts": {
+    "254257e5b3abdcc5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "db90919e-a6ab-460d-a46a-03bd455a5e43",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Steve King",
+      "messages": [],
+      "total_additions": 378,
+      "total_deletions": 0,
+      "accepted_lines": 396,
+      "overriden_lines": 0
+    }
+  }
+}
