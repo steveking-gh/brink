@@ -170,6 +170,7 @@ impl<'toks> TokenInfo<'toks> {
  * This structure contains the AST created from the raw lexical
  * tokens.  The lifetime of this struct is the same as the tokens.
  */
+#[derive(Clone)]
 pub struct Ast<'toks> {
     /// The arena from the indextree crate holding all nodes
     /// in the AST.  Arenas are one idiomatic rust way to nicely
@@ -185,6 +186,18 @@ pub struct Ast<'toks> {
 
     /// The current token number pointer within the tv
     tok_num: usize,
+}
+
+/// Context passed through parse_if / parse_if_body to control which
+/// statements are legal inside an if/else body.
+#[derive(Clone, Copy)]
+enum ParseIfContext {
+    /// if/else at the top level or nested inside another const if/else.
+    /// Only const-compatible statements are allowed.
+    TopLevel,
+    /// if/else directly inside a section body.
+    /// All section-level statements are allowed in addition to const ones.
+    Section,
 }
 
 impl<'toks> Ast<'toks> {
@@ -459,7 +472,7 @@ impl<'toks> Ast<'toks> {
                 LexToken::Section => self.parse_section(self.root, diags),
                 LexToken::Output => self.parse_output(self.root, diags),
                 LexToken::Const => self.parse_const(self.root, diags),
-                LexToken::If => self.parse_if(self.root, diags),
+                LexToken::If => self.parse_if_r(self.root, diags, ParseIfContext::TopLevel),
                 LexToken::Identifier => {
                     let ok = self.parse_deferred_assign(self.root, diags);
                     if !ok {
@@ -711,11 +724,56 @@ impl<'toks> Ast<'toks> {
         self.dbg_exit("parse_section", result)
     }
 
+    /// Returns `true` if `tok` is one of the tokens that a section body dispatches
+    /// to `parse_expr`.  Centralized here so adding a new write instruction (e.g.
+    /// a future `Wr128`) only requires updating this one predicate.
+    fn is_section_expr_tok(tok: LexToken) -> bool {
+        matches!(
+            tok,
+            LexToken::Wrf
+                | LexToken::Wr8
+                | LexToken::Wr16
+                | LexToken::Wr24
+                | LexToken::Wr32
+                | LexToken::Wr40
+                | LexToken::Wr48
+                | LexToken::Wr56
+                | LexToken::Wr64
+                | LexToken::Wrs
+                | LexToken::Assert
+                | LexToken::Align
+                | LexToken::SetSecOffset
+                | LexToken::SetAddrOffset
+                | LexToken::SetAddr
+                | LexToken::SetFileOffset
+                | LexToken::Print
+        )
+    }
+
+    /// Try to parse one section-body statement starting at the current token.
+    ///
+    /// Handles the three dispatch cases shared by `parse_section_contents` and
+    /// `parse_if_body_r` (Section context):
+    ///   - `Label`                        → `parse_label`
+    ///   - `Wr`                           → `parse_wr`
+    ///   - `is_section_expr_tok` tokens   → `parse_expr`
+    ///
+    /// Returns `Some(result)` if the token was handled, `None` if it is not a
+    /// recognized section-level token (caller is responsible for the error).
+    fn try_parse_section_stmt(&mut self, parent: NodeId, diags: &mut Diags) -> Option<bool> {
+        let tok = self.peek()?.tok;
+        match tok {
+            LexToken::Label => Some(self.parse_label(parent, diags)),
+            LexToken::Wr => Some(self.parse_wr(parent, diags)),
+            tok if Self::is_section_expr_tok(tok) => Some(self.parse_expr(parent, diags)),
+            _ => None,
+        }
+    }
+
     /// Parses the body of a section, appending statement nodes directly to the
     /// parent section node.  Loops until a `}` is found or tokens are exhausted.
-    /// Each iteration dispatches to `parse_label`, `parse_wr`, or `parse_expr`
-    /// depending on the leading token; unrecognized tokens produce a diagnostic
-    /// and are skipped to the next `;` to allow recovery.
+    /// Each iteration dispatches via `try_parse_section_stmt`; unrecognized tokens
+    /// produce a diagnostic and are skipped to the next `;` to allow recovery.
     ///
     /// ```text
     /// wr8 1+2; assert x; }
@@ -763,30 +821,13 @@ impl<'toks> Ast<'toks> {
 
             // Stay in the section even after errors to give the user
             // more than one error at a time
-            let parse_ok = match tinfo.tok {
-                LexToken::Label => self.parse_label(parent, diags),
-                LexToken::Wr => self.parse_wr(parent, diags),
-                LexToken::Wrf
-                | LexToken::Wr8
-                | LexToken::Wr16
-                | LexToken::Wr24
-                | LexToken::Wr32
-                | LexToken::Wr40
-                | LexToken::Wr48
-                | LexToken::Wr56
-                | LexToken::Wr64
-                | LexToken::Wrs
-                | LexToken::Assert
-                | LexToken::Align
-                | LexToken::SetSecOffset
-                | LexToken::SetAddrOffset
-                | LexToken::SetAddr
-                | LexToken::SetFileOffset
-                | LexToken::Print => self.parse_expr(parent, diags),
-                _ => {
-                    self.err_invalid_expression(diags, "AST_3");
-                    false
-                }
+            let parse_ok = if tinfo.tok == LexToken::If {
+                self.parse_if_r(parent, diags, ParseIfContext::Section)
+            } else if let Some(result) = self.try_parse_section_stmt(parent, diags) {
+                result
+            } else {
+                self.err_invalid_expression(diags, "AST_3");
+                false
             };
 
             if !parse_ok {
@@ -1403,7 +1444,7 @@ impl<'toks> Ast<'toks> {
         self.dbg_exit("parse_const", result)
     }
 
-    /// Parses an `if/else` statement and attaches it to the AST.
+    /// Recursively parses an `if/else` statement and attaches it to the AST.
     ///
     /// ```text
     /// if <expr> { <body> } [else { <body> } | else if ...]
@@ -1418,7 +1459,7 @@ impl<'toks> Ast<'toks> {
     ///    ├── [else_stmts...]
     ///    └── }]
     /// ```
-    fn parse_if(&mut self, parent: NodeId, diags: &mut Diags) -> bool {
+    fn parse_if_r(&mut self, parent: NodeId, diags: &mut Diags, ctx: ParseIfContext) -> bool {
         self.dbg_enter("parse_if");
         // Consume 'if' and create root node
         let if_nid = self.add_to_parent_and_advance(parent);
@@ -1439,7 +1480,7 @@ impl<'toks> Ast<'toks> {
         ) {
             return self.dbg_exit("parse_if", false);
         }
-        if !self.parse_if_body(if_nid, diags, brace_toknum) {
+        if !self.parse_if_body_r(if_nid, diags, brace_toknum, ctx) {
             return self.dbg_exit("parse_if", false);
         }
 
@@ -1450,11 +1491,11 @@ impl<'toks> Ast<'toks> {
                 if let Some(next) = self.peek() {
                     if next.tok == LexToken::If {
                         // else if: parse nested if directly (no brace wrapper)
-                        self.parse_if(if_nid, diags)
+                        self.parse_if_r(if_nid, diags, ctx)
                     } else if next.tok == LexToken::OpenBrace {
                         let else_brace = self.tok_num;
                         self.add_to_parent_and_advance(if_nid); // consume '{'
-                        self.parse_if_body(if_nid, diags, else_brace)
+                        self.parse_if_body_r(if_nid, diags, else_brace, ctx)
                     } else {
                         self.err_expected_after(
                             diags,
@@ -1478,10 +1519,20 @@ impl<'toks> Ast<'toks> {
         self.dbg_exit("parse_if", result)
     }
 
-    /// Parses the body of an `if` or `else` block.  Loops until `}` or end of input.
-    /// Allowed statements: bare assignment (`IDENT = expr;`), `print`, `assert`,
-    /// and nested `if/else`.
-    fn parse_if_body(&mut self, parent: NodeId, diags: &mut Diags, brace_tok_num: usize) -> bool {
+    /// Recursively (by way of parse_if_r) parses the body of an if/else statement.
+    ///
+    /// In `TopLevel` context, only const-compatible statements are allowed:
+    /// bare assignment (`IDENT = expr;`), `print`, `assert`, and nested `if/else`.
+    ///
+    /// In `Section` context, all section-level statements are also allowed:
+    /// `wr`, `wr8`–`wr64`, `wrs`, `wrf`, `align`, `set_*`, `label:`, and nested `if/else`.
+    fn parse_if_body_r(
+        &mut self,
+        parent: NodeId,
+        diags: &mut Diags,
+        brace_tok_num: usize,
+        ctx: ParseIfContext,
+    ) -> bool {
         self.dbg_enter("parse_if_body");
         let mut result = true;
         let mut tok_num_old = 0;
@@ -1499,14 +1550,26 @@ impl<'toks> Ast<'toks> {
             }
 
             let parse_ok = match tinfo.tok {
-                // We allow `include` too, but include injection happens before parsing.
+                // Const-compatible statements (allowed in both TopLevel and Section)
                 LexToken::Identifier => self.parse_deferred_assign(parent, diags),
                 LexToken::Print | LexToken::Assert => self.parse_expr(parent, diags),
-                LexToken::If => self.parse_if(parent, diags),
+                LexToken::If => self.parse_if_r(parent, diags, ctx),
+                // Section-level statements: delegate to the shared dispatcher.
+                // try_parse_section_stmt returns None for unrecognized tokens.
                 _ => {
-                    let msg = format!("'{}' is not allowed inside an if/else body", tinfo.val);
-                    diags.err1("AST_53", &msg, tinfo.span());
-                    false
+                    // Snapshot the diagnostic info before the mutable borrow below.
+                    let err_val = tinfo.val.to_string();
+                    let err_span = tinfo.span();
+                    let maybe = if matches!(ctx, ParseIfContext::Section) {
+                        self.try_parse_section_stmt(parent, diags)
+                    } else {
+                        None
+                    };
+                    maybe.unwrap_or_else(|| {
+                        let msg = format!("'{}' is not allowed inside an if/else body", err_val);
+                        diags.err1("AST_53", &msg, err_span);
+                        false
+                    })
                 }
             };
 
@@ -1577,6 +1640,17 @@ impl<'toks> Ast<'toks> {
     pub fn get_tinfo(&self, nid: NodeId) -> &'toks TokenInfo<'_> {
         let tok_num = *self.arena[nid].get();
         &self.tv[tok_num]
+    }
+
+    /// Returns the root NodeId of the AST.
+    pub fn root(&self) -> NodeId {
+        self.root
+    }
+
+    /// Returns a mutable reference to the underlying indextree arena.
+    /// Callers can use any indextree `NodeId` operation that requires `&mut Arena`.
+    pub fn arena_mut(&mut self) -> &mut Arena<usize> {
+        &mut self.arena
     }
 
     const DOT_DEFAULT_FILL: &'static str = "#F2F2F2";

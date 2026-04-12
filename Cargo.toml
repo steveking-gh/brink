@@ -17,6 +17,7 @@ members = [
     "std/sha256",
     "std/md5",
     "extensions",
+    "prune",
 ]
 
 [workspace.package]

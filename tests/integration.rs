@@ -2542,4 +2542,135 @@ mod tests {
         assert_brink_failure("tests/irdb_15_wr_bad_repeat_type.brink", &["[IRDB_15]"]);
     }
 
+    // ── Section-level if/else (Phase 1: runtime statements in const conditions) ──
+
+    /// True branch of a section-level if/else emits 0x41 ('A').
+    #[test]
+    fn section_if_true() {
+        let _cmd = Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/section_if_true.brink")
+            .arg("-o")
+            .arg("section_if_true.bin")
+            .assert()
+            .success();
+        let bytevec = fs::read("section_if_true.bin").unwrap();
+        assert_eq!(bytevec, vec![0x41u8]);
+        fs::remove_file("section_if_true.bin").unwrap();
+    }
+
+    /// False branch of a section-level if/else emits 0x42 ('B').
+    #[test]
+    fn section_if_false() {
+        let _cmd = Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/section_if_false.brink")
+            .arg("-o")
+            .arg("section_if_false.bin")
+            .assert()
+            .success();
+        let bytevec = fs::read("section_if_false.bin").unwrap();
+        assert_eq!(bytevec, vec![0x42u8]);
+        fs::remove_file("section_if_false.bin").unwrap();
+    }
+
+    /// Section-level if with no else and a false condition produces one byte (from hdr).
+    #[test]
+    fn section_if_no_else() {
+        let _cmd = Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/section_if_no_else.brink")
+            .arg("-o")
+            .arg("section_if_no_else.bin")
+            .assert()
+            .success();
+        let bytevec = fs::read("section_if_no_else.bin").unwrap();
+        // hdr = [0xFF], payload is empty (WRITE_IT == 0), combo = hdr ++ payload
+        assert_eq!(bytevec, vec![0xFFu8]);
+        fs::remove_file("section_if_no_else.bin").unwrap();
+    }
+
+    /// else-if chain selects the correct branch (VAL == 2 → 0x32).
+    #[test]
+    fn section_if_else_if() {
+        let _cmd = Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/section_if_else_if.brink")
+            .arg("-o")
+            .arg("section_if_else_if.bin")
+            .assert()
+            .success();
+        let bytevec = fs::read("section_if_else_if.bin").unwrap();
+        assert_eq!(bytevec, vec![0x32u8]);
+        fs::remove_file("section_if_else_if.bin").unwrap();
+    }
+
+    /// True branch with multiple statements emits all three bytes.
+    #[test]
+    fn section_if_multi_stmt() {
+        let _cmd = Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/section_if_multi_stmt.brink")
+            .arg("-o")
+            .arg("section_if_multi_stmt.bin")
+            .assert()
+            .success();
+        let bytevec = fs::read("section_if_multi_stmt.bin").unwrap();
+        assert_eq!(bytevec, vec![0x01u8, 0x02, 0x03]);
+        fs::remove_file("section_if_multi_stmt.bin").unwrap();
+    }
+
+    // ── Section-level if/else: corner cases ──────────────────────────────────
+
+    /// Corner case 1: nested if inside a section if.
+    /// The prune loop must re-scan after promoting the inner if node.
+    /// Outer true, inner false → else emits 0x02.
+    #[test]
+    fn section_if_nested() {
+        let _cmd = Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/section_if_nested.brink")
+            .arg("-o")
+            .arg("section_if_nested.bin")
+            .assert()
+            .success();
+        let bytevec = fs::read("section_if_nested.bin").unwrap();
+        assert_eq!(bytevec, vec![0x02u8]);
+        fs::remove_file("section_if_nested.bin").unwrap();
+    }
+
+    /// Corner case 2: `wr <section>` inside a section if.
+    /// After pruning the promoted wr node must still be a valid LayoutDb section write.
+    /// Expected output: 0xDE 0xAD (from header) then 0xBE 0xEF (literal bytes).
+    #[test]
+    fn section_if_wr_section() {
+        let _cmd = Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/section_if_wr_section.brink")
+            .arg("-o")
+            .arg("section_if_wr_section.bin")
+            .assert()
+            .success();
+        let bytevec = fs::read("section_if_wr_section.bin").unwrap();
+        assert_eq!(bytevec, vec![0xDEu8, 0xAD, 0xBE, 0xEF]);
+        fs::remove_file("section_if_wr_section.bin").unwrap();
+    }
+
+    /// Corner case 3: compound arithmetic expression in the condition.
+    /// A + B > 10 (7 + 5 = 12 > 10 → true) → emits 0x01.
+    /// Verifies eval_ast_condition walks the full expression tree.
+    #[test]
+    fn section_if_compound_cond() {
+        let _cmd = Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/section_if_compound_cond.brink")
+            .arg("-o")
+            .arg("section_if_compound_cond.bin")
+            .assert()
+            .success();
+        let bytevec = fs::read("section_if_compound_cond.bin").unwrap();
+        assert_eq!(bytevec, vec![0x01u8]);
+        fs::remove_file("section_if_compound_cond.bin").unwrap();
+    }
+
 } // mod tests

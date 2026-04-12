@@ -1,0 +1,14 @@
+// Corner case: compound arithmetic expression in the if condition.
+// eval_ast_condition must walk the full A + B > 10 sub-tree, not just a leaf.
+const A = 7;
+const B = 5;
+
+section foo {
+    if A + B > 10 {
+        wr8 0x01;
+    } else {
+        wr8 0x00;
+    }
+}
+
+output foo;

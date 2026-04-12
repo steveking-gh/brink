@@ -722,6 +722,20 @@ dependencies = [
  "layoutdb",
  "map",
  "parse_int",
+ "prune",
+ "tracing",
+]
+
+[[package]]
+name = "prune"
+version = "5.0.6"
+dependencies = [
+ "anyhow",
+ "ast",
+ "const_eval",
+ "diags",
+ "indextree",
+ "symtable",
  "tracing",
 ]
 

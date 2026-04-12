@@ -1,0 +1,18 @@
+// Corner case: wr <section> inside a section if.
+// After pruning, the promoted wr node must be a valid LayoutDb section write.
+const INCLUDE = 1;
+
+section header {
+    wr8 0xDE;
+    wr8 0xAD;
+}
+
+section body {
+    if INCLUDE > 0 {
+        wr header;
+    }
+    wr8 0xBE;
+    wr8 0xEF;
+}
+
+output body;

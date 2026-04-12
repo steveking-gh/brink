@@ -23,6 +23,7 @@ diags = { path = "../diags" }
 ir = { path = "../ir" }
 layoutdb = { path = "../layoutdb" }
 const_eval = { path = "../const_eval" }
+prune = { path = "../prune" }
 irdb = { path = "../irdb" }
 engine = { path = "../engine" }
 map = { path = "../map" }

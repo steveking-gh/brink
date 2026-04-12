@@ -897,6 +897,49 @@ impl<'toks> ConstIR {
 
 }
 
+// ── AST condition evaluator for the prune pass ───────────────────────────────
+
+/// Evaluate an AST if-condition expression against a resolved symbol table.
+///
+/// Called by the `prune` crate to determine which branch of a section-level
+/// `if/else` to keep.  Lowers `cond_nid` to LinIR via `Linearizer::record_expr_r`,
+/// then evaluates the resulting `ConstIR` with the existing `eval_const_expr_r`
+/// pipeline.  Returns `Some(true/false)` on success, or `None` after emitting
+/// a diagnostic on error.
+pub fn eval_ast_condition(
+    ast: &Ast,
+    cond_nid: NodeId,
+    symbol_table: &mut SymbolTable,
+    diags: &mut Diags,
+) -> Option<bool> {
+    let src_loc = ast.get_tinfo(cond_nid).loc.clone();
+    let mut lz = Linearizer::new();
+    let mut lops: Vec<usize> = Vec::new();
+    if !lz.record_expr_r(0, cond_nid, &mut lops, diags, ast) {
+        return None;
+    }
+    if lops.len() != 1 {
+        unreachable!(
+            "record_expr_r returned {} operands for if condition; \
+             parser guarantees exactly one expression node",
+            lops.len()
+        );
+    }
+    let const_ir = ConstIR {
+        ir_vec: lz.ir_vec,
+        operand_vec: lz.operand_vec,
+    };
+    let val = ConstIR::eval_const_expr_r(
+        symbol_table,
+        lops[0],
+        &const_ir,
+        &mut std::collections::HashSet::new(),
+        diags,
+        &src_loc,
+    )?;
+    Some(val.to_bool())
+}
+
 // ── Public entry point ────────────────────────────────────────────────────────
 
 /// Lower all const AST statements into `ConstIR`, evaluate them sequentially,

@@ -19,6 +19,7 @@ use std::io::Write;
 // Local libraries
 use ast::{Ast, AstDb};
 use diags::Diags;
+use prune;
 use engine::Engine;
 use ext::{ExtensionRegistry, test_mocks::register_test_extensions};
 use ir::{ConstBuiltins, ParameterValue};
@@ -128,11 +129,14 @@ pub fn process(
 
     let ast_db = AstDb::new(&mut diags, &ast)?;
 
-    let symbol_table = const_eval::evaluate(&mut diags, &ast, &ast_db, &const_defines)
+    let mut symbol_table = const_eval::evaluate(&mut diags, &ast, &ast_db, &const_defines)
         .context("[PROC_2]: Error detected, halting.")?;
 
-    let layout_db =
-        LayoutDb::new(&mut diags, &ast, &ast_db).context("[PROC_3]: Error detected, halting.")?;
+    let pruned_ast = prune::prune(&ast, &ast_db, &mut symbol_table, &mut diags)
+        .context("[PROC_3]: Error detected, halting.")?;
+
+    let layout_db = LayoutDb::new(&mut diags, &pruned_ast, &ast_db)
+        .context("[PROC_4]: Error detected, halting.")?;
     if verbosity > 2 {
         layout_db.dump();
     }
@@ -142,7 +146,7 @@ pub fn process(
     extensions::register_all(&mut ext_registry);
 
     let ir_db = IRDb::new(symbol_table, &layout_db, &mut diags, &ext_registry)
-        .context("[PROC_4]: Error detected, halting.")?;
+        .context("[PROC_5]: Error detected, halting.")?;
 
     debug!("Dumping ir_db");
     if verbosity > 2 {
@@ -150,7 +154,7 @@ pub fn process(
     }
 
     let engine = Engine::new(&ir_db, &ext_registry, &mut diags, 0)
-        .context("[PROC_5]: Error detected, halting.")?;
+        .context("[PROC_6]: Error detected, halting.")?;
     if verbosity > 2 {
         engine.dump_locations();
     }
@@ -171,7 +175,7 @@ pub fn process(
         .execute(&ir_db, &mut diags, &mut file, &ext_registry)
         .is_err()
     {
-        return Err(anyhow!("[PROC_4]: Error detected, halting."));
+        return Err(anyhow!("[PROC_6]: Error detected, halting."));
     }
 
     // Generate map output if requested.  MapDb derives all data from the

@@ -1,0 +1,19 @@
+// Section-level if with no else: when condition false, section is empty.
+const WRITE_IT = 0;
+
+section hdr {
+    wr8 0xFF;
+}
+
+section payload {
+    if WRITE_IT > 0 {
+        wr8 0xAB;
+    }
+}
+
+section combo {
+    wr hdr;
+    wr payload;
+}
+
+output combo;

@@ -1,0 +1,12 @@
+// Section-level if/else: condition is false, so else-branch wr8 is emitted.
+const ENABLED = 0;
+
+section foo {
+    if ENABLED > 0 {
+        wr8 0x41;  // 'A'
+    } else {
+        wr8 0x42;  // 'B'
+    }
+}
+
+output foo;

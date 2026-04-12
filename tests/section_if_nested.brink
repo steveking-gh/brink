@@ -1,0 +1,16 @@
+// Corner case: nested if inside a section if.
+// Outer condition true, inner condition false → else branch emits 0x02.
+const OUTER = 1;
+const INNER = 0;
+
+section foo {
+    if OUTER > 0 {
+        if INNER > 0 {
+            wr8 0x01;
+        } else {
+            wr8 0x02;
+        }
+    }
+}
+
+output foo;

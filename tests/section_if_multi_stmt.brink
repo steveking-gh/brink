@@ -1,0 +1,12 @@
+// Section-level if: multiple statements in the taken branch.
+const INCLUDE = 1;
+
+section header {
+    if INCLUDE > 0 {
+        wr8 0x01;
+        wr8 0x02;
+        wr8 0x03;
+    }
+}
+
+output header;
