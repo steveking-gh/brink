@@ -1,0 +1,53 @@
+tests/section_if_no_else.brink
+  254257e5b3abdcc5 1-19
+prune/Cargo.toml
+  254257e5b3abdcc5 1-19
+process/Cargo.toml
+  254257e5b3abdcc5 26
+tests/section_if_true.brink
+  254257e5b3abdcc5 1-12
+tests/section_if_false.brink
+  254257e5b3abdcc5 1-12
+ast/ast.rs
+  254257e5b3abdcc5 173,191-202,727-772,775-776,824-830,1524-1528,1530-1535,1553,1557-1558,1560-1572,1645-1655
+tests/section_if_else_if.brink
+  254257e5b3abdcc5 1-14
+tests/section_if_nested.brink
+  254257e5b3abdcc5 1-16
+tests/section_if_wr_section.brink
+  254257e5b3abdcc5 1-18
+tests/section_if_compound_cond.brink
+  254257e5b3abdcc5 1-14
+prune/prune.rs
+  254257e5b3abdcc5 1-7,10-143
+tests/integration.rs
+  254257e5b3abdcc5 2545-2675
+Cargo.toml
+  254257e5b3abdcc5 20
+const_eval/const_eval.rs
+  254257e5b3abdcc5 900-942
+tests/section_if_multi_stmt.brink
+  254257e5b3abdcc5 1-12
+process/process.rs
+  254257e5b3abdcc5 22,132,135-139,149,157,178
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "c8d399104aeb78d61ab491cbe0feec059def76c2",
+  "prompts": {
+    "254257e5b3abdcc5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "db90919e-a6ab-460d-a46a-03bd455a5e43",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Steve King",
+      "messages": [],
+      "total_additions": 800,
+      "total_deletions": 267,
+      "accepted_lines": 587,
+      "overriden_lines": 10
+    }
+  }
+}
