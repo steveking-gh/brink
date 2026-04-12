@@ -652,6 +652,40 @@ impl<'toks> ConstIR {
         }
     }
 
+    /// Reconcile an (lhs, rhs) pair for const arithmetic or comparison.
+    /// Promotes `Integer` to match `U64` or `I64` when one side is untyped.
+    /// Passes `(QuotedString, QuotedString)` through unchanged so that the
+    /// caller's numeric dispatch can emit IRDB_26 for string arithmetic.
+    /// Returns `None` and emits `err_code` on any other type mismatch.
+    fn coerce_numeric_pair(
+        lhs: ParameterValue,
+        rhs: ParameterValue,
+        err_code: &str,
+        src_loc: &SourceSpan,
+        diags: &mut Diags,
+    ) -> Option<(ParameterValue, ParameterValue)> {
+        use ParameterValue::*;
+        match (&lhs, &rhs) {
+            (U64(_), U64(_))
+            | (I64(_), I64(_))
+            | (Integer(_), Integer(_))
+            | (QuotedString(_), QuotedString(_)) => Some((lhs, rhs)),
+            (U64(_), Integer(v)) => Some((lhs, U64(*v as u64))),
+            (Integer(v), U64(_)) => Some((U64(*v as u64), rhs)),
+            (I64(_), Integer(v)) => Some((lhs, I64(*v))),
+            (Integer(v), I64(_)) => Some((I64(*v), rhs)),
+            _ => {
+                let m = format!(
+                    "Type mismatch in const expression: {:?} and {:?}.",
+                    lhs.data_type(),
+                    rhs.data_type()
+                );
+                diags.err1(err_code, &m, src_loc.clone());
+                None
+            }
+        }
+    }
+
     /// Apply a binary arithmetic operator to two resolved const values.
     /// Promotes `Integer` to match a `U64` or `I64` operand when needed.
     fn apply_binary_op(
@@ -662,26 +696,7 @@ impl<'toks> ConstIR {
         diags: &mut Diags,
     ) -> Option<ParameterValue> {
         use ParameterValue::*;
-        // Reconcile Integer with a typed value; reject all other mismatches.
-        let (lhs, rhs) = match (&lhs, &rhs) {
-            (U64(_), U64(_))
-            | (I64(_), I64(_))
-            | (Integer(_), Integer(_))
-            | (QuotedString(_), QuotedString(_)) => (lhs, rhs),
-            (U64(_), Integer(v)) => (lhs, U64(*v as u64)),
-            (Integer(v), U64(_)) => (U64(*v as u64), rhs),
-            (I64(_), Integer(v)) => (lhs, I64(*v)),
-            (Integer(v), I64(_)) => (I64(*v), rhs),
-            _ => {
-                let m = format!(
-                    "Type mismatch in const expression: {:?} and {:?}.",
-                    lhs.data_type(),
-                    rhs.data_type()
-                );
-                diags.err1("IRDB_25", &m, src_loc.clone());
-                return None;
-            }
-        };
+        let (lhs, rhs) = Self::coerce_numeric_pair(lhs, rhs, "IRDB_25", src_loc, diags)?;
 
         // Helper to emit the right diagnostic for a CalcErr and return None.
         let emit = |err: CalcErr, diags: &mut Diags| -> Option<ParameterValue> {
@@ -757,23 +772,7 @@ impl<'toks> ConstIR {
             };
             return Some(U64(if result { 1 } else { 0 }));
         }
-        // Reconcile Integer with a typed value; reject non-numeric types.
-        let (lhs, rhs) = match (&lhs, &rhs) {
-            (U64(_), U64(_)) | (I64(_), I64(_)) | (Integer(_), Integer(_)) => (lhs, rhs),
-            (U64(_), Integer(v)) => (lhs, U64(*v as u64)),
-            (Integer(v), U64(_)) => (U64(*v as u64), rhs),
-            (I64(_), Integer(v)) => (lhs, I64(*v)),
-            (Integer(v), I64(_)) => (I64(*v), rhs),
-            _ => {
-                let m = format!(
-                    "Non-numeric or mismatched types in const comparison: {:?} and {:?}.",
-                    lhs.data_type(),
-                    rhs.data_type()
-                );
-                diags.err1("IRDB_29", &m, src_loc.clone());
-                return None;
-            }
-        };
+        let (lhs, rhs) = Self::coerce_numeric_pair(lhs, rhs, "IRDB_29", src_loc, diags)?;
 
         let result = match lhs {
             U64(a) => {
