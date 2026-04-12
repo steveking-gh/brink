@@ -1,0 +1,19 @@
+// Top-level if with condition false: section defined inside if is discarded,
+// the section-body if that would reference it is also not taken.
+// Expected output: 0xAA
+const ENABLE = 0;
+
+if ENABLE {
+    section extra {
+        wr8 0xBB;
+    }
+}
+
+section main {
+    wr8 0xAA;
+    if ENABLE {
+        wr extra;
+    }
+}
+
+output main;

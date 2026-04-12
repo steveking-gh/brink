@@ -127,15 +127,23 @@ pub fn process(
         ast.dump("ast.dot")?;
     }
 
-    let ast_db = AstDb::new(&mut diags, &ast)?;
+    // First AstDb: lenient (no nesting validation) — used only by const_eval.
+    // Nesting validation is deferred to the post-prune AstDb below, where
+    // sections promoted from top-level if/else blocks are visible.
+    let ast_db = AstDb::new(&mut diags, &ast, false)?;
 
     let mut symbol_table = const_eval::evaluate(&mut diags, &ast, &ast_db, &const_defines)
         .context("[PROC_2]: Error detected, halting.")?;
 
-    let pruned_ast = prune::prune(&ast, &ast_db, &mut symbol_table, &mut diags)
+    let pruned_ast = prune::prune(&ast, &mut symbol_table, &mut diags)
         .context("[PROC_3]: Error detected, halting.")?;
 
-    let layout_db = LayoutDb::new(&mut diags, &pruned_ast, &ast_db)
+    // Second AstDb: built from the pruned AST with full nesting validation.
+    // Sections promoted from top-level if/else blocks are now at root level.
+    let pruned_ast_db = AstDb::new(&mut diags, &pruned_ast, true)
+        .context("[PROC_3]: Error detected, halting.")?;
+
+    let layout_db = LayoutDb::new(&mut diags, &pruned_ast, &pruned_ast_db)
         .context("[PROC_4]: Error detected, halting.")?;
     if verbosity > 2 {
         layout_db.dump();

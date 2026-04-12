@@ -1,0 +1,20 @@
+// Top-level if/else with a section defined in each branch under the same name.
+// PLATFORM == 1 selects the if branch; the else branch is discarded.
+// Expected output: 0x01
+const PLATFORM = 1;
+
+if PLATFORM == 1 {
+    section header {
+        wr8 0x01;
+    }
+} else {
+    section header {
+        wr8 0x02;
+    }
+}
+
+section main {
+    wr header;
+}
+
+output main;

@@ -1,0 +1,19 @@
+// Top-level if with condition true: section defined inside if is promoted,
+// referenced via a section-body if that is also taken.
+// Expected output: 0xAA 0xBB
+const ENABLE = 1;
+
+if ENABLE {
+    section extra {
+        wr8 0xBB;
+    }
+}
+
+section main {
+    wr8 0xAA;
+    if ENABLE {
+        wr extra;
+    }
+}
+
+output main;

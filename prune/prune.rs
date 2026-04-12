@@ -1,57 +1,82 @@
-// Prune pass: eliminate if/else nodes from section bodies.
+// Prune pass: eliminate if/else nodes from the AST.
 //
-// This pass runs after const_eval and before LayoutDb.  It walks every section
-// in the AST, finds if/else nodes whose conditions are const expressions, evaluates
-// those conditions against the fully-resolved SymbolTable, and replaces each if/else
-// node with the statements from the taken branch.
+// This pass runs after const_eval and before LayoutDb.  It performs two steps:
 //
-// The original AST is left untouched.  We make a clone, prune it, and
-// return the clone.  The original Ast and AstDb remain valid for debugging (e.g. ast.dump).
+//   1. Top-level prune — walks the root's direct children, finds if/else nodes,
+//      evaluates their conditions, and promotes only Section (and nested If) nodes
+//      from the taken branch.  Non-section content (deferred assigns, print, assert)
+//      has already been handled by const_eval and is silently discarded.
 //
-// Top-level if/else blocks (in const_statements) are NOT pruned here — they are
-// fully handled by const_eval already.  Only section-body if/else nodes are pruned.
+//   2. Section-body prune — for every Section node now visible at root level
+//      (both unconditional sections and those just promoted in step 1), walks the
+//      section body and replaces any if/else nodes with the statements from the
+//      taken branch.
+//
+// The original AST is left untouched: a clone is made, pruned, and returned.
+// The original Ast and AstDb remain valid for debugging (e.g. ast.dump).
 
 use anyhow::bail;
-use ast::{Ast, AstDb, LexToken};
+use ast::{Ast, LexToken};
 use diags::Diags;
 use symtable::SymbolTable;
 
 #[allow(unused_imports)]
 use tracing::debug;
 
-/// Clone `ast`, remove all if/else nodes from section bodies (replacing each
-/// with the statements from the taken branch), and return the pruned clone.
+/// Clone `ast`, prune all if/else nodes at root level and in section bodies,
+/// and return the pruned clone.
+///
+/// Top-level if/else blocks may contain `section` definitions.  Only Section
+/// nodes (and nested If nodes that may themselves contain sections) are promoted
+/// from the taken branch; const-only statements are silently dropped since
+/// `const_eval` has already evaluated them.
 ///
 /// Conditions must be fully resolvable from `symbol_table`; any unresolvable
 /// condition is a compile-time error.
 pub fn prune<'toks>(
     ast: &Ast<'toks>,
-    ast_db: &AstDb<'toks>,
     symbol_table: &mut SymbolTable,
     diags: &mut Diags,
 ) -> anyhow::Result<Ast<'toks>> {
     debug!("prune::prune: ENTER");
     let mut pruned = ast.clone();
 
-    // Prune each section independently.
-    for (_name, section) in &ast_db.sections {
-        prune_section_body(&mut pruned, section.nid, symbol_table, diags)?;
+    // Step 1: prune top-level if/else, keeping only Section and nested If nodes.
+    // root_nid is a Copy value captured before the &mut pruned borrow begins.
+    let root_nid = pruned.root();
+    prune_body(
+        &mut pruned,
+        root_nid,
+        symbol_table,
+        diags,
+        |tok| matches!(tok, LexToken::Section | LexToken::If),
+    )?;
+
+    // Step 2: prune if/else inside every section body now at root level.
+    // This covers both unconditional sections and those promoted in step 1.
+    let section_nids: Vec<_> = pruned
+        .children(pruned.root())
+        .filter(|&nid| pruned.get_tinfo(nid).tok == LexToken::Section)
+        .collect();
+    for sec_nid in section_nids {
+        prune_body(&mut pruned, sec_nid, symbol_table, diags, |_| true)?;
     }
 
     debug!("prune::prune: EXIT");
     Ok(pruned)
 }
 
-/// Prune all if/else nodes that are direct or promoted children of `parent_nid`.
+/// Prune all if/else nodes that are direct children of `parent_nid`.
 ///
-/// Uses a loop-until-no-more-ifs approach: after each prune the children snapshot
-/// is refreshed so promoted if nodes (from else-if chains) are caught on the next
-/// iteration.
-fn prune_section_body(
+/// `keep` controls which statement tokens are promoted from the taken branch.
+/// Uses a loop-until-no-more-ifs approach so that promoted If nodes (from
+/// else-if chains or nested top-level ifs) are caught on the next iteration.
+fn prune_body(
     pruned: &mut Ast,
     parent_nid: indextree::NodeId,
     symbol_table: &mut SymbolTable,
     diags: &mut Diags,
+    keep: fn(LexToken) -> bool,
 ) -> anyhow::Result<()> {
     loop {
         let children: Vec<_> = pruned.children(parent_nid).collect();
@@ -61,19 +86,20 @@ fn prune_section_body(
             .copied();
         match maybe_if {
             None => break,
-            Some(if_nid) => prune_if_node(pruned, if_nid, symbol_table, diags)?,
+            Some(if_nid) => prune_if_node(pruned, if_nid, symbol_table, diags, keep)?,
         }
     }
     Ok(())
 }
 
-/// Evaluate the condition of `if_nid`, promote the taken branch's statements
-/// as preceding siblings of `if_nid`, then detach `if_nid` from the tree.
+/// Evaluate the condition of `if_nid`, promote statements from the taken branch
+/// that satisfy `keep`, then detach `if_nid` from the tree.
 fn prune_if_node(
     pruned: &mut Ast,
     if_nid: indextree::NodeId,
     symbol_table: &mut SymbolTable,
     diags: &mut Diags,
+    keep: fn(LexToken) -> bool,
 ) -> anyhow::Result<()> {
     let children: Vec<_> = pruned.children(if_nid).collect();
     // Structure: [cond_expr, {, then_stmt*, }, [else, ({ | if), else_stmt*, }]?]
@@ -120,7 +146,9 @@ fn prune_if_node(
                     .iter()
                     .position(|&n| pruned.get_tinfo(n).tok == LexToken::CloseBrace)
                     .map(|i| i + after_else_idx + 1)
-                    .unwrap_or_else(|| unreachable!("Malformed if node: no closing brace for else-branch"));
+                    .unwrap_or_else(|| {
+                        unreachable!("Malformed if node: no closing brace for else-branch")
+                    });
                 children[after_else_idx + 1..else_close_idx].to_vec()
             }
         }
@@ -131,10 +159,12 @@ fn prune_if_node(
     // Choose which statements to promote.
     let stmts_to_promote = if cond_val { &then_stmts } else { &else_stmts };
 
-    // Detach each selected statement from if_nid and insert it before if_nid.
+    // Detach each kept statement from if_nid and insert it before if_nid.
     for &stmt_nid in stmts_to_promote {
-        stmt_nid.detach(pruned.arena_mut());
-        if_nid.insert_before(stmt_nid, pruned.arena_mut());
+        if keep(pruned.get_tinfo(stmt_nid).tok) {
+            stmt_nid.detach(pruned.arena_mut());
+            if_nid.insert_before(stmt_nid, pruned.arena_mut());
+        }
     }
 
     // Remove if_nid from the tree entirely.

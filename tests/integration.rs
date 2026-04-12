@@ -2673,4 +2673,70 @@ mod tests {
         fs::remove_file("section_if_compound_cond.bin").unwrap();
     }
 
+    // ── Top-level if/else: section definitions ───────────────────────────────
+
+    /// Top-level if condition true: section defined inside if is promoted and
+    /// referenced via a section-body if.  Expected output: 0xAA 0xBB.
+    #[test]
+    fn toplevel_if_section_true() {
+        let _cmd = Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/toplevel_if_section_true.brink")
+            .arg("-o")
+            .arg("toplevel_if_section_true.bin")
+            .assert()
+            .success();
+        let bytevec = fs::read("toplevel_if_section_true.bin").unwrap();
+        assert_eq!(bytevec, vec![0xAAu8, 0xBB]);
+        fs::remove_file("toplevel_if_section_true.bin").unwrap();
+    }
+
+    /// Top-level if condition false: section discarded, body if also not taken.
+    /// Expected output: 0xAA only.
+    #[test]
+    fn toplevel_if_section_false() {
+        let _cmd = Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/toplevel_if_section_false.brink")
+            .arg("-o")
+            .arg("toplevel_if_section_false.bin")
+            .assert()
+            .success();
+        let bytevec = fs::read("toplevel_if_section_false.bin").unwrap();
+        assert_eq!(bytevec, vec![0xAAu8]);
+        fs::remove_file("toplevel_if_section_false.bin").unwrap();
+    }
+
+    /// Top-level if/else with a section in each branch under the same name.
+    /// PLATFORM == 1 selects the if branch (0x01); else branch discarded.
+    #[test]
+    fn toplevel_if_else_section() {
+        let _cmd = Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/toplevel_if_else_section.brink")
+            .arg("-o")
+            .arg("toplevel_if_else_section.bin")
+            .assert()
+            .success();
+        let bytevec = fs::read("toplevel_if_else_section.bin").unwrap();
+        assert_eq!(bytevec, vec![0x01u8]);
+        fs::remove_file("toplevel_if_else_section.bin").unwrap();
+    }
+
+    /// Corner case: nested top-level if blocks.  A=1 promotes the inner If node;
+    /// B=1 then promotes section combo.  Expected output: 0xCC.
+    #[test]
+    fn toplevel_if_nested_if() {
+        let _cmd = Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/toplevel_if_nested_if.brink")
+            .arg("-o")
+            .arg("toplevel_if_nested_if.bin")
+            .assert()
+            .success();
+        let bytevec = fs::read("toplevel_if_nested_if.bin").unwrap();
+        assert_eq!(bytevec, vec![0xCCu8]);
+        fs::remove_file("toplevel_if_nested_if.bin").unwrap();
+    }
+
 } // mod tests

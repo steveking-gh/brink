@@ -1557,13 +1557,16 @@ impl<'toks> Ast<'toks> {
                 // Section-level statements: delegate to the shared dispatcher.
                 // try_parse_section_stmt returns None for unrecognized tokens.
                 _ => {
-                    // Snapshot the diagnostic info before the mutable borrow below.
+                    // Snapshot before mutable borrows below.
                     let err_val = tinfo.val.to_string();
                     let err_span = tinfo.span();
-                    let maybe = if matches!(ctx, ParseIfContext::Section) {
-                        self.try_parse_section_stmt(parent, diags)
-                    } else {
-                        None
+                    let tok = tinfo.tok;
+                    let maybe = match ctx {
+                        ParseIfContext::Section => self.try_parse_section_stmt(parent, diags),
+                        ParseIfContext::TopLevel if tok == LexToken::Section => {
+                            Some(self.parse_section(parent, diags))
+                        }
+                        _ => None,
                     };
                     maybe.unwrap_or_else(|| {
                         let msg = format!("'{}' is not allowed inside an if/else body", err_val);
@@ -2043,7 +2046,14 @@ impl<'toks> AstDb<'toks> {
         result
     }
 
-    pub fn new(diags: &mut Diags, ast: &'toks Ast) -> anyhow::Result<AstDb<'toks>> {
+    /// Build an `AstDb` from `ast`.
+    ///
+    /// When `validate` is `true` (the normal post-prune call), the output section's
+    /// full nesting tree is walked to catch circular references and unknown `wr`
+    /// targets.  When `false` (the pre-prune call used only for `const_eval`), that
+    /// walk is skipped so that `wr` references to sections defined inside top-level
+    /// `if` blocks do not produce false-positive errors before those blocks are pruned.
+    pub fn new(diags: &mut Diags, ast: &'toks Ast, validate: bool) -> anyhow::Result<AstDb<'toks>> {
         debug!("AstDb::new");
 
         // Populate the AST database of critical structures.
@@ -2137,27 +2147,29 @@ impl<'toks> AstDb<'toks> {
             bail!("AST construction failed");
         }
 
-        let mut children = output_nid.children(&ast.arena);
-        // the section name is the first child of the output
-        // AST processing guarantees this exists.
-        let sec_nid = children.next().unwrap();
-        let sec_tinfo = ast.get_tinfo(sec_nid);
-        let sec_str = sec_tinfo.val;
+        if validate {
+            let mut children = output_nid.children(&ast.arena);
+            // the section name is the first child of the output
+            // AST processing guarantees this exists.
+            let sec_nid = children.next().unwrap();
+            let sec_tinfo = ast.get_tinfo(sec_nid);
+            let sec_str = sec_tinfo.val;
 
-        // add the output section to our nested sections tracker
-        let mut nested_sections = HashSet::new();
-        nested_sections.insert(sec_str);
-        let section = ast_db.sections.get(sec_str).unwrap();
+            // add the output section to our nested sections tracker
+            let mut nested_sections = HashSet::new();
+            nested_sections.insert(sec_str);
+            let section = ast_db.sections.get(sec_str).unwrap();
 
-        // We're going to need this iterator more than once
-        let children = section.nid.children(&ast.arena);
+            // We're going to need this iterator more than once
+            let children = section.nid.children(&ast.arena);
 
-        for nid in children {
-            result &= ast_db.validate_nesting_r(1, nid, ast, &mut nested_sections, diags);
-        }
+            for nid in children {
+                result &= ast_db.validate_nesting_r(1, nid, ast, &mut nested_sections, diags);
+            }
 
-        if !result {
-            bail!("AST construction failed");
+            if !result {
+                bail!("AST construction failed");
+            }
         }
 
         Ok(ast_db)
