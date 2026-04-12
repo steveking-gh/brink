@@ -19,7 +19,6 @@ use std::io::Write;
 // Local libraries
 use ast::{Ast, AstDb};
 use diags::Diags;
-use prune;
 use engine::Engine;
 use ext::{ExtensionRegistry, test_mocks::register_test_extensions};
 use ir::{ConstBuiltins, ParameterValue};
