@@ -1,0 +1,39 @@
+ast/ast.rs
+  254257e5b3abdcc5 1560,1563-1569,2049-2056,2150-2156,2158-2161,2163-2164,2166-2168,2170-2172
+tests/integration.rs
+  254257e5b3abdcc5 2676-2741
+tests/toplevel_if_section_false.brink
+  254257e5b3abdcc5 1-19
+tests/toplevel_if_else_section.brink
+  254257e5b3abdcc5 1-20
+tests/toplevel_if_section_true.brink
+  254257e5b3abdcc5 1-19
+process/process.rs
+  254257e5b3abdcc5 130-133,138,141-146
+prune/prune.rs
+  254257e5b3abdcc5 1,3,5-8,10-16,19,26-27,29-32,44-62,69,71-74,79,89,95-96,102,149-151,162,164-167
+layoutdb/fuzz/fuzz_targets/fuzz_target_1.rs
+  254257e5b3abdcc5 15
+tests/toplevel_if_nested_if.brink
+  254257e5b3abdcc5 1-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "4cbd3f71a07b6d56bd151e928d219d2892cea6b4",
+  "prompts": {
+    "254257e5b3abdcc5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "db90919e-a6ab-460d-a46a-03bd455a5e43",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Steve King",
+      "messages": [],
+      "total_additions": 277,
+      "total_deletions": 82,
+      "accepted_lines": 290,
+      "overriden_lines": 0
+    }
+  }
+}
