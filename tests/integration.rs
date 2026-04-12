@@ -708,6 +708,25 @@ mod tests {
         assert_brink_success("tests/to_i64_2.brink", None, None);
     }
 
+    /// to_i64() in a const expression: verifies that eval_const_expr_r dispatches
+    /// on op before reading operands, so the unary ToI64 ([input, output]) is
+    /// correctly evaluated rather than causing a stack overflow.
+    #[test]
+
+    fn const_to_i64_const() {
+        assert_brink_success("tests/const_to_i64_const.brink", None, None);
+    }
+
+    /// brink::test_logger() in a const expression is rejected with IRDB_21
+    /// (ExtensionCall not supported in const expressions) now that eval_const_expr_r
+    /// dispatches on op before reading operands.  Previously the name was
+    /// accidentally caught by IRDB_20 before the dispatch reached eval_const_expr_r.
+    #[test]
+
+    fn const_ext_call_const() {
+        assert_brink_failure("tests/const_ext_call_const.brink", &["[IRDB_21]"]);
+    }
+
     #[test]
 
     fn print_1() {

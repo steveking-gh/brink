@@ -1,0 +1,6 @@
+const A = to_i64(42u);
+section foo {
+    wr8 0;
+    assert A == 42i;
+}
+output foo;

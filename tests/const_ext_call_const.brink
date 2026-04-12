@@ -1,0 +1,9 @@
+// brink::test_logger() in a const expression is rejected with IRDB_21.
+// With the op-first dispatch fix, eval_const_expr_r reaches the ExtensionCall
+// arm and emits IRDB_21 ("not supported in a const expression") cleanly.
+// Expected: IRDB_21.
+const A = brink::test_logger();
+section foo {
+    wr8 0;
+}
+output foo;

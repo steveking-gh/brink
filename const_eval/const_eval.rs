@@ -516,39 +516,62 @@ impl<'toks> ConstIR {
                 _ => {}
             }
 
-            // Version builtins are compile-time constants; resolve directly without operands.
-            match op {
-                IRKind::BuiltinVersionString => {
-                    return Some(ParameterValue::QuotedString(
-                        ConstBuiltins::get().brink_version_string.to_string(),
-                    ));
-                }
+            // Dispatch on the producing op *before* touching any operands.  Each op
+            // kind has its own operand layout; reading operand_vec[1] for a unary op
+            // (e.g. ToI64 layout = [input, output]) aliases the output slot itself
+            // and causes infinite recursion.
+            return match op {
+                // ── Zero-operand: version builtins ──────────────────────────────
+                IRKind::BuiltinVersionString => Some(ParameterValue::QuotedString(
+                    ConstBuiltins::get().brink_version_string.to_string(),
+                )),
                 IRKind::BuiltinVersionMajor => {
-                    return Some(ParameterValue::U64(
-                        ConstBuiltins::get().brink_version_major,
-                    ));
+                    Some(ParameterValue::U64(ConstBuiltins::get().brink_version_major))
                 }
                 IRKind::BuiltinVersionMinor => {
-                    return Some(ParameterValue::U64(
-                        ConstBuiltins::get().brink_version_minor,
-                    ));
+                    Some(ParameterValue::U64(ConstBuiltins::get().brink_version_minor))
                 }
                 IRKind::BuiltinVersionPatch => {
-                    return Some(ParameterValue::U64(
-                        ConstBuiltins::get().brink_version_patch,
-                    ));
+                    Some(ParameterValue::U64(ConstBuiltins::get().brink_version_patch))
                 }
-                _ => {}
-            }
 
-            // Binary, comparison, and logical ops: evaluate both input operands.
-            let lhs_lop = lin_ir.operand_vec[0];
-            let rhs_lop = lin_ir.operand_vec[1];
-            let lhs_val =
-                Self::eval_const_expr_r(symbol_table, lhs_lop, const_db, diags, err_loc)?;
-            let rhs_val =
-                Self::eval_const_expr_r(symbol_table, rhs_lop, const_db, diags, err_loc)?;
-            return match op {
+                // ── Unary type conversions: operand layout = [input, output] ───
+                IRKind::ToI64 | IRKind::ToU64 => {
+                    let input_lop = lin_ir.operand_vec[0];
+                    let val = Self::eval_const_expr_r(
+                        symbol_table,
+                        input_lop,
+                        const_db,
+                        diags,
+                        err_loc,
+                    )?;
+                    match (&val, op) {
+                        (ParameterValue::U64(v), IRKind::ToI64) => {
+                            Some(ParameterValue::I64(*v as i64))
+                        }
+                        (
+                            ParameterValue::I64(_) | ParameterValue::Integer(_),
+                            IRKind::ToI64,
+                        ) => Some(ParameterValue::I64(val.to_i64())),
+                        (
+                            ParameterValue::U64(_)
+                            | ParameterValue::I64(_)
+                            | ParameterValue::Integer(_),
+                            IRKind::ToU64,
+                        ) => Some(ParameterValue::U64(val.to_u64())),
+                        _ => {
+                            let m = format!(
+                                "Cannot apply '{:?}' to {:?} in a const expression.",
+                                op,
+                                val.data_type()
+                            );
+                            diags.err1("IRDB_21", &m, op_loc);
+                            None
+                        }
+                    }
+                }
+
+                // ── Binary arithmetic: operand layout = [lhs, rhs, output] ─────
                 IRKind::Add
                 | IRKind::Subtract
                 | IRKind::Multiply
@@ -557,23 +580,73 @@ impl<'toks> ConstIR {
                 | IRKind::BitAnd
                 | IRKind::BitOr
                 | IRKind::LeftShift
-                | IRKind::RightShift => Self::apply_binary_op(op, lhs_val, rhs_val, &op_loc, diags),
+                | IRKind::RightShift => {
+                    let lhs_val = Self::eval_const_expr_r(
+                        symbol_table,
+                        lin_ir.operand_vec[0],
+                        const_db,
+                        diags,
+                        err_loc,
+                    )?;
+                    let rhs_val = Self::eval_const_expr_r(
+                        symbol_table,
+                        lin_ir.operand_vec[1],
+                        const_db,
+                        diags,
+                        err_loc,
+                    )?;
+                    Self::apply_binary_op(op, lhs_val, rhs_val, &op_loc, diags)
+                }
+
+                // ── Binary comparison: operand layout = [lhs, rhs, output] ─────
                 IRKind::DoubleEq
                 | IRKind::NEq
                 | IRKind::GEq
                 | IRKind::LEq
                 | IRKind::Gt
-                | IRKind::Lt => Self::apply_comparison_op(op, lhs_val, rhs_val, &op_loc, diags),
+                | IRKind::Lt => {
+                    let lhs_val = Self::eval_const_expr_r(
+                        symbol_table,
+                        lin_ir.operand_vec[0],
+                        const_db,
+                        diags,
+                        err_loc,
+                    )?;
+                    let rhs_val = Self::eval_const_expr_r(
+                        symbol_table,
+                        lin_ir.operand_vec[1],
+                        const_db,
+                        diags,
+                        err_loc,
+                    )?;
+                    Self::apply_comparison_op(op, lhs_val, rhs_val, &op_loc, diags)
+                }
+
+                // ── Binary logical: operand layout = [lhs, rhs, output] ─────────
                 IRKind::LogicalAnd | IRKind::LogicalOr => {
-                    let lhs_bool = lhs_val.to_bool();
-                    let rhs_bool = rhs_val.to_bool();
+                    let lhs_val = Self::eval_const_expr_r(
+                        symbol_table,
+                        lin_ir.operand_vec[0],
+                        const_db,
+                        diags,
+                        err_loc,
+                    )?;
+                    let rhs_val = Self::eval_const_expr_r(
+                        symbol_table,
+                        lin_ir.operand_vec[1],
+                        const_db,
+                        diags,
+                        err_loc,
+                    )?;
                     let result = if op == IRKind::LogicalAnd {
-                        lhs_bool && rhs_bool
+                        lhs_val.to_bool() && rhs_val.to_bool()
                     } else {
-                        lhs_bool || rhs_bool
+                        lhs_val.to_bool() || rhs_val.to_bool()
                     };
                     Some(ParameterValue::U64(if result { 1 } else { 0 }))
                 }
+
+                // ── Everything else is not supported at const time ───────────────
                 _ => {
                     let m = format!(
                         "Operation '{:?}' is not supported in a const expression.",
