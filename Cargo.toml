@@ -27,6 +27,7 @@ edition = "2024"
 
 [package]
 name = "brink"
+description = "Ergonomic firmware and binary file creation tool."
 version = "5.0.6"
 build = "build.rs"
 license-file = "LICENSE.txt"

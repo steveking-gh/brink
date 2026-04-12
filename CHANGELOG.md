@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Added a vscode syntax highlighting extension.  See the bottom of the README for instructions.
 - `if/else` expressions still require const conditional evaluation, but the
   conditional blocks can now contain structural statements, e.g. wr, set_addr, etc.
+- Added prebuilt binaries for homebrew
 
 ## [5.0.5] - 2026-04-09
 
