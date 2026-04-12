@@ -4,5 +4,6 @@
       "Skill(update-config)",
       "Skill(update-config:*)"
     ]
-  }
+  },
+  "enableAllProjectMcpServers": true
 }

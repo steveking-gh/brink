@@ -8,3 +8,4 @@ newlines.py
 newlines2.py
 .claude/settings.local.json
 /tmp/
+.mcp.json

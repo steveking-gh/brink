@@ -15,7 +15,7 @@ use diags::Diags;
 use diags::SourceSpan;
 use indextree::NodeId;
 use parse_int::parse;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 #[allow(unused_imports)]
 use tracing::{debug, trace};
@@ -338,12 +338,10 @@ impl<'toks> ConstIR {
                         panic!("Const name operand must be a Literal");
                     };
                     let rhs_lop_num = ir.operand_vec[1];
-                    let mut in_progress = HashSet::new();
                     let val = Self::eval_const_expr_r(
                         symbol_table,
                         rhs_lop_num,
                         const_db,
-                        &mut in_progress,
                         diags,
                         &src_loc,
                     );
@@ -364,12 +362,10 @@ impl<'toks> ConstIR {
                 }
                 IRKind::IfBegin => {
                     let cond_lop_num = ir.operand_vec[0];
-                    let mut in_progress = HashSet::new();
                     let cond_val = Self::eval_const_expr_r(
                         symbol_table,
                         cond_lop_num,
                         const_db,
-                        &mut in_progress,
                         diags,
                         &src_loc,
                     );
@@ -402,12 +398,10 @@ impl<'toks> ConstIR {
                     };
                     let name = name.clone();
                     let rhs_lop_num = ir.operand_vec[1];
-                    let mut in_progress = HashSet::new();
                     let rhs_val = Self::eval_const_expr_r(
                         symbol_table,
                         rhs_lop_num,
                         const_db,
-                        &mut in_progress,
                         diags,
                         &src_loc,
                     );
@@ -424,12 +418,10 @@ impl<'toks> ConstIR {
                     if !diags.noprint {
                         let mut s = String::new();
                         for &lop_idx in &ir.operand_vec {
-                            let mut in_progress = HashSet::new();
                             match Self::eval_const_expr_r(
                                 symbol_table,
                                 lop_idx,
                                 const_db,
-                                &mut in_progress,
                                 diags,
                                 &src_loc,
                             ) {
@@ -458,12 +450,10 @@ impl<'toks> ConstIR {
                 }
                 IRKind::Assert => {
                     let cond_lop_num = ir.operand_vec[0];
-                    let mut in_progress = HashSet::new();
                     match Self::eval_const_expr_r(
                         symbol_table,
                         cond_lop_num,
                         const_db,
-                        &mut in_progress,
                         diags,
                         &src_loc,
                     ) {
@@ -494,7 +484,6 @@ impl<'toks> ConstIR {
         symbol_table: &mut SymbolTable,
         lop_num: usize,
         const_db: &ConstIR,
-        _in_progress: &mut HashSet<String>,
         diags: &mut Diags,
         err_loc: &SourceSpan,
     ) -> Option<ParameterValue> {
@@ -556,9 +545,9 @@ impl<'toks> ConstIR {
             let lhs_lop = lin_ir.operand_vec[0];
             let rhs_lop = lin_ir.operand_vec[1];
             let lhs_val =
-                Self::eval_const_expr_r(symbol_table, lhs_lop, const_db, _in_progress, diags, err_loc)?;
+                Self::eval_const_expr_r(symbol_table, lhs_lop, const_db, diags, err_loc)?;
             let rhs_val =
-                Self::eval_const_expr_r(symbol_table, rhs_lop, const_db, _in_progress, diags, err_loc)?;
+                Self::eval_const_expr_r(symbol_table, rhs_lop, const_db, diags, err_loc)?;
             return match op {
                 IRKind::Add
                 | IRKind::Subtract
@@ -933,7 +922,6 @@ pub fn eval_ast_condition(
         symbol_table,
         lops[0],
         &const_ir,
-        &mut std::collections::HashSet::new(),
         diags,
         &src_loc,
     )?;

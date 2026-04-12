@@ -1525,40 +1525,52 @@ mod tests {
         );
     }
 
-    /// Two const declarations share the same name.  Expected: AST_30.
+    /// Two const declarations share the same name.
     #[test]
     fn const_duplicate_1() {
         assert_brink_failure("tests/const_duplicate_1.brink", &["[AST_30]"]);
     }
 
-    /// A const name collides with an existing section name.  Expected: AST_31.
+    /// Two const declarations share the same name.
+    #[test]
+    fn const_duplicate_2() {
+        assert_brink_failure("tests/const_duplicate_2.brink", &["[AST_30]"]);
+    }
+
+    /// A const name collides with an existing section name.
     #[test]
     fn const_name_conflict_1() {
         assert_brink_failure("tests/const_name_conflict_1.brink", &["[AST_31]"]);
     }
 
-    /// Two consts mutually depend on each other, forming a cycle.  Expected: IRDB_18.
+    /// Two consts mutually depend on each other, forming a cycle.
     #[test]
     fn const_circular_1() {
         assert_brink_failure("tests/const_circular_1.brink", &["[IRDB_20]"]);
     }
 
+    /// Two consts mutually depend on each other, forming a cycle.
+    #[test]
+    fn const_circular_2() {
+        assert_brink_failure("tests/const_circular_2.brink", &["[IRDB_20]"]);
+    }
+
     /// A const expression depends on sizeof(), which requires engine-time layout.
-    /// Consts must be resolvable before the engine runs.  Expected: IRDB_19.
+    /// Consts must be resolvable before the engine runs.
     #[test]
     fn const_sizeof_1() {
         assert_brink_failure("tests/const_sizeof_1.brink", &["[IRDB_19]"]);
     }
 
     /// A const expression uses __OUTPUT_SIZE, which requires engine-time layout.
-    /// Consts must be resolvable before the engine runs.  Expected: IRDB_19.
+    /// Consts must be resolvable before the engine runs.
     #[test]
     fn test_output_builtin_const_fail() {
         assert_brink_failure("tests/test_output_builtin_const_fail.brink", &["[IRDB_19]"]);
     }
 
     /// A const expression depends on addr(), which requires engine-time addressing.
-    /// Consts must be resolvable before the engine runs.  Expected: IRDB_19.
+    /// Consts must be resolvable before the engine runs.
     #[test]
     fn const_abs_1() {
         assert_brink_failure("tests/const_abs_1.brink", &["[IRDB_19]"]);

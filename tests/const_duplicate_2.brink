@@ -1,0 +1,8 @@
+// A is forward-declared and later defined — definition should take effect.
+const A;
+const B = 1;
+const A = B + 1;  // Disallowed redefinition
+section foo {
+    wr8 A;
+}
+output foo;
