@@ -1,4 +1,4 @@
-repo_root: c:\Users\kings\Documents\projects\brink
+repo_root: /home/kings/projects/brink
 
 # ── Compiler pipeline crates ──────────────────────────────────────────────────
 crates:
@@ -106,7 +106,7 @@ binary:
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
 tests:
-  integration: tests/integration.rs   # 286 tests as of 2026-04-11
+  integration: tests/integration.rs   # 291 tests as of 2026-04-12
   fixtures: tests/*.brink             # ~267 .brink source fixtures
   helpers: [assert_brink_success, assert_brink_failure, assert_brink_warning,
             assert_brink_no_warning]

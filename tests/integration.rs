@@ -1177,6 +1177,18 @@ mod tests {
         assert_brink_failure("tests/test_extension_sizeof_fail.brink", &["[AST_40]"]);
     }
 
+    /// Trying to use non-wr command on the extension output.
+    #[test]
+    fn test_extension_non_wr_1_fails() {
+        assert_brink_failure("tests/test_extension_non_wr_1.brink", &["[EXEC_14]"]);
+    }
+
+    /// Trying to use non-wr command on the extension output.
+    #[test]
+    fn test_extension_non_wr_2_fails() {
+        assert_brink_failure("tests/test_extension_non_wr_2.brink", &["[IRDB_9]"]);
+    }
+
     /// Form 3 (section-name): brink::test_increment receives the `top` section
     /// slice (16 bytes) and appends each byte + 1.  Total output: 32 bytes.
     #[test]

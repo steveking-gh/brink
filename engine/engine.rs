@@ -17,7 +17,7 @@ use diags::{Diags, SourceSpan};
 use ext::{ExtensionRegistry, RegisteredExtension};
 use ir::{ConstBuiltins, DataType, IR, IRKind, ParameterValue};
 use irdb::IRDb;
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs::File;
 use std::io::Write;
 use std::{convert::TryFrom, io::Read};
@@ -48,8 +48,8 @@ pub struct Location {
 impl Location {
     /// Advance all three counters by `sz` bytes.
     /// Emits EXEC_37 on file-offset overflow or EXEC_43 on absolute-address
-    /// overflow, and returns `false`.  Used by every write-type iterate helper so
-    /// the checked-arithmetic pattern lives in exactly one place.
+    /// overflow, and returns `false`.  Every write-type iterate helper calls
+    /// `advance` so the checked-arithmetic pattern lives in exactly one place.
     fn advance(
         &mut self,
         sz: u64,
@@ -2099,6 +2099,25 @@ impl Engine {
             Err(e) => return Err(anyhow!("Failed to memory map output file: {}", e)),
         };
 
+        // Maps each operand index to the first IR index that references the
+        // operand, excluding the defining instruction.  The main loop below
+        // resolves each extension call's consumer in O(1) instead of scanning
+        // ir_vec once per extension node.
+        let mut operand_consumer: HashMap<usize, usize> = HashMap::new();
+        for (c_idx, c_ir) in irdb.ir_vec.iter().enumerate() {
+            for &op in &c_ir.operands {
+                operand_consumer.entry(op).or_insert(c_idx);
+            }
+        }
+
+        // Maps each section name to a list of indices into wr_dispatches.
+        // ExtensionCallSection uses the map to check for ambiguity and to
+        // resolve file_offset in O(1) instead of two linear scans per call.
+        let mut sec_dispatch_map: HashMap<&str, Vec<usize>> = HashMap::new();
+        for (i, d) in self.wr_dispatches.iter().enumerate() {
+            sec_dispatch_map.entry(d.name.as_str()).or_default().push(i);
+        }
+
         // Sequentially execute extensions and patch the output file.
         let mut error_count = 0;
         for &idx in &extension_nodes {
@@ -2106,18 +2125,12 @@ impl Engine {
             let name = self.parms[ir.operands[0]].to_identifier();
             let out_idx = *ir.operands.last().unwrap();
 
-            // Find the consumer of this ExtensionCall's output
-            let mut consumer_ir = None;
-            let mut consumer_idx = 0;
-            for (c_idx, c_ir) in irdb.ir_vec.iter().enumerate() {
-                if c_idx != idx && c_ir.operands.contains(&out_idx) {
-                    consumer_ir = Some(c_ir);
-                    consumer_idx = c_idx;
-                    break;
-                }
-            }
-
-            let Some(c_ir) = consumer_ir else {
+            // Resolve the consumer of the ExtensionCall output.
+            let Some(consumer_idx) = operand_consumer
+                .get(&out_idx)
+                .copied()
+                .filter(|&c| c != idx)
+            else {
                 diags.err1(
                     "EXEC_45",
                     &format!("Extension '{}' output not consumed", name),
@@ -2126,23 +2139,22 @@ impl Engine {
                 error_count += 1;
                 continue;
             };
+            let consumer_ir = &irdb.ir_vec[consumer_idx];
 
             let Some(entry) = ext_registry.get(name) else {
                 unreachable!("Extension '{}' not found in registry", name);
             };
 
-            let byte_width = match c_ir.kind {
-                IRKind::WrExt => entry.cached_size,
-                _ => {
-                    diags.err1(
-                        "EXEC_46",
-                        &format!("Extension '{}' must be consumed by a generic `wr` statement. Fixed-size writes like `wr32` are prohibited.", name),
-                        ir.src_loc.clone(),
-                    );
-                    error_count += 1;
-                    continue;
-                }
+            // IRDb validates that every extension output has DataType::Extension
+            // and that WrExt is the only IR that accepts DataType::Extension operands.
+            // Any other consumer kind here is an IRDb construction bug.
+            let IRKind::WrExt = consumer_ir.kind else {
+                unreachable!(
+                    "Extension '{}' output consumed by {:?}, expected WrExt",
+                    name, consumer_ir.kind
+                );
             };
+            let byte_width = entry.cached_size;
 
             // Build (img_slice, args) according to the call form.
             //
@@ -2169,12 +2181,8 @@ impl Engine {
                 }
                 IRKind::ExtensionCallSection => {
                     let sec_name = self.parms[ir.operands[1]].to_identifier();
-                    let count = self
-                        .wr_dispatches
-                        .iter()
-                        .filter(|d| d.name == sec_name)
-                        .count();
-                    if count > 1 {
+                    let indices = sec_dispatch_map.get(sec_name).map(Vec::as_slice).unwrap_or(&[]);
+                    if indices.len() > 1 {
                         diags.err1(
                             "EXEC_56",
                             &format!(
@@ -2182,15 +2190,14 @@ impl Engine {
                                  the section-name form is ambiguous. Wrap with unique \
                                  section name(s) or use the explicit-range form such as: \
                                  `wr {}(<file_offset>, <length>)` to specify which occurrence.",
-                                sec_name, count, name,
+                                sec_name, indices.len(), name,
                             ),
                             ir.src_loc.clone(),
                         );
                         error_count += 1;
                         continue;
                     }
-                    let dispatch = self.wr_dispatches.iter().find(|d| d.name == sec_name);
-                    let Some(d) = dispatch else {
+                    let Some(&dispatch_idx) = indices.first() else {
                         return Err(anyhow!(
                             "Extension '{}': section '{}' not found in dispatch table. \
                              This is a compiler bug.",
@@ -2198,6 +2205,7 @@ impl Engine {
                             sec_name
                         ));
                     };
+                    let d = &self.wr_dispatches[dispatch_idx];
                     let start = d.file_offset as usize;
                     (start..start + d.size as usize, 2..last)
                 }
