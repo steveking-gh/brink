@@ -758,6 +758,14 @@ mod tests {
         assert_brink_failure("tests/wrx_overflow.brink", &["[EXEC_36]"]);
     }
 
+    /// brink::test_huge_ext has cached_size = usize::MAX.  After one preceding
+    /// byte advances file_offset to 1, iterate_wrext attempts 1 + usize::MAX
+    /// (as u64) which overflows and must emit EXEC_60.
+    #[test]
+    fn wrext_overflow() {
+        assert_brink_failure("tests/wrext_overflow.brink", &["[EXEC_60]"]);
+    }
+
     #[test]
     fn wrx_1() {
         assert_brink_success(

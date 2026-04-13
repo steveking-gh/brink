@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Cleaned up dead code in const evaluation.
 - Refactored common code into coerce_numeric_pair
 - Fixed to_i64() and to_u64() in const expressions
+- Use checked arithmetic for extension size.
 
 ## [5.0.6] - 2026-04-10
 

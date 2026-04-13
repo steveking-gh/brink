@@ -226,9 +226,26 @@ impl Engine {
                 ext_name_for_diag = ext_name;
                 if let Some(entry) = ext_registry.get(ext_name) {
                     let size = entry.cached_size as u64;
-                    current.file_offset += size;
-                    current.addr_offset += size;
-                    current.sec_offset += size;
+                    let Some(new_file_pos) = current.file_offset.checked_add(size) else {
+                        diags.err1(
+                            "EXEC_60",
+                            "Write operation causes location counter overflow",
+                            ir.src_loc.clone(),
+                        );
+                        return false;
+                    };
+                    let new_off = current.addr_offset + size; // safe: off <= file_pos
+                    if current.addr_base.checked_add(new_off).is_none() {
+                        diags.err1(
+                            "EXEC_43",
+                            "Write operation causes absolute address overflow",
+                            ir.src_loc.clone(),
+                        );
+                        return false;
+                    }
+                    current.file_offset = new_file_pos;
+                    current.addr_offset = new_off;
+                    current.sec_offset = current.sec_offset.saturating_add(size);
                     return true;
                 }
             }

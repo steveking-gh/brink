@@ -227,9 +227,28 @@ impl BrinkRangedExtension for MockRejectEmpty {
     }
 }
 
+/// Returns `usize::MAX` from `size()` to force a u64 overflow in the iterate
+/// location counter when written after any prior byte.  Used to test EXEC_60.
+pub struct MockHugeExt;
+
+impl BrinkExtension for MockHugeExt {
+    fn name(&self) -> &str {
+        "brink::test_huge_ext"
+    }
+
+    fn size(&self) -> usize {
+        usize::MAX
+    }
+
+    fn execute(&self, _args: &[u64], _out: &mut [u8]) -> Result<(), String> {
+        unreachable!("MockHugeExt::execute should never be called: iterate fails first");
+    }
+}
+
 pub fn register_test_extensions(reg: &mut ExtensionRegistry) {
     reg.register(Box::new(MockCrc::new()));
     reg.register(Box::new(MockLogger::new()));
+    reg.register(Box::new(MockHugeExt));
     reg.register_ranged(Box::new(MockIncrement::new()));
     reg.register_ranged(Box::new(MockRangedSum::new()));
     reg.register_ranged(Box::new(MockRejectEmpty::new()));
