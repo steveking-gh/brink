@@ -45,6 +45,33 @@ pub struct Location {
     addr_base: u64,
 }
 
+impl Location {
+    /// Advance all three counters by `sz` bytes.
+    /// Emits EXEC_37 on file-offset overflow or EXEC_43 on absolute-address
+    /// overflow, and returns `false`.  Used by every write-type iterate helper so
+    /// the checked-arithmetic pattern lives in exactly one place.
+    fn advance(
+        &mut self,
+        sz: u64,
+        src_loc: &SourceSpan,
+        diags: &mut Diags,
+    ) -> bool {
+        let Some(new_file_pos) = self.file_offset.checked_add(sz) else {
+            diags.err1("EXEC_37", "Write operation causes location counter overflow", src_loc.clone());
+            return false;
+        };
+        let new_off = self.addr_offset + sz; // safe: off <= file_pos
+        if self.addr_base.checked_add(new_off).is_none() {
+            diags.err1("EXEC_43", "Write operation causes absolute address overflow", src_loc.clone());
+            return false;
+        }
+        self.file_offset = new_file_pos;
+        self.addr_offset = new_off;
+        self.sec_offset = self.sec_offset.saturating_add(sz);
+        true
+    }
+}
+
 /// Records one occurrence of a section write in the output image.
 /// A section written N times via `wr` produces N `WrDispatch` entries,
 /// each at a distinct `file_offset`, in output order.
@@ -159,29 +186,7 @@ impl Engine {
         // Will panic if usize does not fit in u64
         let sz = xstr.len() as u64;
 
-        let Some(new_file_pos) = current.file_offset.checked_add(sz) else {
-            diags.err1(
-                "EXEC_41",
-                "Write operation causes location counter overflow",
-                ir.src_loc.clone(),
-            );
-            return false;
-        };
-        let new_off = current.addr_offset + sz; // safe: off <= file_pos, so if file_pos+sz didn't overflow, this won't
-        if current.addr_base.checked_add(new_off).is_none() {
-            diags.err1(
-                "EXEC_43",
-                "Write operation causes absolute address overflow",
-                ir.src_loc.clone(),
-            );
-            return false;
-        }
-
-        current.file_offset = new_file_pos;
-        current.addr_offset = new_off;
-        current.sec_offset = current.sec_offset.saturating_add(sz);
-
-        true
+        current.advance(sz, &ir.src_loc, diags)
     }
 
     /// Evaluates a dynamic `wr` statement specifically targeting compiled `BrinkExtension` traits.
@@ -223,27 +228,7 @@ impl Engine {
                 ext_name_for_diag = ext_name;
                 if let Some(entry) = ext_registry.get(ext_name) {
                     let size = entry.cached_size as u64;
-                    let Some(new_file_pos) = current.file_offset.checked_add(size) else {
-                        diags.err1(
-                            "EXEC_60",
-                            "Write operation causes location counter overflow",
-                            ir.src_loc.clone(),
-                        );
-                        return false;
-                    };
-                    let new_off = current.addr_offset + size; // safe: off <= file_pos
-                    if current.addr_base.checked_add(new_off).is_none() {
-                        diags.err1(
-                            "EXEC_43",
-                            "Write operation causes absolute address overflow",
-                            ir.src_loc.clone(),
-                        );
-                        return false;
-                    }
-                    current.file_offset = new_file_pos;
-                    current.addr_offset = new_off;
-                    current.sec_offset = current.sec_offset.saturating_add(size);
-                    return true;
+                    return current.advance(size, &ir.src_loc, diags);
                 }
             }
         }
@@ -337,29 +322,7 @@ impl Engine {
 
         self.trace(format!("Engine::iterate_wrx-{}: size is {}", byte_size * 8, sz).as_str());
 
-        // Guard against overflow on the file position counter
-        let Some(new_file_pos) = current.file_offset.checked_add(sz) else {
-            diags.err1(
-                "EXEC_37",
-                "Write operation causes location counter overflow",
-                ir.src_loc.clone(),
-            );
-            return false;
-        };
-        let new_off = current.addr_offset + sz; // safe: off <= file_pos
-        if current.addr_base.checked_add(new_off).is_none() {
-            diags.err1(
-                "EXEC_43",
-                "Write operation causes absolute address overflow",
-                ir.src_loc.clone(),
-            );
-            return false;
-        }
-
-        current.file_offset = new_file_pos;
-        current.addr_offset = new_off;
-        current.sec_offset = current.sec_offset.saturating_add(sz);
-
+        result &= current.advance(sz, &ir.src_loc, diags);
         result
     }
 
@@ -394,29 +357,7 @@ impl Engine {
             .as_str(),
         );
 
-        let Some(new_file_pos) = current.file_offset.checked_add(byte_size) else {
-            diags.err1(
-                "EXEC_40",
-                "Write operation causes location counter overflow",
-                ir.src_loc.clone(),
-            );
-            return false;
-        };
-        let new_off = current.addr_offset + byte_size; // safe: off <= file_pos
-        if current.addr_base.checked_add(new_off).is_none() {
-            diags.err1(
-                "EXEC_43",
-                "Write operation causes absolute address overflow",
-                ir.src_loc.clone(),
-            );
-            return false;
-        }
-
-        current.file_offset = new_file_pos;
-        current.addr_offset = new_off;
-        current.sec_offset = current.sec_offset.saturating_add(byte_size);
-
-        true
+        current.advance(byte_size, &ir.src_loc, diags)
     }
 
     /// Compute the string representation of the expression.

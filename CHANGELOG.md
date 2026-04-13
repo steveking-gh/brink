@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - INTERNAL: Cleaned up dead code in const evaluation.
 - INTERNAL: Refactored common code into coerce_numeric_pair
 - INTERNAL: Fixed is_none + unwrap anti-pattern.
+- INTERNAL: Refactor counter advance into one function
 
 ## [5.0.6] - 2026-04-10
 

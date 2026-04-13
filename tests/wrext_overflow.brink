@@ -1,6 +1,6 @@
 // brink::test_huge_ext has cached_size = usize::MAX.  Writing one byte first
 // advances file_offset to 1; the subsequent wr triggers iterate_wrext which
-// computes 1 + usize::MAX as u64, overflowing u64 and emitting EXEC_60.
+// computes 1 + usize::MAX as u64, overflowing u64 and emitting EXEC_37.
 section foo {
     wr8 0;
     wr brink::test_huge_ext();
