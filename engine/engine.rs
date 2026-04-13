@@ -1377,7 +1377,7 @@ impl Engine {
             anyhow::bail!("Engine construction failed.");
         }
 
-        engine.build_dispatches(irdb);
+        engine.build_dispatches(irdb, diags);
         engine.trace("Engine::new: EXIT");
         Ok(engine)
     }
@@ -1391,7 +1391,7 @@ impl Engine {
     ///   - section size = `ir_locs[j].file_pos - ir_locs[i].file_pos`
     ///
     /// A section written N times produces N `WrDispatch` entries in output order.
-    fn build_dispatches(&mut self, irdb: &IRDb) {
+    fn build_dispatches(&mut self, irdb: &IRDb, diags: &mut Diags) {
         // Stack of (section_name, SectionStart IR index) for matching ends.
         let mut stack: Vec<(String, usize)> = Vec::new();
         for (i, ir) in irdb.ir_vec.iter().enumerate() {
@@ -1406,7 +1406,10 @@ impl Engine {
                     let file_start = start_loc.file_offset;
                     let file_end = self.ir_locs[i].file_offset;
                     let addr_offset = start_loc.addr_offset;
-                    let addr = start_loc.addr_base.saturating_add(addr_offset);
+                    let Some(addr) = start_loc.addr_base.checked_add(addr_offset) else {
+                        diags.err1("EXEC_60", "Section address overflows u64", ir.src_loc.clone());
+                        continue;
+                    };
                     self.wr_dispatches.push(WrDispatch {
                         name,
                         file_offset: file_start,
@@ -1420,7 +1423,10 @@ impl Engine {
                     let loc = &self.ir_locs[i];
                     let file_offset = loc.file_offset;
                     let addr_offset = loc.addr_offset;
-                    let addr = loc.addr_base.saturating_add(addr_offset);
+                    let Some(addr) = loc.addr_base.checked_add(addr_offset) else {
+                        diags.err1("EXEC_61", "Label address overflows u64", ir.src_loc.clone());
+                        continue;
+                    };
                     self.label_dispatches.push(LabelDispatch {
                         name,
                         file_offset,
@@ -1637,7 +1643,6 @@ impl Engine {
 
     fn execute_assert(&self, ir: &IR, irdb: &IRDb, diags: &mut Diags) -> Result<()> {
         self.trace("Engine::execute_assert:");
-        let mut result = Ok(());
         let opnd_num = ir.operands[0];
         self.trace(format!("engine::execute_assert: checking operand {}", opnd_num).as_str());
         let parm = &self.parms[opnd_num];
@@ -1651,10 +1656,10 @@ impl Engine {
             // we get the Option<src_lid> for the assert.
             let src_lid = irdb.get_operand_ir_lid(opnd_num);
             self.assert_info(src_lid, irdb, diags);
-            result = Err(anyhow!("Assert failed"));
+            return Err(anyhow!("Assert failed"));
         }
 
-        result
+        Ok(())
     }
 
     /// Execute the print statement.
