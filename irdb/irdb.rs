@@ -241,11 +241,9 @@ impl IRDb {
 
             let dt_opt =
                 Self::get_operand_data_type_r(0, lop_num, lin_db, &self.symbol_table, diags);
-            if dt_opt.is_none() {
+            let Some(data_type) = dt_opt else {
                 return false; // error case, just give up
-            }
-
-            let data_type = dt_opt.unwrap();
+            };
 
             // Destructure fields needed by IROperand::new.  Output operands carry no
             // sval (the engine initializes their value at execution time), so pass "".

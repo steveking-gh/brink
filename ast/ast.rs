@@ -634,7 +634,7 @@ impl<'toks> Ast<'toks> {
         if !self.parse_pratt(0, &mut expr_opt, diags) {
             return false;
         }
-        if expr_opt.is_none() {
+        let Some(expr) = expr_opt else {
             let tinfo = self.get_tinfo(parent);
             let msg = format!(
                 "Expected valid expression inside parentheses after {:?}",
@@ -642,9 +642,9 @@ impl<'toks> Ast<'toks> {
             );
             diags.err1("AST_12", &msg, tinfo.span());
             return false;
-        }
+        };
         // Success, add the expression a child of the input parent node.
-        parent.append(expr_opt.unwrap(), &mut self.arena);
+        parent.append(expr, &mut self.arena);
         true
     }
 
@@ -926,13 +926,10 @@ impl<'toks> Ast<'toks> {
     fn parse_pratt(&mut self, min_bp: u8, top: &mut Option<NodeId>, diags: &mut Diags) -> bool {
         self.dbg_enter("parse_pratt");
         debug!("Ast::parse_pratt: Min BP = {}", min_bp);
-        let lhs_tinfo = self.peek();
-        if lhs_tinfo.is_none() {
+        let Some(lhs_tinfo) = self.peek() else {
             self.err_no_input(diags);
             return self.dbg_exit_pratt("parse_pratt", &None, false);
-        }
-
-        let lhs_tinfo = lhs_tinfo.unwrap();
+        };
 
         *top = None; // Initialize
 
@@ -1215,13 +1212,11 @@ impl<'toks> Ast<'toks> {
         // Keep processing for the remaining right hand side of the expression.
         loop {
             // We expect an operation such as add, a semicolon, etc. or the end of input.
-            let op_tinfo = self.peek();
-            if op_tinfo.is_none() {
+            let Some(op_tinfo) = self.peek() else {
                 break; // end of input.
-            }
+            };
 
             // Filter disallowed operations.
-            let op_tinfo = op_tinfo.unwrap();
             let tok = op_tinfo.tok;
 
             // Comma, close paren, semicolon, open brace, and else are terminating
@@ -1919,15 +1914,13 @@ impl<'toks> AstDb<'toks> {
             }
             num += 1;
         }
-        let sec_name_nid_opt = children.next();
-        if sec_name_nid_opt.is_none() {
+        let Some(sec_name_nid) = children.next() else {
             // error, specified section does not exist
             let m = "Missing section name".to_string();
             let section_tinfo = ast.get_tinfo(parent_nid);
             diags.err1("AST_11", &m, section_tinfo.span());
             return false;
-        }
-        let sec_name_nid = sec_name_nid_opt.unwrap();
+        };
         let sec_tinfo = ast.get_tinfo(sec_name_nid);
         let sec_str = sec_tinfo.val;
         if !self.sections.contains_key(sec_str) {
@@ -2115,10 +2108,10 @@ impl<'toks> AstDb<'toks> {
         }
 
         // Make sure we found an output!
-        if output.is_none() {
+        let Some(output) = output else {
             diags.err0("AST_8", "Missing output statement");
             bail!("AST construction failed");
-        }
+        };
 
         // Check for const names that conflict with section names.
         for (const_name, const_span) in &const_names {
@@ -2133,11 +2126,11 @@ impl<'toks> AstDb<'toks> {
             bail!("AST construction failed");
         }
 
-        let output_nid = output.as_ref().unwrap().nid;
+        let output_nid = output.nid;
         let mut ast_db = AstDb {
             sections,
             labels: HashMap::new(),
-            output: output.unwrap(),
+            output,
             global_asserts,
             const_statements,
             const_names,

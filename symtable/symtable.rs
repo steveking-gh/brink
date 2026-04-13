@@ -79,15 +79,15 @@ impl SymbolTable {
     ) -> bool {
         if let Some(entry) = self.entries.get_mut(name) {
             if entry.value.is_some() {
-                if entry.decl_loc.is_none() {
+                let Some(decl_loc) = entry.decl_loc.as_ref() else {
                     return true;
-                }
+                };
                 let m = format!("Const '{}' cannot be assigned more than once.", name);
                 diags.err2(
                     "SYMTAB_4",
                     &m,
                     loc.clone(),
-                    entry.decl_loc.as_ref().unwrap().clone(),
+                    decl_loc.clone(),
                 );
                 return false;
             }

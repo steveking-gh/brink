@@ -152,12 +152,9 @@ impl Engine {
             .as_str(),
         );
 
-        let xstr_opt = self.evaluate_string_expr(ir, irdb, diags);
-        if xstr_opt.is_none() {
+        let Some(xstr) = self.evaluate_string_expr(ir, irdb, diags) else {
             return false;
-        }
-
-        let xstr = xstr_opt.unwrap();
+        };
 
         // Will panic if usize does not fit in u64
         let sz = xstr.len() as u64;
@@ -904,16 +901,14 @@ impl Engine {
             // We've already verified that the section identifier exists,
             // but unless the section actually got used in the output,
             // then we won't find location info for it.
-            let ir_rng = irdb.sized_locs.get(&sec_name);
-            if ir_rng.is_none() {
+            let Some(ir_rng) = irdb.sized_locs.get(&sec_name) else {
                 let msg = format!(
                     "Can't take sizeof() section '{}' not used in output.",
                     sec_name
                 );
                 diags.err1("EXEC_5", &msg, ir.src_loc.clone());
                 return false;
-            }
-            let ir_rng = ir_rng.unwrap();
+            };
             assert!(ir_rng.start <= ir_rng.end);
             let start_loc = &self.ir_locs[ir_rng.start];
             let end_loc = &self.ir_locs[ir_rng.end];
@@ -972,13 +967,11 @@ impl Engine {
         let out_parm_num = ir.operands[0];
         let sec_name = &irdb.output_sec_str;
 
-        let ir_rng = irdb.sized_locs.get(sec_name);
-        if ir_rng.is_none() {
+        let Some(ir_rng) = irdb.sized_locs.get(sec_name) else {
             let msg = format!("__OUTPUT_SIZE: output section '{}' not found.", sec_name);
             diags.err1("EXEC_57", &msg, ir.src_loc.clone());
             return false;
-        }
-        let ir_rng = ir_rng.unwrap();
+        };
         assert!(ir_rng.start <= ir_rng.end);
         let start_loc = &self.ir_locs[ir_rng.start];
         let end_loc = &self.ir_locs[ir_rng.end];
@@ -997,16 +990,14 @@ impl Engine {
         let out_parm_num = ir.operands[0];
         let sec_name = &irdb.output_sec_str;
 
-        let ir_num = irdb.addressed_locs.get(sec_name);
-        if ir_num.is_none() {
+        let Some(ir_num) = irdb.addressed_locs.get(sec_name) else {
             let msg = format!(
                 "__OUTPUT_ADDR: output section '{}' not reachable.",
                 sec_name
             );
             diags.err1("EXEC_58", &msg, ir.src_loc.clone());
             return false;
-        }
-        let ir_num = ir_num.unwrap();
+        };
         let start_loc = &self.ir_locs[*ir_num];
 
         let Some(val) = start_loc.addr_base.checked_add(start_loc.addr_offset) else {
@@ -1287,16 +1278,14 @@ impl Engine {
         // We've already verified that the section identifier exists,
         // but unless the section actually got used in the output,
         // then we won't find location info for it.
-        let ir_num = irdb.addressed_locs.get(&name);
-        if ir_num.is_none() {
+        let Some(ir_num) = irdb.addressed_locs.get(&name) else {
             let msg = format!(
                 "Address of section or label '{}' not reachable in output.",
                 name
             );
             diags.err1("EXEC_11", &msg, ir.src_loc.clone());
             return false;
-        }
-        let ir_num = ir_num.unwrap();
+        };
         let start_loc = &self.ir_locs[*ir_num];
         match ir.kind {
             IRKind::Addr => {
@@ -1669,11 +1658,10 @@ impl Engine {
     /// Display additional diagnostic if the assertion occurred for an
     /// operand that is an output of another operation.
     fn assert_info(&self, src_lid: Option<usize>, irdb: &IRDb, diags: &mut Diags) {
-        if src_lid.is_none() {
+        let Some(src_lid) = src_lid else {
             // No extra info available.  Source was presumably a constant.
             return;
-        }
-        let src_lid = src_lid.unwrap();
+        };
         // get the operation at the source lid
         let operation = irdb.ir_vec.get(src_lid).unwrap();
         let num_operands = operation.operands.len();
@@ -1737,14 +1725,11 @@ impl Engine {
             return Ok(());
         }
 
-        let xstr_opt = self.evaluate_string_expr(ir, irdb, diags);
-        if xstr_opt.is_none() {
+        let Some(xstr) = self.evaluate_string_expr(ir, irdb, diags) else {
             let msg = "Evaluating string expression failed.".to_string();
             diags.err1("EXEC_16", &msg, ir.src_loc.clone());
             return Err(anyhow!("Wrs failed"));
-        }
-
-        let xstr = xstr_opt.unwrap();
+        };
         print!("{}", xstr);
         Ok(())
     }
@@ -1759,14 +1744,11 @@ impl Engine {
         file: &mut File,
     ) -> Result<()> {
         self.trace("Engine::execute_wrs:");
-        let xstr_opt = self.evaluate_string_expr(ir, irdb, diags);
-        if xstr_opt.is_none() {
+        let Some(xstr) = self.evaluate_string_expr(ir, irdb, diags) else {
             let msg = "Evaluating string expression failed.".to_string();
             diags.err1("EXEC_15", &msg, ir.src_loc.clone());
             return Err(anyhow!("Wrs failed"));
-        }
-
-        let xstr = xstr_opt.unwrap();
+        };
         let size = xstr.len() as u64;
         let loc = &self.ir_locs[lid];
         let addr = loc.addr_base + loc.addr_offset;
