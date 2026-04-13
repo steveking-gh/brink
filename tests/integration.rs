@@ -13,7 +13,7 @@ mod tests {
             cmd.arg("-o").arg(out_file);
             out_file
         } else {
-            // Generate a locally unique binary filename like `tests_test_dynamic_wr.brink.bin`
+            // Generate a locally unique binary filename like `tests_dynamic_wr.brink.bin`
             // avoiding `output.bin` race-conditions across the parallel testing harness entirely!
             derived_out = format!("{}.bin", src.replace('/', "_").replace('\\', "_"));
             cmd.arg("-o").arg(&derived_out);
@@ -416,50 +416,50 @@ mod tests {
 
     /// __BRINK_VERSION_STRING can be written with wrs and used in print.
     #[test]
-    fn test_version_string_1() {
-        assert_brink_success("tests/test_version_string_1.brink", None, None);
+    fn version_string_1() {
+        assert_brink_success("tests/version_string_1.brink", None, None);
     }
 
     /// __BRINK_VERSION_MAJOR/MINOR/PATCH are U64 values usable in expressions.
     #[test]
-    fn test_version_numeric_1() {
-        assert_brink_success("tests/test_version_numeric_1.brink", None, None);
+    fn version_numeric_1() {
+        assert_brink_success("tests/version_numeric_1.brink", None, None);
     }
 
     /// Version builtins are usable in const expressions.
     #[test]
-    fn test_version_in_const_1() {
-        assert_brink_success("tests/test_version_in_const_1.brink", None, None);
+    fn version_in_const_1() {
+        assert_brink_success("tests/version_in_const_1.brink", None, None);
     }
 
     /// Version builtins can be written into the output as wr8 operands.
     #[test]
-    fn test_version_written_1() {
-        assert_brink_success("tests/test_version_written_1.brink", None, None);
+    fn version_written_1() {
+        assert_brink_success("tests/version_written_1.brink", None, None);
     }
 
     /// __OUTPUT_SIZE equals sizeof(output_section) and can be used in asserts.
     #[test]
-    fn test_output_size_1() {
-        assert_brink_success("tests/test_output_size_1.brink", None, None);
+    fn output_size_1() {
+        assert_brink_success("tests/output_size_1.brink", None, None);
     }
 
     /// __OUTPUT_SIZE written into the output header as a 4-byte field.
     #[test]
-    fn test_output_size_2() {
-        assert_brink_success("tests/test_output_size_2.brink", None, None);
+    fn output_size_2() {
+        assert_brink_success("tests/output_size_2.brink", None, None);
     }
 
     /// __OUTPUT_ADDR equals addr(output_section) with a non-zero base address.
     #[test]
-    fn test_output_addr_1() {
-        assert_brink_success("tests/test_output_addr_1.brink", None, None);
+    fn output_addr_1() {
+        assert_brink_success("tests/output_addr_1.brink", None, None);
     }
 
     /// __OUTPUT_ADDR is zero when no base address is specified.
     #[test]
-    fn test_output_addr_2() {
-        assert_brink_success("tests/test_output_addr_2.brink", None, None);
+    fn output_addr_2() {
+        assert_brink_success("tests/output_addr_2.brink", None, None);
     }
 
     #[test]
@@ -717,7 +717,7 @@ mod tests {
         assert_brink_success("tests/const_to_i64_const.brink", None, None);
     }
 
-    /// brink::test_logger() in a const expression is rejected with IRDB_21
+    /// brink::logger() in a const expression is rejected with IRDB_21
     /// (ExtensionCall not supported in const expressions) now that eval_const_expr_r
     /// dispatches on op before reading operands.  Previously the name was
     /// accidentally caught by IRDB_20 before the dispatch reached eval_const_expr_r.
@@ -758,7 +758,7 @@ mod tests {
         assert_brink_failure("tests/wrx_overflow.brink", &["[EXEC_36]"]);
     }
 
-    /// brink::test_huge_ext has cached_size = usize::MAX.  After one preceding
+    /// brink::huge_ext has cached_size = usize::MAX.  After one preceding
     /// byte advances file_offset to 1, iterate_wrext attempts 1 + usize::MAX
     /// (as u64) which overflows and must emit EXEC_37.
     #[test]
@@ -1167,35 +1167,35 @@ mod tests {
     /// sizeof() works for both section names and extension names, and the
     /// two forms agree on the byte count when the extension fills the section.
     #[test]
-    fn test_extension_sizeof() {
-        assert_brink_success("tests/test_extension_sizeof.brink", None, None);
+    fn extension_sizeof() {
+        assert_brink_success("tests/extension_sizeof.brink", None, None);
     }
 
     /// sizeof() with extension call syntax (arguments) is a compile error.
     #[test]
     fn sizeof_ext_name_with_args_fails() {
-        assert_brink_failure("tests/test_extension_sizeof_fail.brink", &["[AST_40]"]);
+        assert_brink_failure("tests/extension_sizeof_fail.brink", &["[AST_40]"]);
     }
 
     /// Trying to use non-wr command on the extension output.
     #[test]
-    fn test_extension_non_wr_1_fails() {
-        assert_brink_failure("tests/test_extension_non_wr_1.brink", &["[EXEC_14]"]);
+    fn extension_non_wr_1_fails() {
+        assert_brink_failure("tests/extension_non_wr_1.brink", &["[EXEC_14]"]);
     }
 
     /// Trying to use non-wr command on the extension output.
     #[test]
-    fn test_extension_non_wr_2_fails() {
-        assert_brink_failure("tests/test_extension_non_wr_2.brink", &["[IRDB_9]"]);
+    fn extension_non_wr_2_fails() {
+        assert_brink_failure("tests/extension_non_wr_2.brink", &["[IRDB_9]"]);
     }
 
-    /// Form 3 (section-name): brink::test_increment receives the `top` section
+    /// Form 3 (section-name): brink::increment receives the `top` section
     /// slice (16 bytes) and appends each byte + 1.  Total output: 32 bytes.
     #[test]
     fn execute_extension_increment() {
         Command::cargo_bin("brink")
             .unwrap()
-            .arg("tests/test_extension_increment.brink")
+            .arg("tests/extension_increment.brink")
             .arg("-o")
             .arg("execute_extension_increment.bin")
             .assert()
@@ -1222,14 +1222,14 @@ mod tests {
         fs::remove_file("execute_extension_increment.bin").ok();
     }
 
-    /// Form 2 (explicit range): brink::test_ranged_sum reads bytes [0..4] of the
+    /// Form 2 (explicit range): brink::ranged_sum reads bytes [0..4] of the
     /// image (the four data bytes written before it) and emits their sum as a
     /// big-endian u64.  Output: 4 data bytes + 8-byte sum = 12 bytes.
     #[test]
     fn execute_extension_ranged_explicit() {
         Command::cargo_bin("brink")
             .unwrap()
-            .arg("tests/test_extension_ranged_explicit.brink")
+            .arg("tests/extension_ranged_explicit.brink")
             .arg("-o")
             .arg("execute_extension_ranged_explicit.bin")
             .assert()
@@ -1254,7 +1254,7 @@ mod tests {
         fs::remove_file("execute_extension_ranged_explicit.bin").ok();
     }
 
-    // Form 3 (section-name): brink::test_ranged_sum receives the entire `out`
+    // Form 3 (section-name): brink::ranged_sum receives the entire `out`
     // section (4 data bytes + 8-byte extension slot) as its image slice.
     // Sum of 0x01+0x02+0x03+0x04 = 10; extension slot bytes are zero.
     // Total output: 4 data bytes + 8-byte sum = 12 bytes.
@@ -1262,7 +1262,7 @@ mod tests {
     fn execute_extension_section_sum() {
         Command::cargo_bin("brink")
             .unwrap()
-            .arg("tests/test_extension_section_sum.brink")
+            .arg("tests/extension_section_sum.brink")
             .arg("-o")
             .arg("execute_extension_section_sum.bin")
             .assert()
@@ -1294,17 +1294,17 @@ mod tests {
     /// be rejected at IRDB time with IRDB_45.
     #[test]
     fn execute_extension_no_range_error() {
-        assert_brink_failure("tests/test_extension_no_range_error.brink", &["[IRDB_45]"]);
+        assert_brink_failure("tests/extension_no_range_error.brink", &["[IRDB_45]"]);
     }
 
     /// A ranged extension called with explicit length=0 succeeds when the
-    /// extension accepts empty input.  brink::test_ranged_sum returns 0.
+    /// extension accepts empty input.  brink::ranged_sum returns 0.
     #[test]
     fn execute_extension_zero_length_success() {
-        let out_path = "test_ext_zero_length_success.bin";
+        let out_path = "ext_zero_length_success.bin";
         Command::cargo_bin("brink")
             .unwrap()
-            .arg("tests/test_extension_zero_length_success.brink")
+            .arg("tests/extension_zero_length_success.brink")
             .arg("-o")
             .arg(out_path)
             .assert()
@@ -1315,21 +1315,21 @@ mod tests {
     }
 
     /// A ranged extension called with explicit length=0 fails when the
-    /// extension rejects empty input.  brink::test_reject_empty returns Err.
+    /// extension rejects empty input.  brink::reject_empty returns Err.
     #[test]
     fn execute_extension_zero_length_failure() {
-        assert_brink_failure("tests/test_extension_zero_length_failure.brink", &[]);
+        assert_brink_failure("tests/extension_zero_length_failure.brink", &[]);
     }
 
     /// A ranged extension called with the section-name form on an empty section
     /// succeeds when the extension accepts empty input.
-    /// brink::test_ranged_sum returns 0.
+    /// brink::ranged_sum returns 0.
     #[test]
     fn execute_extension_zero_length_section_success() {
-        let out_path = "test_ext_zero_length_section_success.bin";
+        let out_path = "ext_zero_length_section_success.bin";
         Command::cargo_bin("brink")
             .unwrap()
-            .arg("tests/test_extension_zero_length_section_success.brink")
+            .arg("tests/extension_zero_length_section_success.brink")
             .arg("-o")
             .arg(out_path)
             .assert()
@@ -1348,7 +1348,7 @@ mod tests {
     #[test]
     fn execute_extension_zero_length_section_failure() {
         assert_brink_failure(
-            "tests/test_extension_zero_length_section_failure.brink",
+            "tests/extension_zero_length_section_failure.brink",
             &[],
         );
     }
@@ -1357,13 +1357,13 @@ mod tests {
     /// after all sections and extensions are fully written.
     #[test]
     fn global_assert_passes() {
-        assert_brink_success("tests/test_global_assert.brink", None, None);
+        assert_brink_success("tests/global_assert.brink", None, None);
     }
 
     /// A global assert that evaluates false must emit EXEC_2.
     #[test]
     fn global_assert_fails() {
-        assert_brink_failure("tests/test_global_assert_fail.brink", &["[EXEC_2]"]);
+        assert_brink_failure("tests/global_assert_fail.brink", &["[EXEC_2]"]);
     }
 
     /// Assert that every error/warning/note code string passed to the diags API
@@ -1604,8 +1604,8 @@ mod tests {
     /// A const expression uses __OUTPUT_SIZE, which requires engine-time layout.
     /// Consts must be resolvable before the engine runs.
     #[test]
-    fn test_output_builtin_const_fail() {
-        assert_brink_failure("tests/test_output_builtin_const_fail.brink", &["[IRDB_19]"]);
+    fn output_builtin_const_fail() {
+        assert_brink_failure("tests/output_builtin_const_fail.brink", &["[IRDB_19]"]);
     }
 
     /// A const expression depends on addr(), which requires engine-time addressing.
@@ -1633,7 +1633,7 @@ mod tests {
     /// Expected: SYMTAB_1 warning.
     #[test]
     fn const_unused_1() {
-        assert_brink_warning("tests/test_const_unused_1.brink", &["[SYMTAB_1]"]);
+        assert_brink_warning("tests/const_unused_1.brink", &["[SYMTAB_1]"]);
     }
 
     /// An I64 const is defined and used as a wr8 operand.
@@ -2408,7 +2408,7 @@ mod tests {
     fn execute_extension_crc() {
         Command::cargo_bin("brink")
             .unwrap()
-            .arg("tests/test_extension.brink")
+            .arg("tests/extension.brink")
             .arg("-o")
             .arg("execute_extension_crc.bin")
             .assert()
