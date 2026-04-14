@@ -99,6 +99,7 @@ impl IRDb {
             linearizer::LinOperand::Output { ir_lid, .. } => {
                 let lin_ir = &lin_db.ir_vec[*ir_lid];
                 match lin_ir.op {
+                    // Extension call output: rejects use in arithmetic, wr8..64, wrs, const.
                     IRKind::ExtensionCall
                     | IRKind::ExtensionCallSection => return Some(DataType::Extension),
 
@@ -503,21 +504,6 @@ impl IRDb {
                 }
                 true
             }
-            IRKind::WrExt => {
-                // layoutdb emits WrExt with operand_count_is_valid(1) — any count
-                // other than 1 fails layout construction before reaching IRDb.
-                assert!(ir.operands.len() == 1, "WrExt must have exactly 1 operand");
-                let lop_idx = ir.operands[0];
-                let lop = &self.parms[lop_idx];
-                // The single WrExt operand is the Output of an ExtensionCall IR;
-                // get_operand_data_type_r always assigns DataType::Extension to such
-                // outputs, so a non-Extension type here is a linearizer bug.
-                assert!(
-                    lop.val.data_type() == DataType::Extension,
-                    "WrExt operand must be DataType::Extension"
-                );
-                true
-            }
             IRKind::NEq
             | IRKind::LEq
             | IRKind::GEq
@@ -764,7 +750,7 @@ impl IRDb {
                             op.push_str(&format!(" ({:?}){}", operand.val.data_type(), v));
                         }
                         DataType::Extension => {
-                            op.push_str(&format!(" ({:?})", operand.val.data_type()));
+                            op.push_str(" (Extension)");
                         }
                         DataType::Unknown => {
                             println!("Dump: Found unknown Data Type operand {:?}", operand);

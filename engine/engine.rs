@@ -189,53 +189,35 @@ impl Engine {
         current.advance(sz, &ir.src_loc, diags)
     }
 
-    /// Evaluates a dynamic `wr` statement specifically targeting compiled `BrinkExtension` traits.
-    /// We check the extension registry to find the fixed length payload size.
-    fn iterate_wrext(
+    /// Advances the location cursor by the fixed output size of an extension call.
+    /// ExtensionCall and ExtensionCallSection are write statements that reserve
+    /// space in the output image during the iterate phase.
+    fn iterate_ext(
         &mut self,
         ir: &IR,
-        irdb: &IRDb,
         current: &mut Location,
         ext_registry: &ExtensionRegistry,
         diags: &mut Diags,
     ) -> bool {
         self.trace(
             format!(
-                "Engine::iterate_wrext: file_pos {}, off {}, sec {}",
+                "Engine::iterate_ext: file_pos {}, off {}, sec {}",
                 current.file_offset, current.addr_offset, current.sec_offset
             )
             .as_str(),
         );
 
-        let opnd_idx = ir.operands[0];
-        let opnd = &irdb.parms[opnd_idx];
-
-        // The operand to a `wr` statement isn't a direct identifier; it evaluates downwards
-        // to essentially an unresolved IR node mapping point. We use `is_output_of()` to crawl backwards
-        // up the instruction's dependency graph to find the `ExtensionCall` IR node that produced this
-        // target mapping. From there, we extract the extension's string name.
-        let mut ext_name_for_diag = "<unknown>";
-        if let Some(prod_ir_idx) = opnd.is_output_of() {
-            let prod_ir = &irdb.ir_vec[prod_ir_idx];
-            if matches!(
-                prod_ir.kind,
-                IRKind::ExtensionCall | IRKind::ExtensionCallSection
-            ) {
-                let ext_name_opnd = &irdb.parms[prod_ir.operands[0]];
-                let ext_name = ext_name_opnd.val.to_identifier();
-                ext_name_for_diag = ext_name;
-                if let Some(entry) = ext_registry.get(ext_name) {
-                    let size = entry.cached_size as u64;
-                    return current.advance(size, &ir.src_loc, diags);
-                }
-            }
+        let ext_name = self.parms[ir.operands[0]].to_identifier();
+        if let Some(entry) = ext_registry.get(ext_name) {
+            let size = entry.cached_size as u64;
+            return current.advance(size, &ir.src_loc, diags);
         }
 
         diags.err1(
             "EXEC_50",
             &format!(
                 "Failed to resolve extension '{}' size during layout.",
-                ext_name_for_diag
+                ext_name
             ),
             ir.src_loc.clone(),
         );
@@ -1528,8 +1510,8 @@ impl Engine {
                     IRKind::SectionEnd => self.iterate_section_end(ir, irdb, diags, &mut current),
 
                     IRKind::Wr(_) => self.iterate_wrx(ir, irdb, diags, &mut current),
-                    IRKind::WrExt => {
-                        self.iterate_wrext(ir, irdb, &mut current, ext_registry, diags)
+                    IRKind::ExtensionCall | IRKind::ExtensionCallSection => {
+                        self.iterate_ext(ir, &mut current, ext_registry, diags)
                     }
                     IRKind::Align => self.iterate_align(ir, irdb, diags, &current),
                     IRKind::SetSecOffset | IRKind::SetAddrOffset | IRKind::SetFileOffset => {
@@ -1565,8 +1547,6 @@ impl Engine {
                     | IRKind::Print
                     | IRKind::I64
                     | IRKind::U64
-                    | IRKind::ExtensionCall
-                    | IRKind::ExtensionCallSection
                     // if/else IR only lives in const_ir_vec; never reaches the engine.
                     | IRKind::ConstDeclare
                     | IRKind::IfBegin
@@ -1996,40 +1976,28 @@ impl Engine {
                 | IRKind::SectionEnd
                 | IRKind::LeftShift
                 | IRKind::RightShift
-                | IRKind::ExtensionCall
-                | IRKind::ExtensionCallSection
                 // if/else IR only lives in const_ir_vec; never reaches the engine.
                 | IRKind::ConstDeclare
                 | IRKind::IfBegin
                 | IRKind::ElseBegin
                 | IRKind::IfEnd
                 | IRKind::BareAssign => Ok(()),
-                IRKind::WrExt => {
-                    // We must emit empty zeroed bytes during the physical serial write loop
-                    // to guarantee that the output file expands to encompass the extension's
-                    // final layout boundaries before memory mapping executes.
-                    let opnd_idx = ir.operands[0];
-                    let opnd = &irdb.parms[opnd_idx];
-                    if let Some(prod_ir_idx) = opnd.is_output_of() {
-                        let prod_ir = &irdb.ir_vec[prod_ir_idx];
-                        if matches!(
-                            prod_ir.kind,
-                            IRKind::ExtensionCall | IRKind::ExtensionCallSection
-                        ) {
-                            let ext_name_opnd = &irdb.parms[prod_ir.operands[0]];
-                            let ext_name = ext_name_opnd.val.to_identifier();
-                            if let Some(entry) = ext_registry.get(ext_name) {
-                                let buf = vec![0u8; entry.cached_size];
-                                if let Err(err) = file.write_all(&buf) {
-                                    return Err(anyhow::anyhow!(
-                                        "Failed to pre-pad space for extension '{}': {}",
-                                        ext_name, err
-                                    ));
-                                }
-                            }
-                        }
+                IRKind::ExtensionCall | IRKind::ExtensionCallSection => {
+                    // Pre-pad zeroed bytes to expand the output file to cover
+                    // the extension's output region before memory mapping.
+                    let ext_name = self.parms[ir.operands[0]].to_identifier();
+                    if let Some(entry) = ext_registry.get(ext_name) {
+                        let buf = vec![0u8; entry.cached_size];
+                        file.write_all(&buf).map_err(|e| {
+                            anyhow::anyhow!(
+                                "Failed to pre-pad space for extension '{}': {}",
+                                ext_name,
+                                e
+                            )
+                        })
+                    } else {
+                        Ok(())
                     }
-                    Ok(())
                 }
             };
 
@@ -2093,17 +2061,6 @@ impl Engine {
             Err(e) => return Err(anyhow!("Failed to memory map output file: {}", e)),
         };
 
-        // Maps each operand index to the first IR index that references the
-        // operand, excluding the defining instruction.  The main loop below
-        // resolves each extension call's consumer in O(1) instead of scanning
-        // ir_vec once per extension node.
-        let mut operand_consumer: HashMap<usize, usize> = HashMap::new();
-        for (c_idx, c_ir) in irdb.ir_vec.iter().enumerate() {
-            for &op in &c_ir.operands {
-                operand_consumer.entry(op).or_insert(c_idx);
-            }
-        }
-
         // Maps each section name to a list of indices into wr_dispatches.
         // ExtensionCallSection uses the map to check for ambiguity and to
         // resolve file_offset in O(1) instead of two linear scans per call.
@@ -2117,36 +2074,9 @@ impl Engine {
         for &idx in &extension_nodes {
             let ir = &irdb.ir_vec[idx];
             let name = self.parms[ir.operands[0]].to_identifier();
-            let out_idx = *ir.operands.last().unwrap();
-
-            // Resolve the consumer of the ExtensionCall output.
-            let Some(consumer_idx) = operand_consumer
-                .get(&out_idx)
-                .copied()
-                .filter(|&c| c != idx)
-            else {
-                diags.err1(
-                    "EXEC_45",
-                    &format!("Extension '{}' output not consumed", name),
-                    ir.src_loc.clone(),
-                );
-                error_count += 1;
-                continue;
-            };
-            let consumer_ir = &irdb.ir_vec[consumer_idx];
 
             let Some(entry) = ext_registry.get(name) else {
                 unreachable!("Extension '{}' not found in registry", name);
-            };
-
-            // IRDb validates that every extension output has DataType::Extension
-            // and that WrExt is the only IR that accepts DataType::Extension operands.
-            // Any other consumer kind here is an IRDb construction bug.
-            let IRKind::WrExt = consumer_ir.kind else {
-                unreachable!(
-                    "Extension '{}' output consumed by {:?}, expected WrExt",
-                    name, consumer_ir.kind
-                );
             };
             let byte_width = entry.cached_size;
 
@@ -2161,8 +2091,11 @@ impl Engine {
             //   args[0] = ExtArg::Section resolved from wr_dispatches.
             //   Remaining user args map to ExtArg::Int or ExtArg::Str.
             //
-            // ExtArg::Section holds &mmap[..], an immutable borrow.  The
-            // block scope below isolates that borrow so it drops before the
+            // The trailing output operand is a type-checking placeholder and
+            // must not be passed to the extension.  last = len-1 excludes it.
+            //
+            // ExtArg::Section holds &mmap[..], an immutable borrow.  The block
+            // scope below isolates that borrow so the borrow drops before the
             // mutable mmap patch write at the end of each iteration.
             let last = ir.operands.len() - 1;
 
@@ -2250,8 +2183,10 @@ impl Engine {
                 }
             };
 
-            // Patch the file at the exact image offset where the consumer instruction evaluated.
-            let loc = &self.ir_locs[consumer_idx];
+            // Patch the file at the exact image offset of this extension call.
+            // ir_locs[idx] holds the file offset before this IR executes, which
+            // is the start of the zeroed placeholder written during generate.
+            let loc = &self.ir_locs[idx];
             let abs_offset = loc.file_offset as usize;
 
             if abs_offset + byte_width > mmap.len() {

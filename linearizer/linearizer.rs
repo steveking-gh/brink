@@ -361,7 +361,9 @@ impl Linearizer {
                         self.add_existing_operand_to_ir(ir_lid, idx);
                     }
 
-                    // Output operand for the extension result.
+                    // Output operand for the extension result.  DataType::Extension
+                    // causes type checking to reject use in arithmetic, wr8..64,
+                    // wrs, or const expressions.
                     let out_idx = self.add_new_operand_to_ir(
                         ir_lid,
                         LinOperand::new_output(ir_lid, tinfo.loc.clone()),
@@ -400,6 +402,7 @@ impl Linearizer {
                     self.add_existing_operand_to_ir(ir_lid, idx);
                 }
 
+                // Output operand: same role as in the Identifier arm above.
                 let out_idx = self.add_new_operand_to_ir(
                     ir_lid,
                     LinOperand::new_output(ir_lid, tinfo.loc.clone()),

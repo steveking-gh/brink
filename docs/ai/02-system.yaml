@@ -80,6 +80,15 @@ extensions:
       IRDb validation (name resolution against a declared parameter list), ExtArg
       extension (add name field or a separate NamedArg variant), extension trait
       extension (fn param_names(&self) -> &[&str] or similar declaration surface).
+    return_values: >
+      Extension calls return a typed ParameterValue so the result flows into
+      downstream expressions (wr32, const, assert, arithmetic).  Requires a new
+      ParameterValue::ByteArray(Vec<u8>) variant (or similar) to carry multi-byte
+      results.  BrinkExtension::execute signature would change from Result<(), String>
+      to Result<ParameterValue, String> or a richer return type.  DataType gains a
+      Bytes variant.  Engine stores the returned value into self.parms at the output
+      operand slot so downstream IR can read it.  Current write-to-buffer style
+      extensions remain valid; return-value style is additive.
 
 language_features:
   const: compile-time integer/string constants; arithmetic, comparison, logical ops

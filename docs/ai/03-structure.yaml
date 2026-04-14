@@ -49,6 +49,11 @@ crates:
     path: engine/engine.rs (approx)
     role: Iterative binary executor; writes output file
     key_types: [Engine]
+    notes: >
+      ExtensionCall/ExtensionCallSection are write statements: iterate_ext
+      advances location, execute_core_operations pre-pads zeroed bytes,
+      execute_extensions patches the mmap at ir_locs[idx].  No WrExt, no
+      operand_consumer reverse-lookup map.
 
   linearizer:
     path: linearizer/linearizer.rs
@@ -113,7 +118,7 @@ binary:
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
 tests:
-  integration: tests/integration.rs   # 294 tests as of 2026-04-13
+  integration: tests/integration.rs   # 294 tests as of 2026-04-14
   fixtures: tests/*.brink             # ~267 .brink source fixtures
   helpers: [assert_brink_success, assert_brink_failure, assert_brink_warning,
             assert_brink_no_warning]

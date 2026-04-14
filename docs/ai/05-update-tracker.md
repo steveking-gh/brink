@@ -145,3 +145,38 @@ Changes:
   list per call.
 - `tests/integration.rs`: Removed 4 obsolete tests; updated 3 tests to reflect
   runtime-vs-compiletime error shift. 294 tests pass.
+
+---
+
+## 2026-04-14 -- WrExt eliminated (Step 5)
+
+**IRKind::WrExt removed**
+The two-node `ExtensionCall + WrExt` structure collapsed into a single
+`ExtensionCall` node, mirroring how `Wrf` works.
+
+Key changes:
+
+- `IRKind::WrExt` removed from `ir/ir.rs`.  `ExtensionCall` and
+  `ExtensionCallSection` are now write statements — they advance the location
+  cursor and pre-pad zeroed bytes directly.
+- `layoutdb/layoutdb.rs`: `wr <extension>` no longer creates a `WrExt` wrapper.
+  The `ExtensionCall` LinIR produced by `record_expr_r` is the statement.
+- `engine/engine.rs`:
+  - `iterate_wrext` renamed to `iterate_ext`; no longer crawls backward via
+    `is_output_of()`.  `ExtensionCall | ExtensionCallSection` now handled in the
+    iterate match arm (previously in the no-op list).
+  - `execute_core_operations`: `WrExt` arm replaced by
+    `ExtensionCall | ExtensionCallSection` arm.
+  - `execute_extensions`: `operand_consumer: HashMap` eliminated.  Patch offset
+    now read from `ir_locs[idx]` (the extension call's own location) instead of
+    `ir_locs[consumer_idx]` (the WrExt's location).
+- `irdb/irdb.rs`: `WrExt` validation arm removed.
+
+**Output operand retained**
+The trailing output operand on `ExtensionCall` and `ExtensionCallSection` is
+kept for type-checking: if the extension result is used in arithmetic, `wr8..64`,
+`wrs`, or `const`, `DataType::Extension` propagates and IRDb rejects it.  In the
+valid `wr <extension>` case the output operand is orphaned (not consumed by any
+IR) but harmless.
+
+294 tests pass.

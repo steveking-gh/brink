@@ -142,7 +142,9 @@ impl<'toks> LayoutDb {
                         Self::record_r(lz, rdepth + 1, sec_nid, &mut lops, diags, ast, ast_db);
                     result &= lz.operand_count_is_valid(0, &lops, diags, tinfo);
                 } else {
-                    let ir_lid = lz.new_ir(parent_nid, ast, IRKind::WrExt);
+                    // record_expr_r (called via record_children_r) creates the
+                    // extension call LinIR as the write statement directly.
+                    // No WrExt wrapper is needed.
                     result &= Self::record_children_r(
                         lz,
                         rdepth + 1,
@@ -152,10 +154,6 @@ impl<'toks> LayoutDb {
                         ast,
                         ast_db,
                     );
-                    result &= lz.operand_count_is_valid(1, &lops, diags, tinfo);
-                    for idx in lops {
-                        lz.add_existing_operand_to_ir(ir_lid, idx);
-                    }
                 }
             }
 

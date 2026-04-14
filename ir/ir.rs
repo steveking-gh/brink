@@ -24,6 +24,8 @@ pub enum DataType {
     Integer, // ambiguously U64 or I64
     QuotedString,
     Identifier,
+    /// Output type of an extension call.  All type checks reject Extension
+    /// except for the ExtensionCall/ExtensionCallSection IR output slot.
     Extension,
     Unknown,
 }
@@ -54,9 +56,9 @@ pub enum IRKind {
     /// Bare assignment inside an if/else body: `NAME = expr;`
     /// Operands: [name_identifier, rhs_expr_output]
     BareAssign,
-    /// Operands: [name, arg0..., output]
+    /// Operands: [name, arg0...]
     ExtensionCall,
-    /// Operands: [name, section_id, arg0..., output]
+    /// Operands: [name, section_id, arg0...]
     /// section_id is an Identifier matching a known section; the engine resolves
     /// (file_offset, size) from wr_dispatches at runtime.
     ExtensionCallSection,
@@ -97,7 +99,6 @@ pub enum IRKind {
     U64,
     /// Write N bytes (little-endian). N is the byte width: 1..=8.
     Wr(u8),
-    WrExt,
     Wrf,
     Wrs,
 }
@@ -109,6 +110,7 @@ pub enum ParameterValue {
     Integer(i64), // ambiguously U64 or I64, physically backed by i64
     QuotedString(String),
     Identifier(String),
+    /// Placeholder value for the output slot of an extension call.
     Extension,
     Unknown,
 }
