@@ -20,6 +20,7 @@ Three structural invariant `bail!` calls in `prune/prune.rs` converted to
 Sections may now be defined inside top-level `if/else` blocks.
 
 Changes:
+
 - `ast/ast.rs`: `ParseIfContext` enum (`TopLevel | Section`) threads through
   `parse_if_r` and `parse_if_body_r`. `TopLevel` context allows `Section`
   token in if body. `AstDb::new` gains `validate: bool` parameter; nesting
@@ -85,3 +86,62 @@ Renamed `.claude/claude.md` to `.claude/CLAUDE.md`.  Corrected `repo_root` in
 `03-structure.yaml` from Windows to WSL path.  Updated test count to 291.
 
 All 291 tests pass.
+
+---
+
+## 2026-04-13 -- ExtArg typed extension API (Steps 1-4)
+
+**BrinkRangedExtension removed; ExtArg introduced**
+Eliminated the two-trait extension design (`BrinkExtension` + `BrinkRangedExtension`)
+in favor of a single typed-argument API.
+
+`ExtArg<'a>` enum added to `brink_extension`:
+
+- `Int(u64)` -- numeric arg
+- `Str(&'a str)` -- quoted string arg
+- `Section { start: u64, len: u64, data: &'a [u8] }` -- section name arg,
+  resolved by the engine to a zero-copy mmap slice
+
+All extensions now implement `BrinkExtension::execute<'a>(&self, args: &[ExtArg<'a>], out: &mut [u8])`.
+Section-bound extensions (formerly BrinkRangedExtension) receive image data via
+`args[0]` as `ExtArg::Section` when called with the section-name form.
+
+**IRKind::ExtensionCallRanged removed**
+Only `ExtensionCall` (plain args) and `ExtensionCallSection` (first arg is a
+known section name) remain. `disambiguate_extension_call` now checks for section
+name in first arg for all extensions, not just ranged ones.
+
+**IRDB_47 updated**
+Now allows QuotedString in addition to numeric types. String args pass IRDb
+validation; extensions reject invalid types at runtime.
+
+**IRDB_45, IRDB_46 retired**
+Error codes for ranged-extension-specific constraints removed along with the
+ranged extension concept.
+
+**Engine execute_extensions updated**
+Builds `Vec<ExtArg>` instead of `Vec<u64>`. Uses a block scope to isolate the
+immutable `&mmap[..]` borrow held by `ExtArg::Section` before the mutable mmap
+patch write.
+
+**std extensions updated**
+`std::crc32c`, `std::sha256`, `std::md5` all switch to `BrinkExtension` and
+receive image data from `args[0]` as `ExtArg::Section`.
+
+Changes:
+
+- `brink_extension/lib.rs`: Added `ExtArg`, rewrote `BrinkExtension` trait,
+  removed `BrinkRangedExtension`.
+- `ext/ext.rs`: Removed `RegisteredExtension` enum; `ExtensionEntry.extension`
+  is now `Box<dyn BrinkExtension>` directly. Removed `register_ranged`,
+  `is_ranged`. Re-exports `ExtArg`.
+- `ext/test_mocks.rs`: All 7 mocks updated to new signature; ranged mocks
+  receive image via `ExtArg::Section`.
+- `std/crc32c`, `std/sha256`, `std/md5`: Converted to `BrinkExtension`.
+- `irdb/irdb.rs`: Removed `ExtensionCallRanged` arm; updated disambiguation
+  and IRDB_47 validation.
+- `ir/ir.rs`: Removed `ExtensionCallRanged` variant.
+- `engine/engine.rs`: Removed `RegisteredExtension` dispatch; builds `ExtArg`
+  list per call.
+- `tests/integration.rs`: Removed 4 obsolete tests; updated 3 tests to reflect
+  runtime-vs-compiletime error shift. 294 tests pass.

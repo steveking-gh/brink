@@ -60,7 +60,8 @@ mod tests {
         );
     }
 
-    /// SHA-256 of a single byte [0xAB] using the explicit range form.
+    /// SHA-256 of a single byte [0xAB]. Data is in a separate `payload` section
+    /// so the extension hashes only that byte, not the digest placeholder.
     /// Output: 1 data byte followed by 32 digest bytes.
     #[test]
     fn sha256_1_byte() {
@@ -81,7 +82,7 @@ mod tests {
         );
     }
 
-    /// SHA-256 of 16 bytes [0x00..0x0F] using the explicit range form.
+    /// SHA-256 of 16 bytes [0x00..0x0F]. Data is in a separate `payload` section.
     /// Output: 16 data bytes followed by 32 digest bytes.
     #[test]
     fn sha256_16_byte() {
@@ -103,7 +104,7 @@ mod tests {
         );
     }
 
-    /// SHA-256 of 64 bytes [0x00..0x3F] using the explicit range form.
+    /// SHA-256 of 64 bytes [0x00..0x3F]. Data is in a separate `payload` section.
     /// 64 bytes spans two SHA-256 compression blocks, exercising multi-block hashing.
     /// Output: 64 data bytes followed by 32 digest bytes.
     #[test]

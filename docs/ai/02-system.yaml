@@ -70,7 +70,16 @@ extensions:
     - std/crc32c  (feature: std-crc32c)
     - std/sha256  (feature: std-sha256)
     - std/md5     (feature: std-md5)
-  custom: implement BrinkExtension or BrinkRangedExtension traits
+  custom: implement BrinkExtension trait
+  planned:
+    named_args: >
+      Extension call sites support named arguments, e.g. foo::bar(barf=10, scarf=20).
+      Motivation: positional args of the same type (e.g. two u64s) can be silently
+      swapped with no compile-time or runtime error.  Named args prevent this class
+      of mistake.  Implementation requires: AST parser change (key=value at call sites),
+      IRDb validation (name resolution against a declared parameter list), ExtArg
+      extension (add name field or a separate NamedArg variant), extension trait
+      extension (fn param_names(&self) -> &[&str] or similar declaration surface).
 
 language_features:
   const: compile-time integer/string constants; arithmetic, comparison, logical ops

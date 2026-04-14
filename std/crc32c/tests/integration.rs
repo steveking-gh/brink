@@ -56,7 +56,8 @@ mod tests {
     }
 
     /// CRC32C over [0xAA, 0xBB, 0xCC, 0xDD] = 0xF7CEEA9E (LE: 9E EA CE F7).
-    /// Explicit range form: wr std::crc32c(0, 4)
+    /// Data is in a separate `payload` section so the extension hashes only
+    /// the data bytes, not the CRC placeholder.
     #[test]
     fn crc32c_explicit_range() {
         let out = run_and_read(

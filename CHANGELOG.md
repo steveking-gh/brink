@@ -6,8 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [5.x.x] - 2026-04-12
 
-- Fixed to_i64() and to_u64() in const expressions
-- Use checked arithmetic for extension size.
+- BREAKING CHANGE: Generalized and unified extension parameter passing.
+- BUG FIX: Fixed to_i64() and to_u64() in const expressions
+- BUG FIX: Use checked arithmetic for extension size.
 - INTERNAL: Fixed unused import clippy warning
 - INTERNAL: Cleaned up dead code in const evaluation.
 - INTERNAL: Refactored common code into coerce_numeric_pair

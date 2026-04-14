@@ -1,0 +1,7 @@
+// Eight literal integer arguments to an extension.
+// brink::test_sum8 writes sum(1..8) = 36 as a little-endian u64.
+// Expected output: 0x24 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+section top {
+    wr brink::test_sum8(1, 2, 3, 4, 5, 6, 7, 8);
+}
+output top 0;

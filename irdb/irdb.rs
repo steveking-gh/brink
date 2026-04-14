@@ -100,7 +100,6 @@ impl IRDb {
                 let lin_ir = &lin_db.ir_vec[*ir_lid];
                 match lin_ir.op {
                     IRKind::ExtensionCall
-                    | IRKind::ExtensionCallRanged
                     | IRKind::ExtensionCallSection => return Some(DataType::Extension),
 
                     // Arithmetic and bitwise ops: output type matches input types.
@@ -406,6 +405,35 @@ impl IRDb {
         true
     }
 
+    /// Validates that every extension user argument in the given operand
+    /// index range is a value type (numeric or quoted string).  Identifiers
+    /// and other non-value types (e.g. Extension outputs) are rejected with
+    /// IRDB_47 because the engine cannot convert them to ExtArg.
+    fn validate_ext_user_args(
+        &self,
+        ir: &IR,
+        user_arg_range: std::ops::Range<usize>,
+        ext_name: &str,
+        diags: &Diags,
+    ) -> bool {
+        for opnd_pos in user_arg_range {
+            let opnd = &self.parms[ir.operands[opnd_pos]];
+            let dt = opnd.val.data_type();
+            if !matches!(
+                dt,
+                DataType::U64 | DataType::I64 | DataType::Integer | DataType::QuotedString
+            ) {
+                let m = format!(
+                    "Extension '{}': argument {} must be a numeric or string expression, got {:?}",
+                    ext_name, opnd_pos, dt
+                );
+                diags.err2("IRDB_47", &m, ir.src_loc.clone(), opnd.src_loc.clone());
+                return false;
+            }
+        }
+        true
+    }
+
     fn validate_operands(
         &mut self,
         ir: &IR,
@@ -431,39 +459,9 @@ impl IRDb {
                     diags.err1("IRDB_40", &m, ir.src_loc.clone());
                     return false;
                 }
-                true
-            }
-            IRKind::ExtensionCallRanged => {
-                let name = self.get_opnd_as_identifier(ir, 0);
-                // disambiguate_extension_call only produces ExtensionCallRanged for
-                // extensions that exist in the registry; unknown names become
-                // ExtensionCall and trigger IRDB_40 instead.
-                assert!(ext_registry.get(name).is_some(), "ExtensionCallRanged with unknown extension '{name}'");
-                // Need at least [name, start, length, output] = 4 operands.
-                if ir.operands.len() < 4 {
-                    let m = format!(
-                        "Ranged extension '{}' requires (start_offset, length) \
-                         as the first two arguments",
-                        name
-                    );
-                    diags.err1("IRDB_45", &m, ir.src_loc.clone());
-                    return false;
-                }
-                // operands[1] and operands[2] must be numeric.
-                for opnd_pos in [1usize, 2usize] {
-                    let opnd = &self.parms[ir.operands[opnd_pos]];
-                    let dt = opnd.val.data_type();
-                    if !matches!(dt, DataType::U64 | DataType::I64 | DataType::Integer) {
-                        let m = format!(
-                            "Ranged extension '{}': range argument {} must be a numeric \
-                             expression, found {:?}",
-                            name, opnd_pos, dt
-                        );
-                        diags.err2("IRDB_46", &m, ir.src_loc.clone(), opnd.src_loc.clone());
-                        return false;
-                    }
-                }
-                true
+                // User args: operands[1..last] (operands[0]=name, operands[last]=output).
+                let last = ir.operands.len() - 1;
+                self.validate_ext_user_args(ir, 1..last, name, diags)
             }
             IRKind::ExtensionCallSection => {
                 let name = self.get_opnd_as_identifier(ir, 0);
@@ -488,7 +486,9 @@ impl IRDb {
                 // disambiguate_extension_call only emits ExtensionCallSection when
                 // section_names.contains(sval) is already true.
                 assert!(section_names.contains(sec_name.as_str()), "ExtensionCallSection section '{sec_name}' not in section_names");
-                true
+                // User args follow the section operand: operands[2..last].
+                let last = ir.operands.len() - 1;
+                self.validate_ext_user_args(ir, 2..last, name, diags)
             }
             IRKind::SizeofExt => {
                 let name = self.get_opnd_as_identifier(ir, 0);
@@ -632,14 +632,11 @@ impl IRDb {
     /// Determines the specific IR kind for an ExtensionCall node.
     ///
     /// LinearDB emits `ExtensionCall` for all extension invocations.  This
-    /// method inspects the first user argument and the registry to select the
-    /// appropriate refined kind:
+    /// method inspects the first user argument to select the appropriate kind:
     ///
-    /// - First user arg is an identifier matching a known section **and** the
-    ///   extension is ranged → `ExtensionCallSection`
-    /// - Extension is ranged (no section match) → `ExtensionCallRanged`
-    /// - Extension is non-ranged → `ExtensionCall` (unchanged)
-    /// - Extension not found → `ExtensionCall` (IRDB_40 will fire in validate_operands)
+    /// - Extension not found → `ExtensionCall` (IRDB_40 fires in validate_operands)
+    /// - First user arg is an identifier matching a known section → `ExtensionCallSection`
+    /// - All other cases → `ExtensionCall`
     fn disambiguate_extension_call(
         &self,
         lir: &LinIR,
@@ -659,15 +656,12 @@ impl IRDb {
         else {
             panic!("Extension call name operand must be a Literal");
         };
-        let Some(entry) = ext_registry.get(name_sval) else {
+        if ext_registry.get(name_sval).is_none() {
             return IRKind::ExtensionCall; // validate_operands will emit IRDB_40
-        };
-
-        if !entry.extension.is_ranged() {
-            return IRKind::ExtensionCall;
         }
 
-        // Ranged extension: check whether the first user arg is a section name.
+        // Check whether the first user arg is a section name.  When it is,
+        // the engine resolves it to ExtArg::Section at execute time.
         if has_user_args {
             let first_user_lop = &lin_db.operand_vec[lir.operand_vec[1]];
             if let LinOperand::Literal {
@@ -681,7 +675,7 @@ impl IRDb {
             }
         }
 
-        IRKind::ExtensionCallRanged
+        IRKind::ExtensionCall
     }
 
     pub fn new(

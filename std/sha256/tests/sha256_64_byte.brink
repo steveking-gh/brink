@@ -1,5 +1,7 @@
-// Computes SHA-256 over 64 bytes [0x00..0x3F] using the explicit range form.
+// Computes SHA-256 over 64 bytes [0x00..0x3F], excluding the digest field.
 // 64 bytes spans two SHA-256 compression blocks, exercising multi-block hashing.
+// Separating payload into its own section lets the section-name form hash
+// only those bytes (no digest placeholder included).
 //
 // SHA-256([0x00, 0x01, ..., 0x3F]):
 //   [0xFD, 0xEA, 0xB9, 0xAC, 0xF3, 0x71, 0x03, 0x62,
@@ -7,7 +9,7 @@
 //    0x9C, 0x75, 0x7F, 0xCF, 0x98, 0x11, 0x60, 0x3A,
 //    0x8C, 0x44, 0x7C, 0xD1, 0xD9, 0x15, 0x11, 0x08]
 // Total output: 96 bytes.
-section data {
+section payload {
     wr8 0x00; wr8 0x01; wr8 0x02; wr8 0x03;
     wr8 0x04; wr8 0x05; wr8 0x06; wr8 0x07;
     wr8 0x08; wr8 0x09; wr8 0x0A; wr8 0x0B;
@@ -24,7 +26,10 @@ section data {
     wr8 0x34; wr8 0x35; wr8 0x36; wr8 0x37;
     wr8 0x38; wr8 0x39; wr8 0x3A; wr8 0x3B;
     wr8 0x3C; wr8 0x3D; wr8 0x3E; wr8 0x3F;
-    wr std::sha256(0, 64);
+}
+section data {
+    wr payload;
+    wr std::sha256(payload);
     assert sizeof(data) == 96;
 }
 

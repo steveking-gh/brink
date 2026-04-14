@@ -1,13 +1,18 @@
-// Computes MD5 over a single byte [0xAB] using the explicit range form.
+// Computes MD5 over a single byte [0xAB], excluding the digest field.
 // Input size (1 byte) is less than the 16-byte MD5 digest size.
+// Separating payload into its own section lets the section-name form hash
+// only that byte (no digest placeholder included).
 //
 // MD5([0xAB]):
 //   [0x24, 0x08, 0xAD, 0x11, 0xF9, 0xEB, 0x83, 0x0D,
 //    0xA7, 0x49, 0xE2, 0xA3, 0x6A, 0x29, 0xEF, 0xF7]
 // Total output: 17 bytes.
-section data {
+section payload {
     wr8 0xAB;
-    wr std::md5(0, 1);
+}
+section data {
+    wr payload;
+    wr std::md5(payload);
     assert sizeof(data) == 17;
 }
 

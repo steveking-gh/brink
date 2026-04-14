@@ -1,0 +1,12 @@
+// sizeof() applied to a section name returns a numeric u64, valid as an
+// extension argument.  brink::test_crc encodes the value as a big-endian u32.
+// sizeof(data) == 4, so the CRC slot contains 0x00 0x00 0x00 0x04.
+// Total output: 4 data bytes + 4 CRC bytes = 8 bytes.
+section data {
+    wr8 0x01; wr8 0x02; wr8 0x03; wr8 0x04;
+}
+section top {
+    wr data;
+    wr brink::test_crc(sizeof(data));
+}
+output top 0;

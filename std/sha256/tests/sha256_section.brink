@@ -12,8 +12,8 @@
 //    0xD7, 0x25, 0x4B, 0x17, 0x51, 0x69, 0x95, 0x2D]
 // Total output: 36 bytes.
 //
-// To hash only the data bytes (excluding the digest field), use the explicit
-// range form instead: wr std::sha256(0, 4)
+// To hash only the data bytes (excluding the digest field), place them in a
+// separate section and pass that section to the extension.
 section data {
     wr8 0x01; wr8 0x02; wr8 0x03; wr8 0x04;
     wr std::sha256(data);

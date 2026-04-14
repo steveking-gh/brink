@@ -1,4 +1,5 @@
 use super::*;
+use brink_extension::ExtArg;
 use std::cell::Cell;
 
 pub struct MockCrc {
@@ -31,14 +32,17 @@ impl BrinkExtension for MockCrc {
         4
     }
 
-    fn execute(&self, args: &[u64], out: &mut [u8]) -> Result<(), String> {
+    fn execute<'a>(&self, args: &[ExtArg<'a>], out: &mut [u8]) -> Result<(), String> {
         if args.len() != 1 {
             return Err("Expected exactly 1 argument for CRC".to_string());
         }
         if out.len() != 4 {
             return Err("Expected 4 bytes of output space".to_string());
         }
-        let val = args[0] as u32;
+        let ExtArg::Int(v) = args[0] else {
+            return Err("Expected Int argument for CRC".to_string());
+        };
+        let val = v as u32;
         out.copy_from_slice(&val.to_be_bytes());
         Ok(())
     }
@@ -74,15 +78,15 @@ impl BrinkExtension for MockLogger {
         0
     }
 
-    fn execute(&self, _args: &[u64], _out: &mut [u8]) -> Result<(), String> {
+    fn execute<'a>(&self, _args: &[ExtArg<'a>], _out: &mut [u8]) -> Result<(), String> {
         tracing::info!("MockLogger executed successfully via tracing API");
         Err("Intentional mock fallback error".to_string())
     }
 }
 
 /// Reads the caller-specified image slice and writes each byte + 1 to the
-/// output buffer.  Verifies that buffer is correctly sliced before the
-/// extension executes.
+/// output buffer. args[0] must be ExtArg::Section; the output buffer receives
+/// the first cached_size bytes of that section, each incremented by 1.
 pub struct MockIncrement {
     size_call_count: Cell<usize>,
 }
@@ -101,7 +105,7 @@ impl Default for MockIncrement {
     }
 }
 
-impl BrinkRangedExtension for MockIncrement {
+impl BrinkExtension for MockIncrement {
     fn name(&self) -> &str {
         "brink::test_increment"
     }
@@ -113,12 +117,12 @@ impl BrinkRangedExtension for MockIncrement {
         16
     }
 
-    fn execute(
-        &self,
-        _args: &[u64],
-        img_buffer: &[u8],
-        out_buffer: &mut [u8],
-    ) -> Result<(), String> {
+    fn execute<'a>(&self, args: &[ExtArg<'a>], out_buffer: &mut [u8]) -> Result<(), String> {
+        let ExtArg::Section { data: img_buffer, .. } = args.first().ok_or(
+            "MockIncrement: expected ExtArg::Section as args[0]".to_string(),
+        )? else {
+            return Err("MockIncrement: args[0] must be ExtArg::Section".to_string());
+        };
         assert!(
             img_buffer.len() >= out_buffer.len(),
             "MockIncrement: img_buffer must be at least as large as out_buffer (got {} vs {})",
@@ -133,7 +137,7 @@ impl BrinkRangedExtension for MockIncrement {
 }
 
 /// Sums every byte in the caller-specified image slice and writes the result
-/// as a little-endian u64.  Used to verify ranged and section-name call forms.
+/// as a little-endian u64. args[0] must be ExtArg::Section.
 pub struct MockRangedSum {
     size_call_count: Cell<usize>,
 }
@@ -152,7 +156,7 @@ impl Default for MockRangedSum {
     }
 }
 
-impl BrinkRangedExtension for MockRangedSum {
+impl BrinkExtension for MockRangedSum {
     fn name(&self) -> &str {
         "brink::test_ranged_sum"
     }
@@ -164,12 +168,12 @@ impl BrinkRangedExtension for MockRangedSum {
         8
     }
 
-    fn execute(
-        &self,
-        _args: &[u64],
-        img_buffer: &[u8],
-        out_buffer: &mut [u8],
-    ) -> Result<(), String> {
+    fn execute<'a>(&self, args: &[ExtArg<'a>], out_buffer: &mut [u8]) -> Result<(), String> {
+        let ExtArg::Section { data: img_buffer, .. } = args.first().ok_or(
+            "MockRangedSum: expected ExtArg::Section as args[0]".to_string(),
+        )? else {
+            return Err("MockRangedSum: args[0] must be ExtArg::Section".to_string());
+        };
         assert_eq!(
             out_buffer.len(),
             8,
@@ -181,8 +185,8 @@ impl BrinkRangedExtension for MockRangedSum {
     }
 }
 
-/// Rejects a zero-length input slice with an error.
-/// Used to verify that extensions can reject empty ranges.
+/// Rejects a zero-length input slice with an error. args[0] must be
+/// ExtArg::Section. Used to verify that extensions can reject empty sections.
 pub struct MockRejectEmpty {
     size_call_count: Cell<usize>,
 }
@@ -201,7 +205,7 @@ impl Default for MockRejectEmpty {
     }
 }
 
-impl BrinkRangedExtension for MockRejectEmpty {
+impl BrinkExtension for MockRejectEmpty {
     fn name(&self) -> &str {
         "brink::test_reject_empty"
     }
@@ -213,12 +217,12 @@ impl BrinkRangedExtension for MockRejectEmpty {
         4
     }
 
-    fn execute(
-        &self,
-        _args: &[u64],
-        img_buffer: &[u8],
-        out_buffer: &mut [u8],
-    ) -> Result<(), String> {
+    fn execute<'a>(&self, args: &[ExtArg<'a>], out_buffer: &mut [u8]) -> Result<(), String> {
+        let ExtArg::Section { data: img_buffer, .. } = args.first().ok_or(
+            "MockRejectEmpty: expected ExtArg::Section as args[0]".to_string(),
+        )? else {
+            return Err("MockRejectEmpty: args[0] must be ExtArg::Section".to_string());
+        };
         if img_buffer.is_empty() {
             return Err("brink::test_reject_empty: input range must not be empty".to_string());
         }
@@ -227,8 +231,43 @@ impl BrinkRangedExtension for MockRejectEmpty {
     }
 }
 
+/// Sums eight u64 arguments and writes the result as a little-endian u64.
+/// Rejects calls with any argument count other than 8.
+pub struct MockSum8;
+
+impl BrinkExtension for MockSum8 {
+    fn name(&self) -> &str {
+        "brink::test_sum8"
+    }
+
+    fn size(&self) -> usize {
+        8
+    }
+
+    fn execute<'a>(&self, args: &[ExtArg<'a>], out: &mut [u8]) -> Result<(), String> {
+        if args.len() != 8 {
+            return Err(format!(
+                "brink::test_sum8: expected 8 args, got {}",
+                args.len()
+            ));
+        }
+        let mut sum: u64 = 0;
+        for (i, arg) in args.iter().enumerate() {
+            let ExtArg::Int(v) = arg else {
+                return Err(format!(
+                    "brink::test_sum8: arg {} must be ExtArg::Int",
+                    i
+                ));
+            };
+            sum = sum.wrapping_add(*v);
+        }
+        out.copy_from_slice(&sum.to_le_bytes());
+        Ok(())
+    }
+}
+
 /// Returns `usize::MAX` from `size()` to force a u64 overflow in the iterate
-/// location counter when written after any prior byte.  Used to test EXEC_60.
+/// location counter when written after any prior byte. Used to test EXEC_60.
 pub struct MockHugeExt;
 
 impl BrinkExtension for MockHugeExt {
@@ -240,7 +279,7 @@ impl BrinkExtension for MockHugeExt {
         usize::MAX
     }
 
-    fn execute(&self, _args: &[u64], _out: &mut [u8]) -> Result<(), String> {
+    fn execute<'a>(&self, _args: &[ExtArg<'a>], _out: &mut [u8]) -> Result<(), String> {
         unreachable!("MockHugeExt::execute should never be called: iterate fails first");
     }
 }
@@ -249,7 +288,8 @@ pub fn register_test_extensions(reg: &mut ExtensionRegistry) {
     reg.register(Box::new(MockCrc::new()));
     reg.register(Box::new(MockLogger::new()));
     reg.register(Box::new(MockHugeExt));
-    reg.register_ranged(Box::new(MockIncrement::new()));
-    reg.register_ranged(Box::new(MockRangedSum::new()));
-    reg.register_ranged(Box::new(MockRejectEmpty::new()));
+    reg.register(Box::new(MockSum8));
+    reg.register(Box::new(MockIncrement::new()));
+    reg.register(Box::new(MockRangedSum::new()));
+    reg.register(Box::new(MockRejectEmpty::new()));
 }

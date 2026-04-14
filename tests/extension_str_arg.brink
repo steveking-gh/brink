@@ -1,0 +1,8 @@
+// Passes a string const as an extension argument.
+// IRDB accepts the string; brink::test_crc rejects it at runtime with EXEC_47
+// because it expects an Int arg.
+const LABEL = "hello";
+section top {
+    wr brink::test_crc(LABEL);
+}
+output top 0;

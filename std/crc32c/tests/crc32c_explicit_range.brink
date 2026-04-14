@@ -1,10 +1,15 @@
-// Computes CRC32C over an explicit byte range (Form 2: offset, length).
-// Data section contains [0xAA, 0xBB, 0xCC, 0xDD] at file offset 0.
-// CRC32C([0xAA,0xBB,0xCC,0xDD]) = 0xF7CEEA9E, LE: [0x9E, 0xEA, 0xCE, 0xF7]
+// Computes CRC32C over exactly the data bytes, excluding the CRC field.
+// Separating payload into its own section lets the section-name form hash
+// only those bytes (no digest placeholder included).
+//
+// CRC32C([0xAA, 0xBB, 0xCC, 0xDD]) = 0xF7CEEA9E, LE: [0x9E, 0xEA, 0xCE, 0xF7]
 // Total output: 8 bytes.
-section data {
+section payload {
     wr8 0xAA; wr8 0xBB; wr8 0xCC; wr8 0xDD;
-    wr std::crc32c(0, 4);
+}
+section data {
+    wr payload;
+    wr std::crc32c(payload);
     assert sizeof(data) == 8;
 }
 

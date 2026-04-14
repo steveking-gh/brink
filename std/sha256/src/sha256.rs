@@ -1,4 +1,4 @@
-// std::sha256 — SHA-256 extension for Brink.
+// std::sha256 -- SHA-256 extension for Brink.
 //
 // Computes a SHA-256 digest over a caller-specified image region and
 // writes the 32-byte result into the output image.
@@ -6,18 +6,15 @@
 // Call-site syntax (section-name form):
 //     wr std::sha256(my_section);
 //
-// Call-site syntax (explicit-range form):
-//     wr std::sha256(start_offset, length);
-//
 // Output: 32 bytes, big-endian digest (standard SHA-256 byte order).
 
-use brink_extension::BrinkRangedExtension;
+use brink_extension::{BrinkExtension, ExtArg};
 use ext::ExtensionRegistry;
 use sha2::{Digest, Sha256};
 
 pub struct Sha256Ext;
 
-impl BrinkRangedExtension for Sha256Ext {
+impl BrinkExtension for Sha256Ext {
     fn name(&self) -> &str {
         "std::sha256"
     }
@@ -26,12 +23,12 @@ impl BrinkRangedExtension for Sha256Ext {
         32
     }
 
-    fn execute(
-        &self,
-        _args: &[u64],
-        img_buffer: &[u8],
-        out_buffer: &mut [u8],
-    ) -> Result<(), String> {
+    fn execute<'a>(&self, args: &[ExtArg<'a>], out_buffer: &mut [u8]) -> Result<(), String> {
+        let ExtArg::Section { data: img_buffer, .. } = args.first().ok_or(
+            "std::sha256: expected ExtArg::Section as args[0]".to_string(),
+        )? else {
+            return Err("std::sha256: args[0] must be ExtArg::Section (use section-name form)".to_string());
+        };
         let digest = Sha256::digest(img_buffer);
         out_buffer.copy_from_slice(&digest);
         Ok(())
@@ -41,5 +38,5 @@ impl BrinkRangedExtension for Sha256Ext {
 /// Registers `std::sha256` into the given registry.
 /// Call this once during process startup, before compiling any scripts.
 pub fn register(registry: &mut ExtensionRegistry) {
-    registry.register_ranged(Box::new(Sha256Ext));
+    registry.register(Box::new(Sha256Ext));
 }

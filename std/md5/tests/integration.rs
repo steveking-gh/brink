@@ -58,7 +58,7 @@ mod tests {
         );
     }
 
-    /// MD5 of a single byte [0xAB] using the explicit range form.
+    /// MD5 of a single byte [0xAB]. Data is in a separate `payload` section.
     /// Input size (1 byte) is less than the 16-byte MD5 digest size.
     /// Output: 1 data byte followed by 16 digest bytes.
     #[test]
@@ -78,7 +78,7 @@ mod tests {
         );
     }
 
-    /// MD5 of 16 bytes [0x00..0x0F] using the explicit range form.
+    /// MD5 of 16 bytes [0x00..0x0F]. Data is in a separate `payload` section.
     /// Input size (16 bytes) equals the MD5 digest size.
     /// Output: 16 data bytes followed by 16 digest bytes.
     #[test]
@@ -99,7 +99,7 @@ mod tests {
         );
     }
 
-    /// MD5 of 64 bytes [0x00..0x3F] using the explicit range form.
+    /// MD5 of 64 bytes [0x00..0x3F]. Data is in a separate `payload` section.
     /// Input size (64 bytes) is greater than the 16-byte MD5 digest size and
     /// spans multiple MD5 compression blocks, exercising multi-block hashing.
     /// Output: 64 data bytes followed by 16 digest bytes.

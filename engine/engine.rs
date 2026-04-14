@@ -14,7 +14,7 @@
 
 use anyhow::{Result, anyhow};
 use diags::{Diags, SourceSpan};
-use ext::{ExtensionRegistry, RegisteredExtension};
+use ext::{ExtArg, ExtensionRegistry};
 use ir::{ConstBuiltins, DataType, IR, IRKind, ParameterValue};
 use irdb::IRDb;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -219,9 +219,7 @@ impl Engine {
             let prod_ir = &irdb.ir_vec[prod_ir_idx];
             if matches!(
                 prod_ir.kind,
-                IRKind::ExtensionCall
-                    | IRKind::ExtensionCallRanged
-                    | IRKind::ExtensionCallSection
+                IRKind::ExtensionCall | IRKind::ExtensionCallSection
             ) {
                 let ext_name_opnd = &irdb.parms[prod_ir.operands[0]];
                 let ext_name = ext_name_opnd.val.to_identifier();
@@ -1568,7 +1566,6 @@ impl Engine {
                     | IRKind::I64
                     | IRKind::U64
                     | IRKind::ExtensionCall
-                    | IRKind::ExtensionCallRanged
                     | IRKind::ExtensionCallSection
                     // if/else IR only lives in const_ir_vec; never reaches the engine.
                     | IRKind::ConstDeclare
@@ -2000,7 +1997,6 @@ impl Engine {
                 | IRKind::LeftShift
                 | IRKind::RightShift
                 | IRKind::ExtensionCall
-                | IRKind::ExtensionCallRanged
                 | IRKind::ExtensionCallSection
                 // if/else IR only lives in const_ir_vec; never reaches the engine.
                 | IRKind::ConstDeclare
@@ -2018,9 +2014,7 @@ impl Engine {
                         let prod_ir = &irdb.ir_vec[prod_ir_idx];
                         if matches!(
                             prod_ir.kind,
-                            IRKind::ExtensionCall
-                                | IRKind::ExtensionCallRanged
-                                | IRKind::ExtensionCallSection
+                            IRKind::ExtensionCall | IRKind::ExtensionCallSection
                         ) {
                             let ext_name_opnd = &irdb.parms[prod_ir.operands[0]];
                             let ext_name = ext_name_opnd.val.to_identifier();
@@ -2071,7 +2065,7 @@ impl Engine {
         for (idx, ir) in irdb.ir_vec.iter().enumerate() {
             if matches!(
                 ir.kind,
-                IRKind::ExtensionCall | IRKind::ExtensionCallRanged | IRKind::ExtensionCallSection
+                IRKind::ExtensionCall | IRKind::ExtensionCallSection
             ) {
                 extension_nodes.push(idx);
             }
@@ -2156,41 +2150,40 @@ impl Engine {
             };
             let byte_width = entry.cached_size;
 
-            // Build (img_slice, args) according to the call form.
+            // Build the ExtArg list and call the extension.
             //
-            // ExtensionCall (form 1):
+            // ExtensionCall:
             //   operands = [name, arg0..., output]
-            //   No image access; args are operands[1..last].
+            //   All user args map to ExtArg::Int or ExtArg::Str.
             //
-            // ExtensionCallRanged (form 2):
-            //   operands = [name, range_start, range_length, arg0..., output]
-            //   img_slice = mmap[range_start..range_start+range_length]
-            //   args are operands[3..last].
-            //
-            // ExtensionCallSection (form 3):
+            // ExtensionCallSection:
             //   operands = [name, section_id, arg0..., output]
-            //   Engine resolves (file_offset, size) from wr_dispatches.
-            //   args are operands[2..last].
+            //   args[0] = ExtArg::Section resolved from wr_dispatches.
+            //   Remaining user args map to ExtArg::Int or ExtArg::Str.
+            //
+            // ExtArg::Section holds &mmap[..], an immutable borrow.  The
+            // block scope below isolates that borrow so it drops before the
+            // mutable mmap patch write at the end of each iteration.
             let last = ir.operands.len() - 1;
-            let (img_slice_range, arg_operand_range) = match ir.kind {
-                IRKind::ExtensionCall => (0..0, 1..last),
-                IRKind::ExtensionCallRanged => {
-                    let start = self.parms[ir.operands[1]].to_u64() as usize;
-                    let length = self.parms[ir.operands[2]].to_u64() as usize;
-                    (start..start + length, 3..last)
-                }
-                IRKind::ExtensionCallSection => {
+
+            // For ExtensionCallSection, resolve the section before entering
+            // the borrow scope so error handling can use `continue`.
+            let section_info: Option<(u64, u64, usize, usize)> =
+                if ir.kind == IRKind::ExtensionCallSection {
                     let sec_name = self.parms[ir.operands[1]].to_identifier();
-                    let indices = sec_dispatch_map.get(sec_name).map(Vec::as_slice).unwrap_or(&[]);
+                    let indices =
+                        sec_dispatch_map.get(sec_name).map(Vec::as_slice).unwrap_or(&[]);
                     if indices.len() > 1 {
                         diags.err1(
                             "EXEC_56",
                             &format!(
                                 "Section '{}' appears {} times in the output; \
-                                 the section-name form is ambiguous. Wrap with unique \
-                                 section name(s) or use the explicit-range form such as: \
-                                 `wr {}(<file_offset>, <length>)` to specify which occurrence.",
-                                sec_name, indices.len(), name,
+                                 section-name form is ambiguous. Wrap with a unique \
+                                 section name or use `wr {}(section_name)` on a single \
+                                 occurrence.",
+                                sec_name,
+                                indices.len(),
+                                name,
                             ),
                             ir.src_loc.clone(),
                         );
@@ -2207,30 +2200,55 @@ impl Engine {
                     };
                     let d = &self.wr_dispatches[dispatch_idx];
                     let start = d.file_offset as usize;
-                    (start..start + d.size as usize, 2..last)
+                    let end = start + d.size as usize;
+                    Some((d.file_offset, d.size, start, end))
+                } else {
+                    None
+                };
+
+            // Build ext_args in a scope that isolates the immutable mmap borrow
+            // held by ExtArg::Section.  The scope produces only an owned Vec<u8>,
+            // so the borrow is fully released before the mutable patch write below.
+            let exec_result: Result<Vec<u8>, String> = {
+                let mut ext_args: Vec<ExtArg<'_>> = Vec::new();
+                let user_arg_start =
+                    if let Some((file_offset, len, start, end)) = section_info {
+                        ext_args.push(ExtArg::Section {
+                            start: file_offset,
+                            len,
+                            data: &mmap[start..end],
+                        });
+                        2
+                    } else {
+                        1
+                    };
+                for &op in &ir.operands[user_arg_start..last] {
+                    let parm = &self.parms[op];
+                    let arg = match parm {
+                        ParameterValue::U64(v) => ExtArg::Int(*v),
+                        ParameterValue::I64(v) | ParameterValue::Integer(v) => {
+                            ExtArg::Int(*v as u64)
+                        }
+                        ParameterValue::QuotedString(s) => ExtArg::Str(s.as_str()),
+                        _ => unreachable!(
+                            "unexpected extension arg type {:?}",
+                            parm.data_type()
+                        ),
+                    };
+                    ext_args.push(arg);
                 }
-                _ => unreachable!(),
+                let mut out = vec![0u8; byte_width];
+                entry.extension.execute(&ext_args, &mut out).map(|_| out)
             };
 
-            let args: Vec<u64> = ir.operands[arg_operand_range]
-                .iter()
-                .map(|&i| self.parms[i].to_u64())
-                .collect();
-
-            let mut out_buffer = vec![0u8; byte_width];
-
-            let exec_result = match &entry.extension {
-                RegisteredExtension::Basic(e) => e.execute(&args, &mut out_buffer),
-                RegisteredExtension::Ranged(e) => {
-                    e.execute(&args, &mmap[img_slice_range], &mut out_buffer)
+            let out_buffer = match exec_result {
+                Ok(buf) => buf,
+                Err(e) => {
+                    let msg = format!("Extension '{}' execution failed: {}", name, e);
+                    diags.err1("EXEC_47", &msg, ir.src_loc.clone());
+                    return Err(anyhow!(msg));
                 }
             };
-
-            if let Err(e) = exec_result {
-                let msg = format!("Extension '{}' execution failed: {}", name, e);
-                diags.err1("EXEC_47", &msg, ir.src_loc.clone());
-                return Err(anyhow!(msg));
-            }
 
             // Patch the file at the exact image offset where the consumer instruction evaluated.
             let loc = &self.ir_locs[consumer_idx];
@@ -2238,7 +2256,7 @@ impl Engine {
 
             if abs_offset + byte_width > mmap.len() {
                 return Err(anyhow!(
-                    "Extension bounded write exceeds file bounds implicitly. This is a severe compiler bug."
+                    "Extension bounded write exceeds file bounds. This is a severe compiler bug."
                 ));
             }
 

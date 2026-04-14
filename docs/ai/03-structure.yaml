@@ -79,12 +79,19 @@ crates:
 
   ext:
     path: ext/
-    role: Extension dispatch wrapper (basic + ranged variants)
+    role: Extension registry and dispatch; re-exports BrinkExtension and ExtArg
+    key_types: [ExtensionEntry, ExtensionRegistry]
+    key_fns: [register, get]
 
   brink_extension:
     path: brink_extension/
     role: Public extension API traits
-    key_types: [BrinkExtension, BrinkRangedExtension]
+    key_types: [BrinkExtension, ExtArg]
+    notes: >
+      ExtArg<'a> enum: Int(u64), Str(&str),
+      Section { start: u64, len: u64, data: &[u8] }.
+      All extensions implement BrinkExtension::execute<'a>(&self, &[ExtArg<'a>], &mut [u8]).
+      BrinkRangedExtension removed; section data arrives via ExtArg::Section in args[0].
 
   process:
     path: process/process.rs
@@ -106,7 +113,7 @@ binary:
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
 tests:
-  integration: tests/integration.rs   # 291 tests as of 2026-04-12
+  integration: tests/integration.rs   # 294 tests as of 2026-04-13
   fixtures: tests/*.brink             # ~267 .brink source fixtures
   helpers: [assert_brink_success, assert_brink_failure, assert_brink_warning,
             assert_brink_no_warning]

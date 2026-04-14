@@ -56,9 +56,6 @@ pub enum IRKind {
     BareAssign,
     /// Operands: [name, arg0..., output]
     ExtensionCall,
-    /// Operands: [name, range_start, range_length, arg0..., output]
-    /// range_start and range_length are numeric expressions evaluated before execution.
-    ExtensionCallRanged,
     /// Operands: [name, section_id, arg0..., output]
     /// section_id is an Identifier matching a known section; the engine resolves
     /// (file_offset, size) from wr_dispatches at runtime.

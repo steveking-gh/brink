@@ -1,0 +1,8 @@
+// All eight extension arguments are arithmetic expressions using a const.
+// BASE - N evaluates to 1..8, so sum == 36, same as extension_8arg.brink.
+// Expected output: 0x24 0x00 0x00 0x00 0x00 0x00 0x00 0x00
+const BASE = 9;
+section top {
+    wr brink::test_sum8(BASE - 8, BASE - 7, BASE - 6, BASE - 5, BASE - 4, BASE - 3, BASE - 2, BASE - 1);
+}
+output top 0;

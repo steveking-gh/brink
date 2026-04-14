@@ -1,42 +1,22 @@
 use std::collections::HashMap;
 
-pub use brink_extension::BrinkExtension;
-pub use brink_extension::BrinkRangedExtension;
-
-/// Wraps either a basic or ranged extension behind a unified enum.
-///
-/// The variant determines which `execute` signature Brink calls and whether
-/// the call site must supply an image range specifier.
-pub enum RegisteredExtension {
-    Basic(Box<dyn BrinkExtension>),
-    Ranged(Box<dyn BrinkRangedExtension>),
-}
-
-impl RegisteredExtension {
-    /// Returns the extension's fully-qualified name.
-    pub fn name(&self) -> &str {
-        match self {
-            Self::Basic(e) => e.name(),
-            Self::Ranged(e) => e.name(),
-        }
-    }
-
-    /// Returns `true` if the extension requires an image range at its call site.
-    pub fn is_ranged(&self) -> bool {
-        matches!(self, Self::Ranged(_))
-    }
-}
+pub use brink_extension::{BrinkExtension, ExtArg};
 
 /// Owns a registered extension alongside its cached size.
 ///
-/// Brink calls `size()` exactly once — at registration time — and stores the
-/// result here. All internal size lookups use [`cached_size`] rather than
+/// Brink calls `size()` exactly once -- at registration time -- and stores the
+/// result here. All internal size lookups use `cached_size` rather than
 /// calling the extension again.
-///
-/// [`cached_size`]: ExtensionEntry::cached_size
 pub struct ExtensionEntry {
-    pub extension: RegisteredExtension,
+    pub extension: Box<dyn BrinkExtension>,
     pub cached_size: usize,
+}
+
+impl ExtensionEntry {
+    /// Returns the extension's fully-qualified name.
+    pub fn name(&self) -> &str {
+        self.extension.name()
+    }
 }
 
 /// A registry that owns and provides lookup for all available Brink extensions.
@@ -58,9 +38,9 @@ impl ExtensionRegistry {
         }
     }
 
-    /// Registers a non-ranged extension. Calls [`BrinkExtension::size`] exactly
-    /// once and caches the result. Panics if an extension with the same name is
-    /// already registered.
+    /// Registers an extension. Calls `BrinkExtension::size` exactly once and
+    /// caches the result. Panics if an extension with the same name is already
+    /// registered.
     pub fn register(&mut self, ext: Box<dyn BrinkExtension>) {
         let name = ext.name().to_string();
         assert!(
@@ -72,27 +52,7 @@ impl ExtensionRegistry {
         self.extensions.insert(
             name,
             ExtensionEntry {
-                extension: RegisteredExtension::Basic(ext),
-                cached_size,
-            },
-        );
-    }
-
-    /// Registers a ranged extension. Calls [`BrinkRangedExtension::size`] exactly
-    /// once and caches the result. Panics if an extension with the same name is
-    /// already registered.
-    pub fn register_ranged(&mut self, ext: Box<dyn BrinkRangedExtension>) {
-        let name = ext.name().to_string();
-        assert!(
-            !self.extensions.contains_key(&name),
-            "Extension '{}' is already registered",
-            name
-        );
-        let cached_size = ext.size();
-        self.extensions.insert(
-            name,
-            ExtensionEntry {
-                extension: RegisteredExtension::Ranged(ext),
+                extension: ext,
                 cached_size,
             },
         );
@@ -109,6 +69,7 @@ pub mod test_mocks;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use brink_extension::ExtArg;
     use test_mocks::*;
 
     #[test]
@@ -134,7 +95,7 @@ mod tests {
         reg.register(Box::new(MockCrc::new()));
     }
 
-    /// size() must be called exactly once — at registration — and never again.
+    /// size() must be called exactly once -- at registration -- and never again.
     #[test]
     fn test_size_called_once_on_register() {
         let mut reg = ExtensionRegistry::new();
@@ -154,35 +115,15 @@ mod tests {
         assert_eq!(entry.cached_size, 4);
     }
 
-    /// is_ranged() must reflect the registration method used.
-    #[test]
-    fn test_is_ranged_reflects_variant() {
-        let mut reg = ExtensionRegistry::new();
-        reg.register(Box::new(MockCrc::new()));
-        reg.register_ranged(Box::new(MockIncrement::new()));
-
-        assert!(
-            !reg.get("brink::test_crc").unwrap().extension.is_ranged(),
-            "Basic extension must not be ranged"
-        );
-        assert!(
-            reg.get("brink::test_increment").unwrap().extension.is_ranged(),
-            "Ranged extension must be ranged"
-        );
-    }
-
     #[test]
     fn test_valid_extension_execution() {
         let mut reg = ExtensionRegistry::new();
         reg.register(Box::new(MockCrc::new()));
         let entry = reg.get("brink::test_crc").unwrap();
 
-        let RegisteredExtension::Basic(ref ext) = entry.extension else {
-            panic!("Expected Basic extension");
-        };
-        let args = vec![0xDEADBEEF_u64];
+        let args = vec![ExtArg::Int(0xDEADBEEF_u64)];
         let mut out = vec![0u8; 4];
-        ext.execute(&args, &mut out).unwrap();
+        entry.extension.execute(&args, &mut out).unwrap();
         assert_eq!(out, vec![0xDE, 0xAD, 0xBE, 0xEF]);
     }
 
@@ -192,12 +133,10 @@ mod tests {
         reg.register(Box::new(MockCrc::new()));
         let entry = reg.get("brink::test_crc").unwrap();
 
-        let RegisteredExtension::Basic(ref ext) = entry.extension else {
-            panic!("Expected Basic extension");
-        };
-        let args = vec![1u64, 2]; // mock expects exactly 1
+        // MockCrc expects exactly 1 arg; provide 2.
+        let args = vec![ExtArg::Int(1), ExtArg::Int(2)];
         let mut out = vec![0u8; 4];
-        let res = ext.execute(&args, &mut out);
+        let res = entry.extension.execute(&args, &mut out);
         assert!(res.is_err());
         assert_eq!(res.unwrap_err(), "Expected exactly 1 argument for CRC");
     }
@@ -208,12 +147,9 @@ mod tests {
         reg.register(Box::new(MockCrc::new()));
         let entry = reg.get("brink::test_crc").unwrap();
 
-        let RegisteredExtension::Basic(ref ext) = entry.extension else {
-            panic!("Expected Basic extension");
-        };
-        let args = vec![1u64];
-        let mut out = vec![0u8; 2]; // mock expects 4
-        let res = ext.execute(&args, &mut out);
+        let args = vec![ExtArg::Int(1)];
+        let mut out = vec![0u8; 2]; // MockCrc expects 4 bytes
+        let res = entry.extension.execute(&args, &mut out);
         assert!(res.is_err());
         assert_eq!(res.unwrap_err(), "Expected 4 bytes of output space");
     }
@@ -221,16 +157,14 @@ mod tests {
     #[test]
     fn test_ranged_sum_execution() {
         let mut reg = ExtensionRegistry::new();
-        reg.register_ranged(Box::new(MockRangedSum::new()));
+        reg.register(Box::new(MockRangedSum::new()));
         let entry = reg.get("brink::test_ranged_sum").unwrap();
         assert_eq!(entry.cached_size, 8);
 
-        let RegisteredExtension::Ranged(ref ext) = entry.extension else {
-            panic!("Expected Ranged extension");
-        };
         let img = vec![0x01u8, 0x02, 0x03, 0x04];
+        let args = vec![ExtArg::Section { start: 0, len: 4, data: &img }];
         let mut out = vec![0u8; 8];
-        ext.execute(&[], &img, &mut out).unwrap();
+        entry.extension.execute(&args, &mut out).unwrap();
         let sum = u64::from_le_bytes(out.try_into().unwrap());
         assert_eq!(sum, 10, "Sum of 1+2+3+4 must be 10");
     }
@@ -275,10 +209,8 @@ mod tests {
         reg.register(Box::new(MockLogger::new()));
 
         let entry = reg.get("brink::test_logger").unwrap();
-        let RegisteredExtension::Basic(ref ext) = entry.extension else {
-            panic!("Expected Basic extension");
-        };
-        let res = ext.execute(&[], &mut []);
+        let args: Vec<ExtArg<'_>> = vec![];
+        let res = entry.extension.execute(&args, &mut []);
 
         assert!(res.is_err());
         assert_eq!(res.unwrap_err(), "Intentional mock fallback error");

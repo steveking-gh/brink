@@ -1189,6 +1189,81 @@ mod tests {
         assert_brink_failure("tests/extension_non_wr_2.brink", &["[IRDB_9]"]);
     }
 
+    /// A string const passed as an extension argument is valid at IRDb time but
+    /// the extension rejects it at runtime with EXEC_47.
+    #[test]
+    fn extension_str_arg_fails() {
+        assert_brink_failure("tests/extension_str_arg.brink", &["[EXEC_47]"]);
+    }
+
+    /// An integer followed by a string const as extension arguments; the extension
+    /// rejects the string arg at runtime with EXEC_47.
+    #[test]
+    fn extension_int_str_arg_fails() {
+        assert_brink_failure("tests/extension_int_str_arg.brink", &["[EXEC_47]"]);
+    }
+
+    /// sizeof(section) produces a numeric u64 and is valid as an extension
+    /// argument.  brink::test_crc encodes sizeof(data)==4 as big-endian u32.
+    /// Expected output: 4 data bytes then 0x00 0x00 0x00 0x04.
+    #[test]
+    fn extension_sizeof_arg() {
+        let out = "tests_extension_sizeof_arg.brink.bin";
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/extension_sizeof_arg.brink")
+            .arg("-o").arg(out)
+            .assert()
+            .success();
+        let bytes = fs::read(out).expect("output file missing");
+        assert_eq!(
+            bytes,
+            vec![0x01, 0x02, 0x03, 0x04, 0x00, 0x00, 0x00, 0x04],
+            "sizeof(data)==4 must appear big-endian in the CRC slot"
+        );
+        fs::remove_file(out).ok();
+    }
+
+    /// Eight literal integer arguments; brink::test_sum8 writes sum(1..8)==36
+    /// as a little-endian u64.
+    #[test]
+    fn extension_8arg() {
+        let out = "tests_extension_8arg.brink.bin";
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/extension_8arg.brink")
+            .arg("-o").arg(out)
+            .assert()
+            .success();
+        let bytes = fs::read(out).expect("output file missing");
+        assert_eq!(
+            bytes,
+            vec![36u8, 0, 0, 0, 0, 0, 0, 0],
+            "sum of 1..8 must be 36 in little-endian u64"
+        );
+        fs::remove_file(out).ok();
+    }
+
+    /// All eight extension arguments are arithmetic expressions; the computed
+    /// values match 1..8 so the sum and output are identical to extension_8arg.
+    #[test]
+    fn extension_8arg_expr() {
+        let out = "tests_extension_8arg_expr.brink.bin";
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/extension_8arg_expr.brink")
+            .arg("-o").arg(out)
+            .assert()
+            .success();
+        let bytes = fs::read(out).expect("output file missing");
+        assert_eq!(
+            bytes,
+            vec![36u8, 0, 0, 0, 0, 0, 0, 0],
+            "arithmetic expression args must evaluate identically to literals"
+        );
+        fs::remove_file(out).ok();
+    }
+
     /// Form 3 (section-name): brink::increment receives the `top` section
     /// slice (16 bytes) and appends each byte + 1.  Total output: 32 bytes.
     #[test]
@@ -1220,38 +1295,6 @@ mod tests {
         }
 
         fs::remove_file("execute_extension_increment.bin").ok();
-    }
-
-    /// Form 2 (explicit range): brink::ranged_sum reads bytes [0..4] of the
-    /// image (the four data bytes written before it) and emits their sum as a
-    /// big-endian u64.  Output: 4 data bytes + 8-byte sum = 12 bytes.
-    #[test]
-    fn execute_extension_ranged_explicit() {
-        Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/extension_ranged_explicit.brink")
-            .arg("-o")
-            .arg("execute_extension_ranged_explicit.bin")
-            .assert()
-            .success();
-
-        let produced = fs::read("execute_extension_ranged_explicit.bin")
-            .expect("execute_extension_ranged_explicit.bin not found");
-
-        assert_eq!(produced.len(), 12, "Expected 12 bytes total");
-
-        // First 4 bytes: 0x01-0x04.
-        assert_eq!(
-            &produced[..4],
-            &[0x01, 0x02, 0x03, 0x04],
-            "Data bytes mismatch"
-        );
-
-        // Next 8 bytes: sum of 1+2+3+4 = 10 as little-endian u64.
-        let sum = u64::from_le_bytes(produced[4..12].try_into().unwrap());
-        assert_eq!(sum, 10, "Sum must be 10");
-
-        fs::remove_file("execute_extension_ranged_explicit.bin").ok();
     }
 
     // Form 3 (section-name): brink::ranged_sum receives the entire `out`
@@ -1288,37 +1331,6 @@ mod tests {
         assert_eq!(sum, 10, "Sum must be 10");
 
         fs::remove_file("execute_extension_section_sum.bin").ok();
-    }
-
-    /// Error case: a BrinkRangedExtension called with no range specifier must
-    /// be rejected at IRDB time with IRDB_45.
-    #[test]
-    fn execute_extension_no_range_error() {
-        assert_brink_failure("tests/extension_no_range_error.brink", &["[IRDB_45]"]);
-    }
-
-    /// A ranged extension called with explicit length=0 succeeds when the
-    /// extension accepts empty input.  brink::ranged_sum returns 0.
-    #[test]
-    fn execute_extension_zero_length_success() {
-        let out_path = "ext_zero_length_success.bin";
-        Command::cargo_bin("brink")
-            .unwrap()
-            .arg("tests/extension_zero_length_success.brink")
-            .arg("-o")
-            .arg(out_path)
-            .assert()
-            .success();
-        let bytes = fs::read(out_path).expect("output file not found");
-        assert_eq!(bytes, vec![0u8; 8], "zero-length sum must be all zeros");
-        fs::remove_file(out_path).unwrap();
-    }
-
-    /// A ranged extension called with explicit length=0 fails when the
-    /// extension rejects empty input.  brink::reject_empty returns Err.
-    #[test]
-    fn execute_extension_zero_length_failure() {
-        assert_brink_failure("tests/extension_zero_length_failure.brink", &[]);
     }
 
     /// A ranged extension called with the section-name form on an empty section
@@ -2579,11 +2591,12 @@ mod tests {
         assert_brink_failure("tests/irdb_44_unknown_sizeof_ext.brink", &["[IRDB_44]"]);
     }
 
-    /// IRDB_46: ranged extension called with a non-numeric first range argument.
-    /// validate_operands must reject the QuotedString start-offset operand.
+    /// A ranged extension called with a string as the first argument passes IRDb
+    /// (strings are allowed as extension args) but the extension rejects it at
+    /// runtime with EXEC_47 because it expects ExtArg::Section in args[0].
     #[test]
     fn irdb_46_ranged_ext_bad_range() {
-        assert_brink_failure("tests/irdb_46_ranged_ext_bad_range.brink", &["[IRDB_46]"]);
+        assert_brink_failure("tests/irdb_46_ranged_ext_bad_range.brink", &["[EXEC_47]"]);
     }
 
     /// IRDB_15: wr repeat-count operand is a quoted string, not a numeric value.
