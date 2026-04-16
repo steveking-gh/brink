@@ -1,0 +1,6 @@
+// Named argument call to brink::test_sum8 with only 'h' supplied.
+// Parameters 'a' through 'g' are absent; IRDb emits IRDB_51 for each.
+section top {
+    wr brink::test_sum8(h=8);
+}
+output top 0;

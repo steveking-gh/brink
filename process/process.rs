@@ -108,7 +108,6 @@ pub fn process(
     map_rs: Option<&str>,
 ) -> Result<()> {
     info!("Processing {}", name);
-    debug!("File contains: {}", fstr);
     ConstBuiltins::init();
 
     let mut diags = Diags::new(name, fstr, verbosity, noprint);

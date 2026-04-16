@@ -23,7 +23,7 @@ use std::fs::File;
 use std::io::prelude::*;
 
 #[allow(unused_imports)]
-use tracing::{debug, error, info, trace, warn};
+use tracing::{enabled, Level, debug, error, info, trace, warn};
 
 /// All tokens in brink.
 /// Keep this simple and do not be tempted to attach
@@ -39,6 +39,7 @@ pub enum LexToken {
     BuiltinVersionMajor,
     BuiltinVersionMinor,
     BuiltinVersionPatch,
+    Include,
     Section,
     Align,
     SetSecOffset,
@@ -97,6 +98,16 @@ pub enum LexToken {
     U64,
     I64,
     QuotedString,
+    /// A synthetic token marking the end of the source file. The parser may
+    /// push synthetic tokens into the vector *after* the EOF token since the
+    /// token vector functions as arena storage for all tokens.  Parsing stops
+    /// when encountering the EOF token.
+    EOF,
+    /// Named argument in an extension call: `param_name=`.
+    /// Not produced by the lexer; synthesized by the parser when it
+    /// sees Identifier followed immediately by Eq inside a call argument
+    /// list.  The token val is the parameter name (without the `=`).
+    NamedArg,
     /// Catch-all for unrecognized input.
     Unknown,
 }
@@ -131,8 +142,8 @@ pub fn is_reserved_identifier(name: &str) -> bool {
         name,
         "wrs"
             | "wrf"
-            | "include"
             | "import"
+            | "include"
             | "if"
             | "else"
             | "true"
@@ -141,6 +152,33 @@ pub fn is_reserved_identifier(name: &str) -> bool {
             | "let"
             | "fill"
     )
+}
+
+
+/// Returns true if the token is one that has a meaningful value
+/// to show in debug logs.
+pub const fn has_useful_debug_value(tok: LexToken) -> bool {
+    matches!(
+        tok,
+        LexToken::QuotedString
+            | LexToken::Identifier
+            | LexToken::Namespace
+            | LexToken::Integer
+            | LexToken::U64
+            | LexToken::I64
+            | LexToken::NamedArg
+    )
+}
+
+/// Logs a token at DEBUG level via TokenVector::describe_token, skipping the
+/// call entirely when DEBUG is disabled.  offset is relative to the current
+/// cursor: 0 = current token, -1 = previous token, etc.
+macro_rules! debug_peek {
+    ($src_str:expr, $tv:expr) => {
+        if enabled!(Level::DEBUG) {
+            debug!("{}: {}", $src_str, $tv.describe_token_at_offset(0));
+        }
+    };
 }
 
 /// The basic token info structure used everywhere.
@@ -165,6 +203,118 @@ impl<'toks> TokenInfo<'toks> {
     }
 }
 
+/// The token vector abstraction used in the AST.  TokenVector proves a thin wrapper around
+/// the underlying vector of TokenInfos and provides basic access function that pay
+/// attention to the EOF sentinel.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TokenVector<'toks> {
+    /// The token enum as identified by logos
+    tv: Vec<TokenInfo<'toks>>,
+
+    /// Index of the EOF token, helpful in clamping out-of-bounds indices to EOF.
+    eof_idx: usize,
+
+    /// Index into tv of the next unread token.
+    idx: usize,
+}
+
+impl<'toks> TokenVector<'toks> {
+    pub fn new(mut tv: Vec<TokenInfo<'toks>>) -> Self {
+        // Mark the end of input.  Synthetic tokens pushed after this sentinel
+        // are never reached by the sequential parse scan.
+        let eof_idx = tv.len();
+        tv.push(TokenInfo { tok: LexToken::EOF, val: "", loc: SourceSpan { file_id: 0, range: 0..0 } });
+        Self { tv, eof_idx, idx: 0 }
+    }
+
+    pub fn get_index(&self) -> usize {
+        self.idx
+    }
+
+    pub fn scannable_len(&self) -> usize {
+        self.eof_idx
+    }
+
+    /// Get needs access to all token including synthetic tokens after the EOF.
+    pub fn get(&self, idx: usize) -> &TokenInfo<'toks> {
+        self.tv.get(idx).unwrap_or_else(||
+            panic!("TokenVector::get: Index {} out of bounds, tv length={}", idx, self.tv.len()))
+    }
+
+    /// Push a synthetic token after the EOF sentinel and return its index.
+    /// The returned index can be used to create an arena node for the token.
+    pub fn push_synthetic(&mut self, tinfo: TokenInfo<'toks>) -> usize {
+        let idx = self.tv.len();
+        self.tv.push(tinfo);
+        idx
+    }
+
+    /// Return the next unread token, but do not advance.  The sequential parser
+    /// never needs to peek past the end-of-input.
+    pub fn peek(&self) -> &TokenInfo<'toks> {
+        debug_assert!(self.idx <= self.eof_idx);
+        &self.tv[self.idx]
+    }
+
+    /// Return the next unread token and advance.  Take stops at the end of input.
+    pub fn take(&mut self) -> &TokenInfo<'toks> {
+        debug_assert!(self.idx <= self.eof_idx);
+        let tinfo = &self.tv[self.idx];
+        // Never advance past the EOF token.
+        if self.idx < self.eof_idx {
+            self.idx += 1;
+        }
+        tinfo
+    }
+
+    /// Return a human-readable description of the token at index + offset.
+    /// Negative offsets look at previously taken tokens.  Out-of-bounds or EOF
+    /// positions are described gracefully rather than panicking. This is a
+    /// debug helper function that needs access to all tokens including
+    /// synthetic tokens after the EOF.
+    pub fn describe_token(&self, idx: usize) -> String {
+        match self.tv.get(idx) {
+            None => format!("token {} out of bounds, length={}", idx, self.tv.len()),
+            Some(tinfo) if has_useful_debug_value(tinfo.tok) => format!("token {}:{:?} is {:?}", idx, tinfo.tok, tinfo.val),
+            Some(tinfo) => format!("token {}:{:?}", idx, tinfo.tok),
+        }
+    }
+
+    /// Return a human-readable description of the token at index + offset.
+    /// Negative offsets look at previously taken tokens.  Out-of-bounds or EOF
+    /// positions are described gracefully rather than panicking. This is a
+    /// debug helper function that needs access to all tokens including
+    /// synthetic tokens after the EOF.
+    pub fn describe_token_at_offset(&self, offset: isize) -> String {
+        let idx = self.idx as isize + offset;
+        if idx < 0 {
+            return format!("token {:+} out of bounds, current index={}", idx, self.idx);
+        }
+        self.describe_token(idx as usize)
+    }
+
+    // Skip stops at the end of input.  The sequential parser never reaches the
+    // synthetic tokens that are pushed after the EOF token.
+    pub fn skip(&mut self) {
+        if self.idx > self.eof_idx {
+            panic!("TokenVector::skip: Index {} exceeded end-of-input, eof_idx={}, tv length={}",
+                self.idx, self.eof_idx, self.tv.len())
+        }
+        if self.idx < self.eof_idx {
+            self.idx += 1;
+        }
+    }
+
+    /// Returns the current token index and advances the cursor to the next token.
+    /// Does not advance past EOF
+    pub fn get_index_and_skip(&mut self) -> usize {
+        let idx = self.idx;
+        self.skip();
+        idx
+    }
+}
+
+
 /**
  * Abstract Syntax Tree
  * This structure contains the AST created from the raw lexical
@@ -178,14 +328,11 @@ pub struct Ast<'toks> {
     arena: Arena<usize>,
 
     /// A vector of info about for tokens identified by logos.
-    tv: Vec<TokenInfo<'toks>>,
+    tv: TokenVector<'toks>,
 
     /// The artificial root of the tree.  The children of this
     /// tree are the top level tokens in the user's source file.
     root: NodeId,
-
-    /// The current token number pointer within the tv
-    tok_num: usize,
 }
 
 /// Context passed through parse_if / parse_if_body to control which
@@ -201,18 +348,6 @@ enum ParseIfContext {
 }
 
 impl<'toks> Ast<'toks> {
-    /// Peek at the next token info object, if any.
-    fn peek(&self) -> Option<&TokenInfo<'toks>> {
-        self.tv.get(self.tok_num)
-    }
-
-    /// Take the next token info object, if any.
-    fn take(&mut self) -> Option<&TokenInfo<'toks>> {
-        let tinfo = self.tv.get(self.tok_num);
-        self.tok_num += 1;
-        tinfo
-    }
-
     /// Recursively lexes the provided `fstr` source string, flattening the tokens directly
     /// into the main `tv` stream. Encountering an `include "path";` sequence triggers
     /// path resolution relative to the current file, reading the target contents,
@@ -231,13 +366,44 @@ impl<'toks> Ast<'toks> {
         let mut lex = Lexer::new(fstr);
         while let Some(tok) = lex.next() {
             let val = lex.slice();
+            if enabled!(Level::DEBUG) {
+                if has_useful_debug_value(tok) {
+                    debug!("ast::lex_file_r: token {} = {:?} {:?}", tv.len(), tok, val);
+                } else {
+                    debug!("ast::lex_file_r: token {} = {:?}", tv.len(), tok);
+                }
+            }
+
             let span = lex.span();
-            if tok == LexToken::Identifier && val == "include" {
-                // Determine whether 'include' serves as a top-level directive
-                // rather than a misused reserved identifier (e.g., `const include = ...`).
-                // Checking whether 'include'appears immediately after a statement boundary (or at the
-                // start of the file) prevents eagerly intercepting valid parser-level error
-                // cases like AST_32 (Reserved section name) or AST_33 (Reserved const name).
+            if tok == LexToken::Include {
+                // How Brink handles include files:
+                //
+                // First, unlike the C preprocessor, Brink does not literally
+                // text substitute the included file into the parent.  Instead,
+                // we logically inline the tokens from the included file into
+                // our single unified token vector (tv). The token number of
+                // each token in the tv increases monotonically regardless if
+                // the token belonged to a parent or included file.  The
+                // downstream parser sees a simple flat vector. For diagnostics,
+                // we track the original source file and source line number of
+                // each token. Because the inlining is not text substitution, we
+                // avoid C preprocessor style line number fixups.
+                //
+                // Secondly, we do not record the LexToken::Include nor the file
+                // path LexToken::QuotedString in the tv. Because the lexer
+                // already logically inlined the included file's tokens, The
+                // LexToken::Include and LexToken::QuotedString are "consumed"
+                // and would just be noise downstream.
+                //
+                // Finally, because of this logical inlining, we do basic
+                // semantic checks here to enforce that LexToken::Include is
+                // used in a valid way. This semantic check determines whether
+                // 'include' serves as a top-level directive rather than misused
+                // token. Checking whether 'include'appears immediately after a
+                // statement boundary (or at the start of the file) prevents
+                // eagerly intercepting valid parser-level error cases like
+                // AST_32 (Reserved section name) or AST_33 (Reserved const
+                // name).
                 let is_directive = tv
                     .last()
                     .is_none_or(|t| matches!(t.tok, LexToken::Semicolon | LexToken::CloseBrace));
@@ -343,7 +509,6 @@ impl<'toks> Ast<'toks> {
                 }
             }
 
-            debug!("ast::new: Token {} = {:?}", tv.len(), tok);
             tv.push(TokenInfo {
                 tok,
                 val,
@@ -360,7 +525,7 @@ impl<'toks> Ast<'toks> {
     pub fn new(name: &str, fstr: &'toks str, diags: &mut Diags) -> anyhow::Result<Self> {
         let mut arena = Arena::new();
         let root = arena.new_node(usize::MAX);
-        let mut tv = Vec::new();
+        let mut raw_tv = Vec::new();
         let mut visited = HashMap::new();
 
         // In Phase 1, `process.rs` adds the main file to diags at id=0.
@@ -378,13 +543,16 @@ impl<'toks> Ast<'toks> {
             },
         );
 
-        Self::lex_file_r(&mut tv, name, fstr, 0, diags, &mut visited)?;
+        // Recursively lex the main file and all includes, flattening tokens
+        // into a single vector.
+        Self::lex_file_r(&mut raw_tv, name, fstr, 0, diags, &mut visited)?;
         let mut ast = Self {
             arena,
-            tv,
+            tv: TokenVector::new(raw_tv),
             root,
-            tok_num: 0,
         };
+
+        // Now parse the flat token vector to build the abstract syntax tree.
         if !ast.parse(diags) {
             // ast construction failed.  Let the caller report
             // this in whatever way they want.
@@ -396,16 +564,8 @@ impl<'toks> Ast<'toks> {
 
     // Boilerplate entry debug tracing for recursive descent parsing functions.
     fn dbg_enter(&self, func_name: &str) {
-        if let Some(tinfo) = self.peek() {
-            trace!(
-                "Ast::{} ENTER, {}:{} is {:?}",
-                func_name, self.tok_num, tinfo.val, tinfo.tok
-            );
-        } else {
-            trace!(
-                "Ast::{} ENTER, {}:{} is {}",
-                func_name, self.tok_num, "<end of input>", "<end of input>"
-            );
+        if enabled!(Level::TRACE) {
+            trace!("Ast::{} ENTER, {}", func_name, self.tv.describe_token_at_offset(0));
         }
     }
 
@@ -461,13 +621,11 @@ impl<'toks> Ast<'toks> {
     /// between elements in the source file.  We check syntax and grammar during
     /// tree construction.
     fn parse(&mut self, diags: &mut Diags) -> bool {
-        self.dbg_enter("parse");
-        let toks_end = self.tv.len();
-        debug!("Ast::parse: Total of {} tokens", toks_end);
+        debug!("Ast::parse: ENTER, Total of {} tokens",  self.tv.scannable_len());
 
         let mut result = true;
-        while let Some(tinfo) = self.peek() {
-            debug!("Ast::parse: Parsing token {}: {:?}", self.tok_num, tinfo);
+        while let tinfo = self.tv.peek() && tinfo.tok != LexToken::EOF {
+            debug_peek!("Ast::parse", self.tv);
             result &= match tinfo.tok {
                 LexToken::Section => self.parse_section(self.root, diags),
                 LexToken::Output => self.parse_output(self.root, diags),
@@ -501,7 +659,7 @@ impl<'toks> Ast<'toks> {
                     diags.err1("AST_18", &msg, tinfo.span());
 
                     // Skip the bad token.
-                    self.tok_num += 1;
+                    self.tv.skip();
                     false
                 }
             };
@@ -509,19 +667,25 @@ impl<'toks> Ast<'toks> {
         self.dbg_exit("parse", result)
     }
 
+    /// Helper function for errors in which the parser failed to find the
+    /// expected next token
     fn err_expected_after(&self, diags: &mut Diags, code: &str, msg: &str) {
-        let m = format!("{}, but found '{}'", msg, self.tv[self.tok_num].val);
+        let idx = self.tv.get_index();
+        let tinfo_after = self.tv.get(idx);
+        let tinfo_before = self.tv.get(idx - 1);
+        let m = format!("{}, found {}", msg, self.tv.describe_token(idx));
         diags.err2(
             code,
             &m,
-            self.tv[self.tok_num].span(),
-            self.tv[self.tok_num - 1].span(),
+            tinfo_after.span(),
+            tinfo_before.span(),
         );
     }
 
     fn err_invalid_expression(&self, diags: &mut Diags, code: &str) {
-        let m = format!("Invalid expression '{}'", self.tv[self.tok_num].val);
-        diags.err1(code, &m, self.tv[self.tok_num].span());
+        let tinfo = self.tv.get(self.tv.get_index());
+        let m = format!("Invalid expression '{}'", tinfo.val);
+        diags.err1(code, &m, tinfo.span());
     }
 
     fn err_no_input(&self, diags: &mut Diags) {
@@ -530,7 +694,7 @@ impl<'toks> Ast<'toks> {
 
     fn err_no_close_brace(&self, diags: &mut Diags, brace_tok_num: usize) {
         let m = "Missing '}'.  The following open brace is unmatched.".to_string();
-        diags.err1("AST_14", &m, self.tv[brace_tok_num].span());
+        diags.err1("AST_14", &m, self.tv.get(brace_tok_num).span());
     }
 
     /// Attempts to advance the token number past the next semicolon. The final
@@ -541,20 +705,20 @@ impl<'toks> Ast<'toks> {
     /// This case occurs when the semicolon itself was unexpected, e.g. missing
     /// close paren like assert(1;
     fn advance_past_semicolon(&mut self) {
-        assert!(self.tok_num > 0);
         self.dbg_enter("advance_past_semicolon");
-        if let Some(prev_tinfo) = self.tv.get(self.tok_num - 1)
-            && prev_tinfo.tok != LexToken::Semicolon
+        let prev_tinfo = self.tv.get(self.tv.get_index() - 1);
+        if prev_tinfo.tok != LexToken::Semicolon
         {
-            while let Some(tinfo) = self.take() {
-                if tinfo.tok == LexToken::Semicolon {
+            loop {
+                let tinfo = self.tv.take();
+                if tinfo.tok == LexToken::EOF || tinfo.tok == LexToken::Semicolon{
                     break;
                 }
             }
         }
         debug!(
             "Ast::advance_past_semicolon: Stopped on token {}",
-            self.tok_num
+            self.tv.get_index()
         );
         self.dbg_exit("advance_past_semicolon", true);
     }
@@ -562,9 +726,9 @@ impl<'toks> Ast<'toks> {
     /// Add the specified token as a child of the parent.
     /// Advance the token number and return the new node ID for the input token.
     fn add_to_parent_and_advance(&mut self, parent: NodeId) -> NodeId {
-        let nid = self.arena.new_node(self.tok_num);
+        let idx = self.tv.get_index_and_skip();
+        let nid = self.arena.new_node(idx);
         parent.append(nid, &mut self.arena);
-        self.tok_num += 1;
         nid
     }
 
@@ -580,15 +744,16 @@ impl<'toks> Ast<'toks> {
 
         let mut result = false;
 
-        if let Some(tinfo) = self.peek() {
+        let tinfo = self.tv.peek();
+        if tinfo.tok == LexToken::EOF {
+            self.err_no_input(diags);
+        } else {
             if expected_token == tinfo.tok {
                 self.add_to_parent_and_advance(parent);
                 result = true;
             } else {
                 self.err_expected_after(diags, code, context);
             }
-        } else {
-            self.err_no_input(diags);
         }
 
         self.dbg_exit("expect_leaf", result)
@@ -597,34 +762,37 @@ impl<'toks> Ast<'toks> {
     /// Process an expected semicolon.  This function is just a convenient
     /// specialization of expect_leaf().
     fn expect_semi(&mut self, diags: &mut Diags, parent: NodeId) -> bool {
-        if let Some(tinfo) = self.peek() {
-            if LexToken::Semicolon == tinfo.tok {
-                self.add_to_parent_and_advance(parent);
-                return true;
-            } else {
-                self.err_expected_after(diags, "AST_17", "Expected ';'");
-            }
-        } else {
+        let tinfo = self.tv.peek();
+
+        if tinfo.tok == LexToken::EOF {
             self.err_no_input(diags);
+            return false;
         }
 
+        if LexToken::Semicolon == tinfo.tok {
+            self.add_to_parent_and_advance(parent);
+            return true;
+        }
+        self.err_expected_after(diags, "AST_17", "Expected ';'");
         false
     }
 
     /// Expect the specified token, add it to the parent and advance.
-    fn expect_token(&mut self, tok: LexToken, diags: &mut Diags, parent: NodeId) -> bool {
-        if let Some(tinfo) = self.peek() {
-            if tok == tinfo.tok {
-                self.add_to_parent_and_advance(parent);
-                return true;
-            } else {
-                let msg = format!("Expected {:?}", tok);
-                self.err_expected_after(diags, "AST_26", &msg);
-            }
-        } else {
+    fn expect_token(&mut self, expected_tok: LexToken, diags: &mut Diags,
+                    parent: NodeId) -> bool {
+        let tinfo = self.tv.peek();
+        if tinfo.tok == LexToken::EOF {
             self.err_no_input(diags);
+            return false;
         }
 
+        if expected_tok == tinfo.tok {
+            self.add_to_parent_and_advance(parent);
+            return true;
+        }
+
+        let msg = format!("Expected {:?}", expected_tok);
+        self.err_expected_after(diags, "AST_26", &msg);
         false
     }
 
@@ -652,32 +820,65 @@ impl<'toks> Ast<'toks> {
     /// If we find an allowed found, add it to the parent and advance.
     /// If not found, do nothing and return success
     fn optional_token(&mut self, tokvec: &[LexToken], diags: &mut Diags, parent: NodeId) -> bool {
-        if let Some(tinfo) = self.peek() {
-            if tokvec.contains(&tinfo.tok) {
-                self.add_to_parent_and_advance(parent);
-            }
-        } else {
+        let tinfo = self.tv.peek();
+        if tinfo.tok == LexToken::EOF {
             self.err_no_input(diags);
+            return true;
         }
 
+        if tokvec.contains(&tinfo.tok) {
+            self.add_to_parent_and_advance(parent);
+        }
         true
     }
 
-    /// Expect the specified token and advance without adding to the parent.
-    // TODO reorder parameters so diags is last
-    fn expect_token_no_add(&mut self, tok: LexToken, diags: &mut Diags) -> bool {
-        if let Some(tinfo) = self.peek() {
-            if tok == tinfo.tok {
-                self.tok_num += 1;
-                return true;
-            } else {
-                let msg = format!("Expected {:?}", tok);
-                self.err_expected_after(diags, "AST_20", &msg);
-            }
-        } else {
+    /// Accept any word-like token as a name and add it as a child of parent.
+    /// Unlike expect_leaf(Identifier), this also accepts keyword tokens (e.g.
+    /// LexToken::Include) so that AstDb can produce a reserved-identifier error
+    /// instead of a generic parse error.  Any token whose val matches the
+    /// identifier pattern [a-zA-Z_][a-zA-Z0-9_]* is accepted.
+    fn expect_name_leaf(
+        &mut self,
+        diags: &mut Diags,
+        parent: NodeId,
+        code: &str,
+        context: &str,
+    ) -> bool {
+        self.dbg_enter("expect_name_leaf");
+        let tinfo = self.tv.peek();
+        if tinfo.tok == LexToken::EOF {
             self.err_no_input(diags);
+            return self.dbg_exit("expect_name_leaf", false);
+        }
+        // Accept any token whose val looks like an identifier so that AstDb can
+        // provide a reserved-identifier error rather than a generic parse failure.
+        let val_is_name = {
+            let mut chars = tinfo.val.chars();
+            matches!(chars.next(), Some(c) if c.is_ascii_alphabetic() || c == '_')
+                && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+        };
+        if val_is_name {
+            self.add_to_parent_and_advance(parent);
+            return self.dbg_exit("expect_name_leaf", true);
+        }
+        self.err_expected_after(diags, code, context);
+        self.dbg_exit("expect_name_leaf", false)
+    }
+
+    /// Expect the specified token and advance without adding to the parent.
+    fn expect_token_no_add(&mut self, tok: LexToken, diags: &mut Diags) -> bool {
+        let tinfo = self.tv.peek();
+        if tinfo.tok == LexToken::EOF {
+            self.err_no_input(diags);
+            return false;
+        }
+        if tok == tinfo.tok {
+            self.tv.skip();
+            return true;
         }
 
+        let msg = format!("Expected {:?}", tok);
+        self.err_expected_after(diags, "AST_20", &msg);
         false
     }
 
@@ -699,18 +900,18 @@ impl<'toks> Ast<'toks> {
         // that a special case here.
         let sec_nid = self.add_to_parent_and_advance(parent);
 
-        // After 'section' an identifier is expected
-        if self.expect_leaf(
+        // After 'section' an identifier is expected.  expect_name_leaf also accepts
+        // keyword tokens so AstDb can emit the specific reserved-identifier error.
+        if self.expect_name_leaf(
             diags,
             sec_nid,
-            LexToken::Identifier,
             "AST_1",
             "Expected an identifier after section",
         ) {
             // After a section identifier, expect an open brace.
             // Remember the location of the opening brace to help with
             // user missing brace errors.
-            let brace_toknum = self.tok_num;
+            let brace_toknum = self.tv.get_index();
             if self.expect_leaf(
                 diags,
                 sec_nid,
@@ -761,7 +962,7 @@ impl<'toks> Ast<'toks> {
     /// Returns `Some(result)` if the token was handled, `None` if it is not a
     /// recognized section-level token (caller is responsible for the error).
     fn try_parse_section_stmt(&mut self, parent: NodeId, diags: &mut Diags) -> Option<bool> {
-        let tok = self.peek()?.tok;
+        let tok = self.tv.peek().tok;
         match tok {
             LexToken::Label => Some(self.parse_label(parent, diags)),
             LexToken::Wr => Some(self.parse_wr(parent, diags)),
@@ -793,13 +994,15 @@ impl<'toks> Ast<'toks> {
         self.dbg_enter("parse_section_contents");
         let mut result = true; // todo fixme
 
-        let mut tok_num_old = 0;
-        while let Some(tinfo) = self.peek() {
-            debug!(
-                "Ast::parse_section_contents: token {}:{}",
-                self.tok_num, tinfo.val
-            );
-            if tok_num_old == self.tok_num {
+        let mut tok_idx_old = 0;
+        loop {
+            debug_peek!("Ast::parse_section_contents", self.tv);
+            let tinfo = self.tv.peek();
+            if tinfo.tok == LexToken::EOF {
+                break;
+            }
+            let tok_idx_new = self.tv.get_index();
+            if tok_idx_old == tok_idx_new {
                 // In some error cases, such as a missing closing brace, parsing
                 // can get stuck without advancing the token pointer.  For
                 // example, this problem occurs because an error occurs at the
@@ -808,11 +1011,11 @@ impl<'toks> Ast<'toks> {
                 // semicolon and at the start of a new statement. As a simple
                 // solution, detect that we're not making forward progress and
                 // force the token number forward.
-                self.tok_num += 1;
+                self.tv.skip();
                 debug!("parse_section_contents: Forcing forward progress.");
                 continue;
             }
-            tok_num_old = self.tok_num;
+            tok_idx_old = tok_idx_new;
             // When we find a close brace, we're done with section content
             if tinfo.tok == LexToken::CloseBrace {
                 self.parse_leaf(parent);
@@ -833,7 +1036,7 @@ impl<'toks> Ast<'toks> {
             if !parse_ok {
                 debug!(
                     "Ast::parse_section_contents: skipping to next ; starting from {}",
-                    self.tok_num
+                    self.tv.get_index()
                 );
                 // Consume the bad token and skip forward
                 self.advance_past_semicolon();
@@ -924,16 +1127,18 @@ impl<'toks> Ast<'toks> {
     ///   └── [<Identifier>] <- optional section or label name
     /// ```
     fn parse_pratt(&mut self, min_bp: u8, top: &mut Option<NodeId>, diags: &mut Diags) -> bool {
-        self.dbg_enter("parse_pratt");
-        debug!("Ast::parse_pratt: Min BP = {}", min_bp);
-        let Some(lhs_tinfo) = self.peek() else {
-            self.err_no_input(diags);
-            return self.dbg_exit_pratt("parse_pratt", &None, false);
-        };
+        debug!("Ast::parse_pratt: ENTER, Min BP = {}", min_bp);
+        debug_peek!("Ast::parse_pratt", self.tv);
+        let lhs_tinfo = self.tv.peek();
 
-        *top = None; // Initialize
+        *top = None; // Initialize our root node.
 
         match lhs_tinfo.tok {
+            LexToken::EOF => {
+                self.err_no_input(diags);
+                return self.dbg_exit_pratt("parse_pratt", &None, false);
+            }
+
             // Finding a close paren or a semi-colon terminates an expression.
             LexToken::CloseParen | LexToken::Semicolon => {
                 /* top will be None */
@@ -944,7 +1149,7 @@ impl<'toks> Ast<'toks> {
             // This is not an open paren associated with a built-in function.
             LexToken::OpenParen => {
                 // move past the open paren without storing in the AST.
-                self.tok_num += 1;
+                self.tv.skip();
                 // lhs is everything inside parentheses.
                 if !self.parse_pratt(0, top, diags) {
                     return self.dbg_exit_pratt("parse_pratt", &None, false);
@@ -957,8 +1162,8 @@ impl<'toks> Ast<'toks> {
 
             // These simple atoms end up as leaf nodes in the AST
             LexToken::QuotedString | LexToken::Integer | LexToken::I64 | LexToken::U64 => {
-                *top = Some(self.arena.new_node(self.tok_num));
-                self.tok_num += 1;
+                *top = Some(self.arena.new_node(self.tv.get_index()));
+                self.tv.skip();
             }
 
             // A namespace component like `custom::` signals the start of a namespaced path.
@@ -966,21 +1171,23 @@ impl<'toks> Ast<'toks> {
             // `(` follows the identifier, the parser aggregates the tokens into a generic
             // function invocation (e.g., `custom::foo(arg1, arg2)`).
             LexToken::Namespace => {
-                let ns_nid = self.arena.new_node(self.tok_num);
+                let ns_nid = self.arena.new_node(self.tv.get_index());
                 *top = Some(ns_nid);
-                self.tok_num += 1;
+                self.tv.skip();
 
                 // A namespace prefix must immediately be followed by an identifier.
-                let Some(next_tinfo) = self.peek() else {
+                debug_peek!("Ast::parse_pratt namespace", self.tv);
+                let next_tinfo = self.tv.peek();
+                if next_tinfo.tok == LexToken::EOF {
                     self.err_no_input(diags);
                     return self.dbg_exit_pratt("parse_pratt", &None, false);
-                };
+                }
 
                 // Add the trailing identifier as the first child of the namespace node.
                 if next_tinfo.tok == LexToken::Identifier {
-                    let id_nid = self.arena.new_node(self.tok_num);
-                    self.tok_num += 1;
+                    let id_nid = self.arena.new_node(self.tv.get_index());
                     ns_nid.append(id_nid, &mut self.arena);
+                    self.tv.skip();
                 } else {
                     diags.err1(
                         "AST_39",
@@ -991,43 +1198,107 @@ impl<'toks> Ast<'toks> {
                 }
 
                 // If an open parenthesis follows, we parse this as a function invocation.
-                if let Some(after_tinfo) = self.peek()
-                    && after_tinfo.tok == LexToken::OpenParen
-                {
-                    self.tok_num += 1; // consume '('
+                let after_tinfo = self.tv.peek();
+                if after_tinfo.tok == LexToken::OpenParen {
+                    self.tv.skip(); // consume '('
+                    let mut saw_named = false;
+                    let mut saw_positional = false;
 
                     loop {
-                        let Some(check_tinfo) = self.peek() else {
+                        debug_peek!("Ast::parse_pratt function call", self.tv);
+                        let check_tinfo = self.tv.peek();
+                        if check_tinfo.tok == LexToken::EOF {
                             self.err_no_input(diags);
                             return self.dbg_exit_pratt("parse_pratt", &None, false);
-                        };
+                        }
 
                         // A trailing close parenthesis indicates the end of the argument list.
                         if check_tinfo.tok == LexToken::CloseParen {
-                            self.tok_num += 1; // consume ')'
+                            self.tv.skip(); // consume ')'
                             break;
                         }
 
-                        // Recursively parse the next argument within the parenthesis.
-                        let mut arg_opt = None;
-                        if !self.parse_pratt(0, &mut arg_opt, diags) {
-                            return self.dbg_exit_pratt("parse_pratt", &None, false);
+                        // Named arg: Identifier immediately followed by Eq (not DoubleEq).
+                        let idx = self.tv.get_index();
+                        let is_named_arg = self.tv.peek().tok == LexToken::Identifier
+                            && self.tv.get(idx + 1).tok == LexToken::Eq;
+
+                        if is_named_arg {
+                            debug!("Ast::parse_pratt: Detected named argument syntax");
+                            saw_named = true;
+                            // Borrow name and loc from the identifier token, then advance.
+                            let param_name = self.tv.peek().val;
+                            let param_loc = self.tv.peek().loc.clone();
+                            self.tv.skip(); // consume Identifier
+                            self.tv.skip(); // consume Eq
+
+                            // Synthesize a NamedArg token and create a node for it.
+                            let named_tok_idx = self.tv.push_synthetic(TokenInfo {
+                                tok: LexToken::NamedArg,
+                                loc: param_loc.clone(),
+                                val: param_name,
+                            });
+                            let named_nid = self.arena.new_node(named_tok_idx);
+                            ns_nid.append(named_nid, &mut self.arena);
+
+                            // The AST now looks like this for a named argument:
+                            //   <namespace::extension_name>   <- ns_nid
+                            //   └── NamedArg                <- named_nid
+                            //
+                            // Parse the RHS expression as the sole child of the NamedArg node.
+                            let mut rhs_opt = None;
+                            if !self.parse_pratt(0, &mut rhs_opt, diags) {
+                                return self.dbg_exit_pratt("parse_pratt", &None, false);
+                            }
+                            if let Some(rhs_nid) = rhs_opt {
+                                // The RHS of a named argument becomes a child of the NamedArg node in the AST.
+                                // The AST now looks like this for a named argument:
+                                //   <namespace::extension_name>   <- ns_nid
+                                //   └── NamedArg                  <- named_nid
+                                //       └── <rhs expression>      <- rhs_nid
+                                named_nid.append(rhs_nid, &mut self.arena);
+                            } else {
+                                diags.err1(
+                                    "AST_41",
+                                    "Expected expression after '=' in named argument",
+                                    param_loc,
+                                );
+                                return self.dbg_exit_pratt("parse_pratt", &None, false);
+                            }
+                        } else {
+                            saw_positional = true;
+                            // Positional argument: parse the expression directly.
+                            let mut arg_opt = None;
+                            if !self.parse_pratt(0, &mut arg_opt, diags) {
+                                return self.dbg_exit_pratt("parse_pratt", &None, false);
+                            }
+                            if let Some(arg_nid) = arg_opt {
+                                ns_nid.append(arg_nid, &mut self.arena);
+                            }
                         }
-                        if let Some(arg_nid) = arg_opt {
-                            ns_nid.append(arg_nid, &mut self.arena);
+
+                        // Reject mixed positional and named arguments.
+                        if saw_named && saw_positional {
+                            diags.err1(
+                                "AST_40",
+                                "Cannot mix positional and named arguments in an extension call",
+                                self.tv.peek().loc.clone(),
+                            );
+                            return self.dbg_exit_pratt("parse_pratt", &None, false);
                         }
 
                         // Arguments must be separated by commas or terminated by a close parenthesis.
-                        let Some(delim_tinfo) = self.peek() else {
+                        let delim_tinfo = self.tv.peek();
+                        if delim_tinfo.tok == LexToken::EOF {
                             self.err_no_input(diags);
                             return self.dbg_exit_pratt("parse_pratt", &None, false);
-                        };
+                        }
 
                         let delim_tok = delim_tinfo.tok;
                         if delim_tok == LexToken::Comma {
-                            self.tok_num += 1; // consume ','
+                            self.tv.skip(); // consume ','
                         } else if delim_tok == LexToken::CloseParen {
-                            self.tok_num += 1; // consume ')'
+                            self.tv.skip(); // consume ')'
                             break;
                         } else {
                             diags.err1(
@@ -1048,48 +1319,96 @@ impl<'toks> Ast<'toks> {
             // AST stage, we parse all arguments without verifying function support. That
             // validation happens in later phases.
             LexToken::Identifier => {
-                let id_nid = self.arena.new_node(self.tok_num);
+                let id_nid = self.arena.new_node(self.tv.get_index());
                 *top = Some(id_nid);
-                self.tok_num += 1;
+                self.tv.skip();
 
                 // If an open parenthesis follows, we parse this as a function invocation.
-                if let Some(next_tinfo) = self.peek()
-                    && next_tinfo.tok == LexToken::OpenParen
-                {
-                    self.tok_num += 1; // consume '('
+                if self.tv.peek().tok == LexToken::OpenParen {
+                    self.tv.skip(); // consume '('
+                    let mut saw_named = false;
+                    let mut saw_positional = false;
 
                     loop {
-                        let Some(check_tinfo) = self.peek() else {
+                        let check_tinfo = self.tv.peek();
+                        if check_tinfo.tok == LexToken::EOF {
                             self.err_no_input(diags);
                             return self.dbg_exit_pratt("parse_pratt", &None, false);
-                        };
+                        }
 
                         // A trailing close parenthesis indicates the end of the argument list.
                         if check_tinfo.tok == LexToken::CloseParen {
-                            self.tok_num += 1; // consume ')'
+                            self.tv.skip(); // consume ')'
                             break;
                         }
 
-                        // Recursively parse the next argument within the parenthesis.
-                        let mut arg_opt = None;
-                        if !self.parse_pratt(0, &mut arg_opt, diags) {
-                            return self.dbg_exit_pratt("parse_pratt", &None, false);
+                        // Named arg: Identifier immediately followed by Eq (not DoubleEq).
+                        let idx = self.tv.get_index();
+                        let is_named_arg = self.tv.peek().tok == LexToken::Identifier
+                            && self.tv.get(idx + 1).tok == LexToken::Eq;
+
+                        if is_named_arg {
+                            saw_named = true;
+                            let param_name = self.tv.peek().val;
+                            let param_loc = self.tv.peek().loc.clone();
+                            self.tv.skip(); // consume Identifier
+                            self.tv.skip(); // consume Eq
+
+                            let named_tok_idx = self.tv.push_synthetic(TokenInfo {
+                                tok: LexToken::NamedArg,
+                                loc: param_loc.clone(),
+                                val: param_name,
+                            });
+                            let named_nid = self.arena.new_node(named_tok_idx);
+                            id_nid.append(named_nid, &mut self.arena);
+
+                            let mut rhs_opt = None;
+                            if !self.parse_pratt(0, &mut rhs_opt, diags) {
+                                return self.dbg_exit_pratt("parse_pratt", &None, false);
+                            }
+                            if let Some(rhs_nid) = rhs_opt {
+                                named_nid.append(rhs_nid, &mut self.arena);
+                            } else {
+                                diags.err1(
+                                    "AST_41",
+                                    "Expected expression after '=' in named argument",
+                                    param_loc,
+                                );
+                                return self.dbg_exit_pratt("parse_pratt", &None, false);
+                            }
+                        } else {
+                            saw_positional = true;
+                            let mut arg_opt = None;
+                            if !self.parse_pratt(0, &mut arg_opt, diags) {
+                                return self.dbg_exit_pratt("parse_pratt", &None, false);
+                            }
+                            if let Some(arg_nid) = arg_opt {
+                                id_nid.append(arg_nid, &mut self.arena);
+                            }
                         }
-                        if let Some(arg_nid) = arg_opt {
-                            id_nid.append(arg_nid, &mut self.arena);
+
+                        // Reject mixed positional and named arguments.
+                        if saw_named && saw_positional {
+                            diags.err1(
+                                "AST_40",
+                                "Cannot mix positional and named arguments in an extension call",
+                                self.tv.peek().loc.clone(),
+                            );
+                            return self.dbg_exit_pratt("parse_pratt", &None, false);
                         }
 
                         // Arguments must be separated by commas or terminated by a close parenthesis.
-                        let Some(delim_tinfo) = self.peek() else {
+                        let delim_tinfo = self.tv.peek();
+                        if delim_tinfo.tok == LexToken::EOF {
                             self.err_no_input(diags);
                             return self.dbg_exit_pratt("parse_pratt", &None, false);
-                        };
+                        }
 
                         let delim_tok = delim_tinfo.tok;
                         if delim_tok == LexToken::Comma {
-                            self.tok_num += 1; // consume ','
+                            self.tv.skip(); // consume ','
                         } else if delim_tok == LexToken::CloseParen {
-                            self.tok_num += 1; // consume ')'
+                            self.tv.skip(); // consume ')'
                             break;
                         } else {
                             diags.err1(
@@ -1107,8 +1426,8 @@ impl<'toks> Ast<'toks> {
             // ( [optional identifier] )
             LexToken::Addr | LexToken::AddrOffset | LexToken::SecOffset | LexToken::FileOffset => {
                 // Create the node for the function and move past
-                *top = Some(self.arena.new_node(self.tok_num));
-                self.tok_num += 1;
+                *top = Some(self.arena.new_node(self.tv.get_index()));
+                self.tv.skip();
 
                 if !self.expect_token_no_add(LexToken::OpenParen, diags) {
                     return self.dbg_exit_pratt("parse_pratt", &None, false);
@@ -1124,8 +1443,8 @@ impl<'toks> Ast<'toks> {
             // Build-in functions with a mandatory identifier inside parens
             // ( <identifier> )
             LexToken::Sizeof => {
-                *top = Some(self.arena.new_node(self.tok_num));
-                self.tok_num += 1;
+                *top = Some(self.arena.new_node(self.tv.get_index()));
+                self.tv.skip();
 
                 if !self.expect_token_no_add(LexToken::OpenParen, diags) {
                     return self.dbg_exit_pratt("parse_pratt", &None, false);
@@ -1172,8 +1491,8 @@ impl<'toks> Ast<'toks> {
             // Built-in functions with a non-optional expression inside parens
             // ( <expr> )
             LexToken::ToI64 | LexToken::ToU64 => {
-                *top = Some(self.arena.new_node(self.tok_num));
-                self.tok_num += 1;
+                *top = Some(self.arena.new_node(self.tv.get_index()));
+                self.tv.skip();
 
                 if !self.expect_token_no_add(LexToken::OpenParen, diags) {
                     return self.dbg_exit_pratt("parse_pratt", &None, false);
@@ -1193,8 +1512,8 @@ impl<'toks> Ast<'toks> {
             | LexToken::BuiltinVersionMajor
             | LexToken::BuiltinVersionMinor
             | LexToken::BuiltinVersionPatch => {
-                *top = Some(self.arena.new_node(self.tok_num));
-                self.tok_num += 1;
+                *top = Some(self.arena.new_node(self.tv.get_index()));
+                self.tv.skip();
             }
 
             _ => {
@@ -1212,9 +1531,10 @@ impl<'toks> Ast<'toks> {
         // Keep processing for the remaining right hand side of the expression.
         loop {
             // We expect an operation such as add, a semicolon, etc. or the end of input.
-            let Some(op_tinfo) = self.peek() else {
+            let op_tinfo = self.tv.peek();
+            if op_tinfo.tok == LexToken::EOF {
                 break; // end of input.
-            };
+            }
 
             // Filter disallowed operations.
             let tok = op_tinfo.tok;
@@ -1248,8 +1568,8 @@ impl<'toks> Ast<'toks> {
                 break;
             }
 
-            let op_nid = self.arena.new_node(self.tok_num);
-            self.tok_num += 1;
+            let op_nid = self.arena.new_node(self.tv.get_index());
+            self.tv.skip();
 
             // Attach the old top as a child of the operation,
             // then update the new top node
@@ -1305,10 +1625,8 @@ impl<'toks> Ast<'toks> {
                 print_nid.append(expr_nid, &mut self.arena);
 
                 // Omit the comma from the AST to reduce clutter.
-                if let Some(tinfo) = self.peek()
-                    && tinfo.tok == LexToken::Comma
-                {
-                    self.tok_num += 1;
+                if self.tv.peek().tok == LexToken::Comma {
+                    self.tv.skip();
                     continue;
                 }
 
@@ -1362,11 +1680,11 @@ impl<'toks> Ast<'toks> {
         // Add the section keyword as a child of the parent and advance
         let output_nid = self.add_to_parent_and_advance(parent);
 
-        // After 'output' a section identifier is expected
-        if self.expect_leaf(
+        // After 'output' a section identifier is expected.  expect_name_leaf also
+        // accepts keyword tokens so AstDb can emit the specific reserved-name error.
+        if self.expect_name_leaf(
             diags,
             output_nid,
-            LexToken::Identifier,
             "AST_7",
             "Expected a section name after output",
         ) {
@@ -1405,35 +1723,34 @@ impl<'toks> Ast<'toks> {
         // Add the const keyword as a child of the parent and advance
         let const_nid = self.add_to_parent_and_advance(parent);
 
-        // After 'const' an identifier is expected
-        if self.expect_leaf(
+        // After 'const' an identifier is expected.  expect_name_leaf also accepts
+        // keyword tokens so AstDb can emit the specific reserved-identifier error.
+        if self.expect_name_leaf(
             diags,
             const_nid,
-            LexToken::Identifier,
             "AST_8",
             "Expected an identifier after 'const'",
         ) {
             // After the identifier: either '=' (full definition) or ';' (declare-only).
-            if let Some(tinfo) = self.peek() {
-                if tinfo.tok == LexToken::Eq {
-                    // Full definition: const NAME = expr;
-                    if self.expect_token(LexToken::Eq, diags, const_nid)
-                        && self.expect_expr(const_nid, diags)
-                    {
-                        result = self.expect_semi(diags, const_nid);
-                    }
-                } else if tinfo.tok == LexToken::Semicolon {
-                    // Declare-only: const NAME;  (value assigned later in an if/else body)
-                    result = self.expect_semi(diags, const_nid);
-                } else {
-                    self.err_expected_after(
-                        diags,
-                        "AST_50",
-                        "Expected '=' or ';' after const identifier",
-                    );
-                }
-            } else {
+            let tinfo = self.tv.peek();
+            if tinfo.tok == LexToken::EOF {
                 self.err_no_input(diags);
+            } else if tinfo.tok == LexToken::Eq {
+                // Full definition: const NAME = expr;
+                if self.expect_token(LexToken::Eq, diags, const_nid)
+                    && self.expect_expr(const_nid, diags)
+                {
+                    result = self.expect_semi(diags, const_nid);
+                }
+            } else if tinfo.tok == LexToken::Semicolon {
+                // Declare-only: const NAME;  (value assigned later in an if/else body)
+                result = self.expect_semi(diags, const_nid);
+            } else {
+                self.err_expected_after(
+                    diags,
+                    "AST_50",
+                    "Expected '=' or ';' after const identifier",
+                );
             }
         }
         self.dbg_exit("parse_const", result)
@@ -1465,7 +1782,7 @@ impl<'toks> Ast<'toks> {
         }
 
         // Expect opening brace for then-body
-        let brace_toknum = self.tok_num;
+        let brace_toknum = self.tv.get_index();
         if !self.expect_leaf(
             diags,
             if_nid,
@@ -1480,35 +1797,33 @@ impl<'toks> Ast<'toks> {
         }
 
         // Check for optional else clause
-        let result = if let Some(tinfo) = self.peek() {
-            if tinfo.tok == LexToken::Else {
-                self.add_to_parent_and_advance(if_nid); // consume 'else', add as child
-                if let Some(next) = self.peek() {
-                    if next.tok == LexToken::If {
-                        // else if: parse nested if directly (no brace wrapper)
-                        self.parse_if_r(if_nid, diags, ctx)
-                    } else if next.tok == LexToken::OpenBrace {
-                        let else_brace = self.tok_num;
-                        self.add_to_parent_and_advance(if_nid); // consume '{'
-                        self.parse_if_body_r(if_nid, diags, else_brace, ctx)
-                    } else {
-                        self.err_expected_after(
-                            diags,
-                            "AST_52",
-                            "Expected '{' or 'if' after 'else'",
-                        );
-                        false
-                    }
-                } else {
-                    self.err_no_input(diags);
-                    false
-                }
-            } else {
-                true // no else clause
-            }
-        } else {
+        let tinfo = self.tv.peek();
+        let result = if tinfo.tok == LexToken::EOF {
             self.err_no_input(diags);
             false
+        } else if tinfo.tok == LexToken::Else {
+            self.add_to_parent_and_advance(if_nid); // consume 'else', add as child
+            let next = self.tv.peek();
+            if next.tok == LexToken::If {
+                // else if: parse nested if directly (no brace wrapper)
+                self.parse_if_r(if_nid, diags, ctx)
+            } else if next.tok == LexToken::OpenBrace {
+                let else_brace = self.tv.get_index();
+                self.add_to_parent_and_advance(if_nid); // consume '{'
+                self.parse_if_body_r(if_nid, diags, else_brace, ctx)
+            } else if next.tok == LexToken::EOF {
+                self.err_no_input(diags);
+                false
+            } else {
+                self.err_expected_after(
+                    diags,
+                    "AST_52",
+                    "Expected '{' or 'if' after 'else'",
+                );
+                false
+            }
+        } else {
+            true // no else clause
         };
 
         self.dbg_exit("parse_if", result)
@@ -1530,14 +1845,19 @@ impl<'toks> Ast<'toks> {
     ) -> bool {
         self.dbg_enter("parse_if_body");
         let mut result = true;
-        let mut tok_num_old = 0;
+        let mut tok_idx_old = 0;
 
-        while let Some(tinfo) = self.peek() {
-            if tok_num_old == self.tok_num {
-                self.tok_num += 1;
+        loop {
+            let tinfo = self.tv.peek();
+            if tinfo.tok == LexToken::EOF {
+                break;
+            }
+            let tok_idx_new = self.tv.get_index();
+            if tok_idx_old == tok_idx_new {
+                self.tv.skip();
                 continue;
             }
-            tok_num_old = self.tok_num;
+            tok_idx_old = tok_idx_new;
 
             if tinfo.tok == LexToken::CloseBrace {
                 self.parse_leaf(parent); // add '}' as child
@@ -1592,25 +1912,25 @@ impl<'toks> Ast<'toks> {
         self.dbg_enter("parse_deferred_assign");
 
         // Confirm the token after the identifier is '=' (not '==', which would be a comparison).
-        let next_tok = self.tv.get(self.tok_num + 1).map(|t| t.tok);
-        if next_tok != Some(LexToken::Eq) {
+        // Short-circuit guarantees idx+1 is in bounds: if current tok is Identifier, idx < eof_idx.
+        let idx = self.tv.get_index();
+        let next_tinfo = self.tv.get(idx + 1);
+        if next_tinfo.tok != LexToken::Eq {
+            let found = if next_tinfo.tok == LexToken::EOF { "<end of input>" } else { next_tinfo.val };
             let msg = format!(
                 "Expected '=' after identifier in deferred const assignment, found '{}'",
-                self.tv
-                    .get(self.tok_num + 1)
-                    .map(|t| t.val)
-                    .unwrap_or("<end of input>")
+                found
             );
-            diags.err1("AST_54", &msg, self.tv[self.tok_num].span());
+            diags.err1("AST_54", &msg, self.tv.peek().span());
             // We don't want the arbitrary chars in an unknown identifier to
             // propogate any further, so eat the identifier here.
-            self.tok_num += 1;
+            self.tv.skip();
             return self.dbg_exit("parse_deferred_assign", false);
         }
 
         // Create the identifier node without attaching it to a parent yet.
-        let ident_nid = self.arena.new_node(self.tok_num);
-        self.tok_num += 1;
+        let ident_nid = self.arena.new_node(self.tv.get_index());
+        self.tv.skip();
 
         // Create the Eq node as the statement root (attached to parent).
         let eq_nid = self.add_to_parent_and_advance(parent);
@@ -1630,14 +1950,14 @@ impl<'toks> Ast<'toks> {
     /// Adds the current token as a child of the parent and advances
     /// the token index.  The current token MUST BE VALID!
     fn parse_leaf(&mut self, parent: NodeId) {
-        let nid = self.arena.new_node(self.tok_num);
+        let nid = self.arena.new_node(self.tv.get_index());
         parent.append(nid, &mut self.arena);
-        self.tok_num += 1;
+        self.tv.skip();
     }
 
     pub fn get_tinfo(&self, nid: NodeId) -> &'toks TokenInfo<'_> {
         let tok_num = *self.arena[nid].get();
-        &self.tv[tok_num]
+        self.tv.get(tok_num)
     }
 
     /// Returns the root NodeId of the AST.

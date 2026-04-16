@@ -1,0 +1,6 @@
+// Positional call to brink::test_increment with an identifier that names no
+// known section.  IRDb rejects the unknown section reference with IRDB_54.
+section top {
+    wr brink::test_increment(nonexistent_section);
+}
+output top 0;

@@ -174,6 +174,7 @@ impl<'toks> LayoutDb {
                         src_loc: first_child_tinfo.loc.clone(),
                         tok: LexToken::Identifier,
                         sval: full_name,
+                        param_name: None,
                     });
 
                     let idx = lz.add_new_operand_to_ir(ir_lid, LinOperand::new_output(ir_lid, tinfo.loc.clone()));
@@ -233,6 +234,7 @@ impl<'toks> LayoutDb {
                         src_loc: tinfo.loc.clone(),
                         tok: LexToken::Integer,
                         sval: "0".to_string(),
+                        param_name: None,
                     });
                 }
                 lz.add_existing_operand_to_ir(wr8_lid, count_output);
@@ -290,6 +292,7 @@ impl<'toks> LayoutDb {
                     src_loc: tinfo.loc.clone(),
                     tok,
                     sval: name_without_colon,
+                    param_name: None,
                 });
             }
 
@@ -617,7 +620,7 @@ impl IdentDb {
         for &lop_num in &lir.operand_vec {
             let lop = &lindb.operand_vec[lop_num];
             // Output operands carry no identifier — only Literal operands need ref checks.
-            let LinOperand::Literal { tok, sval, src_loc } = lop else { continue; };
+            let LinOperand::Literal { tok, sval, src_loc, .. } = lop else { continue; };
             if *tok == LexToken::Identifier {
                 debug!(
                     "IdentDb::verify_identifier_refs: Verifying reference to '{}'",

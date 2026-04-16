@@ -14,7 +14,7 @@
 
 use anyhow::{Result, anyhow};
 use diags::{Diags, SourceSpan};
-use ext::{ExtArg, ExtensionRegistry};
+use ext::{ExtArg, ExtensionRegistry, ParamKind};
 use ir::{ConstBuiltins, DataType, IR, IRKind, ParameterValue};
 use irdb::IRDb;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -190,8 +190,8 @@ impl Engine {
     }
 
     /// Advances the location cursor by the fixed output size of an extension call.
-    /// ExtensionCall and ExtensionCallSection are write statements that reserve
-    /// space in the output image during the iterate phase.
+    /// ExtensionCall is the write statement that reserves space in the output image
+    /// during the iterate phase.
     fn iterate_ext(
         &mut self,
         ir: &IR,
@@ -1510,7 +1510,7 @@ impl Engine {
                     IRKind::SectionEnd => self.iterate_section_end(ir, irdb, diags, &mut current),
 
                     IRKind::Wr(_) => self.iterate_wrx(ir, irdb, diags, &mut current),
-                    IRKind::ExtensionCall | IRKind::ExtensionCallSection => {
+                    IRKind::ExtensionCall => {
                         self.iterate_ext(ir, &mut current, ext_registry, diags)
                     }
                     IRKind::Align => self.iterate_align(ir, irdb, diags, &current),
@@ -1982,7 +1982,7 @@ impl Engine {
                 | IRKind::ElseBegin
                 | IRKind::IfEnd
                 | IRKind::BareAssign => Ok(()),
-                IRKind::ExtensionCall | IRKind::ExtensionCallSection => {
+                IRKind::ExtensionCall => {
                     // Pre-pad zeroed bytes to expand the output file to cover
                     // the extension's output region before memory mapping.
                     let ext_name = self.parms[ir.operands[0]].to_identifier();
@@ -2031,10 +2031,7 @@ impl Engine {
         // decoupled from the core pipeline logic.
         let mut extension_nodes = Vec::new();
         for (idx, ir) in irdb.ir_vec.iter().enumerate() {
-            if matches!(
-                ir.kind,
-                IRKind::ExtensionCall | IRKind::ExtensionCallSection
-            ) {
+            if ir.kind == IRKind::ExtensionCall {
                 extension_nodes.push(idx);
             }
         }
@@ -2062,7 +2059,7 @@ impl Engine {
         };
 
         // Maps each section name to a list of indices into wr_dispatches.
-        // ExtensionCallSection uses the map to check for ambiguity and to
+        // ByteArray param resolution uses the map to check for ambiguity and to
         // resolve file_offset in O(1) instead of two linear scans per call.
         let mut sec_dispatch_map: HashMap<&str, Vec<usize>> = HashMap::new();
         for (i, d) in self.wr_dispatches.iter().enumerate() {
@@ -2082,94 +2079,157 @@ impl Engine {
 
             // Build the ExtArg list and call the extension.
             //
-            // ExtensionCall:
-            //   operands = [name, arg0..., output]
-            //   All user args map to ExtArg::Int or ExtArg::Str.
-            //
-            // ExtensionCallSection:
-            //   operands = [name, section_id, arg0..., output]
-            //   args[0] = ExtArg::Section resolved from wr_dispatches.
-            //   Remaining user args map to ExtArg::Int or ExtArg::Str.
+            // All extension calls use IRKind::ExtensionCall with operand layout:
+            //   [name, user_arg0..., output]
             //
             // The trailing output operand is a type-checking placeholder and
             // must not be passed to the extension.  last = len-1 excludes it.
             //
-            // ExtArg::Section holds &mmap[..], an immutable borrow.  The block
-            // scope below isolates that borrow so the borrow drops before the
-            // mutable mmap patch write at the end of each iteration.
+            // When the extension declares params() (cached_params non-empty), the
+            // engine resolves ByteArray-kinded params to ExtArg::Section and passes
+            // remaining params as ExtArg::Int or ExtArg::Str.  Operands arrive in
+            // declaration order (irdb canonicalized them).
+            //
+            // When cached_params is empty (legacy opt-out), the engine applies the
+            // old heuristic: if the first user arg is an Identifier that names a
+            // known section, resolve it to ExtArg::Section.
+            //
+            // ExtArg::Section holds &mmap[..], an immutable borrow.  Pre-resolve
+            // all section lookups before that scope so error handling can use `continue`.
             let last = ir.operands.len() - 1;
+            let cached_params = &entry.cached_params;
 
-            // For ExtensionCallSection, resolve the section before entering
-            // the borrow scope so error handling can use `continue`.
-            let section_info: Option<(u64, u64, usize, usize)> =
-                if ir.kind == IRKind::ExtensionCallSection {
-                    let sec_name = self.parms[ir.operands[1]].to_identifier();
-                    let indices =
-                        sec_dispatch_map.get(sec_name).map(Vec::as_slice).unwrap_or(&[]);
-                    if indices.len() > 1 {
-                        diags.err1(
-                            "EXEC_56",
-                            &format!(
-                                "Section '{}' appears {} times in the output; \
-                                 section-name form is ambiguous. Wrap with a unique \
-                                 section name or use `wr {}(section_name)` on a single \
-                                 occurrence.",
-                                sec_name,
-                                indices.len(),
-                                name,
-                            ),
-                            ir.src_loc.clone(),
-                        );
-                        error_count += 1;
-                        continue;
+            // Per-param section resolutions, indexed parallel to cached_params.
+            // Each entry is Some((file_offset, size, slice_start, slice_end)) for
+            // ByteArray params, or None for Int/Str params.
+            // For the legacy path a single entry covers user arg 0.
+            let mut resolved_sections: Vec<Option<(u64, u64, usize, usize)>> = Vec::new();
+            let mut section_resolve_failed = false;
+
+            if cached_params.is_empty() {
+                // Legacy heuristic: if user arg 0 is an Identifier matching a section,
+                // resolve it to ExtArg::Section.
+                if last > 1 {
+                    if let ParameterValue::Identifier(ref sec_name) = self.parms[ir.operands[1]] {
+                        let indices = sec_dispatch_map
+                            .get(sec_name.as_str())
+                            .map(Vec::as_slice)
+                            .unwrap_or(&[]);
+                        if indices.len() > 1 {
+                            diags.err1(
+                                "EXEC_56",
+                                &format!(
+                                    "Section '{}' appears {} times in the output; \
+                                     section-name form is ambiguous. Wrap with a unique \
+                                     section name or use `wr {}(section_name)` on a single \
+                                     occurrence.",
+                                    sec_name, indices.len(), name,
+                                ),
+                                ir.src_loc.clone(),
+                            );
+                            error_count += 1;
+                            section_resolve_failed = true;
+                        } else if let Some(&di) = indices.first() {
+                            let d = &self.wr_dispatches[di];
+                            let start = d.file_offset as usize;
+                            resolved_sections.push(Some((d.file_offset, d.size, start, start + d.size as usize)));
+                        } else {
+                            resolved_sections.push(None);
+                        }
+                    } else {
+                        resolved_sections.push(None);
                     }
-                    let Some(&dispatch_idx) = indices.first() else {
-                        return Err(anyhow!(
-                            "Extension '{}': section '{}' not found in dispatch table. \
-                             This is a compiler bug.",
-                            name,
-                            sec_name
-                        ));
-                    };
-                    let d = &self.wr_dispatches[dispatch_idx];
-                    let start = d.file_offset as usize;
-                    let end = start + d.size as usize;
-                    Some((d.file_offset, d.size, start, end))
-                } else {
-                    None
-                };
+                }
+            } else {
+                // Named-arg/positional path: resolve each ByteArray param.
+                // Operands arrive in declaration order after irdb canonicalization.
+                for (i, p) in cached_params.iter().enumerate() {
+                    if p.kind == ParamKind::ByteArray {
+                        let sec_name = self.parms[ir.operands[1 + i]].to_identifier().to_string();
+                        let indices = sec_dispatch_map
+                            .get(sec_name.as_str())
+                            .map(Vec::as_slice)
+                            .unwrap_or(&[]);
+                        if indices.len() > 1 {
+                            diags.err1(
+                                "EXEC_56",
+                                &format!(
+                                    "Extension '{}': section '{}' for parameter '{}' appears {} \
+                                     times in the output and is ambiguous.",
+                                    name, sec_name, p.name, indices.len(),
+                                ),
+                                ir.src_loc.clone(),
+                            );
+                            error_count += 1;
+                            section_resolve_failed = true;
+                            break;
+                        }
+                        let Some(&di) = indices.first() else {
+                            return Err(anyhow!(
+                                "Extension '{}': section '{}' for parameter '{}' not found \
+                                 in dispatch table. This is a compiler bug.",
+                                name, sec_name, p.name
+                            ));
+                        };
+                        let d = &self.wr_dispatches[di];
+                        let start = d.file_offset as usize;
+                        resolved_sections.push(Some((d.file_offset, d.size, start, start + d.size as usize)));
+                    } else {
+                        resolved_sections.push(None);
+                    }
+                }
+            }
+
+            if section_resolve_failed {
+                continue;
+            }
 
             // Build ext_args in a scope that isolates the immutable mmap borrow
             // held by ExtArg::Section.  The scope produces only an owned Vec<u8>,
-            // so the borrow is fully released before the mutable patch write below.
+            // so the borrow drops before the mutable patch write below.
             let exec_result: Result<Vec<u8>, String> = {
                 let mut ext_args: Vec<ExtArg<'_>> = Vec::new();
-                let user_arg_start =
-                    if let Some((file_offset, len, start, end)) = section_info {
-                        ext_args.push(ExtArg::Section {
-                            start: file_offset,
-                            len,
-                            data: &mmap[start..end],
-                        });
+
+                if cached_params.is_empty() {
+                    // Legacy path: section at user arg 0 (if any), then remaining args.
+                    let user_arg_start = if let Some(Some((file_offset, len, start, end))) =
+                        resolved_sections.first().copied()
+                    {
+                        ext_args.push(ExtArg::Section { start: file_offset, len, data: &mmap[start..end] });
                         2
                     } else {
                         1
                     };
-                for &op in &ir.operands[user_arg_start..last] {
-                    let parm = &self.parms[op];
-                    let arg = match parm {
-                        ParameterValue::U64(v) => ExtArg::Int(*v),
-                        ParameterValue::I64(v) | ParameterValue::Integer(v) => {
-                            ExtArg::Int(*v as u64)
+                    for &op in &ir.operands[user_arg_start..last] {
+                        let parm = &self.parms[op];
+                        let arg = match parm {
+                            ParameterValue::U64(v) => ExtArg::Int(*v),
+                            ParameterValue::I64(v) | ParameterValue::Integer(v) => ExtArg::Int(*v as u64),
+                            ParameterValue::QuotedString(s) => ExtArg::Str(s.as_str()),
+                            _ => unreachable!("unexpected extension arg type {:?}", parm.data_type()),
+                        };
+                        ext_args.push(arg);
+                    }
+                } else {
+                    // Named-arg/positional path: build args from declared params in order.
+                    for (i, p) in cached_params.iter().enumerate() {
+                        if p.kind == ParamKind::ByteArray {
+                            if let Some((file_offset, len, start, end)) = resolved_sections[i] {
+                                ext_args.push(ExtArg::Section { start: file_offset, len, data: &mmap[start..end] });
+                            }
+                        } else {
+                            let parm = &self.parms[ir.operands[1 + i]];
+                            let arg = match parm {
+                                ParameterValue::U64(v) => ExtArg::Int(*v),
+                                ParameterValue::I64(v) | ParameterValue::Integer(v) => ExtArg::Int(*v as u64),
+                                ParameterValue::QuotedString(s) => ExtArg::Str(s.as_str()),
+                                _ => unreachable!("unexpected extension arg type {:?}", parm.data_type()),
+                            };
+                            ext_args.push(arg);
                         }
-                        ParameterValue::QuotedString(s) => ExtArg::Str(s.as_str()),
-                        _ => unreachable!(
-                            "unexpected extension arg type {:?}",
-                            parm.data_type()
-                        ),
-                    };
-                    ext_args.push(arg);
+                    }
                 }
+
                 let mut out = vec![0u8; byte_width];
                 entry.extension.execute(&ext_args, &mut out).map(|_| out)
             };

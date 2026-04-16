@@ -8,7 +8,7 @@
 //
 // Output: 16 bytes, standard MD5 byte order.
 
-use brink_extension::{BrinkExtension, ExtArg};
+use brink_extension::{BrinkExtension, ExtArg, ParamDesc, ParamKind};
 use ext::ExtensionRegistry;
 use md5::{Digest, Md5};
 
@@ -21,6 +21,10 @@ impl BrinkExtension for Md5Ext {
 
     fn size(&self) -> usize {
         16
+    }
+
+    fn params(&self) -> &[ParamDesc] {
+        &[ParamDesc { name: "data", kind: ParamKind::ByteArray }]
     }
 
     fn execute<'a>(&self, args: &[ExtArg<'a>], out_buffer: &mut [u8]) -> Result<(), String> {

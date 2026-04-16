@@ -7,7 +7,7 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'brink'",
+            "name": "Debug executable 'brink' named_arg_crc",
             "cargo": {
                 "args": [
                     "build",
@@ -23,7 +23,7 @@
                      "-v",
                      "-v",
                      "-v",
-                     "${workspaceFolder}/tests/align_1.brink"],
+                     "${workspaceFolder}/tests/named_arg_crc.brink"],
         },
         {
             "type": "lldb",

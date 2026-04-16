@@ -1,0 +1,7 @@
+// Named arguments to brink::test_sum8 supplied in reverse declaration order.
+// h=8, g=7, ... a=1 must be reordered to (a=1, b=2, ... h=8) before execute.
+// Expected output: sum(1..8) = 36 as little-endian u64 = 0x24 followed by seven 0x00.
+section top {
+    wr brink::test_sum8(h=8, g=7, f=6, e=5, d=4, c=3, b=2, a=1);
+}
+output top 0;

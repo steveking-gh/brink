@@ -659,7 +659,7 @@ impl<'toks> ConstIR {
         }
 
         // Literal operands: evaluate directly from tok and sval.
-        let LinOperand::Literal { tok, sval, src_loc } = lop else {
+        let LinOperand::Literal { tok, sval, src_loc, .. } = lop else {
             unreachable!()
         };
         let sval = sval.clone();

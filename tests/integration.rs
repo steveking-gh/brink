@@ -2591,12 +2591,109 @@ mod tests {
         assert_brink_failure("tests/irdb_44_unknown_sizeof_ext.brink", &["[IRDB_44]"]);
     }
 
-    /// A ranged extension called with a string as the first argument passes IRDb
-    /// (strings are allowed as extension args) but the extension rejects it at
-    /// runtime with EXEC_47 because it expects ExtArg::Section in args[0].
+    /// A ByteArray-kinded extension parameter receives a quoted string instead of a
+    /// section name.  IRDb rejects the call with IRDB_52.
     #[test]
     fn irdb_46_ranged_ext_bad_range() {
-        assert_brink_failure("tests/irdb_46_ranged_ext_bad_range.brink", &["[EXEC_47]"]);
+        assert_brink_failure("tests/irdb_46_ranged_ext_bad_range.brink", &["[IRDB_52]"]);
+    }
+
+    // ── Named extension arguments ─────────────────────────────────────────────
+
+    /// Named Int argument: brink::test_crc(value=42) encodes 42 as big-endian u32.
+    /// Expected output: 0x00 0x00 0x00 0x2A.
+    #[test]
+    fn named_arg_crc() {
+        let out = "tests_named_arg_crc.brink.bin";
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/named_arg_crc.brink")
+            .arg("-o").arg(out)
+            .assert()
+            .success();
+        let bytes = fs::read(out).expect("output file missing");
+        assert_eq!(bytes, vec![0x00, 0x00, 0x00, 0x2A], "42 must encode as big-endian u32");
+        fs::remove_file(out).ok();
+    }
+
+    /// Named ByteArray argument to brink::test_increment.
+    /// data=top passes the top section slice; execute appends each byte + 1.
+    /// Expected output: 32 bytes -- 0x00-0x0F then 0x01-0x10.
+    #[test]
+    fn named_arg_section() {
+        let out = "tests_named_arg_section.brink.bin";
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/named_arg_section.brink")
+            .arg("-o").arg(out)
+            .assert()
+            .success();
+        let bytes = fs::read(out).expect("output file missing");
+        assert_eq!(bytes.len(), 32, "expected 32 bytes total");
+        for i in 0..16usize {
+            assert_eq!(bytes[i], i as u8, "data byte {i} mismatch");
+            assert_eq!(bytes[16 + i], (i as u8).wrapping_add(1), "incremented byte {i} mismatch");
+        }
+        fs::remove_file(out).ok();
+    }
+
+    /// Named arguments supplied in reverse declaration order.
+    /// h=8, g=7, ... a=1 must be reordered to (a..h) before execute.
+    /// Expected output: sum(1..8) = 36 as little-endian u64.
+    #[test]
+    fn named_arg_sum8_reorder() {
+        let out = "tests_named_arg_sum8_reorder.brink.bin";
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/named_arg_sum8_reorder.brink")
+            .arg("-o").arg(out)
+            .assert()
+            .success();
+        let bytes = fs::read(out).expect("output file missing");
+        assert_eq!(bytes, vec![36u8, 0, 0, 0, 0, 0, 0, 0], "sum of 1..8 must be 36 in little-endian u64");
+        fs::remove_file(out).ok();
+    }
+
+    /// Mixed positional and named arguments in one call: AST rejects with AST_40.
+    #[test]
+    fn ast_40_mixed_args() {
+        assert_brink_failure("tests/ast_40_mixed_args.brink", &["[AST_40]"]);
+    }
+
+    /// Named argument with no value after '=': AST rejects with AST_41.
+    #[test]
+    fn ast_41_empty_rhs() {
+        assert_brink_failure("tests/ast_41_empty_rhs.brink", &["[AST_41]"]);
+    }
+
+    /// Named argument with an unrecognized parameter name: IRDb rejects with IRDB_48.
+    #[test]
+    fn irdb_48_unknown_param() {
+        assert_brink_failure("tests/irdb_48_unknown_param.brink", &["[IRDB_48]"]);
+    }
+
+    /// The same named parameter appears twice in one call: IRDb rejects with IRDB_49.
+    #[test]
+    fn irdb_49_dup_param() {
+        assert_brink_failure("tests/irdb_49_dup_param.brink", &["[IRDB_49]"]);
+    }
+
+    /// Named-arg call missing required parameters: IRDb emits IRDB_51 for each absent param.
+    #[test]
+    fn irdb_51_missing_param() {
+        assert_brink_failure("tests/irdb_51_missing_param.brink", &["[IRDB_51]"]);
+    }
+
+    /// Positional call with wrong argument count: IRDb rejects with IRDB_53.
+    #[test]
+    fn irdb_53_positional_count() {
+        assert_brink_failure("tests/irdb_53_positional_count.brink", &["[IRDB_53]"]);
+    }
+
+    /// Positional ByteArray argument names a section that does not exist: IRDb rejects with IRDB_54.
+    #[test]
+    fn irdb_54_unknown_section() {
+        assert_brink_failure("tests/irdb_54_unknown_section.brink", &["[IRDB_54]"]);
     }
 
     /// IRDB_15: wr repeat-count operand is a quoted string, not a numeric value.

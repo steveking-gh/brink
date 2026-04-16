@@ -56,12 +56,10 @@ pub enum IRKind {
     /// Bare assignment inside an if/else body: `NAME = expr;`
     /// Operands: [name_identifier, rhs_expr_output]
     BareAssign,
-    /// Operands: [name, arg0...]
+    /// Operands: [name, arg0..., output]
+    /// All extension calls use this form.  The engine resolves ByteArray-kinded
+    /// params to ExtArg::Section by consulting cached_params in the registry.
     ExtensionCall,
-    /// Operands: [name, section_id, arg0...]
-    /// section_id is an Identifier matching a known section; the engine resolves
-    /// (file_offset, size) from wr_dispatches at runtime.
-    ExtensionCallSection,
     GEq,
     Gt,
     I64,
@@ -212,6 +210,9 @@ pub struct IROperand {
     /// is parsed from the source literal; for output placeholders it is
     /// initialized to a zero-equivalent and overwritten during execution.
     pub val: ParameterValue,
+    /// Named-argument parameter name from the call site, if the caller used
+    /// `name=value` syntax.  None for positional arguments.
+    pub param_name: Option<String>,
 }
 
 impl IROperand {
@@ -229,6 +230,7 @@ impl IROperand {
                 src_loc: src_loc.clone(),
                 is_immediate,
                 val,
+                param_name: None,
             });
         }
 

@@ -34,12 +34,18 @@ pub enum LinOperand {
         tok: LexToken,
         /// Token text as parsed from source.
         sval: String,
+        /// Named-argument parameter name, if the call site used `name=value` syntax.
+        /// None for positional arguments.
+        param_name: Option<String>,
     },
     Output {
         /// Source location for diagnostics.
         src_loc: SourceSpan,
         /// Index of this output in the owning Linearizer's ir_vec.
         ir_lid: usize,
+        /// Named-argument parameter name, if the call site used `name=value` syntax.
+        /// None for positional arguments and for the output placeholder of an expression.
+        param_name: Option<String>,
     },
 }
 
@@ -51,6 +57,7 @@ impl LinOperand {
             src_loc: tinfo.loc.clone(),
             sval: tinfo.val.to_string(),
             tok: tinfo.tok,
+            param_name: None,
         }
     }
 
@@ -62,6 +69,23 @@ impl LinOperand {
         LinOperand::Output {
             src_loc,
             ir_lid,
+            param_name: None,
+        }
+    }
+
+    /// Tag this operand with a named-argument parameter name.
+    pub fn set_param_name(&mut self, name: String) {
+        match self {
+            LinOperand::Literal { param_name, .. } => *param_name = Some(name),
+            LinOperand::Output { param_name, .. } => *param_name = Some(name),
+        }
+    }
+
+    /// Return the named-argument parameter name, if any.
+    pub fn param_name(&self) -> Option<&str> {
+        match self {
+            LinOperand::Literal { param_name, .. } => param_name.as_deref(),
+            LinOperand::Output { param_name, .. } => param_name.as_deref(),
         }
     }
 }
@@ -392,6 +416,7 @@ impl Linearizer {
                     src_loc: tinfo.loc.clone(),
                     tok: LexToken::Identifier,
                     sval: extension_name,
+                    param_name: None,
                 });
 
                 let mut lops = Vec::new();
@@ -477,6 +502,7 @@ impl Linearizer {
                         src_loc: first_child_tinfo.loc.clone(),
                         tok: LexToken::Identifier,
                         sval: full_name,
+                        param_name: None,
                     });
                     let idx =
                         self.add_new_operand_to_ir(ir_lid, LinOperand::new_output(ir_lid, tinfo.loc.clone()));
@@ -511,6 +537,21 @@ impl Linearizer {
             | LexToken::CloseParen
             | LexToken::OpenBrace
             | LexToken::CloseBrace => {}
+
+            // ── Named argument: name=expr ─────────────────────────────────
+            // A NamedArg node (synthesized by the parser) wraps one RHS expression
+            // child.  Lower the child normally, then tag the resulting operand(s)
+            // with the parameter name so IRDb can reorder to declaration order.
+            LexToken::NamedArg => {
+                let param_name = tinfo.val.to_string();
+                let before = returned_operands.len();
+                let child = ast.children(parent_nid).next().unwrap();
+                result &= self.record_expr_r(rdepth + 1, child, returned_operands, diags, ast);
+                // Tag every operand added for this arg with the parameter name.
+                for idx in &returned_operands[before..] {
+                    self.operand_vec[*idx].set_param_name(param_name.clone());
+                }
+            }
 
             // ── Anything else is a bug: statement tokens must not reach here
             _ => {

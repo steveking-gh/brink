@@ -14,12 +14,11 @@
 use diags::Diags;
 use diags::SourceSpan;
 use layoutdb::LayoutDb;
-use linearizer::{LinIR, LinOperand};
 
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
 
-use ext::ExtensionRegistry;
+use ext::{ExtensionRegistry, ParamKind};
 use ir::{DataType, IR, IRKind, IROperand, ParameterValue};
 use parse_int::parse;
 use std::{
@@ -100,8 +99,7 @@ impl IRDb {
                 let lin_ir = &lin_db.ir_vec[*ir_lid];
                 match lin_ir.op {
                     // Extension call output: rejects use in arithmetic, wr8..64, wrs, const.
-                    IRKind::ExtensionCall
-                    | IRKind::ExtensionCallSection => return Some(DataType::Extension),
+                    IRKind::ExtensionCall => return Some(DataType::Extension),
 
                     // Arithmetic and bitwise ops: output type matches input types.
                     IRKind::Add
@@ -226,6 +224,7 @@ impl IRDb {
                 tok: ast::LexToken::Identifier,
                 sval,
                 src_loc,
+                param_name,
             } = lop
                 && let Some(const_val) = self.symbol_table.get(sval.as_str()).cloned()
             {
@@ -235,6 +234,7 @@ impl IRDb {
                     src_loc: src_loc.clone(),
                     is_immediate: true,
                     val: const_val,
+                    param_name: param_name.clone(),
                 });
                 continue;
             }
@@ -247,18 +247,19 @@ impl IRDb {
 
             // Destructure fields needed by IROperand::new.  Output operands carry no
             // sval (the engine initializes their value at execution time), so pass "".
-            let (ir_lid, sval, src_loc, is_immediate) = match lop {
-                linearizer::LinOperand::Literal { sval, src_loc, .. } => {
-                    (None, sval.as_str(), src_loc, true)
+            let (ir_lid, sval, src_loc, is_immediate, param_name) = match lop {
+                linearizer::LinOperand::Literal { sval, src_loc, param_name, .. } => {
+                    (None, sval.as_str(), src_loc, true, param_name.clone())
                 }
-                linearizer::LinOperand::Output { ir_lid, src_loc } => {
-                    (Some(*ir_lid), "", src_loc, false)
+                linearizer::LinOperand::Output { ir_lid, src_loc, param_name } => {
+                    (Some(*ir_lid), "", src_loc, false, param_name.clone())
                 }
             };
 
             // Convert the string literal to a typed value; fails on malformed input.
             let opnd = IROperand::new(ir_lid, sval, src_loc, data_type, is_immediate, diags);
-            if let Some(opnd) = opnd {
+            if let Some(mut opnd) = opnd {
+                opnd.param_name = param_name;
                 self.parms.push(opnd);
             } else {
                 // keep processing to return more type conversion errors, if any
@@ -407,9 +408,9 @@ impl IRDb {
     }
 
     /// Validates that every extension user argument in the given operand
-    /// index range is a value type (numeric or quoted string).  Identifiers
-    /// and other non-value types (e.g. Extension outputs) are rejected with
-    /// IRDB_47 because the engine cannot convert them to ExtArg.
+    /// index range is a value type (numeric, string, or section-name identifier).
+    /// Extension outputs and unknown types are rejected with IRDB_47 because
+    /// the engine cannot convert them to ExtArg.
     fn validate_ext_user_args(
         &self,
         ir: &IR,
@@ -422,10 +423,15 @@ impl IRDb {
             let dt = opnd.val.data_type();
             if !matches!(
                 dt,
-                DataType::U64 | DataType::I64 | DataType::Integer | DataType::QuotedString
+                DataType::U64
+                | DataType::I64
+                | DataType::Integer
+                | DataType::QuotedString
+                // Identifier section names resolve to ExtArg::Section at engine time.
+                | DataType::Identifier
             ) {
                 let m = format!(
-                    "Extension '{}': argument {} must be a numeric or string expression, got {:?}",
+                    "Extension '{}': argument {} must be a numeric, string, or section-name expression, got {:?}",
                     ext_name, opnd_pos, dt
                 );
                 diags.err2("IRDB_47", &m, ir.src_loc.clone(), opnd.src_loc.clone());
@@ -440,7 +446,7 @@ impl IRDb {
         ir: &IR,
         diags: &mut Diags,
         ext_registry: &ExtensionRegistry,
-        section_names: &HashSet<String>,
+        _section_names: &HashSet<String>,
     ) -> bool {
         match ir.kind {
             IRKind::Align | IRKind::SetSecOffset | IRKind::SetAddrOffset | IRKind::SetAddr | IRKind::SetFileOffset | IRKind::Wr(_) => {
@@ -463,33 +469,6 @@ impl IRDb {
                 // User args: operands[1..last] (operands[0]=name, operands[last]=output).
                 let last = ir.operands.len() - 1;
                 self.validate_ext_user_args(ir, 1..last, name, diags)
-            }
-            IRKind::ExtensionCallSection => {
-                let name = self.get_opnd_as_identifier(ir, 0);
-                // disambiguate_extension_call only produces ExtensionCallSection for
-                // extensions confirmed present in the registry.  Unknown names cause
-                // ExtensionCall and trigger IRDB_40 instead.
-                assert!(ext_registry.get(name).is_some(), "ExtensionCallSection with unknown extension '{name}'");
-                // Need at least [name, section_id, output] = 3 operands.
-                assert!(
-                    ir.operands.len() >= 3,
-                    "ExtensionCallSection must have at least 3 operands"
-                );
-                // operands[1] must be an Identifier matching a known section.
-                // disambiguate_extension_call only emits ExtensionCallSection when the
-                // first user arg is a Literal{Identifier} contained in section_names.
-                // AST_31 prevents const/section name collisions, so process_lin_operands
-                // cannot substitute it away.  This arm is structurally always Identifier.
-                let sec_opnd = &self.parms[ir.operands[1]];
-                let ParameterValue::Identifier(ref sec_name) = sec_opnd.val else {
-                    unreachable!("ExtensionCallSection operand[1] must be a section Identifier")
-                };
-                // disambiguate_extension_call only emits ExtensionCallSection when
-                // section_names.contains(sval) is already true.
-                assert!(section_names.contains(sec_name.as_str()), "ExtensionCallSection section '{sec_name}' not in section_names");
-                // User args follow the section operand: operands[2..last].
-                let last = ir.operands.len() - 1;
-                self.validate_ext_user_args(ir, 2..last, name, diags)
             }
             IRKind::SizeofExt => {
                 let name = self.get_opnd_as_identifier(ir, 0);
@@ -552,6 +531,161 @@ impl IRDb {
         }
     }
 
+    /// Emits IRDB_52: a ByteArray parameter received a value expression instead of a section name.
+    /// Centralizes the error code so the uniqueness check finds exactly one occurrence.
+    fn err_bytearray_needs_section(
+        ir: &IR,
+        param_name: &str,
+        opnd: &IROperand,
+        ext_name: &str,
+        diags: &mut Diags,
+    ) {
+        let m = format!(
+            "Extension '{}': parameter '{}' has kind ByteArray and requires a section name, \
+             not a value expression",
+            ext_name, param_name
+        );
+        diags.err2("IRDB_52", &m, ir.src_loc.clone(), opnd.src_loc.clone());
+    }
+
+    /// Validates and canonicalizes named/positional arguments for one ExtensionCall IR.
+    ///
+    /// When the extension declares params() and the call site uses named args:
+    ///   - Validates every arg name against params() (IRDB_48).
+    ///   - Rejects duplicate names (IRDB_49).
+    ///   - Rejects missing required params (IRDB_51).
+    ///   - Rejects ByteArray params that received a non-Identifier value (IRDB_52).
+    ///   - Reorders ir.operands[1..last] to declaration order.
+    ///
+    /// When the extension declares params() and the call site uses positional args:
+    ///   - Validates argument count matches params() length (IRDB_53).
+    ///
+    /// When the extension returns an empty params() slice (legacy opt-out):
+    ///   - No validation beyond what validate_operands already performs.
+    ///   - The engine applies the first-Identifier-is-section heuristic.
+    fn resolve_named_ext_args(
+        &self,
+        ir: &mut IR,
+        ext_registry: &ExtensionRegistry,
+        section_names: &HashSet<String>,
+        diags: &mut Diags,
+    ) -> bool {
+        let name = self.get_opnd_as_identifier(ir, 0);
+        let Some(entry) = ext_registry.get(name) else {
+            return true; // Unknown extension; validate_operands fires IRDB_40.
+        };
+        let params = &entry.cached_params;
+
+        // operands layout: [name, user_arg0..., output]
+        // last = index of the trailing output operand
+        let last = ir.operands.len() - 1;
+        let user_count = last - 1; // operands[1..last]
+
+        if params.is_empty() {
+            // Legacy path: no named-arg enforcement.  Engine heuristic applies.
+            return true;
+        }
+
+        // Detect whether any user arg carries a param_name (named-args mode).
+        let any_named = (1..last).any(|i| self.parms[ir.operands[i]].param_name.is_some());
+
+        if any_named {
+            // Named-args mode: resolve, validate, and reorder to declaration order.
+            let mut name_to_opnd_idx: HashMap<&str, usize> = HashMap::new();
+            for i in 1..last {
+                let opnd_idx = ir.operands[i];
+                let opnd = &self.parms[opnd_idx];
+                let param_name = match &opnd.param_name {
+                    Some(n) => n.as_str(),
+                    None => continue, // AST_40 would have caught mixing; skip stray positional.
+                };
+                // IRDB_48: unknown param name.
+                if !params.iter().any(|p| p.name == param_name) {
+                    let m = format!(
+                        "Extension '{}': unknown parameter name '{}'",
+                        name, param_name
+                    );
+                    diags.err2("IRDB_48", &m, ir.src_loc.clone(), opnd.src_loc.clone());
+                    return false;
+                }
+                // IRDB_49: duplicate name.
+                if name_to_opnd_idx.contains_key(param_name) {
+                    let m = format!(
+                        "Extension '{}': duplicate parameter name '{}'",
+                        name, param_name
+                    );
+                    diags.err2("IRDB_49", &m, ir.src_loc.clone(), opnd.src_loc.clone());
+                    return false;
+                }
+                name_to_opnd_idx.insert(param_name, opnd_idx);
+            }
+
+            // IRDB_51: every declared param must be present.
+            for p in params.iter() {
+                if !name_to_opnd_idx.contains_key(p.name) {
+                    let m = format!(
+                        "Extension '{}': missing required parameter '{}'",
+                        name, p.name
+                    );
+                    diags.err1("IRDB_51", &m, ir.src_loc.clone());
+                    return false;
+                }
+            }
+
+            // IRDB_52: ByteArray params must receive an Identifier (section name).
+            for p in params.iter() {
+                if p.kind == ParamKind::ByteArray {
+                    let opnd_idx = name_to_opnd_idx[p.name];
+                    let opnd = &self.parms[opnd_idx];
+                    if !matches!(opnd.val, ParameterValue::Identifier(_)) {
+                        Self::err_bytearray_needs_section(ir, p.name, opnd, name, diags);
+                        return false;
+                    }
+                }
+            }
+
+            // Reorder user-arg operand slots to declaration order.
+            for (i, p) in params.iter().enumerate() {
+                ir.operands[1 + i] = name_to_opnd_idx[p.name];
+            }
+        } else {
+            // Positional mode with params declared: validate count (IRDB_53).
+            if user_count != params.len() {
+                let m = format!(
+                    "Extension '{}': expected {} argument(s), got {}",
+                    name,
+                    params.len(),
+                    user_count
+                );
+                diags.err1("IRDB_53", &m, ir.src_loc.clone());
+                return false;
+            }
+            // Validate ByteArray positional params received an Identifier (section name).
+            for (i, p) in params.iter().enumerate() {
+                if p.kind == ParamKind::ByteArray {
+                    let opnd = &self.parms[ir.operands[1 + i]];
+                    if !matches!(opnd.val, ParameterValue::Identifier(_)) {
+                        // IRDB_52: value expression where a section name is required.
+                        Self::err_bytearray_needs_section(ir, p.name, opnd, name, diags);
+                        return false;
+                    }
+                    // IRDB_54: the identifier does not name a known section.
+                    let ParameterValue::Identifier(ref sec_name) = opnd.val else { unreachable!() };
+                    if !section_names.contains(sec_name.as_str()) {
+                        let m = format!(
+                            "Extension '{}': parameter '{}' names an unknown section '{}'",
+                            name, p.name, sec_name
+                        );
+                        diags.err2("IRDB_54", &m, ir.src_loc.clone(), opnd.src_loc.clone());
+                        return false;
+                    }
+                }
+            }
+        }
+
+        true
+    }
+
     /// Convert the linear IR to real IR.  Conversion from Linear IR to real IR can fail,
     /// which is a hassle we don't want to deal with during linearization of the AST.
     fn process_linear_ir(
@@ -567,23 +701,25 @@ impl IRDb {
 
         let mut result = true;
         for lir in &lin_db.ir_vec {
-            // Disambiguate ExtensionCall into the specific form before building the IR.
-            // All extension calls arrive from LinearDB as IRKind::ExtensionCall; we
-            // refine that here using the registry and section name set.
-            let kind = if lir.op == IRKind::ExtensionCall {
-                self.disambiguate_extension_call(lir, lin_db, ext_registry, section_names)
-            } else {
-                lir.op
-            };
-
-            let ir = IR {
-                kind,
+            let mut ir = IR {
+                kind: lir.op,
                 operands: lir.operand_vec.clone(),
                 src_loc: lir.src_loc.clone(),
             };
+
+            // For extension calls, resolve named args and reorder operands to declaration
+            // order before validation.  Positional calls with params() declared also have
+            // their argument count checked here.
+            if ir.kind == IRKind::ExtensionCall
+                && !self.resolve_named_ext_args(&mut ir, ext_registry, section_names, diags)
+            {
+                result = false;
+                continue;
+            }
+
             let ir_num = self.ir_vec.len();
             if self.validate_operands(&ir, diags, ext_registry, section_names) {
-                match kind {
+                match ir.kind {
                     IRKind::Label => {
                         // create the addressable entry and set the IR number
                         let name = self.get_opnd_as_identifier(&ir, 0).to_string();
@@ -613,55 +749,6 @@ impl IRDb {
             }
         }
         result
-    }
-
-    /// Determines the specific IR kind for an ExtensionCall node.
-    ///
-    /// LinearDB emits `ExtensionCall` for all extension invocations.  This
-    /// method inspects the first user argument to select the appropriate kind:
-    ///
-    /// - Extension not found → `ExtensionCall` (IRDB_40 fires in validate_operands)
-    /// - First user arg is an identifier matching a known section → `ExtensionCallSection`
-    /// - All other cases → `ExtensionCall`
-    fn disambiguate_extension_call(
-        &self,
-        lir: &LinIR,
-        lin_db: &LayoutDb,
-        ext_registry: &ExtensionRegistry,
-        section_names: &HashSet<String>,
-    ) -> IRKind {
-        // operands layout: [name, user_arg0, ..., output]
-        // At least 2 operands (name + output) always present; user args are in between.
-        let has_user_args = lir.operand_vec.len() > 2;
-
-        // Resolve the extension name from the name operand (always operands[0]).
-        let name_op = &lin_db.operand_vec[lir.operand_vec[0]];
-        let LinOperand::Literal {
-            sval: name_sval, ..
-        } = name_op
-        else {
-            panic!("Extension call name operand must be a Literal");
-        };
-        if ext_registry.get(name_sval).is_none() {
-            return IRKind::ExtensionCall; // validate_operands will emit IRDB_40
-        }
-
-        // Check whether the first user arg is a section name.  When it is,
-        // the engine resolves it to ExtArg::Section at execute time.
-        if has_user_args {
-            let first_user_lop = &lin_db.operand_vec[lir.operand_vec[1]];
-            if let LinOperand::Literal {
-                tok: ast::LexToken::Identifier,
-                sval,
-                ..
-            } = first_user_lop
-                && section_names.contains(sval.as_str())
-            {
-                return IRKind::ExtensionCallSection;
-            }
-        }
-
-        IRKind::ExtensionCall
     }
 
     pub fn new(

@@ -1,0 +1,7 @@
+// Named argument to brink::test_crc: value=42.
+// Semantically identical to the positional form brink::test_crc(42).
+// Expected output: 0x00 0x00 0x00 0x2A (big-endian u32).
+section top {
+    wr brink::test_crc(value=42);
+}
+output top 0;

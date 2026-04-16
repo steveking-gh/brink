@@ -8,7 +8,7 @@
 //
 // Output: 32 bytes, big-endian digest (standard SHA-256 byte order).
 
-use brink_extension::{BrinkExtension, ExtArg};
+use brink_extension::{BrinkExtension, ExtArg, ParamDesc, ParamKind};
 use ext::ExtensionRegistry;
 use sha2::{Digest, Sha256};
 
@@ -21,6 +21,10 @@ impl BrinkExtension for Sha256Ext {
 
     fn size(&self) -> usize {
         32
+    }
+
+    fn params(&self) -> &[ParamDesc] {
+        &[ParamDesc { name: "data", kind: ParamKind::ByteArray }]
     }
 
     fn execute<'a>(&self, args: &[ExtArg<'a>], out_buffer: &mut [u8]) -> Result<(), String> {

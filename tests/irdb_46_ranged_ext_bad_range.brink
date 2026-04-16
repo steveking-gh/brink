@@ -1,10 +1,11 @@
-// A ranged extension called with a string as the first arg.
-// IRDB accepts the string (QuotedString is a valid arg type); MockRangedSum
-// rejects it at runtime with EXEC_47 because args[0] must be ExtArg::Section.
+// A ByteArray-kinded extension arg receives a quoted string instead of a section name.
+// MockRangedSum declares params() with one ByteArray param named "data".
+// IRDb rejects the string value with IRDB_52 because ByteArray params require
+// a section identifier, not a value expression.
 
 section foo {
     wr8 0x01; wr8 0x02; wr8 0x03; wr8 0x04;
-    wr brink::test_ranged_sum("start", 4);
+    wr brink::test_ranged_sum("start");
 }
 
 output foo;

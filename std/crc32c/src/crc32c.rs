@@ -9,7 +9,7 @@
 //
 // Output: 4 bytes, little-endian u32.
 
-use brink_extension::{BrinkExtension, ExtArg};
+use brink_extension::{BrinkExtension, ExtArg, ParamDesc, ParamKind};
 use ext::ExtensionRegistry;
 
 pub struct Crc32c;
@@ -21,6 +21,10 @@ impl BrinkExtension for Crc32c {
 
     fn size(&self) -> usize {
         4
+    }
+
+    fn params(&self) -> &[ParamDesc] {
+        &[ParamDesc { name: "data", kind: ParamKind::ByteArray }]
     }
 
     fn execute<'a>(&self, args: &[ExtArg<'a>], out_buffer: &mut [u8]) -> Result<(), String> {

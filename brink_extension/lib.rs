@@ -2,9 +2,9 @@
 //
 // This crate defines the public API for Brink extension authors.
 //
-// BrinkExtension — the single trait all extensions implement.
+// BrinkExtension -- the single trait all extensions implement.
 //
-// ExtArg — typed argument passed to execute().  Each parameter passed
+// ExtArg -- typed argument passed to execute().  Each parameter passed
 // to an extension in Brink code maps to one ExtArg passed to the extension
 // by the compiler.
 //
@@ -22,6 +22,41 @@
 // Brink registers extensions at startup via the ExtensionRegistry (defined in
 // the ext crate).  Brink calls size() exactly once during registration and caches
 // the result.  The `brink` and `std` namespaces are reserved.
+//
+// Named parameters:
+//   An extension declares named parameters via params(), returning a slice of
+//   ParamDesc values.  Each ParamDesc pairs a name with a ParamKind.
+//   ParamKind::ByteArray declares that a parameter accepts a sequence of bytes
+//   (supplied at call sites as a section name).  ParamKind::Int and
+//   ParamKind::Str declare numeric and string parameters respectively.
+//   An empty params() slice opts out of named-arg enforcement; positional-only
+//   rules apply with legacy heuristics.
+
+/// The kind of a declared extension parameter.
+///
+/// Used in [`ParamDesc`] to specify what type of argument a parameter accepts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParamKind {
+    /// A numeric argument: u64, i64, or an untyped integer constant.
+    Int,
+    /// A quoted string constant.
+    Str,
+    /// A sequence of bytes.  At call sites a section name supplies the bytes.
+    /// The kind names the data type; the mechanism (section name) is separate.
+    ByteArray,
+}
+
+/// Describes one declared parameter of an extension.
+///
+/// An extension returns a slice of `ParamDesc` from [`BrinkExtension::params`]
+/// to opt into named-argument call sites.
+#[derive(Debug, Clone, Copy)]
+pub struct ParamDesc {
+    /// The parameter name used at call sites: `foo::bar(name=value)`.
+    pub name: &'static str,
+    /// The kind of value the parameter accepts.
+    pub kind: ParamKind,
+}
 
 /// The argument type passed to an extension at execution time.
 ///
@@ -104,9 +139,23 @@ pub trait BrinkExtension {
     /// All layout calculations use the cached value.
     fn size(&self) -> usize;
 
+    /// Returns the declared parameters for this extension.
+    ///
+    /// Each entry in the slice declares one parameter: its name and kind.
+    /// Return a non-empty slice to enable named-argument call sites
+    /// (`foo::bar(data=my_section, seed=42)`).  Brink validates argument names
+    /// against this slice and reorders call-site args to declaration order
+    /// before passing them to [`execute`](Self::execute).
+    ///
+    /// Return an empty slice (the default) to opt out.  Positional-only rules
+    /// apply and legacy section-detection heuristics remain active.
+    fn params(&self) -> &[ParamDesc] {
+        &[]
+    }
+
     /// Produces the extension output bytes.
     ///
-    /// * `args` -- one [`ExtArg`] per Brink call-site argument, in order.
+    /// * `args` -- one [`ExtArg`] per Brink call-site argument, in declaration order.
     /// * `out`  -- pre-allocated buffer of exactly [`size`](Self::size) bytes.
     ///
     /// Return `Err(message)` to abort compilation with a diagnostic.

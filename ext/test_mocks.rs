@@ -1,5 +1,5 @@
 use super::*;
-use brink_extension::ExtArg;
+use brink_extension::{ExtArg, ParamDesc, ParamKind};
 use std::cell::Cell;
 
 pub struct MockCrc {
@@ -30,6 +30,10 @@ impl BrinkExtension for MockCrc {
         assert_eq!(prev, 0, "MockCrc::size() called more than once");
         self.size_call_count.set(prev + 1);
         4
+    }
+
+    fn params(&self) -> &[ParamDesc] {
+        &[ParamDesc { name: "value", kind: ParamKind::Int }]
     }
 
     fn execute<'a>(&self, args: &[ExtArg<'a>], out: &mut [u8]) -> Result<(), String> {
@@ -117,6 +121,10 @@ impl BrinkExtension for MockIncrement {
         16
     }
 
+    fn params(&self) -> &[ParamDesc] {
+        &[ParamDesc { name: "data", kind: ParamKind::ByteArray }]
+    }
+
     fn execute<'a>(&self, args: &[ExtArg<'a>], out_buffer: &mut [u8]) -> Result<(), String> {
         let ExtArg::Section { data: img_buffer, .. } = args.first().ok_or(
             "MockIncrement: expected ExtArg::Section as args[0]".to_string(),
@@ -168,6 +176,10 @@ impl BrinkExtension for MockRangedSum {
         8
     }
 
+    fn params(&self) -> &[ParamDesc] {
+        &[ParamDesc { name: "data", kind: ParamKind::ByteArray }]
+    }
+
     fn execute<'a>(&self, args: &[ExtArg<'a>], out_buffer: &mut [u8]) -> Result<(), String> {
         let ExtArg::Section { data: img_buffer, .. } = args.first().ok_or(
             "MockRangedSum: expected ExtArg::Section as args[0]".to_string(),
@@ -217,6 +229,10 @@ impl BrinkExtension for MockRejectEmpty {
         4
     }
 
+    fn params(&self) -> &[ParamDesc] {
+        &[ParamDesc { name: "data", kind: ParamKind::ByteArray }]
+    }
+
     fn execute<'a>(&self, args: &[ExtArg<'a>], out_buffer: &mut [u8]) -> Result<(), String> {
         let ExtArg::Section { data: img_buffer, .. } = args.first().ok_or(
             "MockRejectEmpty: expected ExtArg::Section as args[0]".to_string(),
@@ -242,6 +258,19 @@ impl BrinkExtension for MockSum8 {
 
     fn size(&self) -> usize {
         8
+    }
+
+    fn params(&self) -> &[ParamDesc] {
+        &[
+            ParamDesc { name: "a", kind: ParamKind::Int },
+            ParamDesc { name: "b", kind: ParamKind::Int },
+            ParamDesc { name: "c", kind: ParamKind::Int },
+            ParamDesc { name: "d", kind: ParamKind::Int },
+            ParamDesc { name: "e", kind: ParamKind::Int },
+            ParamDesc { name: "f", kind: ParamKind::Int },
+            ParamDesc { name: "g", kind: ParamKind::Int },
+            ParamDesc { name: "h", kind: ParamKind::Int },
+        ]
     }
 
     fn execute<'a>(&self, args: &[ExtArg<'a>], out: &mut [u8]) -> Result<(), String> {

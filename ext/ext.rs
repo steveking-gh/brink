@@ -1,15 +1,18 @@
 use std::collections::HashMap;
 
-pub use brink_extension::{BrinkExtension, ExtArg};
+pub use brink_extension::{BrinkExtension, ExtArg, ParamDesc, ParamKind};
 
-/// Owns a registered extension alongside its cached size.
+/// Owns a registered extension alongside its cached metadata.
 ///
-/// Brink calls `size()` exactly once -- at registration time -- and stores the
-/// result here. All internal size lookups use `cached_size` rather than
-/// calling the extension again.
+/// Brink calls `size()` and `params()` exactly once -- at registration time --
+/// and stores the results here.  All internal lookups use cached values rather
+/// than calling the extension again.
 pub struct ExtensionEntry {
     pub extension: Box<dyn BrinkExtension>,
     pub cached_size: usize,
+    /// Parameter declarations cached from `BrinkExtension::params()`.
+    /// Empty when the extension opts out of named-argument enforcement.
+    pub cached_params: Vec<ParamDesc>,
 }
 
 impl ExtensionEntry {
@@ -49,11 +52,13 @@ impl ExtensionRegistry {
             name
         );
         let cached_size = ext.size();
+        let cached_params = ext.params().to_vec();
         self.extensions.insert(
             name,
             ExtensionEntry {
                 extension: ext,
                 cached_size,
+                cached_params,
             },
         );
     }
