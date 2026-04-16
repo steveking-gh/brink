@@ -1101,6 +1101,115 @@ impl<'toks> Ast<'toks> {
         }
     }
 
+    /// Parses the arguments of a function or extension invocation.
+    /// The caller must have already consumed the opening parenthesis `(`.
+    /// This function consumes the closing parenthesis `)`.
+    fn parse_function_args(&mut self, parent_nid: NodeId, diags: &mut Diags) -> bool {
+        self.dbg_enter("parse_function_args");
+        let mut saw_named = false;
+        let mut saw_positional = false;
+
+        loop {
+            debug_peek!("Ast::parse_function_args call", self.tv);
+            let check_tinfo = self.tv.peek();
+            if check_tinfo.tok == LexToken::EOF {
+                self.err_no_input(diags);
+                return self.dbg_exit("parse_function_args", false);
+            }
+
+            // A trailing close parenthesis indicates the end of the argument list.
+            if check_tinfo.tok == LexToken::CloseParen {
+                self.tv.skip(); // consume ')'
+                break;
+            }
+
+            // Named arg: Identifier immediately followed by Eq (not DoubleEq).
+            let idx = self.tv.get_index();
+            let is_named_arg = self.tv.peek().tok == LexToken::Identifier
+                && self.tv.get(idx + 1).tok == LexToken::Eq;
+
+            if is_named_arg {
+                debug!("Ast::parse_function_args: Detected named argument syntax");
+                saw_named = true;
+                // Borrow name and loc from the identifier token, then advance.
+                let param_name = self.tv.peek().val;
+                let param_loc = self.tv.peek().loc.clone();
+                self.tv.skip(); // consume Identifier
+                self.tv.skip(); // consume Eq
+
+                // Synthesize a NamedArg token and create a node for it.
+                let named_tok_idx = self.tv.push_synthetic(TokenInfo {
+                    tok: LexToken::NamedArg,
+                    loc: param_loc.clone(),
+                    val: param_name,
+                });
+                let named_nid = self.arena.new_node(named_tok_idx);
+                parent_nid.append(named_nid, &mut self.arena);
+
+                // Parse the RHS expression as the sole child of the NamedArg node.
+                let mut rhs_opt = None;
+                if !self.parse_pratt(0, &mut rhs_opt, diags) {
+                    return self.dbg_exit("parse_function_args", false);
+                }
+                if let Some(rhs_nid) = rhs_opt {
+                    // The RHS of a named argument becomes a child of the NamedArg node in the AST.
+                    named_nid.append(rhs_nid, &mut self.arena);
+                } else {
+                    diags.err1(
+                        "AST_41",
+                        "Expected expression after '=' in named argument",
+                        param_loc,
+                    );
+                    return self.dbg_exit("parse_function_args", false);
+                }
+            } else {
+                saw_positional = true;
+                // Positional argument: parse the expression directly.
+                let mut arg_opt = None;
+                if !self.parse_pratt(0, &mut arg_opt, diags) {
+                    return self.dbg_exit("parse_function_args", false);
+                }
+                if let Some(arg_nid) = arg_opt {
+                    parent_nid.append(arg_nid, &mut self.arena);
+                }
+            }
+
+            // Reject mixed positional and named arguments.
+            if saw_named && saw_positional {
+                diags.err1(
+                    "AST_40",
+                    "Cannot mix positional and named arguments in an extension call",
+                    self.tv.peek().loc.clone(),
+                );
+                return self.dbg_exit("parse_function_args", false);
+            }
+
+            // Arguments must be separated by commas or terminated by a close parenthesis.
+            let delim_tinfo = self.tv.peek();
+            if delim_tinfo.tok == LexToken::EOF {
+                self.err_no_input(diags);
+                return self.dbg_exit("parse_function_args", false);
+            }
+
+            let delim_tok = delim_tinfo.tok;
+            if delim_tok == LexToken::Comma {
+                self.tv.skip(); // consume ','
+            } else if delim_tok == LexToken::CloseParen {
+                self.tv.skip(); // consume ')'
+                break;
+            } else {
+                diags.err1(
+                    "AST_38",
+                    "Expected ',' or ')' in function call",
+                    delim_tinfo.span(),
+                );
+                return self.dbg_exit("parse_function_args", false);
+            }
+        }
+
+        self.dbg_exit("parse_function_args", true)
+    }
+
     /// Parses an expression with correct operator precedence using a Pratt
     /// (precedence-climbing) algorithm.  Returns the root `NodeId` of the
     /// sub-tree via `top`, or `None` if the expression is empty.  On success
@@ -1201,113 +1310,8 @@ impl<'toks> Ast<'toks> {
                 let after_tinfo = self.tv.peek();
                 if after_tinfo.tok == LexToken::OpenParen {
                     self.tv.skip(); // consume '('
-                    let mut saw_named = false;
-                    let mut saw_positional = false;
-
-                    loop {
-                        debug_peek!("Ast::parse_pratt function call", self.tv);
-                        let check_tinfo = self.tv.peek();
-                        if check_tinfo.tok == LexToken::EOF {
-                            self.err_no_input(diags);
-                            return self.dbg_exit_pratt("parse_pratt", &None, false);
-                        }
-
-                        // A trailing close parenthesis indicates the end of the argument list.
-                        if check_tinfo.tok == LexToken::CloseParen {
-                            self.tv.skip(); // consume ')'
-                            break;
-                        }
-
-                        // Named arg: Identifier immediately followed by Eq (not DoubleEq).
-                        let idx = self.tv.get_index();
-                        let is_named_arg = self.tv.peek().tok == LexToken::Identifier
-                            && self.tv.get(idx + 1).tok == LexToken::Eq;
-
-                        if is_named_arg {
-                            debug!("Ast::parse_pratt: Detected named argument syntax");
-                            saw_named = true;
-                            // Borrow name and loc from the identifier token, then advance.
-                            let param_name = self.tv.peek().val;
-                            let param_loc = self.tv.peek().loc.clone();
-                            self.tv.skip(); // consume Identifier
-                            self.tv.skip(); // consume Eq
-
-                            // Synthesize a NamedArg token and create a node for it.
-                            let named_tok_idx = self.tv.push_synthetic(TokenInfo {
-                                tok: LexToken::NamedArg,
-                                loc: param_loc.clone(),
-                                val: param_name,
-                            });
-                            let named_nid = self.arena.new_node(named_tok_idx);
-                            ns_nid.append(named_nid, &mut self.arena);
-
-                            // The AST now looks like this for a named argument:
-                            //   <namespace::extension_name>   <- ns_nid
-                            //   └── NamedArg                <- named_nid
-                            //
-                            // Parse the RHS expression as the sole child of the NamedArg node.
-                            let mut rhs_opt = None;
-                            if !self.parse_pratt(0, &mut rhs_opt, diags) {
-                                return self.dbg_exit_pratt("parse_pratt", &None, false);
-                            }
-                            if let Some(rhs_nid) = rhs_opt {
-                                // The RHS of a named argument becomes a child of the NamedArg node in the AST.
-                                // The AST now looks like this for a named argument:
-                                //   <namespace::extension_name>   <- ns_nid
-                                //   └── NamedArg                  <- named_nid
-                                //       └── <rhs expression>      <- rhs_nid
-                                named_nid.append(rhs_nid, &mut self.arena);
-                            } else {
-                                diags.err1(
-                                    "AST_41",
-                                    "Expected expression after '=' in named argument",
-                                    param_loc,
-                                );
-                                return self.dbg_exit_pratt("parse_pratt", &None, false);
-                            }
-                        } else {
-                            saw_positional = true;
-                            // Positional argument: parse the expression directly.
-                            let mut arg_opt = None;
-                            if !self.parse_pratt(0, &mut arg_opt, diags) {
-                                return self.dbg_exit_pratt("parse_pratt", &None, false);
-                            }
-                            if let Some(arg_nid) = arg_opt {
-                                ns_nid.append(arg_nid, &mut self.arena);
-                            }
-                        }
-
-                        // Reject mixed positional and named arguments.
-                        if saw_named && saw_positional {
-                            diags.err1(
-                                "AST_40",
-                                "Cannot mix positional and named arguments in an extension call",
-                                self.tv.peek().loc.clone(),
-                            );
-                            return self.dbg_exit_pratt("parse_pratt", &None, false);
-                        }
-
-                        // Arguments must be separated by commas or terminated by a close parenthesis.
-                        let delim_tinfo = self.tv.peek();
-                        if delim_tinfo.tok == LexToken::EOF {
-                            self.err_no_input(diags);
-                            return self.dbg_exit_pratt("parse_pratt", &None, false);
-                        }
-
-                        let delim_tok = delim_tinfo.tok;
-                        if delim_tok == LexToken::Comma {
-                            self.tv.skip(); // consume ','
-                        } else if delim_tok == LexToken::CloseParen {
-                            self.tv.skip(); // consume ')'
-                            break;
-                        } else {
-                            diags.err1(
-                                "AST_38",
-                                "Expected ',' or ')' in function call",
-                                delim_tinfo.span(),
-                            );
-                            return self.dbg_exit_pratt("parse_pratt", &None, false);
-                        }
+                    if !self.parse_function_args(ns_nid, diags) {
+                        return self.dbg_exit_pratt("parse_pratt", &None, false);
                     }
                 }
             }
@@ -1326,98 +1330,8 @@ impl<'toks> Ast<'toks> {
                 // If an open parenthesis follows, we parse this as a function invocation.
                 if self.tv.peek().tok == LexToken::OpenParen {
                     self.tv.skip(); // consume '('
-                    let mut saw_named = false;
-                    let mut saw_positional = false;
-
-                    loop {
-                        let check_tinfo = self.tv.peek();
-                        if check_tinfo.tok == LexToken::EOF {
-                            self.err_no_input(diags);
-                            return self.dbg_exit_pratt("parse_pratt", &None, false);
-                        }
-
-                        // A trailing close parenthesis indicates the end of the argument list.
-                        if check_tinfo.tok == LexToken::CloseParen {
-                            self.tv.skip(); // consume ')'
-                            break;
-                        }
-
-                        // Named arg: Identifier immediately followed by Eq (not DoubleEq).
-                        let idx = self.tv.get_index();
-                        let is_named_arg = self.tv.peek().tok == LexToken::Identifier
-                            && self.tv.get(idx + 1).tok == LexToken::Eq;
-
-                        if is_named_arg {
-                            saw_named = true;
-                            let param_name = self.tv.peek().val;
-                            let param_loc = self.tv.peek().loc.clone();
-                            self.tv.skip(); // consume Identifier
-                            self.tv.skip(); // consume Eq
-
-                            let named_tok_idx = self.tv.push_synthetic(TokenInfo {
-                                tok: LexToken::NamedArg,
-                                loc: param_loc.clone(),
-                                val: param_name,
-                            });
-                            let named_nid = self.arena.new_node(named_tok_idx);
-                            id_nid.append(named_nid, &mut self.arena);
-
-                            let mut rhs_opt = None;
-                            if !self.parse_pratt(0, &mut rhs_opt, diags) {
-                                return self.dbg_exit_pratt("parse_pratt", &None, false);
-                            }
-                            if let Some(rhs_nid) = rhs_opt {
-                                named_nid.append(rhs_nid, &mut self.arena);
-                            } else {
-                                diags.err1(
-                                    "AST_41",
-                                    "Expected expression after '=' in named argument",
-                                    param_loc,
-                                );
-                                return self.dbg_exit_pratt("parse_pratt", &None, false);
-                            }
-                        } else {
-                            saw_positional = true;
-                            let mut arg_opt = None;
-                            if !self.parse_pratt(0, &mut arg_opt, diags) {
-                                return self.dbg_exit_pratt("parse_pratt", &None, false);
-                            }
-                            if let Some(arg_nid) = arg_opt {
-                                id_nid.append(arg_nid, &mut self.arena);
-                            }
-                        }
-
-                        // Reject mixed positional and named arguments.
-                        if saw_named && saw_positional {
-                            diags.err1(
-                                "AST_40",
-                                "Cannot mix positional and named arguments in an extension call",
-                                self.tv.peek().loc.clone(),
-                            );
-                            return self.dbg_exit_pratt("parse_pratt", &None, false);
-                        }
-
-                        // Arguments must be separated by commas or terminated by a close parenthesis.
-                        let delim_tinfo = self.tv.peek();
-                        if delim_tinfo.tok == LexToken::EOF {
-                            self.err_no_input(diags);
-                            return self.dbg_exit_pratt("parse_pratt", &None, false);
-                        }
-
-                        let delim_tok = delim_tinfo.tok;
-                        if delim_tok == LexToken::Comma {
-                            self.tv.skip(); // consume ','
-                        } else if delim_tok == LexToken::CloseParen {
-                            self.tv.skip(); // consume ')'
-                            break;
-                        } else {
-                            diags.err1(
-                                "AST_38",
-                                "Expected ',' or ')' in function call",
-                                delim_tinfo.span(),
-                            );
-                            return self.dbg_exit_pratt("parse_pratt", &None, false);
-                        }
+                    if !self.parse_function_args(id_nid, diags) {
+                        return self.dbg_exit_pratt("parse_pratt", &None, false);
                     }
                 }
             }
