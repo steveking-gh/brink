@@ -9,7 +9,7 @@ path = "src/md5.rs"
 
 [dependencies]
 brink_extension = { path = "../../brink_extension" }
-md-5 = "0.10"
+md-5 = "0.11"
 extension_registry = { path = "../../extension_registry" }
 
 [dev-dependencies]
