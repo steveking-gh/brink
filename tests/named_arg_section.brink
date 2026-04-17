@@ -1,4 +1,4 @@
-// Named ByteArray argument to brink::test_increment.
+// Named Slice argument to brink::test_increment.
 // data=top passes the top section slice; execute appends each byte + 1.
 // Expected output: 32 bytes -- 0x00-0x0F then 0x01-0x10.
 section top {

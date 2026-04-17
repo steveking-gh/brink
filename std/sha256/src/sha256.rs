@@ -8,7 +8,7 @@
 //
 // Output: 32 bytes, big-endian digest (standard SHA-256 byte order).
 
-use brink_extension::{BrinkExtension, ExtArg, ParamDesc, ParamKind};
+use brink_extension::{BrinkExtension, ParamArg, ParamDesc, ParamKind};
 use ext::ExtensionRegistry;
 use sha2::{Digest, Sha256};
 
@@ -24,14 +24,20 @@ impl BrinkExtension for Sha256Ext {
     }
 
     fn params(&self) -> &[ParamDesc] {
-        &[ParamDesc { name: "data", kind: ParamKind::ByteArray }]
+        &[ParamDesc {
+            name: "data",
+            kind: ParamKind::Slice,
+        }]
     }
 
-    fn execute<'a>(&self, args: &[ExtArg<'a>], out_buffer: &mut [u8]) -> Result<(), String> {
-        let ExtArg::Section { data: img_buffer, .. } = args.first().ok_or(
-            "std::sha256: expected ExtArg::Section as args[0]".to_string(),
-        )? else {
-            return Err("std::sha256: args[0] must be ExtArg::Section (use section-name form)".to_string());
+    fn execute<'a>(&self, args: &[ParamArg<'a>], out_buffer: &mut [u8]) -> Result<(), String> {
+        let ParamArg::Slice { data: img_buffer } = args
+            .first()
+            .ok_or("std::sha256: expected ParamArg::Slice as args[0]".to_string())?
+        else {
+            return Err(
+                "std::sha256: args[0] must be ParamArg::Slice (use section-name form)".to_string(),
+            );
         };
         let digest = Sha256::digest(img_buffer);
         out_buffer.copy_from_slice(&digest);

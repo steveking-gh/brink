@@ -8,7 +8,7 @@
 //
 // Output: 16 bytes, standard MD5 byte order.
 
-use brink_extension::{BrinkExtension, ExtArg, ParamDesc, ParamKind};
+use brink_extension::{BrinkExtension, ParamArg, ParamDesc, ParamKind};
 use ext::ExtensionRegistry;
 use md5::{Digest, Md5};
 
@@ -24,14 +24,20 @@ impl BrinkExtension for Md5Ext {
     }
 
     fn params(&self) -> &[ParamDesc] {
-        &[ParamDesc { name: "data", kind: ParamKind::ByteArray }]
+        &[ParamDesc {
+            name: "data",
+            kind: ParamKind::Slice,
+        }]
     }
 
-    fn execute<'a>(&self, args: &[ExtArg<'a>], out_buffer: &mut [u8]) -> Result<(), String> {
-        let ExtArg::Section { data: img_buffer, .. } = args.first().ok_or(
-            "std::md5: expected ExtArg::Section as args[0]".to_string(),
-        )? else {
-            return Err("std::md5: args[0] must be ExtArg::Section (use section-name form)".to_string());
+    fn execute<'a>(&self, args: &[ParamArg<'a>], out_buffer: &mut [u8]) -> Result<(), String> {
+        let ParamArg::Slice { data: img_buffer } = args
+            .first()
+            .ok_or("std::md5: expected ParamArg::Slice as args[0]".to_string())?
+        else {
+            return Err(
+                "std::md5: args[0] must be ParamArg::Slice (use section-name form)".to_string(),
+            );
         };
         let digest = Md5::digest(img_buffer);
         out_buffer.copy_from_slice(&digest);

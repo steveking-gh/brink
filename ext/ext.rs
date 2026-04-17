@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-pub use brink_extension::{BrinkExtension, ExtArg, ParamDesc, ParamKind};
+pub use brink_extension::{BrinkExtension, ParamArg, ParamDesc, ParamKind};
 
 /// Owns a registered extension alongside its cached metadata.
 ///
@@ -74,7 +74,7 @@ pub mod test_mocks;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use brink_extension::ExtArg;
+    use brink_extension::ParamArg;
     use test_mocks::*;
 
     #[test]
@@ -126,7 +126,7 @@ mod tests {
         reg.register(Box::new(MockCrc::new()));
         let entry = reg.get("brink::test_crc").unwrap();
 
-        let args = vec![ExtArg::Int(0xDEADBEEF_u64)];
+        let args = vec![ParamArg::Int(0xDEADBEEF_u64)];
         let mut out = vec![0u8; 4];
         entry.extension.execute(&args, &mut out).unwrap();
         assert_eq!(out, vec![0xDE, 0xAD, 0xBE, 0xEF]);
@@ -139,7 +139,7 @@ mod tests {
         let entry = reg.get("brink::test_crc").unwrap();
 
         // MockCrc expects exactly 1 arg; provide 2.
-        let args = vec![ExtArg::Int(1), ExtArg::Int(2)];
+        let args = vec![ParamArg::Int(1), ParamArg::Int(2)];
         let mut out = vec![0u8; 4];
         let res = entry.extension.execute(&args, &mut out);
         assert!(res.is_err());
@@ -152,7 +152,7 @@ mod tests {
         reg.register(Box::new(MockCrc::new()));
         let entry = reg.get("brink::test_crc").unwrap();
 
-        let args = vec![ExtArg::Int(1)];
+        let args = vec![ParamArg::Int(1)];
         let mut out = vec![0u8; 2]; // MockCrc expects 4 bytes
         let res = entry.extension.execute(&args, &mut out);
         assert!(res.is_err());
@@ -167,7 +167,7 @@ mod tests {
         assert_eq!(entry.cached_size, 8);
 
         let img = vec![0x01u8, 0x02, 0x03, 0x04];
-        let args = vec![ExtArg::Section { start: 0, len: 4, data: &img }];
+        let args = vec![ParamArg::Slice { data: &img }];
         let mut out = vec![0u8; 8];
         entry.extension.execute(&args, &mut out).unwrap();
         let sum = u64::from_le_bytes(out.try_into().unwrap());
@@ -214,7 +214,7 @@ mod tests {
         reg.register(Box::new(MockLogger::new()));
 
         let entry = reg.get("brink::test_logger").unwrap();
-        let args: Vec<ExtArg<'_>> = vec![];
+        let args: Vec<ParamArg<'_>> = vec![];
         let res = entry.extension.execute(&args, &mut []);
 
         assert!(res.is_err());

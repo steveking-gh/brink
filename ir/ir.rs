@@ -57,8 +57,8 @@ pub enum IRKind {
     /// Operands: [name_identifier, rhs_expr_output]
     BareAssign,
     /// Operands: [name, arg0..., output]
-    /// All extension calls use this form.  The engine resolves ByteArray-kinded
-    /// params to ExtArg::Section by consulting cached_params in the registry.
+    /// All extension calls use this form.  The engine resolves Slice-kinded
+    /// params to ParamArg::Slice by consulting cached_params in the registry.
     ExtensionCall,
     GEq,
     Gt,

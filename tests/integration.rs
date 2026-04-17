@@ -2591,7 +2591,7 @@ mod tests {
         assert_brink_failure("tests/irdb_44_unknown_sizeof_ext.brink", &["[IRDB_44]"]);
     }
 
-    /// A ByteArray-kinded extension parameter receives a quoted string instead of a
+    /// A Slice-kinded extension parameter receives a quoted string instead of a
     /// section name.  IRDb rejects the call with IRDB_52.
     #[test]
     fn irdb_46_ranged_ext_bad_range() {
@@ -2616,7 +2616,7 @@ mod tests {
         fs::remove_file(out).ok();
     }
 
-    /// Named ByteArray argument to brink::test_increment.
+    /// Named Slice argument to brink::test_increment.
     /// data=top passes the top section slice; execute appends each byte + 1.
     /// Expected output: 32 bytes -- 0x00-0x0F then 0x01-0x10.
     #[test]
@@ -2690,7 +2690,7 @@ mod tests {
         assert_brink_failure("tests/irdb_53_positional_count.brink", &["[IRDB_53]"]);
     }
 
-    /// Positional ByteArray argument names a section that does not exist: IRDb rejects with IRDB_54.
+    /// Positional Slice argument names a section that does not exist: IRDb rejects with IRDB_54.
     #[test]
     fn irdb_54_unknown_section() {
         assert_brink_failure("tests/irdb_54_unknown_section.brink", &["[IRDB_54]"]);

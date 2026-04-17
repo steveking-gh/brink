@@ -83,19 +83,19 @@ extensions:
 
       1. ParamDesc/ParamKind on the trait.  BrinkExtension gains fn params(&self) -> &[ParamDesc]
          with default &[].  ParamDesc carries name: &'static str and kind: ParamKind.
-         ParamKind variants: Int | Str | ByteArray.
-         ByteArray (not Section) is the declared kind for any parameter that accepts a sequence
+         ParamKind variants: Int | Str | Slice.
+         Slice (not Section) is the declared kind for any parameter that accepts a sequence
          of bytes.  At call sites a section name supplies the bytes.  The declaration says what
          type of data the parameter accepts; the mechanism (section name) is separate.
-         ByteArray aligns with ParameterValue::ByteArray in the planned return-value feature,
-         and naturally supports multiple ByteArray parameters per extension.
+         Slice aligns with ParameterValue::Slice in the planned return-value feature,
+         and naturally supports multiple Slice parameters per extension.
          Empty params() slice = opt-out; positional-only rules apply with legacy heuristics.
 
       2. IRKind::ExtensionCallSection eliminated.  All extension calls use IRKind::ExtensionCall
-         with uniform operand layout [name, arg0..., output].  The engine resolves ByteArray
+         with uniform operand layout [name, arg0..., output].  The engine resolves Slice
          params by consulting cached_params in the registry: for each user-arg operand whose
-         corresponding cached_params[i].kind == ByteArray, resolve the section identifier to
-         ExtArg::Section from wr_dispatches.  This supports any number of ByteArray params at
+         corresponding cached_params[i].kind == Slice, resolve the section identifier to
+         ParamArg::Slice from wr_dispatches.  This supports any number of Slice params at
          any positions.  disambiguate_extension_call in irdb.rs is removed entirely.
          Legacy path: when cached_params is empty, the engine falls back to the old heuristic
          (first Identifier in user-arg range = section) for backward compat with extensions
@@ -104,7 +104,7 @@ extensions:
       3. Canonicalization in IRDb, not the engine.  IRDb resolves argument names, validates
          them against params(), and rewrites operand order to canonical (params()) order before
          pushing to ir_vec.  The engine receives args in declaration order; only section
-         resolution (converting Identifier to ExtArg::Section) remains engine-side.
+         resolution (converting Identifier to ParamArg::Slice) remains engine-side.
 
       4. Mixed positional+named is rejected at parse time (AST_40).
 
@@ -113,26 +113,26 @@ extensions:
 
       6. New error codes: IRDB_48 (unknown param name), IRDB_49 (duplicate name),
          IRDB_50 (mixed positional+named), IRDB_51 (missing required param),
-         IRDB_52 (ByteArray param received non-section-name value),
+         IRDB_52 (Slice param received non-section-name value),
          IRDB_53 (positional count mismatch when params declared).
-         EXEC_56 (ambiguous section) now fires per-ByteArray-param, not once globally.
+         EXEC_56 (ambiguous section) now fires per-Slice-param, not once globally.
 
       Phase order:
-        1. brink_extension/lib.rs -- ParamDesc, ParamKind (Int|Str|ByteArray), params() default
-        2. std extensions + mocks -- implement params() with ByteArray where applicable
+        1. brink_extension/lib.rs -- ParamDesc, ParamKind (Int|Str|Slice), params() default
+        2. std extensions + mocks -- implement params() with Slice where applicable
         3. ast/ast.rs -- LexToken::NamedArg, named-arg parsing, AST_40/AST_41
         4. linearizer/linearizer.rs -- param_name on LinOperand, Namespace arm update
         5. ir/ir.rs -- param_name on IROperand; remove ExtensionCallSection variant
         6. irdb/irdb.rs -- remove disambiguate_extension_call; name resolution, reorder,
-           validate ByteArray params, new IRDB_4x/5x error codes
+           validate Slice params, new IRDB_4x/5x error codes
         7. engine/engine.rs -- merge ExtensionCallSection arms into ExtensionCall;
-           resolve ByteArray params from cached_params; per-param EXEC_56 check
+           resolve Slice params from cached_params; per-param EXEC_56 check
         8. ext/ext.rs -- add cached_params: Vec<ParamDesc> to ExtensionEntry
         9. tests
     return_values: >
       Extension calls return a typed ParameterValue so the result flows into
       downstream expressions (wr32, const, assert, arithmetic).  Requires a new
-      ParameterValue::ByteArray(Vec<u8>) variant (or similar) to carry multi-byte
+      ParameterValue::Slice(Vec<u8>) variant (or similar) to carry multi-byte
       results.  BrinkExtension::execute signature would change from Result<(), String>
       to Result<ParameterValue, String> or a richer return type.  DataType gains a
       Bytes variant.  Engine stores the returned value into self.parms at the output

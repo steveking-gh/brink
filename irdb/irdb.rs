@@ -410,7 +410,7 @@ impl IRDb {
     /// Validates that every extension user argument in the given operand
     /// index range is a value type (numeric, string, or section-name identifier).
     /// Extension outputs and unknown types are rejected with IRDB_47 because
-    /// the engine cannot convert them to ExtArg.
+    /// the engine cannot convert them to ParamArg.
     fn validate_ext_user_args(
         &self,
         ir: &IR,
@@ -427,7 +427,7 @@ impl IRDb {
                 | DataType::I64
                 | DataType::Integer
                 | DataType::QuotedString
-                // Identifier section names resolve to ExtArg::Section at engine time.
+                // Identifier section names resolve to ParamArg::Slice at engine time.
                 | DataType::Identifier
             ) {
                 let m = format!(
@@ -531,7 +531,7 @@ impl IRDb {
         }
     }
 
-    /// Emits IRDB_52: a ByteArray parameter received a value expression instead of a section name.
+    /// Emits IRDB_52: a Slice parameter received a value expression instead of a section name.
     /// Centralizes the error code so the uniqueness check finds exactly one occurrence.
     fn err_bytearray_needs_section(
         ir: &IR,
@@ -541,7 +541,7 @@ impl IRDb {
         diags: &mut Diags,
     ) {
         let m = format!(
-            "Extension '{}': parameter '{}' has kind ByteArray and requires a section name, \
+            "Extension '{}': parameter '{}' has kind Slice and requires a section name, \
              not a value expression",
             ext_name, param_name
         );
@@ -554,7 +554,7 @@ impl IRDb {
     ///   - Validates every arg name against params() (IRDB_48).
     ///   - Rejects duplicate names (IRDB_49).
     ///   - Rejects missing required params (IRDB_51).
-    ///   - Rejects ByteArray params that received a non-Identifier value (IRDB_52).
+    ///   - Rejects Slice params that received a non-Identifier value (IRDB_52).
     ///   - Reorders ir.operands[1..last] to declaration order.
     ///
     /// When the extension declares params() and the call site uses positional args:
@@ -632,9 +632,9 @@ impl IRDb {
                 }
             }
 
-            // IRDB_52: ByteArray params must receive an Identifier (section name).
+            // IRDB_52: Slice params must receive an Identifier (section name).
             for p in params.iter() {
-                if p.kind == ParamKind::ByteArray {
+                if p.kind == ParamKind::Slice {
                     let opnd_idx = name_to_opnd_idx[p.name];
                     let opnd = &self.parms[opnd_idx];
                     if !matches!(opnd.val, ParameterValue::Identifier(_)) {
@@ -660,9 +660,9 @@ impl IRDb {
                 diags.err1("IRDB_53", &m, ir.src_loc.clone());
                 return false;
             }
-            // Validate ByteArray positional params received an Identifier (section name).
+            // Validate Slice positional params received an Identifier (section name).
             for (i, p) in params.iter().enumerate() {
-                if p.kind == ParamKind::ByteArray {
+                if p.kind == ParamKind::Slice {
                     let opnd = &self.parms[ir.operands[1 + i]];
                     if !matches!(opnd.val, ParameterValue::Identifier(_)) {
                         // IRDB_52: value expression where a section name is required.

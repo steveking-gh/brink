@@ -1,5 +1,5 @@
 use super::*;
-use brink_extension::{ExtArg, ParamDesc, ParamKind};
+use brink_extension::{ParamArg, ParamDesc, ParamKind};
 use std::cell::Cell;
 
 pub struct MockCrc {
@@ -36,14 +36,14 @@ impl BrinkExtension for MockCrc {
         &[ParamDesc { name: "value", kind: ParamKind::Int }]
     }
 
-    fn execute<'a>(&self, args: &[ExtArg<'a>], out: &mut [u8]) -> Result<(), String> {
+    fn execute<'a>(&self, args: &[ParamArg<'a>], out: &mut [u8]) -> Result<(), String> {
         if args.len() != 1 {
             return Err("Expected exactly 1 argument for CRC".to_string());
         }
         if out.len() != 4 {
             return Err("Expected 4 bytes of output space".to_string());
         }
-        let ExtArg::Int(v) = args[0] else {
+        let ParamArg::Int(v) = args[0] else {
             return Err("Expected Int argument for CRC".to_string());
         };
         let val = v as u32;
@@ -82,14 +82,14 @@ impl BrinkExtension for MockLogger {
         0
     }
 
-    fn execute<'a>(&self, _args: &[ExtArg<'a>], _out: &mut [u8]) -> Result<(), String> {
+    fn execute<'a>(&self, _args: &[ParamArg<'a>], _out: &mut [u8]) -> Result<(), String> {
         tracing::info!("MockLogger executed successfully via tracing API");
         Err("Intentional mock fallback error".to_string())
     }
 }
 
 /// Reads the caller-specified image slice and writes each byte + 1 to the
-/// output buffer. args[0] must be ExtArg::Section; the output buffer receives
+/// output buffer. args[0] must be ParamArg::Slice; the output buffer receives
 /// the first cached_size bytes of that section, each incremented by 1.
 pub struct MockIncrement {
     size_call_count: Cell<usize>,
@@ -122,14 +122,14 @@ impl BrinkExtension for MockIncrement {
     }
 
     fn params(&self) -> &[ParamDesc] {
-        &[ParamDesc { name: "data", kind: ParamKind::ByteArray }]
+        &[ParamDesc { name: "data", kind: ParamKind::Slice }]
     }
 
-    fn execute<'a>(&self, args: &[ExtArg<'a>], out_buffer: &mut [u8]) -> Result<(), String> {
-        let ExtArg::Section { data: img_buffer, .. } = args.first().ok_or(
-            "MockIncrement: expected ExtArg::Section as args[0]".to_string(),
+    fn execute<'a>(&self, args: &[ParamArg<'a>], out_buffer: &mut [u8]) -> Result<(), String> {
+        let ParamArg::Slice { data: img_buffer } = args.first().ok_or(
+            "MockIncrement: expected ParamArg::Slice as args[0]".to_string(),
         )? else {
-            return Err("MockIncrement: args[0] must be ExtArg::Section".to_string());
+            return Err("MockIncrement: args[0] must be ParamArg::Slice".to_string());
         };
         assert!(
             img_buffer.len() >= out_buffer.len(),
@@ -145,7 +145,7 @@ impl BrinkExtension for MockIncrement {
 }
 
 /// Sums every byte in the caller-specified image slice and writes the result
-/// as a little-endian u64. args[0] must be ExtArg::Section.
+/// as a little-endian u64. args[0] must be ParamArg::Slice.
 pub struct MockRangedSum {
     size_call_count: Cell<usize>,
 }
@@ -177,14 +177,14 @@ impl BrinkExtension for MockRangedSum {
     }
 
     fn params(&self) -> &[ParamDesc] {
-        &[ParamDesc { name: "data", kind: ParamKind::ByteArray }]
+        &[ParamDesc { name: "data", kind: ParamKind::Slice }]
     }
 
-    fn execute<'a>(&self, args: &[ExtArg<'a>], out_buffer: &mut [u8]) -> Result<(), String> {
-        let ExtArg::Section { data: img_buffer, .. } = args.first().ok_or(
-            "MockRangedSum: expected ExtArg::Section as args[0]".to_string(),
+    fn execute<'a>(&self, args: &[ParamArg<'a>], out_buffer: &mut [u8]) -> Result<(), String> {
+        let ParamArg::Slice { data: img_buffer } = args.first().ok_or(
+            "MockRangedSum: expected ParamArg::Slice as args[0]".to_string(),
         )? else {
-            return Err("MockRangedSum: args[0] must be ExtArg::Section".to_string());
+            return Err("MockRangedSum: args[0] must be ParamArg::Slice".to_string());
         };
         assert_eq!(
             out_buffer.len(),
@@ -198,7 +198,7 @@ impl BrinkExtension for MockRangedSum {
 }
 
 /// Rejects a zero-length input slice with an error. args[0] must be
-/// ExtArg::Section. Used to verify that extensions can reject empty sections.
+/// ParamArg::Slice. Used to verify that extensions can reject empty sections.
 pub struct MockRejectEmpty {
     size_call_count: Cell<usize>,
 }
@@ -230,14 +230,14 @@ impl BrinkExtension for MockRejectEmpty {
     }
 
     fn params(&self) -> &[ParamDesc] {
-        &[ParamDesc { name: "data", kind: ParamKind::ByteArray }]
+        &[ParamDesc { name: "data", kind: ParamKind::Slice }]
     }
 
-    fn execute<'a>(&self, args: &[ExtArg<'a>], out_buffer: &mut [u8]) -> Result<(), String> {
-        let ExtArg::Section { data: img_buffer, .. } = args.first().ok_or(
-            "MockRejectEmpty: expected ExtArg::Section as args[0]".to_string(),
+    fn execute<'a>(&self, args: &[ParamArg<'a>], out_buffer: &mut [u8]) -> Result<(), String> {
+        let ParamArg::Slice { data: img_buffer } = args.first().ok_or(
+            "MockRejectEmpty: expected ParamArg::Slice as args[0]".to_string(),
         )? else {
-            return Err("MockRejectEmpty: args[0] must be ExtArg::Section".to_string());
+            return Err("MockRejectEmpty: args[0] must be ParamArg::Slice".to_string());
         };
         if img_buffer.is_empty() {
             return Err("brink::test_reject_empty: input range must not be empty".to_string());
@@ -273,7 +273,7 @@ impl BrinkExtension for MockSum8 {
         ]
     }
 
-    fn execute<'a>(&self, args: &[ExtArg<'a>], out: &mut [u8]) -> Result<(), String> {
+    fn execute<'a>(&self, args: &[ParamArg<'a>], out: &mut [u8]) -> Result<(), String> {
         if args.len() != 8 {
             return Err(format!(
                 "brink::test_sum8: expected 8 args, got {}",
@@ -282,9 +282,9 @@ impl BrinkExtension for MockSum8 {
         }
         let mut sum: u64 = 0;
         for (i, arg) in args.iter().enumerate() {
-            let ExtArg::Int(v) = arg else {
+            let ParamArg::Int(v) = arg else {
                 return Err(format!(
-                    "brink::test_sum8: arg {} must be ExtArg::Int",
+                    "brink::test_sum8: arg {} must be ParamArg::Int",
                     i
                 ));
             };
@@ -308,7 +308,7 @@ impl BrinkExtension for MockHugeExt {
         usize::MAX
     }
 
-    fn execute<'a>(&self, _args: &[ExtArg<'a>], _out: &mut [u8]) -> Result<(), String> {
+    fn execute<'a>(&self, _args: &[ParamArg<'a>], _out: &mut [u8]) -> Result<(), String> {
         unreachable!("MockHugeExt::execute should never be called: iterate fails first");
     }
 }

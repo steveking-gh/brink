@@ -1,6 +1,6 @@
-// A ByteArray-kinded extension arg receives a quoted string instead of a section name.
-// MockRangedSum declares params() with one ByteArray param named "data".
-// IRDb rejects the string value with IRDB_52 because ByteArray params require
+// A Slice-kinded extension arg receives a quoted string instead of a section name.
+// MockRangedSum declares params() with one Slice param named "data".
+// IRDb rejects the string value with IRDB_52 because Slice params require
 // a section identifier, not a value expression.
 
 section foo {

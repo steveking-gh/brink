@@ -14,7 +14,7 @@
 
 use anyhow::{Result, anyhow};
 use diags::{Diags, SourceSpan};
-use ext::{ExtArg, ExtensionRegistry, ParamKind};
+use ext::{ExtensionRegistry, ParamArg, ParamKind};
 use ir::{ConstBuiltins, DataType, IR, IRKind, ParameterValue};
 use irdb::IRDb;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -50,19 +50,22 @@ impl Location {
     /// Emits EXEC_37 on file-offset overflow or EXEC_43 on absolute-address
     /// overflow, and returns `false`.  Every write-type iterate helper calls
     /// `advance` so the checked-arithmetic pattern lives in exactly one place.
-    fn advance(
-        &mut self,
-        sz: u64,
-        src_loc: &SourceSpan,
-        diags: &mut Diags,
-    ) -> bool {
+    fn advance(&mut self, sz: u64, src_loc: &SourceSpan, diags: &mut Diags) -> bool {
         let Some(new_file_pos) = self.file_offset.checked_add(sz) else {
-            diags.err1("EXEC_37", "Write operation causes location counter overflow", src_loc.clone());
+            diags.err1(
+                "EXEC_37",
+                "Write operation causes location counter overflow",
+                src_loc.clone(),
+            );
             return false;
         };
         let new_off = self.addr_offset + sz; // safe: off <= file_pos
         if self.addr_base.checked_add(new_off).is_none() {
-            diags.err1("EXEC_43", "Write operation causes absolute address overflow", src_loc.clone());
+            diags.err1(
+                "EXEC_43",
+                "Write operation causes absolute address overflow",
+                src_loc.clone(),
+            );
             return false;
         }
         self.file_offset = new_file_pos;
@@ -1156,9 +1159,10 @@ impl Engine {
         // Record that set_addr was called mid-section if sec_offset is non-zero.
         // This arms the warning for any subsequent set_sec_offset in this scope.
         if current.sec_offset != 0
-            && let Some(frame) = self.scope_stack.last_mut() {
-                frame.set_addr_seen = true;
-            }
+            && let Some(frame) = self.scope_stack.last_mut()
+        {
+            frame.set_addr_seen = true;
+        }
 
         current.addr_base = set_val;
         current.addr_offset = 0;
@@ -1387,7 +1391,11 @@ impl Engine {
                     let file_end = self.ir_locs[i].file_offset;
                     let addr_offset = start_loc.addr_offset;
                     let Some(addr) = start_loc.addr_base.checked_add(addr_offset) else {
-                        diags.err1("EXEC_60", "Section address overflows u64", ir.src_loc.clone());
+                        diags.err1(
+                            "EXEC_60",
+                            "Section address overflows u64",
+                            ir.src_loc.clone(),
+                        );
                         continue;
                     };
                     self.wr_dispatches.push(WrDispatch {
@@ -2059,7 +2067,7 @@ impl Engine {
         };
 
         // Maps each section name to a list of indices into wr_dispatches.
-        // ByteArray param resolution uses the map to check for ambiguity and to
+        // Slice param resolution uses the map to check for ambiguity and to
         // resolve file_offset in O(1) instead of two linear scans per call.
         let mut sec_dispatch_map: HashMap<&str, Vec<usize>> = HashMap::new();
         for (i, d) in self.wr_dispatches.iter().enumerate() {
@@ -2077,7 +2085,7 @@ impl Engine {
             };
             let byte_width = entry.cached_size;
 
-            // Build the ExtArg list and call the extension.
+            // Build the ParamArg list and call the extension.
             //
             // All extension calls use IRKind::ExtensionCall with operand layout:
             //   [name, user_arg0..., output]
@@ -2086,29 +2094,29 @@ impl Engine {
             // must not be passed to the extension.  last = len-1 excludes it.
             //
             // When the extension declares params() (cached_params non-empty), the
-            // engine resolves ByteArray-kinded params to ExtArg::Section and passes
-            // remaining params as ExtArg::Int or ExtArg::Str.  Operands arrive in
+            // engine resolves Slice-kinded params to ParamArg::Slice and passes
+            // remaining params as ParamArg::Int or ParamArg::Str.  Operands arrive in
             // declaration order (irdb canonicalized them).
             //
             // When cached_params is empty (legacy opt-out), the engine applies the
             // old heuristic: if the first user arg is an Identifier that names a
-            // known section, resolve it to ExtArg::Section.
+            // known section, resolve it to ParamArg::Slice.
             //
-            // ExtArg::Section holds &mmap[..], an immutable borrow.  Pre-resolve
+            // ParamArg::Slice holds &mmap[..], an immutable borrow.  Pre-resolve
             // all section lookups before that scope so error handling can use `continue`.
             let last = ir.operands.len() - 1;
             let cached_params = &entry.cached_params;
 
             // Per-param section resolutions, indexed parallel to cached_params.
             // Each entry is Some((file_offset, size, slice_start, slice_end)) for
-            // ByteArray params, or None for Int/Str params.
+            // Slice params, or None for Int/Str params.
             // For the legacy path a single entry covers user arg 0.
             let mut resolved_sections: Vec<Option<(u64, u64, usize, usize)>> = Vec::new();
             let mut section_resolve_failed = false;
 
             if cached_params.is_empty() {
                 // Legacy heuristic: if user arg 0 is an Identifier matching a section,
-                // resolve it to ExtArg::Section.
+                // resolve it to ParamArg::Slice.
                 if last > 1 {
                     if let ParameterValue::Identifier(ref sec_name) = self.parms[ir.operands[1]] {
                         let indices = sec_dispatch_map
@@ -2123,7 +2131,9 @@ impl Engine {
                                      section-name form is ambiguous. Wrap with a unique \
                                      section name or use `wr {}(section_name)` on a single \
                                      occurrence.",
-                                    sec_name, indices.len(), name,
+                                    sec_name,
+                                    indices.len(),
+                                    name,
                                 ),
                                 ir.src_loc.clone(),
                             );
@@ -2132,7 +2142,12 @@ impl Engine {
                         } else if let Some(&di) = indices.first() {
                             let d = &self.wr_dispatches[di];
                             let start = d.file_offset as usize;
-                            resolved_sections.push(Some((d.file_offset, d.size, start, start + d.size as usize)));
+                            resolved_sections.push(Some((
+                                d.file_offset,
+                                d.size,
+                                start,
+                                start + d.size as usize,
+                            )));
                         } else {
                             resolved_sections.push(None);
                         }
@@ -2141,10 +2156,10 @@ impl Engine {
                     }
                 }
             } else {
-                // Named-arg/positional path: resolve each ByteArray param.
+                // Named-arg/positional path: resolve each Slice param.
                 // Operands arrive in declaration order after irdb canonicalization.
                 for (i, p) in cached_params.iter().enumerate() {
-                    if p.kind == ParamKind::ByteArray {
+                    if p.kind == ParamKind::Slice {
                         let sec_name = self.parms[ir.operands[1 + i]].to_identifier().to_string();
                         let indices = sec_dispatch_map
                             .get(sec_name.as_str())
@@ -2156,7 +2171,10 @@ impl Engine {
                                 &format!(
                                     "Extension '{}': section '{}' for parameter '{}' appears {} \
                                      times in the output and is ambiguous.",
-                                    name, sec_name, p.name, indices.len(),
+                                    name,
+                                    sec_name,
+                                    p.name,
+                                    indices.len(),
                                 ),
                                 ir.src_loc.clone(),
                             );
@@ -2168,12 +2186,19 @@ impl Engine {
                             return Err(anyhow!(
                                 "Extension '{}': section '{}' for parameter '{}' not found \
                                  in dispatch table. This is a compiler bug.",
-                                name, sec_name, p.name
+                                name,
+                                sec_name,
+                                p.name
                             ));
                         };
                         let d = &self.wr_dispatches[di];
                         let start = d.file_offset as usize;
-                        resolved_sections.push(Some((d.file_offset, d.size, start, start + d.size as usize)));
+                        resolved_sections.push(Some((
+                            d.file_offset,
+                            d.size,
+                            start,
+                            start + d.size as usize,
+                        )));
                     } else {
                         resolved_sections.push(None);
                     }
@@ -2185,17 +2210,17 @@ impl Engine {
             }
 
             // Build ext_args in a scope that isolates the immutable mmap borrow
-            // held by ExtArg::Section.  The scope produces only an owned Vec<u8>,
+            // held by ParamArg::Slice.  The scope produces only an owned Vec<u8>,
             // so the borrow drops before the mutable patch write below.
             let exec_result: Result<Vec<u8>, String> = {
-                let mut ext_args: Vec<ExtArg<'_>> = Vec::new();
+                let mut ext_args: Vec<ParamArg<'_>> = Vec::new();
 
                 if cached_params.is_empty() {
                     // Legacy path: section at user arg 0 (if any), then remaining args.
-                    let user_arg_start = if let Some(Some((file_offset, len, start, end))) =
+                    let user_arg_start = if let Some(Some((_file_offset, _len, start, end))) =
                         resolved_sections.first().copied()
                     {
-                        ext_args.push(ExtArg::Section { start: file_offset, len, data: &mmap[start..end] });
+                        ext_args.push(ParamArg::Slice { data: &mmap[start..end] });
                         2
                     } else {
                         1
@@ -2203,27 +2228,36 @@ impl Engine {
                     for &op in &ir.operands[user_arg_start..last] {
                         let parm = &self.parms[op];
                         let arg = match parm {
-                            ParameterValue::U64(v) => ExtArg::Int(*v),
-                            ParameterValue::I64(v) | ParameterValue::Integer(v) => ExtArg::Int(*v as u64),
-                            ParameterValue::QuotedString(s) => ExtArg::Str(s.as_str()),
-                            _ => unreachable!("unexpected extension arg type {:?}", parm.data_type()),
+                            ParameterValue::U64(v) => ParamArg::Int(*v),
+                            ParameterValue::I64(v) | ParameterValue::Integer(v) => {
+                                ParamArg::Int(*v as u64)
+                            }
+                            ParameterValue::QuotedString(s) => ParamArg::Str(s.as_str()),
+                            _ => {
+                                unreachable!("unexpected extension arg type {:?}", parm.data_type())
+                            }
                         };
                         ext_args.push(arg);
                     }
                 } else {
                     // Named-arg/positional path: build args from declared params in order.
                     for (i, p) in cached_params.iter().enumerate() {
-                        if p.kind == ParamKind::ByteArray {
-                            if let Some((file_offset, len, start, end)) = resolved_sections[i] {
-                                ext_args.push(ExtArg::Section { start: file_offset, len, data: &mmap[start..end] });
+                        if p.kind == ParamKind::Slice {
+                            if let Some((_file_offset, _len, start, end)) = resolved_sections[i] {
+                                ext_args.push(ParamArg::Slice { data: &mmap[start..end] });
                             }
                         } else {
                             let parm = &self.parms[ir.operands[1 + i]];
                             let arg = match parm {
-                                ParameterValue::U64(v) => ExtArg::Int(*v),
-                                ParameterValue::I64(v) | ParameterValue::Integer(v) => ExtArg::Int(*v as u64),
-                                ParameterValue::QuotedString(s) => ExtArg::Str(s.as_str()),
-                                _ => unreachable!("unexpected extension arg type {:?}", parm.data_type()),
+                                ParameterValue::U64(v) => ParamArg::Int(*v),
+                                ParameterValue::I64(v) | ParameterValue::Integer(v) => {
+                                    ParamArg::Int(*v as u64)
+                                }
+                                ParameterValue::QuotedString(s) => ParamArg::Str(s.as_str()),
+                                _ => unreachable!(
+                                    "unexpected extension arg type {:?}",
+                                    parm.data_type()
+                                ),
                             };
                             ext_args.push(arg);
                         }
