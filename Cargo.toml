@@ -77,6 +77,6 @@ tracing-subscriber = "0.3.22"
 
 [dev-dependencies]
 assert_cmd = "1.0.1"
-predicates = "1.0.5"
+predicates = "3.1.4"
 serial_test = "0.5.1"
 serde_json = "1"

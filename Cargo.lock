@@ -130,7 +130,7 @@ dependencies = [
  "assert_cmd",
  "clap",
  "indextree",
- "predicates 1.0.8",
+ "predicates 3.1.4",
  "process",
  "serde_json",
  "serial_test",
@@ -261,12 +261,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "difference"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "524cbf6897b527295dff137cec09ecf3a05f4fddffd7dfcd1585403449e74198"
-
-[[package]]
 name = "difflib"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -330,9 +324,9 @@ dependencies = [
 
 [[package]]
 name = "float-cmp"
-version = "0.8.0"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1267f4ac4f343772758f7b1bdcbe767c218bbab93bb432acbf5162bbf85a6c4"
+checksum = "b09cf3155332e944990140d967ff5eceb70df778b34f77d8075db46e4704e6d8"
 dependencies = [
  "num-traits",
 ]
@@ -606,19 +600,6 @@ checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 
 [[package]]
 name = "predicates"
-version = "1.0.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f49cfaf7fdaa3bfacc6fa3e7054e65148878354a5cfddcf661df4c851f8021df"
-dependencies = [
- "difference",
- "float-cmp",
- "normalize-line-endings",
- "predicates-core",
- "regex",
-]
-
-[[package]]
-name = "predicates"
 version = "2.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "59230a63c37f3e18569bdb90e4a89cbf5bf8b06fea0b84e65ea10cc4df47addd"
@@ -626,6 +607,20 @@ dependencies = [
  "difflib",
  "itertools 0.10.5",
  "predicates-core",
+]
+
+[[package]]
+name = "predicates"
+version = "3.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ada8f2932f28a27ee7b70dd6c1c39ea0675c55a36879ab92f3a715eaa1e63cfe"
+dependencies = [
+ "anstyle",
+ "difflib",
+ "float-cmp",
+ "normalize-line-endings",
+ "predicates-core",
+ "regex",
 ]
 
 [[package]]
@@ -858,7 +853,7 @@ dependencies = [
  "brink_extension",
  "crc32c",
  "extension_registry",
- "predicates 1.0.8",
+ "predicates 3.1.4",
 ]
 
 [[package]]
@@ -869,7 +864,7 @@ dependencies = [
  "brink_extension",
  "extension_registry",
  "md-5",
- "predicates 1.0.8",
+ "predicates 3.1.4",
 ]
 
 [[package]]
@@ -879,7 +874,7 @@ dependencies = [
  "assert_cmd",
  "brink_extension",
  "extension_registry",
- "predicates 1.0.8",
+ "predicates 3.1.4",
  "sha2",
 ]
 
