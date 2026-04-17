@@ -16,7 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - INTERNAL: Fixed is_none + unwrap anti-pattern.
 - INTERNAL: Refactor counter advance into one function
 - INTERNAL: Changed a saturating add to checked add.
-- ITTERNAL: Simplified extension call handling in the IR.
+- INTERNAL: Simplified extension call handling in the IR.
 - INTERNAL: Implemented Rustc-style AST storage for synthetic nodes.
 - INTERNAL: Added large comment about how brink handles include files.
 - INTERNAL: renamed ext to extension_registry
