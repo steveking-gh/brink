@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - INTERNAL: Remove unused codespan-reporting crate
 - INTERNAL: Upgrade to latest ariadne crate
 - INTERNAL: Upgrade to latest predicates crate
+- INTERNAL: Upgrade to latest assert crate
 
 ## [6.0.0] - 2026-04-16
 

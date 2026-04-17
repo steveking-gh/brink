@@ -79,13 +79,14 @@ dependencies = [
 
 [[package]]
 name = "assert_cmd"
-version = "1.0.8"
+version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c98233c6673d8601ab23e77eb38f999c51100d46c5703b17288c57fddf3a1ffe"
+checksum = "39bae1d3fa576f7c6519514180a72559268dd7d1fe104070956cb687bc6673bd"
 dependencies = [
+ "anstyle",
  "bstr",
- "doc-comment",
- "predicates 2.1.5",
+ "libc",
+ "predicates",
  "predicates-core",
  "predicates-tree",
  "wait-timeout",
@@ -130,7 +131,7 @@ dependencies = [
  "assert_cmd",
  "clap",
  "indextree",
- "predicates 3.1.4",
+ "predicates",
  "process",
  "serde_json",
  "serial_test",
@@ -144,13 +145,13 @@ version = "6.0.0"
 
 [[package]]
 name = "bstr"
-version = "0.2.17"
+version = "1.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba3569f383e8f1598449f1a423e72e99569137b47740b1da11ef19af3d5c3223"
+checksum = "63044e1ae8e69f3b5a92c736ca6269b8d12fa7efe39bf34ddb06d102cf0e2cab"
 dependencies = [
- "lazy_static",
  "memchr",
- "regex-automata 0.1.10",
+ "regex-automata",
+ "serde",
 ]
 
 [[package]]
@@ -278,12 +279,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "doc-comment"
-version = "0.3.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "780955b8b195a21ab8e4ac6b60dd1dbdcec1dc6c51c0617964b08c81785e12c9"
-
-[[package]]
 name = "either"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -362,7 +357,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f85dac6c239acc85fd61934c572292d93adfd2de459d9c032aa22b553506e915"
 dependencies = [
  "either",
- "itertools 0.14.0",
+ "itertools",
  "proc-macro2",
  "quote",
  "strum",
@@ -410,15 +405,6 @@ name = "is_terminal_polyfill"
 version = "1.70.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a6cb138bb79a146c1bd460005623e142ef0181e3d0219cb493e02f7d08a35695"
-
-[[package]]
-name = "itertools"
-version = "0.10.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0fd2260e829bddf4cb6ea802289de2f86d6a7a690192fbe91b3f46e0f2c8473"
-dependencies = [
- "either",
-]
 
 [[package]]
 name = "itertools"
@@ -600,17 +586,6 @@ checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 
 [[package]]
 name = "predicates"
-version = "2.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59230a63c37f3e18569bdb90e4a89cbf5bf8b06fea0b84e65ea10cc4df47addd"
-dependencies = [
- "difflib",
- "itertools 0.10.5",
- "predicates-core",
-]
-
-[[package]]
-name = "predicates"
 version = "3.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ada8f2932f28a27ee7b70dd6c1c39ea0675c55a36879ab92f3a715eaa1e63cfe"
@@ -707,15 +682,9 @@ checksum = "e10754a14b9137dd7b1e3e5b0493cc9171fdd105e0ab477f51b72e7f3ac0e276"
 dependencies = [
  "aho-corasick",
  "memchr",
- "regex-automata 0.4.14",
+ "regex-automata",
  "regex-syntax",
 ]
-
-[[package]]
-name = "regex-automata"
-version = "0.1.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c230d73fb8d8c1b9c0b3135c5142a8acee3a0558fb8db5cf1cb65f8d7862132"
 
 [[package]]
 name = "regex-automata"
@@ -853,7 +822,7 @@ dependencies = [
  "brink_extension",
  "crc32c",
  "extension_registry",
- "predicates 3.1.4",
+ "predicates",
 ]
 
 [[package]]
@@ -864,7 +833,7 @@ dependencies = [
  "brink_extension",
  "extension_registry",
  "md-5",
- "predicates 3.1.4",
+ "predicates",
 ]
 
 [[package]]
@@ -874,7 +843,7 @@ dependencies = [
  "assert_cmd",
  "brink_extension",
  "extension_registry",
- "predicates 3.1.4",
+ "predicates",
  "sha2",
 ]
 

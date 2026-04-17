@@ -13,5 +13,5 @@ md-5 = "0.11"
 extension_registry = { path = "../../extension_registry" }
 
 [dev-dependencies]
-assert_cmd = "1.0.1"
+assert_cmd = "2.2.1"
 predicates = "3.1.4"
