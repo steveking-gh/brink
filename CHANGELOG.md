@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [5.x.x] - 2026-04-12
 
 - EXTENSION API BREAKING CHANGE: Generalized and unified extension parameter passing.
+- FEATURE: Extensions support named arguments, as in foo:bar(stuff=42);
 - BUG FIX: Fixed to_i64() and to_u64() in const expressions
 - BUG FIX: Use checked arithmetic for extension size.
 - INTERNAL: Fixed unused import clippy warning
