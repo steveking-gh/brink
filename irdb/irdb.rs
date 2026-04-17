@@ -18,7 +18,7 @@ use layoutdb::LayoutDb;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
 
-use ext::{ExtensionRegistry, ParamKind};
+use extension_registry::{ExtensionRegistry, ParamKind};
 use ir::{DataType, IR, IRKind, IROperand, ParameterValue};
 use parse_int::parse;
 use std::{

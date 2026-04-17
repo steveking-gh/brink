@@ -21,5 +21,5 @@ ir = { path = "../ir" }
 symtable = { path = "../symtable" }
 layoutdb = { path = "../layoutdb" }
 linearizer = { path = "../linearizer" }
-ext = { path = "../ext" }
+extension_registry = { path = "../extension_registry" }
 tracing = "0.1.44"

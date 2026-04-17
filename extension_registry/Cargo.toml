@@ -1,11 +1,11 @@
 [package]
-name = "ext"
+name = "extension_registry"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
 
 [lib]
-path = "ext.rs"
+path = "extension_registry.rs"
 
 [dependencies]
 brink_extension = { path = "../brink_extension" }

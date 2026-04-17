@@ -10,7 +10,7 @@ members = [
     "irdb",
     "diags",
     "map",
-    "ext",
+    "extension_registry",
     "const_eval",
     "brink_extension",
     "std/crc32c",

@@ -1409,7 +1409,7 @@ workspace path matching your namespace for third-party extensions.  Implement th
 
     // my_extension/src/lib.rs
     use brink_extension::BrinkExtension;
-    use ext::ExtensionRegistry;
+    use extension_registry::ExtensionRegistry;
 
     pub struct MyExtension;
 
@@ -1488,54 +1488,54 @@ To update the coverage table in this README from Windows, run `.\update_coverage
 
 <!-- COVERAGE_START -->
 ```text
-Filename                      Regions    Missed Regions     Cover   Functions  Missed Functions  Executed       Lines      Missed Lines     Cover    Branches   Missed Branches     Cover
------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-ast\ast.rs                       2318               452    80.50%          70                 8    88.57%        1265               208    83.56%           0                 0         -
-ast\lexer.rs                      376                12    96.81%          16                 0   100.00%         234                 9    96.15%           0                 0         -
-brink_extension\lib.rs              3                 0   100.00%           1                 0   100.00%           3                 0   100.00%           0                 0         -
-const_eval\const_eval.rs         1081               174    83.90%          26                 5    80.77%         701               150    78.60%           0                 0         -
-diags\diags.rs                    209                25    88.04%          10                 1    90.00%         106                19    82.08%           0                 0         -
-engine\engine.rs                 2296               485    78.88%          66                 6    90.91%        1451               255    82.43%           0                 0         -
-ext\ext.rs                        248                 9    96.37%          17                 3    82.35%         121                 9    92.56%           0                 0         -
-ext\test_mocks.rs                 259                34    86.87%          38                 6    84.21%         204                33    83.82%           0                 0         -
-extensions\src\lib.rs               8                 0   100.00%           1                 0   100.00%           5                 0   100.00%           0                 0         -
-ir\ir.rs                          226                28    87.61%          22                 1    95.45%         172                18    89.53%           0                 0         -
-irdb\irdb.rs                      818                97    88.14%          17                 1    94.12%         482                60    87.55%           0                 0         -
-layoutdb\layoutdb.rs              772               160    79.27%          18                 0   100.00%         434                72    83.41%           0                 0         -
-linearizer\linearizer.rs          568                87    84.68%          19                 1    94.74%         332                38    88.55%           0                 0         -
-map\map.rs                        860                13    98.49%          58                 0   100.00%         579                 9    98.45%           0                 0         -
-process\process.rs                360                25    93.06%          22                 5    77.27%         195                 9    95.38%           0                 0         -
-prune\prune.rs                    150                 9    94.00%          12                 2    83.33%          95                 7    92.63%           0                 0         -
-src\main.rs                       123                 6    95.12%           8                 1    87.50%          84                 5    94.05%           0                 0         -
-std\crc32c\src\crc32c.rs           31                 2    93.55%           5                 0   100.00%          21                 2    90.48%           0                 0         -
-std\md5\src\md5.rs                 31                 2    93.55%           5                 0   100.00%          21                 2    90.48%           0                 0         -
-std\sha256\src\sha256.rs           31                 2    93.55%           5                 0   100.00%          21                 2    90.48%           0                 0         -
-symtable\symtable.rs              114                 5    95.61%          14                 2    85.71%          80                 5    93.75%           0                 0         -
------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-TOTAL                           10882              1627    85.05%         450                42    90.67%        6606               912    86.19%           0                 0         -
+Filename                                     Regions    Missed Regions     Cover   Functions  Missed Functions  Executed       Lines      Missed Lines     Cover    Branches   Missed Branches     Cover
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ast\ast.rs                                      2318               452    80.50%          70                 8    88.57%        1265               208    83.56%           0                 0         -
+ast\lexer.rs                                     376                12    96.81%          16                 0   100.00%         234                 9    96.15%           0                 0         -
+brink_extension\lib.rs                             3                 0   100.00%           1                 0   100.00%           3                 0   100.00%           0                 0         -
+const_eval\const_eval.rs                        1081               174    83.90%          26                 5    80.77%         701               150    78.60%           0                 0         -
+diags\diags.rs                                   209                25    88.04%          10                 1    90.00%         106                19    82.08%           0                 0         -
+engine\engine.rs                                2292               483    78.93%          66                 6    90.91%        1480               271    81.69%           0                 0         -
+extension_registry\extension_registry.rs         248                 9    96.37%          17                 3    82.35%         121                 9    92.56%           0                 0         -
+extension_registry\test_mocks.rs                 259                34    86.87%          38                 6    84.21%         204                33    83.82%           0                 0         -
+extensions\src\lib.rs                              8                 0   100.00%           1                 0   100.00%           5                 0   100.00%           0                 0         -
+ir\ir.rs                                         226                28    87.61%          22                 1    95.45%         172                18    89.53%           0                 0         -
+irdb\irdb.rs                                     818                97    88.14%          17                 1    94.12%         482                60    87.55%           0                 0         -
+layoutdb\layoutdb.rs                             772               160    79.27%          18                 0   100.00%         434                72    83.41%           0                 0         -
+linearizer\linearizer.rs                         568                87    84.68%          19                 1    94.74%         332                38    88.55%           0                 0         -
+map\map.rs                                       860                13    98.49%          58                 0   100.00%         579                 9    98.45%           0                 0         -
+process\process.rs                               360                25    93.06%          22                 5    77.27%         195                 9    95.38%           0                 0         -
+prune\prune.rs                                   150                 9    94.00%          12                 2    83.33%          95                 7    92.63%           0                 0         -
+src\main.rs                                      123                 6    95.12%           8                 1    87.50%          84                 5    94.05%           0                 0         -
+std\crc32c\src\crc32c.rs                          31                 2    93.55%           5                 0   100.00%          26                 3    88.46%           0                 0         -
+std\md5\src\md5.rs                                31                 2    93.55%           5                 0   100.00%          26                 3    88.46%           0                 0         -
+std\sha256\src\sha256.rs                          31                 2    93.55%           5                 0   100.00%          26                 3    88.46%           0                 0         -
+symtable\symtable.rs                             114                 5    95.61%          14                 2    85.71%          80                 5    93.75%           0                 0         -
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+TOTAL                                          10878              1625    85.06%         450                42    90.67%        6650               931    86.00%           0                 0         -
 ```
 <!-- COVERAGE_END -->
 
 ## Brink Source Code Overview
 
-| File                     | Stage         | Summary                                                                       |
-| ------------------------ | ------------- | ----------------------------------------------------------------------------- |
-| ast/ast.rs               | Stage 1       | Logos lexer → token stream → arena AST → AstDb validation                     |
-| const_eval/const_eval.rs | Stage 2       | Lowers const AST statements to LinIR, evaluates them, returns a SymbolTable   |
-| layoutdb/layoutdb.rs     | Stage 3       | AST flattening into linear IR and operand vectors; values are still strings   |
-| irdb/irdb.rs             | Stage 4       | String to typed value conversion, operand and file validation                 |
-| engine/engine.rs         | Stage 5       | Layout iteration loop, then execute pass to write binary output               |
-| symtable/symtable.rs     | Shared types  | SymbolTable tracking every compile-time const from declaration through use    |
-| linearizer/linearizer.rs | Shared types  | LinIR and LinOperand types; shared lowering infrastructure for stages 2 and 3 |
-| ir/ir.rs                 | Shared types  | IRKind, ParameterValue, IROperand, IR — the data flowing between stages 3–5   |
-| map/map.rs               | Map output    | Constructs MapDb and renders human-friendly map text                          |
-| process/process.rs       | Orchestrator  | Orchestration of all stages, parses `-D` defines, opens the output file       |
-| diags/diags.rs           | Cross-cutting | Ariadne-backed diagnostic output channel used by every stage                  |
-| extensions/src/lib.rs    | Extensions    | Single registration point for all extensions                                  |
-| brink_extension/lib.rs   | Extensions    | Public API for extension authors                                              |
-| ext/ext.rs               | Extensions    | Runtime extension registry and dispatch wrapper                               |
-| std/crc32c/src/lib.rs    | std extension | CRC-32C (Castagnoli) hash over caller-specified output region                 |
-| std/sha256/src/lib.rs    | std extension | SHA256 hash over caller-specified output region                               |
+| File                                     | Stage         | Summary                                                                       |
+| ---------------------------------------- | ------------- | ----------------------------------------------------------------------------- |
+| ast/ast.rs                               | Stage 1       | Logos lexer → token stream → arena AST → AstDb validation                     |
+| const_eval/const_eval.rs                 | Stage 2       | Lowers const AST statements to LinIR, evaluates them, returns a SymbolTable   |
+| layoutdb/layoutdb.rs                     | Stage 3       | AST flattening into linear IR and operand vectors; values are still strings   |
+| irdb/irdb.rs                             | Stage 4       | String to typed value conversion, operand and file validation                 |
+| engine/engine.rs                         | Stage 5       | Layout iteration loop, then execute pass to write binary output               |
+| symtable/symtable.rs                     | Shared types  | SymbolTable tracking every compile-time const from declaration through use    |
+| linearizer/linearizer.rs                 | Shared types  | LinIR and LinOperand types; shared lowering infrastructure for stages 2 and 3 |
+| ir/ir.rs                                 | Shared types  | IRKind, ParameterValue, IROperand, IR — the data flowing between stages 3–5   |
+| map/map.rs                               | Map output    | Constructs MapDb and renders human-friendly map text                          |
+| process/process.rs                       | Orchestrator  | Orchestration of all stages, parses `-D` defines, opens the output file       |
+| diags/diags.rs                           | Cross-cutting | Ariadne-backed diagnostic output channel used by every stage                  |
+| extensions/src/lib.rs                    | Extensions    | Single registration point for all extensions                                  |
+| brink_extension/lib.rs                   | Extensions    | Public API for extension authors                                              |
+| extension_registry/extension_registry.rs | Extensions    | Runtime extension registry and dispatch wrapper                               |
+| std/crc32c/src/lib.rs                    | std extension | CRC-32C (Castagnoli) hash over caller-specified output region                 |
+| std/sha256/src/lib.rs                    | std extension | SHA256 hash over caller-specified output region                               |
 
 ## Rebuilding the vscode Syntax Highlighting Extension
 
@@ -1553,6 +1553,7 @@ No you're ready to rebuild the extension.
 To install the extension into vscode locally:
 
     code --install-extension vscode-brink-0.1.0.vsix
+
 
 
 

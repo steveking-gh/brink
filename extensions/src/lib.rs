@@ -11,7 +11,7 @@
 // `process.rs` calls `register_all` once at startup and does not need
 // to know about individual extensions.
 
-use ext::ExtensionRegistry;
+use extension_registry::ExtensionRegistry;
 
 /// Registers all compiled-in extensions into `registry`.
 /// Call once before compiling any Brink scripts.

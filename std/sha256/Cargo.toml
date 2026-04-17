@@ -10,7 +10,7 @@ path = "src/sha256.rs"
 [dependencies]
 brink_extension = { path = "../../brink_extension" }
 sha2 = { version = "0.11.0" }
-ext = { path = "../../ext" }
+extension_registry = { path = "../../extension_registry" }
 
 [dev-dependencies]
 assert_cmd = "1.0.1"

@@ -14,7 +14,7 @@
 
 use anyhow::{Result, anyhow};
 use diags::{Diags, SourceSpan};
-use ext::{ExtensionRegistry, ParamArg, ParamKind};
+use extension_registry::{ExtensionRegistry, ParamArg, ParamKind};
 use ir::{ConstBuiltins, DataType, IR, IRKind, ParameterValue};
 use irdb::IRDb;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -2220,7 +2220,9 @@ impl Engine {
                     let user_arg_start = if let Some(Some((_file_offset, _len, start, end))) =
                         resolved_sections.first().copied()
                     {
-                        ext_args.push(ParamArg::Slice { data: &mmap[start..end] });
+                        ext_args.push(ParamArg::Slice {
+                            data: &mmap[start..end],
+                        });
                         2
                     } else {
                         1
@@ -2244,7 +2246,9 @@ impl Engine {
                     for (i, p) in cached_params.iter().enumerate() {
                         if p.kind == ParamKind::Slice {
                             if let Some((_file_offset, _len, start, end)) = resolved_sections[i] {
-                                ext_args.push(ParamArg::Slice { data: &mmap[start..end] });
+                                ext_args.push(ParamArg::Slice {
+                                    data: &mmap[start..end],
+                                });
                             }
                         } else {
                             let parm = &self.parms[ir.operands[1 + i]];

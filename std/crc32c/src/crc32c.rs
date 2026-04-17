@@ -10,7 +10,7 @@
 // Output: 4 bytes, little-endian u32.
 
 use brink_extension::{BrinkExtension, ParamArg, ParamDesc, ParamKind};
-use ext::ExtensionRegistry;
+use extension_registry::ExtensionRegistry;
 
 pub struct Crc32c;
 
@@ -24,14 +24,20 @@ impl BrinkExtension for Crc32c {
     }
 
     fn params(&self) -> &[ParamDesc] {
-        &[ParamDesc { name: "data", kind: ParamKind::Slice }]
+        &[ParamDesc {
+            name: "data",
+            kind: ParamKind::Slice,
+        }]
     }
 
     fn execute<'a>(&self, args: &[ParamArg<'a>], out_buffer: &mut [u8]) -> Result<(), String> {
-        let ParamArg::Slice { data: img_buffer } = args.first().ok_or(
-            "std::crc32c: expected ParamArg::Slice as args[0]".to_string(),
-        )? else {
-            return Err("std::crc32c: args[0] must be ParamArg::Slice (use section-name form)".to_string());
+        let ParamArg::Slice { data: img_buffer } = args
+            .first()
+            .ok_or("std::crc32c: expected ParamArg::Slice as args[0]".to_string())?
+        else {
+            return Err(
+                "std::crc32c: args[0] must be ParamArg::Slice (use section-name form)".to_string(),
+            );
         };
         let crc = crc32c::crc32c(img_buffer);
         out_buffer.copy_from_slice(&crc.to_le_bytes());

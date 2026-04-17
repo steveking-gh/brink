@@ -20,7 +20,7 @@ use std::io::Write;
 use ast::{Ast, AstDb};
 use diags::Diags;
 use engine::Engine;
-use ext::{ExtensionRegistry, test_mocks::register_test_extensions};
+use extension_registry::{ExtensionRegistry, test_mocks::register_test_extensions};
 use ir::{ConstBuiltins, ParameterValue};
 use irdb::IRDb;
 use layoutdb::LayoutDb;
@@ -138,8 +138,8 @@ pub fn process(
 
     // Second AstDb: built from the pruned AST with full nesting validation.
     // Sections promoted from top-level if/else blocks are now at root level.
-    let pruned_ast_db = AstDb::new(&mut diags, &pruned_ast, true)
-        .context("[PROC_3]: Error detected, halting.")?;
+    let pruned_ast_db =
+        AstDb::new(&mut diags, &pruned_ast, true).context("[PROC_3]: Error detected, halting.")?;
 
     let layout_db = LayoutDb::new(&mut diags, &pruned_ast, &pruned_ast_db)
         .context("[PROC_4]: Error detected, halting.")?;

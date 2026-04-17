@@ -27,6 +27,6 @@ prune = { path = "../prune" }
 irdb = { path = "../irdb" }
 engine = { path = "../engine" }
 map = { path = "../map" }
-ext = { path = "../ext" }
+extension_registry = { path = "../extension_registry" }
 extensions = { path = "../extensions" }
 tracing = "0.1.44"

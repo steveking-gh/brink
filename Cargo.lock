@@ -343,7 +343,7 @@ dependencies = [
  "ast",
  "codespan-reporting",
  "diags",
- "ext",
+ "extension_registry",
  "ir",
  "irdb",
  "memmap2",
@@ -351,7 +351,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ext"
+name = "extension_registry"
 version = "5.0.6"
 dependencies = [
  "brink_extension",
@@ -363,7 +363,7 @@ dependencies = [
 name = "extensions"
 version = "5.0.6"
 dependencies = [
- "ext",
+ "extension_registry",
  "std_crc32c",
  "std_md5",
  "std_sha256",
@@ -453,7 +453,7 @@ dependencies = [
  "ast",
  "codespan-reporting",
  "diags",
- "ext",
+ "extension_registry",
  "indextree",
  "ir",
  "layoutdb",
@@ -715,7 +715,7 @@ dependencies = [
  "const_eval",
  "diags",
  "engine",
- "ext",
+ "extension_registry",
  "extensions",
  "ir",
  "irdb",
@@ -910,7 +910,7 @@ dependencies = [
  "assert_cmd",
  "brink_extension",
  "crc32c",
- "ext",
+ "extension_registry",
  "predicates 1.0.8",
 ]
 
@@ -920,7 +920,7 @@ version = "5.0.6"
 dependencies = [
  "assert_cmd",
  "brink_extension",
- "ext",
+ "extension_registry",
  "md-5",
  "predicates 1.0.8",
 ]
@@ -931,7 +931,7 @@ version = "5.0.6"
 dependencies = [
  "assert_cmd",
  "brink_extension",
- "ext",
+ "extension_registry",
  "predicates 1.0.8",
  "sha2",
 ]

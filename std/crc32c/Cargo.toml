@@ -10,7 +10,7 @@ path = "src/crc32c.rs"
 [dependencies]
 brink_extension = { path = "../../brink_extension" }
 crc32c = "0.6"
-ext = { path = "../../ext" }
+extension_registry = { path = "../../extension_registry" }
 
 [dev-dependencies]
 assert_cmd = "1.0.1"

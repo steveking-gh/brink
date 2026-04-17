@@ -9,7 +9,7 @@
 // Output: 32 bytes, big-endian digest (standard SHA-256 byte order).
 
 use brink_extension::{BrinkExtension, ParamArg, ParamDesc, ParamKind};
-use ext::ExtensionRegistry;
+use extension_registry::ExtensionRegistry;
 use sha2::{Digest, Sha256};
 
 pub struct Sha256Ext;
