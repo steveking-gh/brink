@@ -246,13 +246,8 @@ impl<'toks> ConstIR {
                         if tok == LexToken::CloseBrace {
                             break;
                         }
-                        result &= Self::record_if_body_stmt(
-                            lz,
-                            children[i],
-                            rdepth + 1,
-                            diags,
-                            ast,
-                        );
+                        result &=
+                            Self::record_if_body_stmt(lz, children[i], rdepth + 1, diags, ast);
                         i += 1;
                     }
                 }
@@ -414,38 +409,36 @@ impl<'toks> ConstIR {
                         }
                     }
                 }
-                IRKind::Print => {
-                    if !diags.noprint {
-                        let mut s = String::new();
-                        for &lop_idx in &ir.operand_vec {
-                            match Self::eval_const_expr_r(
-                                symbol_table,
-                                lop_idx,
-                                const_db,
-                                diags,
-                                &src_loc,
-                            ) {
-                                Some(ParameterValue::QuotedString(ref v)) => s.push_str(v),
-                                Some(ParameterValue::U64(v)) => s.push_str(&format!("{:#X}", v)),
-                                Some(ParameterValue::I64(v) | ParameterValue::Integer(v)) => {
-                                    s.push_str(&format!("{}", v));
-                                }
-                                Some(_) => {
-                                    diags.err1(
-                                        "IRDB_31",
-                                        "Cannot print this value type in a const context",
-                                        src_loc.clone(),
-                                    );
-                                    result = false;
-                                }
-                                None => {
-                                    result = false;
-                                }
+                IRKind::Print if !diags.noprint => {
+                    let mut s = String::new();
+                    for &lop_idx in &ir.operand_vec {
+                        match Self::eval_const_expr_r(
+                            symbol_table,
+                            lop_idx,
+                            const_db,
+                            diags,
+                            &src_loc,
+                        ) {
+                            Some(ParameterValue::QuotedString(ref v)) => s.push_str(v),
+                            Some(ParameterValue::U64(v)) => s.push_str(&format!("{:#X}", v)),
+                            Some(ParameterValue::I64(v) | ParameterValue::Integer(v)) => {
+                                s.push_str(&format!("{}", v));
+                            }
+                            Some(_) => {
+                                diags.err1(
+                                    "IRDB_31",
+                                    "Cannot print this value type in a const context",
+                                    src_loc.clone(),
+                                );
+                                result = false;
+                            }
+                            None => {
+                                result = false;
                             }
                         }
-                        if result {
-                            print!("{}", s);
-                        }
+                    }
+                    if result {
+                        print!("{}", s);
                     }
                 }
                 IRKind::Assert => {
@@ -525,34 +518,28 @@ impl<'toks> ConstIR {
                 IRKind::BuiltinVersionString => Some(ParameterValue::QuotedString(
                     ConstBuiltins::get().brink_version_string.to_string(),
                 )),
-                IRKind::BuiltinVersionMajor => {
-                    Some(ParameterValue::U64(ConstBuiltins::get().brink_version_major))
-                }
-                IRKind::BuiltinVersionMinor => {
-                    Some(ParameterValue::U64(ConstBuiltins::get().brink_version_minor))
-                }
-                IRKind::BuiltinVersionPatch => {
-                    Some(ParameterValue::U64(ConstBuiltins::get().brink_version_patch))
-                }
+                IRKind::BuiltinVersionMajor => Some(ParameterValue::U64(
+                    ConstBuiltins::get().brink_version_major,
+                )),
+                IRKind::BuiltinVersionMinor => Some(ParameterValue::U64(
+                    ConstBuiltins::get().brink_version_minor,
+                )),
+                IRKind::BuiltinVersionPatch => Some(ParameterValue::U64(
+                    ConstBuiltins::get().brink_version_patch,
+                )),
 
                 // ── Unary type conversions: operand layout = [input, output] ───
                 IRKind::ToI64 | IRKind::ToU64 => {
                     let input_lop = lin_ir.operand_vec[0];
-                    let val = Self::eval_const_expr_r(
-                        symbol_table,
-                        input_lop,
-                        const_db,
-                        diags,
-                        err_loc,
-                    )?;
+                    let val =
+                        Self::eval_const_expr_r(symbol_table, input_lop, const_db, diags, err_loc)?;
                     match (&val, op) {
                         (ParameterValue::U64(v), IRKind::ToI64) => {
                             Some(ParameterValue::I64(*v as i64))
                         }
-                        (
-                            ParameterValue::I64(_) | ParameterValue::Integer(_),
-                            IRKind::ToI64,
-                        ) => Some(ParameterValue::I64(val.to_i64())),
+                        (ParameterValue::I64(_) | ParameterValue::Integer(_), IRKind::ToI64) => {
+                            Some(ParameterValue::I64(val.to_i64()))
+                        }
                         (
                             ParameterValue::U64(_)
                             | ParameterValue::I64(_)
@@ -659,7 +646,10 @@ impl<'toks> ConstIR {
         }
 
         // Literal operands: evaluate directly from tok and sval.
-        let LinOperand::Literal { tok, sval, src_loc, .. } = lop else {
+        let LinOperand::Literal {
+            tok, sval, src_loc, ..
+        } = lop
+        else {
             unreachable!()
         };
         let sval = sval.clone();
@@ -893,13 +883,8 @@ impl<'toks> ConstIR {
                     "Multiply expression '{a} * {b}' will overflow type U64"
                 ))
             }),
-            IRKind::Divide => {
-                if b == 0 {
-                    Err(CalcErr::DivByZero)
-                } else {
-                    Ok(a / b)
-                }
-            }
+            IRKind::Divide => a.checked_div(b).ok_or(CalcErr::DivByZero),
+
             IRKind::Modulo => {
                 if b == 0 {
                     Err(CalcErr::DivByZero)
@@ -955,7 +940,6 @@ impl<'toks> ConstIR {
             )),
         }
     }
-
 }
 
 // ── AST condition evaluator for the prune pass ───────────────────────────────
@@ -990,13 +974,7 @@ pub fn eval_ast_condition(
         ir_vec: lz.ir_vec,
         operand_vec: lz.operand_vec,
     };
-    let val = ConstIR::eval_const_expr_r(
-        symbol_table,
-        lops[0],
-        &const_ir,
-        diags,
-        &src_loc,
-    )?;
+    let val = ConstIR::eval_const_expr_r(symbol_table, lops[0], &const_ir, diags, &src_loc)?;
     Some(val.to_bool())
 }
 
