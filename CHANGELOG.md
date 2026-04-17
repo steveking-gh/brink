@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [5.x.x] - 2026-04-12
 
-- BREAKING CHANGE: Generalized and unified extension parameter passing.
+- EXTENSION API BREAKING CHANGE: Generalized and unified extension parameter passing.
 - BUG FIX: Fixed to_i64() and to_u64() in const expressions
 - BUG FIX: Use checked arithmetic for extension size.
 - INTERNAL: Fixed unused import clippy warning
@@ -16,6 +16,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - INTERNAL: Refactor counter advance into one function
 - INTERNAL: Changed a saturating add to checked add.
 - ITTERNAL: Simplified extension call handling in the IR.
+- INTERNAL: Implemented Rustc-style AST storage for synthetic nodes.
+- INTERNAL: Added large comment about how brink handles include files.
 
 ## [5.0.6] - 2026-04-10
 

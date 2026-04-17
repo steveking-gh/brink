@@ -208,23 +208,14 @@ impl<'toks> TokenInfo<'toks> {
 /// attention to the EOF sentinel.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TokenVector<'toks> {
-    /// The token enum as identified by logos
     tv: Vec<TokenInfo<'toks>>,
-
-    /// Index of the EOF token, helpful in clamping out-of-bounds indices to EOF.
-    eof_idx: usize,
-
-    /// Index into tv of the next unread token.
     idx: usize,
 }
 
 impl<'toks> TokenVector<'toks> {
     pub fn new(mut tv: Vec<TokenInfo<'toks>>) -> Self {
-        // Mark the end of input.  Synthetic tokens pushed after this sentinel
-        // are never reached by the sequential parse scan.
-        let eof_idx = tv.len();
         tv.push(TokenInfo { tok: LexToken::EOF, val: "", loc: SourceSpan { file_id: 0, range: 0..0 } });
-        Self { tv, eof_idx, idx: 0 }
+        Self { tv, idx: 0 }
     }
 
     pub fn get_index(&self) -> usize {
@@ -232,46 +223,33 @@ impl<'toks> TokenVector<'toks> {
     }
 
     pub fn scannable_len(&self) -> usize {
-        self.eof_idx
+        self.tv.len() - 1
     }
 
-    /// Get needs access to all token including synthetic tokens after the EOF.
+    /// Get needs access to all tokens.
     pub fn get(&self, idx: usize) -> &TokenInfo<'toks> {
         self.tv.get(idx).unwrap_or_else(||
             panic!("TokenVector::get: Index {} out of bounds, tv length={}", idx, self.tv.len()))
     }
 
-    /// Push a synthetic token after the EOF sentinel and return its index.
-    /// The returned index can be used to create an arena node for the token.
-    pub fn push_synthetic(&mut self, tinfo: TokenInfo<'toks>) -> usize {
-        let idx = self.tv.len();
-        self.tv.push(tinfo);
-        idx
-    }
-
     /// Return the next unread token, but do not advance.  The sequential parser
     /// never needs to peek past the end-of-input.
     pub fn peek(&self) -> &TokenInfo<'toks> {
-        debug_assert!(self.idx <= self.eof_idx);
         &self.tv[self.idx]
     }
 
     /// Return the next unread token and advance.  Take stops at the end of input.
     pub fn take(&mut self) -> &TokenInfo<'toks> {
-        debug_assert!(self.idx <= self.eof_idx);
         let tinfo = &self.tv[self.idx];
-        // Never advance past the EOF token.
-        if self.idx < self.eof_idx {
+        if self.idx < self.tv.len() - 1 {
             self.idx += 1;
         }
         tinfo
     }
 
-    /// Return a human-readable description of the token at index + offset.
-    /// Negative offsets look at previously taken tokens.  Out-of-bounds or EOF
-    /// positions are described gracefully rather than panicking. This is a
-    /// debug helper function that needs access to all tokens including
-    /// synthetic tokens after the EOF.
+    /// Return a human-readable description of the token at index.
+    /// Out-of-bounds or EOF positions are described gracefully rather than panicking. 
+    /// This is a debug helper function that needs access to all tokens.
     pub fn describe_token(&self, idx: usize) -> String {
         match self.tv.get(idx) {
             None => format!("token {} out of bounds, length={}", idx, self.tv.len()),
@@ -283,8 +261,7 @@ impl<'toks> TokenVector<'toks> {
     /// Return a human-readable description of the token at index + offset.
     /// Negative offsets look at previously taken tokens.  Out-of-bounds or EOF
     /// positions are described gracefully rather than panicking. This is a
-    /// debug helper function that needs access to all tokens including
-    /// synthetic tokens after the EOF.
+    /// debug helper function that needs access to all tokens.
     pub fn describe_token_at_offset(&self, offset: isize) -> String {
         let idx = self.idx as isize + offset;
         if idx < 0 {
@@ -293,14 +270,12 @@ impl<'toks> TokenVector<'toks> {
         self.describe_token(idx as usize)
     }
 
-    // Skip stops at the end of input.  The sequential parser never reaches the
-    // synthetic tokens that are pushed after the EOF token.
+    // Skip stops at the end of input.
     pub fn skip(&mut self) {
-        if self.idx > self.eof_idx {
-            panic!("TokenVector::skip: Index {} exceeded end-of-input, eof_idx={}, tv length={}",
-                self.idx, self.eof_idx, self.tv.len())
+        if self.idx >= self.tv.len() {
+            panic!("TokenVector::skip: Index {} exceeded bounds, tv length={}", self.idx, self.tv.len())
         }
-        if self.idx < self.eof_idx {
+        if self.idx < self.tv.len() - 1 {
             self.idx += 1;
         }
     }
@@ -325,7 +300,7 @@ pub struct Ast<'toks> {
     /// The arena from the indextree crate holding all nodes
     /// in the AST.  Arenas are one idiomatic rust way to nicely
     /// manage the pointer craziness of trees
-    arena: Arena<usize>,
+    arena: Arena<TokenInfo<'toks>>,
 
     /// A vector of info about for tokens identified by logos.
     tv: TokenVector<'toks>,
@@ -524,7 +499,12 @@ impl<'toks> Ast<'toks> {
     /// Create a new abstract syntax tree.
     pub fn new(name: &str, fstr: &'toks str, diags: &mut Diags) -> anyhow::Result<Self> {
         let mut arena = Arena::new();
-        let root = arena.new_node(usize::MAX);
+        let dummy_tinfo = TokenInfo {
+            tok: LexToken::EOF,
+            val: "",
+            loc: SourceSpan { file_id: 0, range: 0..0 },
+        };
+        let root = arena.new_node(dummy_tinfo);
         let mut raw_tv = Vec::new();
         let mut visited = HashMap::new();
 
@@ -591,7 +571,7 @@ impl<'toks> Ast<'toks> {
     }
 
     /// Return an iterator over the children of the specified AST node
-    pub fn children(&self, nid: NodeId) -> indextree::Children<'_, usize> {
+    pub fn children(&self, nid: NodeId) -> indextree::Children<'_, TokenInfo<'toks>> {
         nid.children(&self.arena)
     }
 
@@ -726,8 +706,8 @@ impl<'toks> Ast<'toks> {
     /// Add the specified token as a child of the parent.
     /// Advance the token number and return the new node ID for the input token.
     fn add_to_parent_and_advance(&mut self, parent: NodeId) -> NodeId {
-        let idx = self.tv.get_index_and_skip();
-        let nid = self.arena.new_node(idx);
+        let tinfo = self.tv.take().clone();
+        let nid = self.arena.new_node(tinfo);
         parent.append(nid, &mut self.arena);
         nid
     }
@@ -1138,12 +1118,12 @@ impl<'toks> Ast<'toks> {
                 self.tv.skip(); // consume Eq
 
                 // Synthesize a NamedArg token and create a node for it.
-                let named_tok_idx = self.tv.push_synthetic(TokenInfo {
+                let synthetic = TokenInfo {
                     tok: LexToken::NamedArg,
                     loc: param_loc.clone(),
                     val: param_name,
-                });
-                let named_nid = self.arena.new_node(named_tok_idx);
+                };
+                let named_nid = self.arena.new_node(synthetic);
                 parent_nid.append(named_nid, &mut self.arena);
 
                 // Parse the RHS expression as the sole child of the NamedArg node.
@@ -1271,7 +1251,7 @@ impl<'toks> Ast<'toks> {
 
             // These simple atoms end up as leaf nodes in the AST
             LexToken::QuotedString | LexToken::Integer | LexToken::I64 | LexToken::U64 => {
-                *top = Some(self.arena.new_node(self.tv.get_index()));
+                *top = Some(self.arena.new_node(self.tv.peek().clone()));
                 self.tv.skip();
             }
 
@@ -1280,7 +1260,7 @@ impl<'toks> Ast<'toks> {
             // `(` follows the identifier, the parser aggregates the tokens into a generic
             // function invocation (e.g., `custom::foo(arg1, arg2)`).
             LexToken::Namespace => {
-                let ns_nid = self.arena.new_node(self.tv.get_index());
+                let ns_nid = self.arena.new_node(self.tv.peek().clone());
                 *top = Some(ns_nid);
                 self.tv.skip();
 
@@ -1294,7 +1274,7 @@ impl<'toks> Ast<'toks> {
 
                 // Add the trailing identifier as the first child of the namespace node.
                 if next_tinfo.tok == LexToken::Identifier {
-                    let id_nid = self.arena.new_node(self.tv.get_index());
+                    let id_nid = self.arena.new_node(self.tv.peek().clone());
                     ns_nid.append(id_nid, &mut self.arena);
                     self.tv.skip();
                 } else {
@@ -1323,7 +1303,7 @@ impl<'toks> Ast<'toks> {
             // AST stage, we parse all arguments without verifying function support. That
             // validation happens in later phases.
             LexToken::Identifier => {
-                let id_nid = self.arena.new_node(self.tv.get_index());
+                let id_nid = self.arena.new_node(self.tv.peek().clone());
                 *top = Some(id_nid);
                 self.tv.skip();
 
@@ -1340,7 +1320,7 @@ impl<'toks> Ast<'toks> {
             // ( [optional identifier] )
             LexToken::Addr | LexToken::AddrOffset | LexToken::SecOffset | LexToken::FileOffset => {
                 // Create the node for the function and move past
-                *top = Some(self.arena.new_node(self.tv.get_index()));
+                *top = Some(self.arena.new_node(self.tv.peek().clone()));
                 self.tv.skip();
 
                 if !self.expect_token_no_add(LexToken::OpenParen, diags) {
@@ -1357,7 +1337,7 @@ impl<'toks> Ast<'toks> {
             // Build-in functions with a mandatory identifier inside parens
             // ( <identifier> )
             LexToken::Sizeof => {
-                *top = Some(self.arena.new_node(self.tv.get_index()));
+                *top = Some(self.arena.new_node(self.tv.peek().clone()));
                 self.tv.skip();
 
                 if !self.expect_token_no_add(LexToken::OpenParen, diags) {
@@ -1405,7 +1385,7 @@ impl<'toks> Ast<'toks> {
             // Built-in functions with a non-optional expression inside parens
             // ( <expr> )
             LexToken::ToI64 | LexToken::ToU64 => {
-                *top = Some(self.arena.new_node(self.tv.get_index()));
+                *top = Some(self.arena.new_node(self.tv.peek().clone()));
                 self.tv.skip();
 
                 if !self.expect_token_no_add(LexToken::OpenParen, diags) {
@@ -1426,7 +1406,7 @@ impl<'toks> Ast<'toks> {
             | LexToken::BuiltinVersionMajor
             | LexToken::BuiltinVersionMinor
             | LexToken::BuiltinVersionPatch => {
-                *top = Some(self.arena.new_node(self.tv.get_index()));
+                *top = Some(self.arena.new_node(self.tv.peek().clone()));
                 self.tv.skip();
             }
 
@@ -1482,7 +1462,7 @@ impl<'toks> Ast<'toks> {
                 break;
             }
 
-            let op_nid = self.arena.new_node(self.tv.get_index());
+            let op_nid = self.arena.new_node(self.tv.peek().clone());
             self.tv.skip();
 
             // Attach the old top as a child of the operation,
@@ -1843,7 +1823,7 @@ impl<'toks> Ast<'toks> {
         }
 
         // Create the identifier node without attaching it to a parent yet.
-        let ident_nid = self.arena.new_node(self.tv.get_index());
+        let ident_nid = self.arena.new_node(self.tv.peek().clone());
         self.tv.skip();
 
         // Create the Eq node as the statement root (attached to parent).
@@ -1864,14 +1844,13 @@ impl<'toks> Ast<'toks> {
     /// Adds the current token as a child of the parent and advances
     /// the token index.  The current token MUST BE VALID!
     fn parse_leaf(&mut self, parent: NodeId) {
-        let nid = self.arena.new_node(self.tv.get_index());
+        let nid = self.arena.new_node(self.tv.peek().clone());
         parent.append(nid, &mut self.arena);
         self.tv.skip();
     }
 
-    pub fn get_tinfo(&self, nid: NodeId) -> &'toks TokenInfo<'_> {
-        let tok_num = *self.arena[nid].get();
-        self.tv.get(tok_num)
+    pub fn get_tinfo(&self, nid: NodeId) -> &TokenInfo<'toks> {
+        self.arena[nid].get()
     }
 
     /// Returns the root NodeId of the AST.
@@ -1881,7 +1860,7 @@ impl<'toks> Ast<'toks> {
 
     /// Returns a mutable reference to the underlying indextree arena.
     /// Callers can use any indextree `NodeId` operation that requires `&mut Arena`.
-    pub fn arena_mut(&mut self) -> &mut Arena<usize> {
+    pub fn arena_mut(&mut self) -> &mut Arena<TokenInfo<'toks>> {
         &mut self.arena
     }
 

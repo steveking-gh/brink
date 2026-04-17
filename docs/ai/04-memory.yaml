@@ -53,6 +53,16 @@ lessons_learned:
       bail!() is reserved for user-reachable failures that already emitted
       a diags diagnostic (e.g., condition evaluation failure).
 
+  - id: L8
+    topic: Rustc-style AST storage for synthetic nodes
+    detail: >
+      Instead of using dual vectors or an eof_idx hack in TokenVector to handle
+      synthetic tokens (like NamedArg) while keeping pass-by-reference semantics,
+      the indextree nodes own the lightweight 6-word TokenInfo directly by value.
+      This rustc-style approach completely decouples the token scanning cursor from
+      AST memory, eliminates borrow checker friction, and requires zero downstream
+      changes because Ast::get_tinfo(nid) returns a reference to the stored value.
+
 active_risks:
   - id: R1
     risk: >

@@ -10,9 +10,10 @@ pipeline:
     - name: Lexer + Parser → AST
       crate: ast
       input: .brink source text
-      output: Ast (arena-based indextree), AstDb (index of sections/consts/output)
+      output: Ast (arena-based indextree holding TokenInfo by value), AstDb (index of sections/consts/output)
       notes: Hand-rolled lexer (LexToken enum). Pratt parser for expressions.
              ParseIfContext enum distinguishes TopLevel vs Section if/else.
+             AST uses rustc-style storage, fully decoupling from TokenVector after parsing.
 
     - name: const_eval
       crate: const_eval

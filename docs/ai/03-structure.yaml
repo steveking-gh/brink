@@ -12,6 +12,7 @@ crates:
       AstDb::new validate=false skips nesting validation (used pre-prune).
       ParseIfContext (TopLevel | Section) threads through parse_if_r and
       parse_if_body_r.  Section token allowed in TopLevel if/else bodies.
+      Ast nodes hold TokenInfo by value (rustc-style), avoiding arena index lookups.
 
   const_eval:
     path: const_eval/const_eval.rs

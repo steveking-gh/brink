@@ -1,4 +1,4 @@
-// Error case: brink::test_ranged_sum is a BrinkRangedExtension but is called
+// Error case: brink::test_ranged_sum is a BrinkExtension but is called
 // with no range specifier.  Brink must reject this at IRDB time with IRDB_45.
 section top {
     wr8 0x01;
