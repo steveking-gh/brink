@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [6.x.x] - 2026-04-17
 - INTERNAL: Upgrade to latest md-5 crate.
+- INTERNAL: Upgrade to latest parse_int crate.
 
 ## [6.0.0] - 2026-04-16
 

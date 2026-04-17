@@ -605,9 +605,9 @@ dependencies = [
 
 [[package]]
 name = "parse_int"
-version = "0.5.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15f96500577cfa0a3bad8a88a3c4daa66684828af2e7d349012fa7fc3c725f0c"
+checksum = "1c464266693329dd5a8715098c7f86e6c5fd5d985018b8318f53d9c6c2b21a31"
 dependencies = [
  "num-traits",
 ]
