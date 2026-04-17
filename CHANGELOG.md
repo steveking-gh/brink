@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - INTERNAL: Upgrade to latest ariadne crate
 - INTERNAL: Upgrade to latest predicates crate
 - INTERNAL: Upgrade to latest assert crate
+- INTERNAL: Upgrade to latest serial_test crate
 
 ## [6.0.0] - 2026-04-16
 
