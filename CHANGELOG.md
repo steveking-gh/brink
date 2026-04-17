@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [5.x.x] - 2026-04-12
+## [6.0.0] - 2026-04-16
 
 - EXTENSION API BREAKING CHANGE: Generalized and unified extension parameter passing.
 - FEATURE: Extensions support named arguments, as in foo:bar(stuff=42);
@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - ITTERNAL: Simplified extension call handling in the IR.
 - INTERNAL: Implemented Rustc-style AST storage for synthetic nodes.
 - INTERNAL: Added large comment about how brink handles include files.
+- INTERNAL: renamed ext to extension_registry
 
 ## [5.0.6] - 2026-04-10
 

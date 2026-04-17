@@ -93,7 +93,7 @@ dependencies = [
 
 [[package]]
 name = "ast"
-version = "5.0.6"
+version = "6.0.0"
 dependencies = [
  "anyhow",
  "codespan-reporting",
@@ -134,7 +134,7 @@ dependencies = [
 
 [[package]]
 name = "brink"
-version = "5.0.6"
+version = "6.0.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -150,7 +150,7 @@ dependencies = [
 
 [[package]]
 name = "brink_extension"
-version = "5.0.6"
+version = "6.0.0"
 
 [[package]]
 name = "bstr"
@@ -233,7 +233,7 @@ checksum = "a6ef517f0926dd24a1582492c791b6a4818a4d94e789a334894aa15b0d12f55c"
 
 [[package]]
 name = "const_eval"
-version = "5.0.6"
+version = "6.0.0"
 dependencies = [
  "anyhow",
  "ast",
@@ -285,7 +285,7 @@ dependencies = [
 
 [[package]]
 name = "diags"
-version = "5.0.6"
+version = "6.0.0"
 dependencies = [
  "ariadne",
 ]
@@ -337,7 +337,7 @@ checksum = "48c757948c5ede0e46177b7add2e67155f70e33c07fea8284df6576da70b3719"
 
 [[package]]
 name = "engine"
-version = "5.0.6"
+version = "6.0.0"
 dependencies = [
  "anyhow",
  "ast",
@@ -352,7 +352,7 @@ dependencies = [
 
 [[package]]
 name = "extension_registry"
-version = "5.0.6"
+version = "6.0.0"
 dependencies = [
  "brink_extension",
  "tracing",
@@ -361,7 +361,7 @@ dependencies = [
 
 [[package]]
 name = "extensions"
-version = "5.0.6"
+version = "6.0.0"
 dependencies = [
  "extension_registry",
  "std_crc32c",
@@ -438,7 +438,7 @@ dependencies = [
 
 [[package]]
 name = "ir"
-version = "5.0.6"
+version = "6.0.0"
 dependencies = [
  "diags",
  "parse_int",
@@ -447,7 +447,7 @@ dependencies = [
 
 [[package]]
 name = "irdb"
-version = "5.0.6"
+version = "6.0.0"
 dependencies = [
  "anyhow",
  "ast",
@@ -495,7 +495,7 @@ checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
 name = "layoutdb"
-version = "5.0.6"
+version = "6.0.0"
 dependencies = [
  "anyhow",
  "ast",
@@ -521,7 +521,7 @@ checksum = "48f5d2a454e16a5ea0f4ced81bd44e4cfc7bd3a507b61887c99fd3538b28e4af"
 
 [[package]]
 name = "linearizer"
-version = "5.0.6"
+version = "6.0.0"
 dependencies = [
  "ast",
  "diags",
@@ -547,7 +547,7 @@ checksum = "5e5032e24019045c762d3c0f28f5b6b8bbf38563a65908389bf7978758920897"
 
 [[package]]
 name = "map"
-version = "5.0.6"
+version = "6.0.0"
 dependencies = [
  "engine",
  "ir",
@@ -708,7 +708,7 @@ dependencies = [
 
 [[package]]
 name = "process"
-version = "5.0.6"
+version = "6.0.0"
 dependencies = [
  "anyhow",
  "ast",
@@ -728,7 +728,7 @@ dependencies = [
 
 [[package]]
 name = "prune"
-version = "5.0.6"
+version = "6.0.0"
 dependencies = [
  "anyhow",
  "ast",
@@ -905,7 +905,7 @@ checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 
 [[package]]
 name = "std_crc32c"
-version = "5.0.6"
+version = "6.0.0"
 dependencies = [
  "assert_cmd",
  "brink_extension",
@@ -916,7 +916,7 @@ dependencies = [
 
 [[package]]
 name = "std_md5"
-version = "5.0.6"
+version = "6.0.0"
 dependencies = [
  "assert_cmd",
  "brink_extension",
@@ -927,7 +927,7 @@ dependencies = [
 
 [[package]]
 name = "std_sha256"
-version = "5.0.6"
+version = "6.0.0"
 dependencies = [
  "assert_cmd",
  "brink_extension",
@@ -965,7 +965,7 @@ dependencies = [
 
 [[package]]
 name = "symtable"
-version = "5.0.6"
+version = "6.0.0"
 dependencies = [
  "diags",
  "ir",

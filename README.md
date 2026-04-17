@@ -1360,25 +1360,26 @@ Users invoke extensions using function-style syntax.  For example, consider an e
 
 Users write the extension's result to the output using the generic `wr` command, for example `wr custom::crc(start_label, end_label);`.  Fixed-size write commands like `wr32` are invalid for extensions. If the designer needs to pad the extension's output to a specific size, they must follow the `wr` command with a `set_sec_offset` or `align` statement.
 
-### Named Arguments
+### Named Parameters
 
-To help eliminate bugs, Brink extensions support named arguments.  For example, consider the following code that uses two [labels](#labels) to identify the start and end of data to process.  We must run a custom extension over the range defined by start_label and end_label.  But does the extension take starting byte and ending byte or starting byte and length?  Using named arguments eliminates this ambiguity, requiging start + length in our example below.
+To help eliminate bugs, Brink extensions support named parameters.  Extensions define their parameter names when registered.  In the example below, we call the extension `custom::my_extension` passing it the required parameters `data_section` and `code_section`.  But which comes first?  With named parameters, we don't need to know.  The compiler passes the values by name in the order expected by the extension, regardless of the order given at the call site.
 
     //
     // extension example
     //
-    section data start_label end_label {
-        wrs "DATA_START";
-        data_start:
-            wrf "cool_data.bin";
-        data_end:
-            wrs "DATA_END";
+    section my_data {
+        wrf "cool_data.bin";
+    };
+
+    section my_code {
+        wrf "cool_code.bin";
     };
 
     section stuff {
-        wr data;
+        wr my_data;
+        wr my_code;
         // Use named arguments to avoid positional and semantic bugs!
-        custom::my_extension(start=DATA_START, length=addr(DATA_END - addr(DATA_START));
+        custom::my_extension(data_section=my_data, code_section=my_code);
     };
 
 ---
@@ -1553,6 +1554,7 @@ No you're ready to rebuild the extension.
 To install the extension into vscode locally:
 
     code --install-extension vscode-brink-0.1.0.vsix
+
 
 
 
