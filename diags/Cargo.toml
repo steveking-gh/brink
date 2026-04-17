@@ -10,5 +10,5 @@ edition.workspace = true
 path = "diags.rs"
 
 [dependencies]
-ariadne = "0.4.1"
+ariadne = "0.6.0"
 

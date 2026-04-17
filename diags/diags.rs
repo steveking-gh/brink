@@ -62,7 +62,7 @@ impl Diags {
             return;
         }
 
-        let report = Report::build(ReportKind::Warning, self.name.clone(), 0)
+        let report = Report::build(ReportKind::Warning, (self.name.clone(), 0..0))
             .with_code(code)
             .with_message(msg)
             .finish();
@@ -75,9 +75,8 @@ impl Diags {
             return;
         }
 
-        let start = loc.range.start;
         let id = self.files[loc.file_id].0.clone();
-        let report = Report::build(ReportKind::Warning, id.clone(), start)
+        let report = Report::build(ReportKind::Warning, (id.clone(), loc.range.clone()))
             .with_code(code)
             .with_message(msg)
             .with_label(Label::new((id, loc.range)).with_color(Color::Yellow))
@@ -92,7 +91,7 @@ impl Diags {
             return;
         }
 
-        let report = Report::build(ReportKind::Error, self.name.clone(), 0)
+        let report = Report::build(ReportKind::Error, (self.name.clone(), 0..0))
             .with_code(code)
             .with_message(msg)
             .finish();
@@ -106,9 +105,8 @@ impl Diags {
             return;
         }
 
-        let start = loc.range.start;
         let id = self.files[loc.file_id].0.clone();
-        let report = Report::build(ReportKind::Error, id.clone(), start)
+        let report = Report::build(ReportKind::Error, (id.clone(), loc.range.clone()))
             .with_code(code)
             .with_message(msg)
             .with_label(Label::new((id, loc.range)).with_color(Color::Red))
@@ -125,8 +123,7 @@ impl Diags {
 
         let report = Report::build(
             ReportKind::Custom("Note", Color::Blue),
-            self.name.clone(),
-            0,
+            (self.name.clone(), 0..0),
         )
         .with_code(code)
         .with_message(msg)
@@ -141,13 +138,15 @@ impl Diags {
             return;
         }
 
-        let start = loc.range.start;
         let id = self.files[loc.file_id].0.clone();
-        let report = Report::build(ReportKind::Custom("Note", Color::Blue), id.clone(), start)
-            .with_code(code)
-            .with_message(msg)
-            .with_label(Label::new((id, loc.range)).with_color(Color::Blue))
-            .finish();
+        let report = Report::build(
+            ReportKind::Custom("Note", Color::Blue),
+            (id.clone(), loc.range.clone()),
+        )
+        .with_code(code)
+        .with_message(msg)
+        .with_label(Label::new((id, loc.range)).with_color(Color::Blue))
+        .finish();
         self.print_report(report);
     }
 
@@ -158,11 +157,10 @@ impl Diags {
             return;
         }
 
-        let start = loc1.range.start;
         let id1 = self.files[loc1.file_id].0.clone();
         let id2 = self.files[loc2.file_id].0.clone();
 
-        let report = Report::build(ReportKind::Error, id1.clone(), start)
+        let report = Report::build(ReportKind::Error, (id1.clone(), loc1.range.clone()))
             .with_code(code)
             .with_message(msg)
             .with_label(Label::new((id1, loc1.range)).with_color(Color::Red))
