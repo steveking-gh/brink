@@ -367,6 +367,11 @@ mod tests {
         assert_brink_failure("tests/fuzz_found_20.brink", &["[AST_42]"]);
     }
 
+    #[test]
+    fn fuzz_found_21() {
+        assert_brink_failure("tests/fuzz_found_21.brink", &["[IRDB_55]"]);
+    }
+
     /// --max-output-size 0 rejects a 1-byte output.
     #[test]
     fn max_output_size_flag() {

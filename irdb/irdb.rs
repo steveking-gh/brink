@@ -373,9 +373,14 @@ impl IRDb {
     // Expect 1 numeric operand (value) followed by one optional numeric operand (repeat count)
     fn validate_numeric_1_or_2(&self, ir: &IR, diags: &mut Diags) -> bool {
         let len = ir.operands.len();
-        // The linearizer always emits 1 or 2 operands for these instructions;
-        // any other count indicates a linearizer bug, not a user error.
-        assert!(len == 1 || len == 2, "{:?} must have 1 or 2 operands", ir.kind);
+        if len < 1 || len > 2 {
+            let m = format!(
+                "'{:?}' takes 1 or 2 arguments, found {}.",
+                ir.kind, len
+            );
+            diags.err1("IRDB_55", &m, ir.src_loc.clone());
+            return false;
+        }
 
         // First operand must be numeric
         let opnd = &self.parms[ir.operands[0]];

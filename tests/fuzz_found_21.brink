@@ -1,0 +1,3 @@
+section main { wr32 ths,ed_noto ,(12);
+}
+output main;
