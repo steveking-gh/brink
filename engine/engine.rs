@@ -1631,7 +1631,7 @@ impl Engine {
         let opnd_num = ir.operands[0];
         self.trace(format!("engine::execute_assert: checking operand {}", opnd_num).as_str());
         let parm = &self.parms[opnd_num];
-        if !parm.to_bool() {
+        if !parm.to_bool().expect("assert operand must be numeric; IRDb type check failed") {
             // assert failed
             let msg = "Assert expression failed".to_string();
             diags.err1("EXEC_2", &msg, ir.src_loc.clone());

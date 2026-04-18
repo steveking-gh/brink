@@ -1,0 +1,5 @@
+// || with a string lhs panics (IRDB_58).
+const s = "x";
+const x = s || 0;
+section foo { wr8 1; }
+output foo;

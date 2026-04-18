@@ -206,3 +206,45 @@ PROC_7: output image size exceeds `--max-output-size` limit.
 **Regression test**
 `tests/fuzz_found_19.brink` added to integration suite; expects PROC_7.
 `max_output_size_flag` inline test: `--max-output-size 0` on 1-byte output.
+
+---
+
+## 2026-04-17 — fuzz fixes and to_bool() hardening
+
+**fuzz_found_20: wrf extra args (AST_42)**
+`wrf(f), "n"` caused IRDb assert.  Parser now rejects extra args after the
+first wrf argument with AST_42 and advances past `;`.
+
+**fuzz_found_21: wr32 extra args (IRDB_55)**
+`wr32 a, b, (12)` caused IRDb assert.  `validate_numeric_1_or_2` replaced
+`assert!` with graceful IRDB_55 diagnostic.  Covers all Wr(n), Align,
+SetAddr*, SetSecOffset, SetFileOffset.
+
+**fuzz_found_22: if with string condition (IRDB_56)**
+`const MODE = ""; if MODE { }` panicked in `to_bool()`.  Fixed two call
+sites in `const_eval.rs` (IfBegin arm and eval_ast_condition) with IRDB_56.
+
+**to_bool() Option A hardening**
+Changed `ParameterValue::to_bool()` return type from `bool` to `Option<bool>`.
+All five call sites updated:
+
+- `engine/engine.rs` execute_assert: `expect()` (invariant protected by IRDb)
+- `const_eval.rs` IfBegin: `and_then` with IRDB_56
+- `const_eval.rs` Assert in if/else body: `and_then` with IRDB_57
+- `const_eval.rs` LogicalAnd/Or: let-else with IRDB_58
+- `const_eval.rs` eval_ast_condition: match on `to_bool()` with IRDB_56
+
+**New error codes**
+IRDB_57: assert condition in if/else body is non-numeric.
+IRDB_58: `&&`/`||` operand is non-numeric.
+
+**New test files**
+`fuzz_found_20.brink`, `fuzz_found_21.brink`, `fuzz_found_22.brink`,
+`const_bool_string_assert.brink`, `const_bool_string_and.brink`,
+`const_bool_string_or.brink`.
+
+**New error code registry**
+`docs/error-codes.md`: unified list of all error codes by prefix with
+next-available summary line.
+
+312 tests pass.

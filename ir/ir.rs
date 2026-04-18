@@ -126,13 +126,11 @@ impl ParameterValue {
         }
     }
 
-    pub fn to_bool(&self) -> bool {
+    pub fn to_bool(&self) -> Option<bool> {
         match self {
-            ParameterValue::I64(v) | ParameterValue::Integer(v) => (*v as u64) != 0,
-            ParameterValue::U64(v) => *v != 0,
-            _ => {
-                panic!("Internal error: Invalid type conversion to bool");
-            }
+            ParameterValue::I64(v) | ParameterValue::Integer(v) => Some((*v as u64) != 0),
+            ParameterValue::U64(v) => Some(*v != 0),
+            _ => None,
         }
     }
 

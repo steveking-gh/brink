@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - FEATURE: added --max-output-size CLI option.
 - BUG FIX: Fixed assert when wrf had too man args
 - BUG FIX: Fixed assert when wr8..wr64 had too man args
+- BUG FIX: Fixed bad bool conversion assert
 - INTERNAL: Upgrade to latest md-5 crate.
 - INTERNAL: Upgrade to latest parse_int crate.
 - INTERNAL: Remove unused codespan-reporting crate

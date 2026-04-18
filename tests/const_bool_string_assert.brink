@@ -1,0 +1,7 @@
+// assert inside a top-level if body with a string condition panics (IRDB_57).
+const s = "x";
+if 1 {
+    assert s;
+}
+section foo { wr8 1; }
+output foo;

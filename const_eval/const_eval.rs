@@ -364,15 +364,20 @@ impl<'toks> ConstIR {
                         diags,
                         &src_loc,
                     );
-                    match cond_val {
-                        Some(v) if v.to_bool() => {
+                    match cond_val.and_then(|v| v.to_bool()) {
+                        Some(true) => {
                             // Condition true: process then-body (no skip needed)
                         }
-                        Some(_) => {
+                        Some(false) => {
                             // Condition false: skip then-body
                             skip_stack.push(SkipState::SkipThen { depth: 0 });
                         }
                         None => {
+                            diags.err1(
+                                "IRDB_56",
+                                "if condition must evaluate to a numeric type",
+                                src_loc,
+                            );
                             result = false;
                             // Skip entire if/else to avoid cascading errors
                             skip_stack.push(SkipState::SkipThen { depth: 0 });
@@ -449,8 +454,8 @@ impl<'toks> ConstIR {
                         const_db,
                         diags,
                         &src_loc,
-                    ) {
-                        Some(v) if !v.to_bool() => {
+                    ).and_then(|v| v.to_bool()) {
+                        Some(false) => {
                             diags.err1(
                                 "IRDB_32",
                                 "Assert expression failed in if/else body",
@@ -459,9 +464,14 @@ impl<'toks> ConstIR {
                             result = false;
                         }
                         None => {
+                            diags.err1(
+                                "IRDB_57",
+                                "assert condition must evaluate to a numeric type",
+                                src_loc,
+                            );
                             result = false;
                         }
-                        _ => {}
+                        Some(true) => {}
                     }
                 }
                 _ => { /* other IR kinds are not emitted into const_ir_vec */ }
@@ -625,10 +635,18 @@ impl<'toks> ConstIR {
                         diags,
                         err_loc,
                     )?;
+                    let Some(lhs_b) = lhs_val.to_bool() else {
+                        diags.err1("IRDB_58", "'&&'/'||' operands must be numeric", err_loc.clone());
+                        return None;
+                    };
+                    let Some(rhs_b) = rhs_val.to_bool() else {
+                        diags.err1("IRDB_58", "'&&'/'||' operands must be numeric", err_loc.clone());
+                        return None;
+                    };
                     let result = if op == IRKind::LogicalAnd {
-                        lhs_val.to_bool() && rhs_val.to_bool()
+                        lhs_b && rhs_b
                     } else {
-                        lhs_val.to_bool() || rhs_val.to_bool()
+                        lhs_b || rhs_b
                     };
                     Some(ParameterValue::U64(if result { 1 } else { 0 }))
                 }
@@ -975,7 +993,13 @@ pub fn eval_ast_condition(
         operand_vec: lz.operand_vec,
     };
     let val = ConstIR::eval_const_expr_r(symbol_table, lops[0], &const_ir, diags, &src_loc)?;
-    Some(val.to_bool())
+    match val.to_bool() {
+        Some(b) => Some(b),
+        None => {
+            diags.err1("IRDB_56", "if condition must evaluate to a numeric type", src_loc);
+            None
+        }
+    }
 }
 
 // ── Public entry point ────────────────────────────────────────────────────────

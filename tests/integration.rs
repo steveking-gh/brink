@@ -372,6 +372,29 @@ mod tests {
         assert_brink_failure("tests/fuzz_found_21.brink", &["[IRDB_55]"]);
     }
 
+    #[test]
+    fn fuzz_found_22() {
+        assert_brink_failure("tests/fuzz_found_22.brink", &["[IRDB_56]"]);
+    }
+
+    /// assert inside a top-level if body with a string condition panics -- latent bug.
+    #[test]
+    fn const_bool_string_assert() {
+        assert_brink_failure("tests/const_bool_string_assert.brink", &["[IRDB_57]"]);
+    }
+
+    /// && with a string lhs panics -- latent bug.
+    #[test]
+    fn const_bool_string_and() {
+        assert_brink_failure("tests/const_bool_string_and.brink", &["[IRDB_58]"]);
+    }
+
+    /// || with a string lhs panics -- latent bug.
+    #[test]
+    fn const_bool_string_or() {
+        assert_brink_failure("tests/const_bool_string_or.brink", &["[IRDB_58]"]);
+    }
+
     /// --max-output-size 0 rejects a 1-byte output.
     #[test]
     fn max_output_size_flag() {

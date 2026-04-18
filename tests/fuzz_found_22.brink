@@ -1,0 +1,9 @@
+const MODE = "";
+if MODE     {
+}
+
+section foo {
+    wr32 CCLES;
+}
+
+output foo;
