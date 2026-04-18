@@ -335,6 +335,7 @@ impl<'toks> ConstIR {
                     let rhs_lop_num = ir.operand_vec[1];
                     let val = Self::eval_const_expr_r(
                         symbol_table,
+                        0,
                         rhs_lop_num,
                         const_db,
                         diags,
@@ -359,6 +360,7 @@ impl<'toks> ConstIR {
                     let cond_lop_num = ir.operand_vec[0];
                     let cond_val = Self::eval_const_expr_r(
                         symbol_table,
+                        0,
                         cond_lop_num,
                         const_db,
                         diags,
@@ -400,6 +402,7 @@ impl<'toks> ConstIR {
                     let rhs_lop_num = ir.operand_vec[1];
                     let rhs_val = Self::eval_const_expr_r(
                         symbol_table,
+                        0,
                         rhs_lop_num,
                         const_db,
                         diags,
@@ -419,6 +422,7 @@ impl<'toks> ConstIR {
                     for &lop_idx in &ir.operand_vec {
                         match Self::eval_const_expr_r(
                             symbol_table,
+                            0,
                             lop_idx,
                             const_db,
                             diags,
@@ -450,6 +454,7 @@ impl<'toks> ConstIR {
                     let cond_lop_num = ir.operand_vec[0];
                     match Self::eval_const_expr_r(
                         symbol_table,
+                        0,
                         cond_lop_num,
                         const_db,
                         diags,
@@ -481,15 +486,33 @@ impl<'toks> ConstIR {
         result
     }
 
+    /// Maximum expression tree depth before IRDB_59 fires.
+    /// Matches Linearizer::MAX_RECURSION_DEPTH (100) for a uniform recursion limit.
+    /// Expressions reaching the linearizer fire LINEAR_1 first; IRDB_59 provides
+    /// defense-in-depth for eval paths that bypass the linearizer.
+    const MAX_EVAL_DEPTH: usize = 100;
+
     /// Evaluate a const expression operand recursively.
     /// Returns the computed `ParameterValue`, or `None` on error.
     fn eval_const_expr_r(
         symbol_table: &mut SymbolTable,
+        depth: usize,
         lop_num: usize,
         const_db: &ConstIR,
         diags: &mut Diags,
         err_loc: &SourceSpan,
     ) -> Option<ParameterValue> {
+        if depth > Self::MAX_EVAL_DEPTH {
+            diags.err1(
+                "IRDB_59",
+                &format!(
+                    "Const expression nesting depth exceeds maximum ({}).",
+                    Self::MAX_EVAL_DEPTH
+                ),
+                err_loc.clone(),
+            );
+            return None;
+        }
         let lop = &const_db.operand_vec[lop_num];
 
         // Output operands: evaluate by looking up the producing instruction's IRKind.
@@ -542,7 +565,7 @@ impl<'toks> ConstIR {
                 IRKind::ToI64 | IRKind::ToU64 => {
                     let input_lop = lin_ir.operand_vec[0];
                     let val =
-                        Self::eval_const_expr_r(symbol_table, input_lop, const_db, diags, err_loc)?;
+                        Self::eval_const_expr_r(symbol_table, depth + 1, input_lop, const_db, diags, err_loc)?;
                     match (&val, op) {
                         (ParameterValue::U64(v), IRKind::ToI64) => {
                             Some(ParameterValue::I64(*v as i64))
@@ -580,6 +603,7 @@ impl<'toks> ConstIR {
                 | IRKind::RightShift => {
                     let lhs_val = Self::eval_const_expr_r(
                         symbol_table,
+                        depth + 1,
                         lin_ir.operand_vec[0],
                         const_db,
                         diags,
@@ -587,6 +611,7 @@ impl<'toks> ConstIR {
                     )?;
                     let rhs_val = Self::eval_const_expr_r(
                         symbol_table,
+                        depth + 1,
                         lin_ir.operand_vec[1],
                         const_db,
                         diags,
@@ -604,6 +629,7 @@ impl<'toks> ConstIR {
                 | IRKind::Lt => {
                     let lhs_val = Self::eval_const_expr_r(
                         symbol_table,
+                        depth + 1,
                         lin_ir.operand_vec[0],
                         const_db,
                         diags,
@@ -611,6 +637,7 @@ impl<'toks> ConstIR {
                     )?;
                     let rhs_val = Self::eval_const_expr_r(
                         symbol_table,
+                        depth + 1,
                         lin_ir.operand_vec[1],
                         const_db,
                         diags,
@@ -623,6 +650,7 @@ impl<'toks> ConstIR {
                 IRKind::LogicalAnd | IRKind::LogicalOr => {
                     let lhs_val = Self::eval_const_expr_r(
                         symbol_table,
+                        depth + 1,
                         lin_ir.operand_vec[0],
                         const_db,
                         diags,
@@ -630,6 +658,7 @@ impl<'toks> ConstIR {
                     )?;
                     let rhs_val = Self::eval_const_expr_r(
                         symbol_table,
+                        depth + 1,
                         lin_ir.operand_vec[1],
                         const_db,
                         diags,
@@ -992,7 +1021,7 @@ pub fn eval_ast_condition(
         ir_vec: lz.ir_vec,
         operand_vec: lz.operand_vec,
     };
-    let val = ConstIR::eval_const_expr_r(symbol_table, lops[0], &const_ir, diags, &src_loc)?;
+    let val = ConstIR::eval_const_expr_r(symbol_table, 0, lops[0], &const_ir, diags, &src_loc)?;
     match val.to_bool() {
         Some(b) => Some(b),
         None => {

@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - BUG FIX: Fixed assert when wrf had too man args
 - BUG FIX: Fixed assert when wr8..wr64 had too man args
 - BUG FIX: Fixed bad bool conversion assert
+- BUG FIX: Fixed unlimited const evaluation recursion
 - INTERNAL: Upgrade to latest md-5 crate.
 - INTERNAL: Upgrade to latest parse_int crate.
 - INTERNAL: Remove unused codespan-reporting crate
@@ -16,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - INTERNAL: Upgrade to latest predicates crate
 - INTERNAL: Upgrade to latest assert crate
 - INTERNAL: Upgrade to latest serial_test crate
+- INTERNAL: Renamed and improved the fuzz_help.md
 
 
 ## [6.0.0] - 2026-04-16

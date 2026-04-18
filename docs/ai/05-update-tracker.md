@@ -248,3 +248,37 @@ IRDB_58: `&&`/`||` operand is non-numeric.
 next-available summary line.
 
 312 tests pass.
+
+---
+
+## 2026-04-18 -- Recursive depth guards (AST_43, AST_44, IRDB_59)
+
+**parse_pratt depth guard (AST_43)**
+Added `MAX_PRATT_DEPTH = 200` check at the top of `parse_pratt`.  All recursive
+call sites inside `parse_pratt` pass `depth + 1`; top-level entry points pass `0`.
+
+**parse_if_r / parse_if_body_r mutual recursion guard (AST_44)**
+Added `MAX_IF_DEPTH = 100` check at the top of `parse_if_r`.  `parse_if_body_r`
+carries the depth parameter and passes `depth + 1` when recursing into nested `if`.
+
+**parse_function_args depth threading (root cause of fuzz SIGSEGV)**
+`parse_function_args` was calling `parse_pratt(0, 0, ...)` internally, resetting
+the depth counter to zero and bypassing AST_43.  Fixed by threading `depth` through
+`parse_function_args` and passing `depth + 1` at both call sites inside `parse_pratt`
+and both internal `parse_pratt` calls within `parse_function_args`.
+
+**eval_const_expr_r depth guard (IRDB_59)**
+Added `MAX_EVAL_DEPTH = 100` check (matching `Linearizer::MAX_RECURSION_DEPTH`) to
+`eval_const_expr_r`.  Adds `depth: usize` parameter threaded through all 7 internal
+recursive calls.  Six external call sites pass `0`.  For inputs going through the
+linearizer, LINEAR_1 fires first; IRDB_59 provides defense-in-depth for eval paths
+that bypass the linearizer.
+
+**Error codes**
+AST_43, AST_44, IRDB_59 added to `docs/error-codes.md`.
+Next available: AST_45, EXEC_62, IR_5, IRDB_60, LINEAR_18, PROC_8, SYMTAB_5.
+
+Regression tests: `fuzz_found_23` (250-level `f(f(...))` fires AST_43),
+`fuzz_found_24` (5000-term flat `1 + 1 + ...` fires LINEAR_1).
+
+314 tests pass.

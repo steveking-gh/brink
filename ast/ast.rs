@@ -610,7 +610,7 @@ impl<'toks> Ast<'toks> {
                 LexToken::Section => self.parse_section(self.root, diags),
                 LexToken::Output => self.parse_output(self.root, diags),
                 LexToken::Const => self.parse_const(self.root, diags),
-                LexToken::If => self.parse_if_r(self.root, diags, ParseIfContext::TopLevel),
+                LexToken::If => self.parse_if_r(0, self.root, diags, ParseIfContext::TopLevel),
                 LexToken::Identifier => {
                     let ok = self.parse_deferred_assign(self.root, diags);
                     if !ok {
@@ -779,7 +779,7 @@ impl<'toks> Ast<'toks> {
     /// Expect an expression which cannot be None.
     fn expect_expr(&mut self, parent: NodeId, diags: &mut Diags) -> bool {
         let mut expr_opt = None;
-        if !self.parse_pratt(0, &mut expr_opt, diags) {
+        if !self.parse_pratt(0, 0, &mut expr_opt, diags) {
             return false;
         }
         let Some(expr) = expr_opt else {
@@ -1005,7 +1005,7 @@ impl<'toks> Ast<'toks> {
             // Stay in the section even after errors to give the user
             // more than one error at a time
             let parse_ok = if tinfo.tok == LexToken::If {
-                self.parse_if_r(parent, diags, ParseIfContext::Section)
+                self.parse_if_r(0, parent, diags, ParseIfContext::Section)
             } else if let Some(result) = self.try_parse_section_stmt(parent, diags) {
                 result
             } else {
@@ -1084,7 +1084,7 @@ impl<'toks> Ast<'toks> {
     /// Parses the arguments of a function or extension invocation.
     /// The caller must have already consumed the opening parenthesis `(`.
     /// This function consumes the closing parenthesis `)`.
-    fn parse_function_args(&mut self, parent_nid: NodeId, diags: &mut Diags) -> bool {
+    fn parse_function_args(&mut self, depth: usize, parent_nid: NodeId, diags: &mut Diags) -> bool {
         self.dbg_enter("parse_function_args");
         let mut saw_named = false;
         let mut saw_positional = false;
@@ -1128,7 +1128,7 @@ impl<'toks> Ast<'toks> {
 
                 // Parse the RHS expression as the sole child of the NamedArg node.
                 let mut rhs_opt = None;
-                if !self.parse_pratt(0, &mut rhs_opt, diags) {
+                if !self.parse_pratt(depth + 1, 0, &mut rhs_opt, diags) {
                     return self.dbg_exit("parse_function_args", false);
                 }
                 if let Some(rhs_nid) = rhs_opt {
@@ -1146,7 +1146,7 @@ impl<'toks> Ast<'toks> {
                 saw_positional = true;
                 // Positional argument: parse the expression directly.
                 let mut arg_opt = None;
-                if !self.parse_pratt(0, &mut arg_opt, diags) {
+                if !self.parse_pratt(depth + 1, 0, &mut arg_opt, diags) {
                     return self.dbg_exit("parse_function_args", false);
                 }
                 if let Some(arg_nid) = arg_opt {
@@ -1215,9 +1215,32 @@ impl<'toks> Ast<'toks> {
     ///   abs
     ///   └── [<Identifier>] <- optional section or label name
     /// ```
-    fn parse_pratt(&mut self, min_bp: u8, top: &mut Option<NodeId>, diags: &mut Diags) -> bool {
+    /// Maximum expression nesting depth before AST_43 fires.
+    const MAX_PRATT_DEPTH: usize = 200;
+
+    fn parse_pratt(
+        &mut self,
+        depth: usize,
+        min_bp: u8,
+        top: &mut Option<NodeId>,
+        diags: &mut Diags,
+    ) -> bool {
         debug!("Ast::parse_pratt: ENTER, Min BP = {}", min_bp);
         debug_peek!("Ast::parse_pratt", self.tv);
+
+        if depth > Self::MAX_PRATT_DEPTH {
+            let tinfo = self.tv.peek();
+            diags.err1(
+                "AST_43",
+                &format!(
+                    "Expression nesting depth exceeds maximum ({}).",
+                    Self::MAX_PRATT_DEPTH
+                ),
+                tinfo.loc.clone(),
+            );
+            return false;
+        }
+
         let lhs_tinfo = self.tv.peek();
 
         *top = None; // Initialize our root node.
@@ -1240,7 +1263,7 @@ impl<'toks> Ast<'toks> {
                 // move past the open paren without storing in the AST.
                 self.tv.skip();
                 // lhs is everything inside parentheses.
-                if !self.parse_pratt(0, top, diags) {
+                if !self.parse_pratt(depth + 1, 0, top, diags) {
                     return self.dbg_exit_pratt("parse_pratt", &None, false);
                 }
                 // Open paren must have a matching close paren.
@@ -1290,7 +1313,7 @@ impl<'toks> Ast<'toks> {
                 let after_tinfo = self.tv.peek();
                 if after_tinfo.tok == LexToken::OpenParen {
                     self.tv.skip(); // consume '('
-                    if !self.parse_function_args(ns_nid, diags) {
+                    if !self.parse_function_args(depth + 1, ns_nid, diags) {
                         return self.dbg_exit_pratt("parse_pratt", &None, false);
                     }
                 }
@@ -1310,7 +1333,7 @@ impl<'toks> Ast<'toks> {
                 // If an open parenthesis follows, we parse this as a function invocation.
                 if self.tv.peek().tok == LexToken::OpenParen {
                     self.tv.skip(); // consume '('
-                    if !self.parse_function_args(id_nid, diags) {
+                    if !self.parse_function_args(depth + 1, id_nid, diags) {
                         return self.dbg_exit_pratt("parse_pratt", &None, false);
                     }
                 }
@@ -1344,7 +1367,7 @@ impl<'toks> Ast<'toks> {
                     return self.dbg_exit_pratt("parse_pratt", &None, false);
                 }
                 let mut arg_opt = None;
-                if !self.parse_pratt(0, &mut arg_opt, diags) {
+                if !self.parse_pratt(depth + 1, 0, &mut arg_opt, diags) {
                     return self.dbg_exit_pratt("parse_pratt", &None, false);
                 }
 
@@ -1474,7 +1497,7 @@ impl<'toks> Ast<'toks> {
 
             // Recurse into the right hand side of the operation, if any
             let mut rhs_opt = None;
-            if !self.parse_pratt(rbp, &mut rhs_opt, diags) {
+            if !self.parse_pratt(depth + 1, rbp, &mut rhs_opt, diags) {
                 return self.dbg_exit_pratt("parse_pratt", &None, false);
             }
 
@@ -1511,7 +1534,7 @@ impl<'toks> Ast<'toks> {
         // Loop until we run out of comma separated expressions.
         // After each return from parse_pratt, we should be pointing at a comma.
         loop {
-            result &= self.parse_pratt(0, &mut expr_opt, diags);
+            result &= self.parse_pratt(0, 0, &mut expr_opt, diags);
             if !result {
                 break; // error occurred
             }
@@ -1679,8 +1702,31 @@ impl<'toks> Ast<'toks> {
     ///    ├── [else_stmts...]
     ///    └── }]
     /// ```
-    fn parse_if_r(&mut self, parent: NodeId, diags: &mut Diags, ctx: ParseIfContext) -> bool {
+    /// Maximum if/else nesting depth before AST_44 fires.
+    const MAX_IF_DEPTH: usize = 100;
+
+    fn parse_if_r(
+        &mut self,
+        depth: usize,
+        parent: NodeId,
+        diags: &mut Diags,
+        ctx: ParseIfContext,
+    ) -> bool {
         self.dbg_enter("parse_if");
+
+        if depth > Self::MAX_IF_DEPTH {
+            let tinfo = self.tv.peek();
+            diags.err1(
+                "AST_44",
+                &format!(
+                    "if/else nesting depth exceeds maximum ({}).",
+                    Self::MAX_IF_DEPTH
+                ),
+                tinfo.loc.clone(),
+            );
+            return false;
+        }
+
         // Consume 'if' and create root node
         let if_nid = self.add_to_parent_and_advance(parent);
 
@@ -1700,7 +1746,7 @@ impl<'toks> Ast<'toks> {
         ) {
             return self.dbg_exit("parse_if", false);
         }
-        if !self.parse_if_body_r(if_nid, diags, brace_toknum, ctx) {
+        if !self.parse_if_body_r(depth, if_nid, diags, brace_toknum, ctx) {
             return self.dbg_exit("parse_if", false);
         }
 
@@ -1714,11 +1760,11 @@ impl<'toks> Ast<'toks> {
             let next = self.tv.peek();
             if next.tok == LexToken::If {
                 // else if: parse nested if directly (no brace wrapper)
-                self.parse_if_r(if_nid, diags, ctx)
+                self.parse_if_r(depth + 1, if_nid, diags, ctx)
             } else if next.tok == LexToken::OpenBrace {
                 let else_brace = self.tv.get_index();
                 self.add_to_parent_and_advance(if_nid); // consume '{'
-                self.parse_if_body_r(if_nid, diags, else_brace, ctx)
+                self.parse_if_body_r(depth, if_nid, diags, else_brace, ctx)
             } else if next.tok == LexToken::EOF {
                 self.err_no_input(diags);
                 false
@@ -1746,6 +1792,7 @@ impl<'toks> Ast<'toks> {
     /// `wr`, `wr8`–`wr64`, `wrs`, `wrf`, `align`, `set_*`, `label:`, and nested `if/else`.
     fn parse_if_body_r(
         &mut self,
+        depth: usize,
         parent: NodeId,
         diags: &mut Diags,
         brace_tok_num: usize,
@@ -1776,7 +1823,7 @@ impl<'toks> Ast<'toks> {
                 // Const-compatible statements (allowed in both TopLevel and Section)
                 LexToken::Identifier => self.parse_deferred_assign(parent, diags),
                 LexToken::Print | LexToken::Assert => self.parse_expr(parent, diags),
-                LexToken::If => self.parse_if_r(parent, diags, ctx),
+                LexToken::If => self.parse_if_r(depth + 1, parent, diags, ctx),
                 // Section-level statements: delegate to the shared dispatcher.
                 // try_parse_section_stmt returns None for unrecognized tokens.
                 _ => {
