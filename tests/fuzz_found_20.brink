@@ -1,0 +1,4 @@
+section foo { wrf(f), "n";
+}
+
+output foo;

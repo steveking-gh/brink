@@ -1518,6 +1518,20 @@ impl<'toks> Ast<'toks> {
             if let Some(expr_nid) = expr_opt {
                 print_nid.append(expr_nid, &mut self.arena);
 
+                // wrf takes exactly one argument; a comma after the first is an error.
+                if self.get_tinfo(print_nid).tok == LexToken::Wrf
+                    && self.tv.peek().tok == LexToken::Comma
+                {
+                    diags.err1(
+                        "AST_42",
+                        "'wrf' takes exactly one argument",
+                        self.get_tinfo(print_nid).span(),
+                    );
+                    self.advance_past_semicolon();
+                    result = false;
+                    break;
+                }
+
                 // Omit the comma from the AST to reduce clutter.
                 if self.tv.peek().tok == LexToken::Comma {
                     self.tv.skip();
