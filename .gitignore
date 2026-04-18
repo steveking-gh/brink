@@ -1,11 +1,9 @@
 /target
 **/output.bin
 **/*.profraw
+process/fuzz/seeds
 ast/fuzz/cov
 engine/fix.py
-refactor.py
-newlines.py
-newlines2.py
 .claude/settings.local.json
 /tmp/
 .mcp.json

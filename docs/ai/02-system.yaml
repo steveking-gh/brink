@@ -63,6 +63,7 @@ pipeline:
     PROC_4: LayoutDb failure
     PROC_5: IRDb failure
     PROC_6: Engine failure
+    PROC_7: Output image size exceeds --max-output-size limit
 
 extensions:
   api_crate: brink_extension
@@ -152,6 +153,7 @@ language_features:
   wrf: write a binary file
   align: pad to alignment boundary
   set_addr / set_addr_offset / set_sec_offset / set_file_offset: address control
+  --max-output-size: CLI flag (default 256M); rejects images exceeding the limit before execute (PROC_7)
   label: named location for map output
   assert: compile-time or layout-time assertion
   print: compile-time diagnostic output

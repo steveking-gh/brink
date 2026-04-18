@@ -180,3 +180,29 @@ valid `wr <extension>` case the output operand is orphaned (not consumed by any
 IR) but harmless.
 
 294 tests pass.
+
+
+---
+
+## 2026-04-17 — max-output-size flag (region plan step 1)
+
+**Fuzz bug fix**
+`set_addr_offset 0xFFFFFFFFFFFFF; wrs "123";` caused a hang in `execute_wrx`
+(petabyte-range pad count).  Fix: pre-execute size check in `process.rs` using
+`engine.wr_dispatches.last().map_or(0, |d| d.file_offset + d.size)`.
+
+**New CLI flag**
+`--max-output-size SIZE` (default 256M, accepts K/M/G suffix).  Parsed by
+`parse_size()` in `src/main.rs`.  Passed as new `max_output_size: u64` parameter
+to `process()`.  Rejects before `execute()` with PROC_7.
+
+**New error code**
+PROC_7: output image size exceeds `--max-output-size` limit.
+
+**Fuzz target**
+`process/fuzz/fuzz_targets/fuzz_target_1.rs` updated to pass `max_output_size`
+(64 KiB for fast fuzzing).
+
+**Regression test**
+`tests/fuzz_found_19.brink` added to integration suite; expects PROC_7.
+`max_output_size_flag` inline test: `--max-output-size 0` on 1-byte output.

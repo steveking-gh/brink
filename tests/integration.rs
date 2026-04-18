@@ -358,6 +358,24 @@ mod tests {
     }
 
     #[test]
+    fn fuzz_found_19() {
+        assert_brink_failure("tests/fuzz_found_19.brink", &["[PROC_7]"]);
+    }
+
+    /// --max-output-size 0 rejects a 1-byte output.
+    #[test]
+    fn max_output_size_flag() {
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/wr_single.brink")
+            .arg("--max-output-size")
+            .arg("0")
+            .assert()
+            .failure()
+            .stderr(predicates::str::contains("[PROC_7]"));
+    }
+
+    #[test]
     fn missing_brace_1() {
         assert_brink_failure("tests/missing_brace_1.brink", &["[AST_3]", "[AST_14]"]);
     }

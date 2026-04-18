@@ -1,6 +1,14 @@
 Fuzz tests run until stopped with Ctrl-C.  In my experience, fuzz tests will catch a problem in 60 seconds or not at all.
 
-Cargo fuzz uses LLVM's libFuzzer internally, which provides a vast array of runtime options.  To see thh options using the nightly compiler build:
+You will generally use the fuzz tests in process/fuzz since these exercise the entire Brink pipeline.
+
+Here's an example usage:
+
+    cd process
+    cp ../tests/* fuzz/seeds
+    cargo +nightly fuzz run fuzz_target_1 fuzz/corpus/fuzz_target_1 ./fuzz/seeds -- -only_ascii=1 -dict=../tests/brink_fuzz.dict -timeout=5
+
+Cargo fuzz uses LLVM's libFuzzer internally, which provides a vast array of runtime options.  To see the options using the nightly compiler build:
 
     cargo +nightly fuzz run fuzz_target_1 -- -help=1
 

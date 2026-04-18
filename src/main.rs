@@ -9,6 +9,27 @@ use std::env;
 use std::fs;
 use std::path::Path;
 
+/// Parse a size string with optional K/M/G suffix (case-insensitive).
+/// Examples: "256M" -> 268435456, "64K" -> 65536, "1G" -> 1073741824, "1024" -> 1024.
+fn parse_size(s: &str) -> Result<u64, String> {
+    let s = s.trim();
+    let (num_str, shift) = if s.len() > 1 {
+        match s.chars().last().unwrap().to_ascii_uppercase() {
+            'K' => (&s[..s.len() - 1], 10u32),
+            'M' => (&s[..s.len() - 1], 20u32),
+            'G' => (&s[..s.len() - 1], 30u32),
+            _ => (s, 0u32),
+        }
+    } else {
+        (s, 0u32)
+    };
+    let base: u64 = num_str
+        .parse()
+        .map_err(|_| format!("invalid size value: '{}'", s))?;
+    base.checked_shl(shift)
+        .ok_or_else(|| format!("size '{}' overflows u64", s))
+}
+
 // Local libraries
 use process::process;
 
@@ -84,6 +105,12 @@ pub struct Cli {
     /// (e.g. firmware.brink -> firmware.map.rs).  Use FILE=- for stdout.
     #[arg(long = "map-rs", value_name = "FILE", num_args(0..=1), default_missing_value = "", require_equals = true)]
     pub map_rs: Option<String>,
+
+    /// Maximum output file size in bytes.  Default is 256 MiB.
+    /// Accepts an integer (e.g. 67108864) or a K/M/G suffix (e.g. 64M, 512K, 1G).
+    /// Suffix is case-insensitive.
+    #[arg(long = "max-output-size", value_name = "SIZE", default_value = "256M", value_parser = parse_size)]
+    pub max_output_size: u64,
 }
 
 fn main() -> Result<()> {
@@ -174,6 +201,7 @@ fn main() -> Result<()> {
         verbosity,
         cli.noprint,
         &cli.defines,
+        cli.max_output_size,
         map_csv,
         map_json,
         map_c99,

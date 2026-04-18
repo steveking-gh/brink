@@ -90,10 +90,11 @@ fn parse_define(s: &str) -> Result<(String, ParameterValue)> {
 /// `verbosity`   — log level (0 = quiet, 1 = default, 2+ = verbose)
 /// `noprint`     — suppress print statements in source
 /// `defines`     — command-line const defines, e.g. `["BASE=0x1000", "COUNT=4"]`
-/// `map_hf`      — human-friendly map destination: None = skip,
-///                 Some("-") = stdout, Some(path) = file
-/// `map_json`    — JSON map destination: None = skip,
-///                 Some("-") = stdout, Some(path) = file
+/// `map_hf`           — human-friendly map destination: None = skip,
+///                      Some("-") = stdout, Some(path) = file
+/// `map_json`         — JSON map destination: None = skip,
+///                      Some("-") = stdout, Some(path) = file
+/// `max_output_size`  — reject images larger than this many bytes (EXEC_62)
 #[allow(clippy::too_many_arguments)]
 pub fn process(
     name: &str,
@@ -102,6 +103,7 @@ pub fn process(
     verbosity: u64,
     noprint: bool,
     defines: &[String],
+    max_output_size: u64,
     map_csv: Option<&str>,
     map_json: Option<&str>,
     map_c99: Option<&str>,
@@ -164,6 +166,22 @@ pub fn process(
     if verbosity > 2 {
         engine.dump_locations();
     }
+
+    // Check image size against --max-output-size before writing any bytes.
+    let final_size = engine
+        .wr_dispatches
+        .last()
+        .map_or(0, |d| d.file_offset + d.size);
+    if final_size > max_output_size {
+        let msg = format!(
+            "Output image size {} bytes exceeds maximum {} bytes. \
+             Use --max-output-size to increase the limit.",
+            final_size, max_output_size
+        );
+        diags.err0("PROC_7", &msg);
+        return Err(anyhow!("[PROC_7]: Error detected, halting."));
+    }
+
     // Determine if the user specified an output file on the command line
     // Trim whitespace
     let fname_str = String::from(output_file.unwrap_or("output.bin").trim_matches(' '));

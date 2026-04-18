@@ -2060,7 +2060,7 @@ impl Engine {
             ));
         }
 
-        // This is the only bit of `unsafe code in brink.
+        // This is the only bit of unsafe code in brink.
         let mut mmap = match unsafe { MmapOptions::new().map_mut(&*file) } {
             Ok(m) => m,
             Err(e) => return Err(anyhow!("Failed to memory map output file: {}", e)),
