@@ -1,0 +1,8 @@
+[env]
+# Forces `cargo test` to spawn test threads with an 8MB stack on all platforms
+RUST_MIN_STACK = "8388608"
+
+[target.'cfg(windows)']
+# Instructs the MSVC linker to build the Windows executable with an 8MB main thread stack,
+# perfectly matching the Linux default behavior for the CLI app.
+rustflags = ["-C", "link-arg=/STACK:8388608"]

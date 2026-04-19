@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - BUG FIX: Fixed bad bool conversion assert
 - BUG FIX: Fixed unlimited const evaluation recursion
 - BUG FIX: Fixed incorrect const substitution
+- BUG FIX: Support 8MB stack depth on Windows, which matches Linux default.
 - INTERNAL: Upgrade to latest md-5 crate.
 - INTERNAL: Upgrade to latest parse_int crate.
 - INTERNAL: Remove unused codespan-reporting crate
