@@ -1,0 +1,14 @@
+// Constmpar10>
+const A = 10;
+const B = 9;
+const EQ = A == A;
+const NE = A != B;
+const GE = A >= B;
+const LE = A <= B;
+section foo {
+    assert EQ == 1;
+  assert NE == 1;
+    assert GE (foo); // ef<E == 0;
+        wr8 LE;
+}
+output foo;

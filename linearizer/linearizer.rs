@@ -22,37 +22,61 @@ use ir::IRKind;
 ///   to these structs.
 /// * LinOperand owns its own data.
 ///
-/// We have two types of operands:
-///   * Literal: integer and string literals, identifiers, etc.
-///     These have a source token defining their type and value.
-///   * Output: outputs of IR instructions and extension calls.
-///     These have no source token since they computed values.
+/// Four variants cover all operand roles:
+///   * Literal: direct-value tokens (integers, strings).  The tok field
+///     identifies the type; sval holds the source text.  Never substituted.
+///   * Ref: an identifier value reference (e.g. a const name).
+///     process_lin_operands replaces the operand with the const's typed value
+///     if found in the symbol table; otherwise the operand becomes
+///     ParameterValue::Identifier.
+///   * NameDef: a structural identifier whose string IS the final value (extension
+///     names, label names, const LHS, assign LHS).  Never substituted.
+///   * Output: the result slot of a prior IR instruction.
 pub enum LinOperand {
+    /// Direct-value token: integer literal, string literal, etc.
     Literal {
         /// Source location for diagnostics.
         src_loc: SourceSpan,
-        /// Token kind for the literal's type, e.g. U64, QuotedString, etc.
+        /// Token kind, e.g. U64, QuotedString.  Never Identifier or Label.
         tok: LexToken,
         /// Token text as parsed from source.
         sval: String,
         /// Named-argument parameter name, if the call site used `name=value` syntax.
-        /// None for positional arguments.
         param_name: Option<String>,
     },
+    /// Identifier value reference; const-substitution applies if the identifier names a const.
+    Ref {
+        /// Source location for diagnostics.
+        src_loc: SourceSpan,
+        /// The identifier text to look up in the symbol table.
+        sval: String,
+        /// Named-argument parameter name, if the call site used `name=value` syntax.
+        param_name: Option<String>,
+    },
+    /// Identifier at a definition site: the string is the value, not a lookup key.
+    /// Covers extension call names, label declarations, const LHS names, and assign LHS names.
+    /// The same identifier string in an expression (e.g. addr(my_label)) becomes Ref.
+    /// NameDef operands are never const-substituted and carry no param_name.
+    NameDef {
+        /// Source location for diagnostics.
+        src_loc: SourceSpan,
+        /// The identifier string used directly as the operand value.
+        sval: String,
+    },
+    /// Result slot produced by a prior IR instruction.
     Output {
         /// Source location for diagnostics.
         src_loc: SourceSpan,
         /// Index of this output in the owning Linearizer's ir_vec.
         ir_lid: usize,
         /// Named-argument parameter name, if the call site used `name=value` syntax.
-        /// None for positional arguments and for the output placeholder of an expression.
+        /// None for positional arguments and for non-named-arg output placeholders.
         param_name: Option<String>,
     },
 }
 
 impl LinOperand {
-    /// Construct a LinOperand from a token.  Pass `ir_lid` as `Some(lid)` for
-    /// output slots produced by an IR instruction, or `None` for leaf literals.
+    /// Construct a direct-value literal operand from a token.
     pub fn new_literal(tinfo: &TokenInfo<'_>) -> Self {
         LinOperand::Literal {
             src_loc: tinfo.loc.clone(),
@@ -62,10 +86,29 @@ impl LinOperand {
         }
     }
 
-    /// Construct an output-slot operand for an extension call result.
-    /// Use this instead of `new` when no source token describes the output type —
-    /// only the source location is meaningful.  Sets `tok` to `LexToken::OutputSlot`
-    /// and `sval` to an empty string.
+    /// Construct a value-reference operand for an identifier that may name a const.
+    pub fn new_ref(tinfo: &TokenInfo<'_>) -> Self {
+        LinOperand::Ref {
+            src_loc: tinfo.loc.clone(),
+            sval: tinfo.val.to_string(),
+            param_name: None,
+        }
+    }
+
+    /// Construct a definition-site name operand from a token.
+    pub fn new_name(tinfo: &TokenInfo<'_>) -> Self {
+        LinOperand::NameDef {
+            src_loc: tinfo.loc.clone(),
+            sval: tinfo.val.to_string(),
+        }
+    }
+
+    /// Construct a definition-site name operand from a pre-built string (e.g. "ns::ext").
+    pub fn new_name_str(sval: String, src_loc: SourceSpan) -> Self {
+        LinOperand::NameDef { src_loc, sval }
+    }
+
+    /// Construct an output-slot operand for a computed IR result.
     pub fn new_output(ir_lid: usize, src_loc: SourceSpan) -> Self {
         LinOperand::Output {
             src_loc,
@@ -74,11 +117,16 @@ impl LinOperand {
         }
     }
 
-    /// Tag this operand with a named-argument parameter name.
+    /// Tag the operand with a named-argument parameter name.
+    /// Panics if called on a NameDef operand, which cannot be a named-arg value.
     pub fn set_param_name(&mut self, name: String) {
         match self {
             LinOperand::Literal { param_name, .. } => *param_name = Some(name),
+            LinOperand::Ref { param_name, .. } => *param_name = Some(name),
             LinOperand::Output { param_name, .. } => *param_name = Some(name),
+            LinOperand::NameDef { .. } => {
+                panic!("set_param_name called on a NameDef operand — NameDef operands are not named-arg values");
+            }
         }
     }
 
@@ -86,7 +134,9 @@ impl LinOperand {
     pub fn param_name(&self) -> Option<&str> {
         match self {
             LinOperand::Literal { param_name, .. } => param_name.as_deref(),
+            LinOperand::Ref { param_name, .. } => param_name.as_deref(),
             LinOperand::Output { param_name, .. } => param_name.as_deref(),
+            LinOperand::NameDef { .. } => None,
         }
     }
 }
@@ -350,9 +400,9 @@ impl Linearizer {
                 if ast.has_children(parent_nid) {
                     // An identifier with children means this is an extension call.
                     let ir_lid = self.new_ir(parent_nid, ast, IRKind::ExtensionCall);
-                    // Add the extension's name identifier as the first operand,
-                    // so the backend can look up the extension.
-                    self.add_new_operand_to_ir(ir_lid, LinOperand::new_literal(tinfo));
+                    // Add the extension's name as the first operand so the backend
+                    // can look up the extension.  Name variant: the linearizer never const-substitutes the name.
+                    self.add_new_operand_to_ir(ir_lid, LinOperand::new_name(tinfo));
 
                     // Now recursively add operands for the extension call arguments.
                     let mut lops = Vec::new();
@@ -372,9 +422,10 @@ impl Linearizer {
                     );
                     returned_operands.push(out_idx);
                 } else {
-                    // Leaf identifier — const ref, section name, etc.
+                    // Leaf identifier — const ref or section/label name used as value.
+                    // process_lin_operands substitutes the operand if the identifier names a const.
                     let idx = self.operand_vec.len();
-                    self.operand_vec.push(LinOperand::new_literal(tinfo));
+                    self.operand_vec.push(LinOperand::new_ref(tinfo));
                     returned_operands.push(idx);
                 }
             }
@@ -387,15 +438,9 @@ impl Linearizer {
                 let extension_name = format!("{}{}", tinfo.val, id_tinfo.val);
 
                 let ir_lid = self.new_ir(parent_nid, ast, IRKind::ExtensionCall);
-                // Store the full qualified name (e.g. "custom::foo") in sval.
-                // tok is Identifier to match the simple foo(args) case in the
-                // Identifier arm above, making irdb handling uniform.
-                self.add_new_operand_to_ir(ir_lid, LinOperand::Literal {
-                    src_loc: tinfo.loc.clone(),
-                    tok: LexToken::Identifier,
-                    sval: extension_name,
-                    param_name: None,
-                });
+                // Store the full qualified name (e.g. "custom::foo") as a Name
+                // operand so the backend can look it up without const substitution.
+                self.add_new_operand_to_ir(ir_lid, LinOperand::new_name_str(extension_name, tinfo.loc.clone()));
 
                 let mut lops = Vec::new();
                 for child in children {
@@ -474,14 +519,7 @@ impl Linearizer {
                     let ext_id_tinfo = ast.get_tinfo(ns_children[0]);
                     let full_name = format!("{}{}", first_child_tinfo.val, ext_id_tinfo.val);
                     let ir_lid = self.new_ir(parent_nid, ast, IRKind::SizeofExt);
-                    // Store the full qualified name (e.g. "custom::foo") in sval.
-                    // tok is Identifier to match the simple sizeof(section) case below.
-                    self.add_new_operand_to_ir(ir_lid, LinOperand::Literal {
-                        src_loc: first_child_tinfo.loc.clone(),
-                        tok: LexToken::Identifier,
-                        sval: full_name,
-                        param_name: None,
-                    });
+                    self.add_new_operand_to_ir(ir_lid, LinOperand::new_name_str(full_name, first_child_tinfo.loc.clone()));
                     let idx =
                         self.add_new_operand_to_ir(ir_lid, LinOperand::new_output(ir_lid, tinfo.loc.clone()));
                     returned_operands.push(idx);

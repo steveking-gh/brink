@@ -59,7 +59,9 @@ impl ConstIR {
                     first = false;
                 }
                 match operand {
-                    LinOperand::Literal { sval, .. } => op.push_str(&format!(" {}", sval)),
+                    LinOperand::Literal { sval, .. }
+                    | LinOperand::Ref { sval, .. }
+                    | LinOperand::NameDef { sval, .. } => op.push_str(&format!(" {}", sval)),
                     LinOperand::Output { ir_lid, .. } => {
                         op.push_str(&format!(" tmp{}, output of lid {}", *child, ir_lid))
                     }
@@ -92,7 +94,7 @@ impl<'toks> ConstIR {
         let name_nid = children.next().unwrap();
         let name_tinfo = ast.get_tinfo(name_nid);
         let name_idx = lz.operand_vec.len();
-        lz.operand_vec.push(LinOperand::new_literal(name_tinfo));
+        lz.operand_vec.push(LinOperand::new_name(name_tinfo));
         lz.add_existing_operand_to_ir(ir_lid, name_idx);
 
         // Child 1: `=` sign
@@ -126,7 +128,7 @@ impl<'toks> ConstIR {
         let name_nid = children.next().unwrap();
         let name_tinfo = ast.get_tinfo(name_nid);
         let ir_lid = lz.new_ir(const_nid, ast, IRKind::ConstDeclare);
-        lz.add_new_operand_to_ir(ir_lid, LinOperand::new_literal(name_tinfo));
+        lz.add_new_operand_to_ir(ir_lid, LinOperand::new_name(name_tinfo));
         true
     }
 
@@ -143,7 +145,7 @@ impl<'toks> ConstIR {
         let ident_tinfo = ast.get_tinfo(ident_nid);
 
         let ir_lid = lz.new_ir(eq_nid, ast, IRKind::BareAssign);
-        lz.add_new_operand_to_ir(ir_lid, LinOperand::new_literal(ident_tinfo));
+        lz.add_new_operand_to_ir(ir_lid, LinOperand::new_name(ident_tinfo));
 
         let mut rhs_lops = Vec::new();
         if !lz.record_expr_r(expr_nid, &mut rhs_lops, diags, ast) {
@@ -326,8 +328,8 @@ impl<'toks> ConstIR {
             match op {
                 IRKind::Const => {
                     let name_lop = &const_db.operand_vec[ir.operand_vec[0]];
-                    let LinOperand::Literal { sval: name, .. } = name_lop else {
-                        panic!("Const name operand must be a Literal");
+                    let LinOperand::NameDef { sval: name, .. } = name_lop else {
+                        panic!("Const name operand must be a NameDef");
                     };
                     let rhs_lop_num = ir.operand_vec[1];
                     let val = Self::eval_const_expr_r(
@@ -347,8 +349,8 @@ impl<'toks> ConstIR {
                 }
                 IRKind::ConstDeclare => {
                     let name_lop = &const_db.operand_vec[ir.operand_vec[0]];
-                    let LinOperand::Literal { sval: name, .. } = name_lop else {
-                        panic!("ConstDeclare name operand must be a Literal");
+                    let LinOperand::NameDef { sval: name, .. } = name_lop else {
+                        panic!("ConstDeclare name operand must be a NameDef");
                     };
                     symbol_table.declare(name.clone(), src_loc);
                 }
@@ -390,8 +392,8 @@ impl<'toks> ConstIR {
                 }
                 IRKind::BareAssign => {
                     let name_lop = &const_db.operand_vec[ir.operand_vec[0]];
-                    let LinOperand::Literal { sval: name, .. } = name_lop else {
-                        panic!("BareAssign name operand must be a Literal");
+                    let LinOperand::NameDef { sval: name, .. } = name_lop else {
+                        panic!("BareAssign name operand must be a NameDef");
                     };
                     let name = name.clone();
                     let rhs_lop_num = ir.operand_vec[1];
@@ -671,11 +673,24 @@ impl<'toks> ConstIR {
             };
         }
 
+        // Ref operands: identifier reference — look up in the symbol table.
+        if let LinOperand::Ref { sval, src_loc, .. } = lop {
+            if let Some(val) = symbol_table.get_value(sval.as_str()) {
+                symbol_table.mark_used(sval.as_str());
+                return Some(val);
+            } else {
+                let m = format!(
+                    "Unknown or uninitialized identifier '{}' in const expression. \
+                     Constants must be defined before use.",
+                    sval
+                );
+                diags.err1("IRDB_20", &m, src_loc.clone());
+                return None;
+            }
+        }
+
         // Literal operands: evaluate directly from tok and sval.
-        let LinOperand::Literal {
-            tok, sval, src_loc, ..
-        } = lop
-        else {
+        let LinOperand::Literal { tok, sval, src_loc, .. } = lop else {
             unreachable!()
         };
         let sval = sval.clone();
@@ -716,21 +731,6 @@ impl<'toks> ConstIR {
                     .unwrap_or(&sval)
                     .to_string();
                 Some(ParameterValue::QuotedString(trimmed))
-            }
-            ast::LexToken::Identifier => {
-                // Reference to another const.
-                if let Some(val) = symbol_table.get_value(sval.as_str()) {
-                    symbol_table.mark_used(sval.as_str());
-                    Some(val)
-                } else {
-                    let m = format!(
-                        "Unknown or uninitialized identifier '{}' in const expression. \
-                         Constants must be defined before use.",
-                        sval
-                    );
-                    diags.err1("IRDB_20", &m, src_loc);
-                    None
-                }
             }
             _ => {
                 panic!(

@@ -377,6 +377,21 @@ mod tests {
         assert_brink_failure("tests/fuzz_found_22.brink", &["[IRDB_56]"]);
     }
 
+    #[test]
+    fn fuzz_found_23() {
+        assert_brink_failure("tests/fuzz_found_23.brink", &["[AST_43]"]);
+    }
+
+    #[test]
+    fn fuzz_found_24() {
+        assert_brink_failure("tests/fuzz_found_24.brink", &["[LINEAR_1]"]);
+    }
+
+    #[test]
+    fn fuzz_found_25() {
+        assert_brink_failure("tests/fuzz_found_25.brink", &["[IRDB_40]"]);
+    }
+
     /// assert inside a top-level if body with a string condition panics -- latent bug.
     #[test]
     fn const_bool_string_assert() {
@@ -2949,48 +2964,6 @@ mod tests {
         let bytevec = fs::read("toplevel_if_nested_if.bin").unwrap();
         assert_eq!(bytevec, vec![0xCCu8]);
         fs::remove_file("toplevel_if_nested_if.bin").unwrap();
-    }
-
-    /// Regression: eval_const_expr_r had no depth guard.  A flat left-associative
-    /// binary expression (1 + 1 + 1 + ...) parses at shallow depth (AST_43 never
-    /// fires) but creates an N-level deep left-fold tree in the ConstIR.
-    /// eval_const_expr_r then recurses N deep, overflowing the stack.
-    /// For inputs that go through the linearizer, LINEAR_1 fires first at depth 100.
-    /// IRDB_59 (depth guard added to eval_const_expr_r at the same limit) provides
-    /// defense-in-depth for any eval path that bypasses the linearizer.
-    #[test]
-    fn fuzz_found_24() {
-        // 5000 additions: parse depth ~1 per op (AST_43 never fires), but the
-        // left-fold ConstIR tree is 4999 levels deep.  The linearizer fires
-        // LINEAR_1 at depth 100 before eval_const_expr_r is reached.
-        let terms: usize = 5000;
-        let ops = " + 1".repeat(terms - 1);
-        let src = format!(
-            "const X = 1{};\nsection main {{ wr8 X; }}\noutput main;\n",
-            ops,
-        );
-        let path = "tests/fuzz_found_24.brink";
-        fs::write(path, &src).unwrap();
-        assert_brink_failure(path, &["[LINEAR_1]"]);
-        fs::remove_file(path).unwrap();
-    }
-
-    /// Regression: parse_function_args reset the parse_pratt depth counter to 0,
-    /// allowing f(f(f(...))) to recurse to unbounded depth.  Deeply nested function
-    /// calls must fire AST_43 instead of overflowing the stack (SIGSEGV).
-    #[test]
-    fn fuzz_found_23() {
-        // 250 levels of f(...) exceeds MAX_PRATT_DEPTH (200).
-        let depth: usize = 250;
-        let src = format!(
-            "section main {{ wr8 {}1{}; }}\noutput main;\n",
-            "f(".repeat(depth),
-            ")".repeat(depth),
-        );
-        let path = "tests/fuzz_found_23.brink";
-        fs::write(path, &src).unwrap();
-        assert_brink_failure(path, &["[AST_43]"]);
-        fs::remove_file(path).unwrap();
     }
 
 } // mod tests

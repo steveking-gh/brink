@@ -179,28 +179,32 @@ impl IRDb {
                 }
             }
 
-            linearizer::LinOperand::Literal { tok, sval, .. } => {
+            linearizer::LinOperand::Literal { tok, .. } => {
                 match tok {
-                    // Literals typed directly at the site of the token.
                     ast::LexToken::U64 => data_type = Some(DataType::U64),
                     ast::LexToken::I64 => data_type = Some(DataType::I64),
                     ast::LexToken::Integer => data_type = Some(DataType::Integer),
                     ast::LexToken::QuotedString => data_type = Some(DataType::QuotedString),
-                    ast::LexToken::Label => data_type = Some(DataType::Identifier),
                     ast::LexToken::Namespace => data_type = Some(DataType::Identifier),
                     ast::LexToken::BuiltinVersionString => data_type = Some(DataType::QuotedString),
-                    ast::LexToken::Identifier => {
-                        // If this identifier is a resolved const, return the const's type.
-                        if let Some(cv) = symbol_table.get(sval.as_str()) {
-                            data_type = Some(cv.data_type());
-                        } else {
-                            data_type = Some(DataType::Identifier);
-                        }
-                    }
                     _ => {
                         panic!("Literal operand with unexpected token {:?}", tok);
                     }
                 }
+            }
+
+            // Identifier reference: type is the const's type if found, else Identifier.
+            linearizer::LinOperand::Ref { sval, .. } => {
+                if let Some(cv) = symbol_table.get(sval.as_str()) {
+                    data_type = Some(cv.data_type());
+                } else {
+                    data_type = Some(DataType::Identifier);
+                }
+            }
+
+            // NameDef: always resolves to Identifier.
+            linearizer::LinOperand::NameDef { .. } => {
+                data_type = Some(DataType::Identifier);
             }
         };
 
@@ -217,15 +221,9 @@ impl IRDb {
 
         let mut result = true;
         for (lop_num, lop) in lin_db.operand_vec.iter().enumerate() {
-            // Const substitution: replace Identifier literals that name a resolved const
-            // with the const's typed value so irdb never sees bare Identifier operands
-            // for consts.
-            if let linearizer::LinOperand::Literal {
-                tok: ast::LexToken::Identifier,
-                sval,
-                src_loc,
-                param_name,
-            } = lop
+            // Const substitution: replace Ref operands that name a resolved const
+            // with the const's typed value.
+            if let linearizer::LinOperand::Ref { sval, src_loc, param_name } = lop
                 && let Some(const_val) = self.symbol_table.get(sval.as_str()).cloned()
             {
                 self.symbol_table.mark_used(sval.as_str());
@@ -250,6 +248,12 @@ impl IRDb {
             let (ir_lid, sval, src_loc, is_immediate, param_name) = match lop {
                 linearizer::LinOperand::Literal { sval, src_loc, param_name, .. } => {
                     (None, sval.as_str(), src_loc, true, param_name.clone())
+                }
+                linearizer::LinOperand::Ref { sval, src_loc, param_name } => {
+                    (None, sval.as_str(), src_loc, true, param_name.clone())
+                }
+                linearizer::LinOperand::NameDef { sval, src_loc } => {
+                    (None, sval.as_str(), src_loc, true, None)
                 }
                 linearizer::LinOperand::Output { ir_lid, src_loc, param_name } => {
                     (Some(*ir_lid), "", src_loc, false, param_name.clone())

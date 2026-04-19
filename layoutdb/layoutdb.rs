@@ -54,8 +54,9 @@ impl LayoutDb {
                     first = false;
                 }
                 match operand {
-                    LinOperand::Literal { sval, .. } =>
-                        op.push_str(&format!(" {}", sval)),
+                    LinOperand::Literal { sval, .. }
+                    | LinOperand::Ref { sval, .. }
+                    | LinOperand::NameDef { sval, .. } => op.push_str(&format!(" {}", sval)),
                     LinOperand::Output { ir_lid, .. } => {
                         op.push_str(&format!(" tmp{}, output of lid {}", *child, ir_lid))
                     }
@@ -171,12 +172,7 @@ impl<'toks> LayoutDb {
                     let ir_lid = lz.new_ir(parent_nid, ast, IRKind::SizeofExt);
                     // Store the full qualified name (e.g. "custom::foo") in sval.
                     // tok is Identifier to match the simple sizeof(section) case below.
-                    lz.add_new_operand_to_ir(ir_lid, LinOperand::Literal {
-                        src_loc: first_child_tinfo.loc.clone(),
-                        tok: LexToken::Identifier,
-                        sval: full_name,
-                        param_name: None,
-                    });
+                    lz.add_new_operand_to_ir(ir_lid, LinOperand::new_name_str(full_name, first_child_tinfo.loc.clone()));
 
                     let idx = lz.add_new_operand_to_ir(ir_lid, LinOperand::new_output(ir_lid, tinfo.loc.clone()));
                     returned_operands.push(idx);
@@ -264,36 +260,31 @@ impl<'toks> LayoutDb {
 
             // ── Section block ─────────────────────────────────────────────
             LexToken::Section => {
-                let mut lops = Vec::new();
+                // First child is the section name; emit as Name (structural,
+                // the linearizer never const-substitutes the name) then process the rest as body.
+                let mut children = ast.children(parent_nid);
+                let name_tinfo = ast.get_tinfo(children.next().unwrap());
+                let name_idx = lz.operand_vec.len();
+                lz.operand_vec.push(LinOperand::new_name(name_tinfo));
+
                 let start_lid = lz.new_ir(parent_nid, ast, IRKind::SectionStart);
-                result &= Self::record_children_r(
-                    lz,
-                    parent_nid,
-                    &mut lops,
-                    diags,
-                    ast,
-                    ast_db,
-                );
-                let end_lid = lz.new_ir(parent_nid, ast, IRKind::SectionEnd);
-                if lz.operand_count_is_valid(1, &lops, diags, tinfo) {
-                    let sec_id_lid = lops.pop().unwrap();
-                    lz.add_existing_operand_to_ir(start_lid, sec_id_lid);
-                    lz.add_existing_operand_to_ir(end_lid, sec_id_lid);
-                } else {
-                    result = false;
+                lz.add_existing_operand_to_ir(start_lid, name_idx);
+
+                let mut dummy = Vec::new();
+                for child_nid in children {
+                    result &= Self::record_r(lz, child_nid, &mut dummy, diags, ast, ast_db);
                 }
+
+                let end_lid = lz.new_ir(parent_nid, ast, IRKind::SectionEnd);
+                lz.add_existing_operand_to_ir(end_lid, name_idx);
             }
 
             // ── Label declaration ─────────────────────────────────────────
             LexToken::Label => {
                 let ir_lid = lz.new_ir(parent_nid, ast, IRKind::Label);
+                // Strip the trailing ':' from the label token text.
                 let name_without_colon = tinfo.val[..tinfo.val.len() - 1].to_string();
-                lz.add_new_operand_to_ir(ir_lid, LinOperand::Literal {
-                    src_loc: tinfo.loc.clone(),
-                    tok,
-                    sval: name_without_colon,
-                    param_name: None,
-                });
+                lz.add_new_operand_to_ir(ir_lid, LinOperand::new_name_str(name_without_colon, tinfo.loc.clone()));
             }
 
             // ── Error arms ────────────────────────────────────────────────
@@ -513,8 +504,8 @@ impl IdentDb {
         let mut result = true;
         let name_operand_num = lir.operand_vec[op_num];
         let name_operand = lindb.operand_vec.get(name_operand_num).unwrap();
-        let LinOperand::Literal { sval: name, src_loc, .. } = name_operand else {
-            panic!("label identifier operand must be a Literal operand type!");
+        let LinOperand::NameDef { sval: name, src_loc } = name_operand else {
+            panic!("label identifier operand must be a NameDef operand type!");
         };
         if is_reserved_identifier(name) {
             let m = format!(
@@ -545,8 +536,8 @@ impl IdentDb {
         trace!("IdentDb::inventory_section_identifiers: ENTER");
         let name_operand_num = lir.operand_vec[0];
         let name_operand = lindb.operand_vec.get(name_operand_num).unwrap();
-        let LinOperand::Literal { sval: name, .. } = name_operand else {
-            panic!("section identifier operand must be a Literal operand type!");
+        let LinOperand::NameDef { sval: name, .. } = name_operand else {
+            panic!("section identifier operand must be a NameDef operand type!");
         };
         debug!(
             "IdentDb::inventory_section_identifiers: Adding section name {} to inventory.",
@@ -590,8 +581,7 @@ impl IdentDb {
     }
 
     fn is_valid_section_ref(&self, lop: &LinOperand, diags: &mut Diags) -> bool {
-        // A section identifier is a LinIoperand::Literal with an identifier token.
-        let LinOperand::Literal { sval, src_loc, .. } = lop else {
+        let LinOperand::Ref { sval, src_loc, .. } = lop else {
             return false;
         };
         if let Some(count) = self.section_count.get(sval) {
@@ -608,7 +598,7 @@ impl IdentDb {
     }
 
     fn is_valid_label_ref(&self, lop: &LinOperand) -> bool {
-        let LinOperand::Literal { sval, .. } = lop else { return false; };
+        let LinOperand::Ref { sval, .. } = lop else { return false; };
         self.label_idents.contains_key(sval)
     }
 
@@ -616,9 +606,9 @@ impl IdentDb {
         let mut result = true;
         for &lop_num in &lir.operand_vec {
             let lop = &lindb.operand_vec[lop_num];
-            // Output operands carry no identifier — only Literal operands need ref checks.
-            let LinOperand::Literal { tok, sval, src_loc, .. } = lop else { continue; };
-            if *tok == LexToken::Identifier {
+            // Only Ref operands (identifier value references) need ref checks.
+            let LinOperand::Ref { sval, src_loc, .. } = lop else { continue; };
+            {
                 debug!(
                     "IdentDb::verify_identifier_refs: Verifying reference to '{}'",
                     sval
