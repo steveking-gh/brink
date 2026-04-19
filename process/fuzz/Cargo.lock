@@ -29,6 +29,7 @@ name = "ast"
 version = "6.0.0"
 dependencies = [
  "anyhow",
+ "depth_guard",
  "diags",
  "indextree",
  "tracing",
@@ -60,6 +61,7 @@ version = "6.0.0"
 dependencies = [
  "anyhow",
  "ast",
+ "depth_guard",
  "diags",
  "indextree",
  "ir",
@@ -68,6 +70,10 @@ dependencies = [
  "symtable",
  "tracing",
 ]
+
+[[package]]
+name = "depth_guard"
+version = "6.0.0"
 
 [[package]]
 name = "diags"
@@ -194,6 +200,7 @@ version = "6.0.0"
 dependencies = [
  "anyhow",
  "ast",
+ "depth_guard",
  "diags",
  "indextree",
  "ir",
@@ -222,6 +229,7 @@ name = "linearizer"
 version = "6.0.0"
 dependencies = [
  "ast",
+ "depth_guard",
  "diags",
  "indextree",
  "ir",

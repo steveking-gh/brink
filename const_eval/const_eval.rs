@@ -11,6 +11,7 @@
 // The caller receives a fully resolved `SymbolTable`; `ConstIR` is an
 // internal implementation detail and never exposed outside this crate.
 
+use depth_guard::{DepthGuard, MAX_RECURSION_DEPTH};
 use diags::Diags;
 use diags::SourceSpan;
 use indextree::NodeId;
@@ -101,7 +102,7 @@ impl<'toks> ConstIR {
         // Child 2: RHS expression
         let rhs_nid = children.next().unwrap();
         let mut rhs_lops = Vec::new();
-        if !lz.record_expr_r(1, rhs_nid, &mut rhs_lops, diags, ast) {
+        if !lz.record_expr_r(rhs_nid, &mut rhs_lops, diags, ast) {
             return false;
         }
         if rhs_lops.len() != 1 {
@@ -133,7 +134,6 @@ impl<'toks> ConstIR {
     fn record_deferred_assign(
         lz: &mut Linearizer,
         eq_nid: NodeId,
-        rdepth: usize,
         diags: &mut Diags,
         ast: &'toks Ast,
     ) -> bool {
@@ -146,7 +146,7 @@ impl<'toks> ConstIR {
         lz.add_new_operand_to_ir(ir_lid, LinOperand::new_literal(ident_tinfo));
 
         let mut rhs_lops = Vec::new();
-        if !lz.record_expr_r(rdepth + 1, expr_nid, &mut rhs_lops, diags, ast) {
+        if !lz.record_expr_r(expr_nid, &mut rhs_lops, diags, ast) {
             return false;
         }
         if rhs_lops.len() != 1 {
@@ -164,23 +164,22 @@ impl<'toks> ConstIR {
     fn record_if_body_stmt(
         lz: &mut Linearizer,
         stmt_nid: NodeId,
-        rdepth: usize,
         diags: &mut Diags,
         ast: &'toks Ast,
     ) -> bool {
         let tinfo = ast.get_tinfo(stmt_nid);
         match tinfo.tok {
-            LexToken::Eq => Self::record_deferred_assign(lz, stmt_nid, rdepth, diags, ast),
+            LexToken::Eq => Self::record_deferred_assign(lz, stmt_nid, diags, ast),
             LexToken::Print | LexToken::Assert => {
                 let mut lops = Vec::new();
-                lz.record_expr_children_r(rdepth, stmt_nid, &mut lops, diags, ast);
+                lz.record_expr_children_r(stmt_nid, &mut lops, diags, ast);
                 let ir_lid = lz.new_ir(stmt_nid, ast, tok_to_irkind(tinfo.tok));
                 for idx in lops {
                     lz.add_existing_operand_to_ir(ir_lid, idx);
                 }
                 true
             }
-            LexToken::If => Self::record_if_else(lz, stmt_nid, rdepth, diags, ast),
+            LexToken::If => Self::record_if_else(lz, stmt_nid, diags, ast),
             _ => true, // syntactic tokens already filtered by parser
         }
     }
@@ -189,7 +188,6 @@ impl<'toks> ConstIR {
     fn record_if_else(
         lz: &mut Linearizer,
         if_nid: NodeId,
-        rdepth: usize,
         diags: &mut Diags,
         ast: &'toks Ast,
     ) -> bool {
@@ -201,7 +199,7 @@ impl<'toks> ConstIR {
         let cond_nid = children[i];
         i += 1;
         let mut cond_lops = Vec::new();
-        if !lz.record_expr_r(rdepth + 1, cond_nid, &mut cond_lops, diags, ast) {
+        if !lz.record_expr_r(cond_nid, &mut cond_lops, diags, ast) {
             return false;
         }
         if cond_lops.len() != 1 {
@@ -225,7 +223,7 @@ impl<'toks> ConstIR {
                 i += 1;
                 break;
             }
-            result &= Self::record_if_body_stmt(lz, children[i], rdepth + 1, diags, ast);
+            result &= Self::record_if_body_stmt(lz, children[i], diags, ast);
             i += 1;
         }
 
@@ -238,7 +236,7 @@ impl<'toks> ConstIR {
             if i < children.len() {
                 let next_tok = ast.get_tinfo(children[i]).tok;
                 if next_tok == LexToken::If {
-                    result &= Self::record_if_else(lz, children[i], rdepth + 1, diags, ast);
+                    result &= Self::record_if_else(lz, children[i], diags, ast);
                 } else if next_tok == LexToken::OpenBrace {
                     i += 1; // skip '{'
                     while i < children.len() {
@@ -246,8 +244,7 @@ impl<'toks> ConstIR {
                         if tok == LexToken::CloseBrace {
                             break;
                         }
-                        result &=
-                            Self::record_if_body_stmt(lz, children[i], rdepth + 1, diags, ast);
+                        result &= Self::record_if_body_stmt(lz, children[i], diags, ast);
                         i += 1;
                     }
                 }
@@ -335,7 +332,6 @@ impl<'toks> ConstIR {
                     let rhs_lop_num = ir.operand_vec[1];
                     let val = Self::eval_const_expr_r(
                         symbol_table,
-                        0,
                         rhs_lop_num,
                         const_db,
                         diags,
@@ -360,7 +356,6 @@ impl<'toks> ConstIR {
                     let cond_lop_num = ir.operand_vec[0];
                     let cond_val = Self::eval_const_expr_r(
                         symbol_table,
-                        0,
                         cond_lop_num,
                         const_db,
                         diags,
@@ -402,7 +397,6 @@ impl<'toks> ConstIR {
                     let rhs_lop_num = ir.operand_vec[1];
                     let rhs_val = Self::eval_const_expr_r(
                         symbol_table,
-                        0,
                         rhs_lop_num,
                         const_db,
                         diags,
@@ -422,7 +416,6 @@ impl<'toks> ConstIR {
                     for &lop_idx in &ir.operand_vec {
                         match Self::eval_const_expr_r(
                             symbol_table,
-                            0,
                             lop_idx,
                             const_db,
                             diags,
@@ -454,7 +447,6 @@ impl<'toks> ConstIR {
                     let cond_lop_num = ir.operand_vec[0];
                     match Self::eval_const_expr_r(
                         symbol_table,
-                        0,
                         cond_lop_num,
                         const_db,
                         diags,
@@ -486,33 +478,26 @@ impl<'toks> ConstIR {
         result
     }
 
-    /// Maximum expression tree depth before IRDB_59 fires.
-    /// Matches Linearizer::MAX_RECURSION_DEPTH (100) for a uniform recursion limit.
-    /// Expressions reaching the linearizer fire LINEAR_1 first; IRDB_59 provides
-    /// defense-in-depth for eval paths that bypass the linearizer.
-    const MAX_EVAL_DEPTH: usize = 100;
-
     /// Evaluate a const expression operand recursively.
     /// Returns the computed `ParameterValue`, or `None` on error.
     fn eval_const_expr_r(
         symbol_table: &mut SymbolTable,
-        depth: usize,
         lop_num: usize,
         const_db: &ConstIR,
         diags: &mut Diags,
         err_loc: &SourceSpan,
     ) -> Option<ParameterValue> {
-        if depth > Self::MAX_EVAL_DEPTH {
+        let Some(_guard) = DepthGuard::enter(MAX_RECURSION_DEPTH) else {
             diags.err1(
                 "IRDB_59",
                 &format!(
                     "Const expression nesting depth exceeds maximum ({}).",
-                    Self::MAX_EVAL_DEPTH
+                    MAX_RECURSION_DEPTH
                 ),
                 err_loc.clone(),
             );
             return None;
-        }
+        };
         let lop = &const_db.operand_vec[lop_num];
 
         // Output operands: evaluate by looking up the producing instruction's IRKind.
@@ -565,7 +550,7 @@ impl<'toks> ConstIR {
                 IRKind::ToI64 | IRKind::ToU64 => {
                     let input_lop = lin_ir.operand_vec[0];
                     let val =
-                        Self::eval_const_expr_r(symbol_table, depth + 1, input_lop, const_db, diags, err_loc)?;
+                        Self::eval_const_expr_r(symbol_table, input_lop, const_db, diags, err_loc)?;
                     match (&val, op) {
                         (ParameterValue::U64(v), IRKind::ToI64) => {
                             Some(ParameterValue::I64(*v as i64))
@@ -603,7 +588,6 @@ impl<'toks> ConstIR {
                 | IRKind::RightShift => {
                     let lhs_val = Self::eval_const_expr_r(
                         symbol_table,
-                        depth + 1,
                         lin_ir.operand_vec[0],
                         const_db,
                         diags,
@@ -611,7 +595,6 @@ impl<'toks> ConstIR {
                     )?;
                     let rhs_val = Self::eval_const_expr_r(
                         symbol_table,
-                        depth + 1,
                         lin_ir.operand_vec[1],
                         const_db,
                         diags,
@@ -629,7 +612,6 @@ impl<'toks> ConstIR {
                 | IRKind::Lt => {
                     let lhs_val = Self::eval_const_expr_r(
                         symbol_table,
-                        depth + 1,
                         lin_ir.operand_vec[0],
                         const_db,
                         diags,
@@ -637,7 +619,6 @@ impl<'toks> ConstIR {
                     )?;
                     let rhs_val = Self::eval_const_expr_r(
                         symbol_table,
-                        depth + 1,
                         lin_ir.operand_vec[1],
                         const_db,
                         diags,
@@ -650,7 +631,6 @@ impl<'toks> ConstIR {
                 IRKind::LogicalAnd | IRKind::LogicalOr => {
                     let lhs_val = Self::eval_const_expr_r(
                         symbol_table,
-                        depth + 1,
                         lin_ir.operand_vec[0],
                         const_db,
                         diags,
@@ -658,7 +638,6 @@ impl<'toks> ConstIR {
                     )?;
                     let rhs_val = Self::eval_const_expr_r(
                         symbol_table,
-                        depth + 1,
                         lin_ir.operand_vec[1],
                         const_db,
                         diags,
@@ -1007,7 +986,7 @@ pub fn eval_ast_condition(
     let src_loc = ast.get_tinfo(cond_nid).loc.clone();
     let mut lz = Linearizer::new();
     let mut lops: Vec<usize> = Vec::new();
-    if !lz.record_expr_r(0, cond_nid, &mut lops, diags, ast) {
+    if !lz.record_expr_r(cond_nid, &mut lops, diags, ast) {
         return None;
     }
     if lops.len() != 1 {
@@ -1021,7 +1000,7 @@ pub fn eval_ast_condition(
         ir_vec: lz.ir_vec,
         operand_vec: lz.operand_vec,
     };
-    let val = ConstIR::eval_const_expr_r(symbol_table, 0, lops[0], &const_ir, diags, &src_loc)?;
+    let val = ConstIR::eval_const_expr_r(symbol_table, lops[0], &const_ir, diags, &src_loc)?;
     match val.to_bool() {
         Some(b) => Some(b),
         None => {
@@ -1065,12 +1044,12 @@ pub fn evaluate<'toks>(
                 }
             }
             LexToken::If => {
-                if !ConstIR::record_if_else(&mut lz, nid, 1, diags, ast) {
+                if !ConstIR::record_if_else(&mut lz, nid, diags, ast) {
                     anyhow::bail!("const_eval lowering failed.");
                 }
             }
             LexToken::Eq => {
-                if !ConstIR::record_deferred_assign(&mut lz, nid, 0, diags, ast) {
+                if !ConstIR::record_deferred_assign(&mut lz, nid, diags, ast) {
                     anyhow::bail!("const_eval lowering failed.");
                 }
             }

@@ -97,6 +97,7 @@ name = "ast"
 version = "6.0.0"
 dependencies = [
  "anyhow",
+ "depth_guard",
  "diags",
  "indextree",
  "tracing",
@@ -218,6 +219,7 @@ version = "6.0.0"
 dependencies = [
  "anyhow",
  "ast",
+ "depth_guard",
  "diags",
  "indextree",
  "ir",
@@ -457,6 +459,7 @@ version = "6.0.0"
 dependencies = [
  "anyhow",
  "ast",
+ "depth_guard",
  "diags",
  "indextree",
  "ir",
@@ -481,6 +484,7 @@ name = "linearizer"
 version = "6.0.0"
 dependencies = [
  "ast",
+ "depth_guard",
  "diags",
  "indextree",
  "ir",

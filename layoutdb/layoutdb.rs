@@ -9,6 +9,7 @@
 // Expression lowering (atoms, operators, extension calls) calls into the
 // shared `linearizer` crate.
 
+use depth_guard::{DepthGuard, MAX_RECURSION_DEPTH};
 use diags::Diags;
 use diags::SourceSpan;
 use indextree::NodeId;
@@ -78,7 +79,6 @@ impl<'toks> LayoutDb {
     /// Recurse over each child of parent_nid calling record_r.
     fn record_children_r(
         lz: &mut Linearizer,
-        rdepth: usize,
         parent_nid: NodeId,
         lops: &mut Vec<usize>,
         diags: &mut Diags,
@@ -87,7 +87,7 @@ impl<'toks> LayoutDb {
     ) -> bool {
         let mut result = true;
         for nid in ast.children(parent_nid) {
-            result &= Self::record_r(lz, rdepth, nid, lops, diags, ast, ast_db);
+            result &= Self::record_r(lz, nid, lops, diags, ast, ast_db);
         }
         result
     }
@@ -99,21 +99,23 @@ impl<'toks> LayoutDb {
     #[allow(clippy::too_many_arguments)]
     fn record_r(
         lz: &mut Linearizer,
-        rdepth: usize,
         parent_nid: NodeId,
         returned_operands: &mut Vec<usize>,
         diags: &mut Diags,
         ast: &'toks Ast,
         ast_db: &AstDb,
     ) -> bool {
-        debug!(
-            "LayoutDb::record_r: ENTER at depth {} for parent nid: {}",
-            rdepth, parent_nid
-        );
+        debug!("LayoutDb::record_r: ENTER for parent nid: {}", parent_nid);
 
-        if !lz.depth_sanity(rdepth, parent_nid, diags, ast) {
+        let Some(_guard) = DepthGuard::enter(MAX_RECURSION_DEPTH) else {
+            let tinfo = ast.get_tinfo(parent_nid);
+            let m = format!(
+                "Maximum recursion depth ({MAX_RECURSION_DEPTH}) exceeded when processing '{}'.",
+                tinfo.val
+            );
+            diags.err1("LINEAR_1", &m, tinfo.span());
             return false;
-        }
+        };
 
         let tinfo = ast.get_tinfo(parent_nid);
         let tok = tinfo.tok;
@@ -139,7 +141,7 @@ impl<'toks> LayoutDb {
                     let section = ast_db.sections.get(sec_name_str).unwrap();
                     let sec_nid = section.nid;
                     result &=
-                        Self::record_r(lz, rdepth + 1, sec_nid, &mut lops, diags, ast, ast_db);
+                        Self::record_r(lz, sec_nid, &mut lops, diags, ast, ast_db);
                     result &= lz.operand_count_is_valid(0, &lops, diags, tinfo);
                 } else {
                     // record_expr_r (called via record_children_r) creates the
@@ -147,7 +149,6 @@ impl<'toks> LayoutDb {
                     // No WrExt wrapper is needed.
                     result &= Self::record_children_r(
                         lz,
-                        rdepth + 1,
                         parent_nid,
                         &mut lops,
                         diags,
@@ -183,7 +184,7 @@ impl<'toks> LayoutDb {
                     let mut lops = Vec::new();
                     let ir_lid = lz.new_ir(parent_nid, ast, IRKind::Sizeof);
                     result &=
-                        lz.record_expr_children_r(rdepth + 1, parent_nid, &mut lops, diags, ast);
+                        lz.record_expr_children_r(parent_nid, &mut lops, diags, ast);
                     result &= lz.process_operands(1, &mut lops, ir_lid, diags, tinfo);
                     let idx = lz.add_new_operand_to_ir(ir_lid, LinOperand::new_output(ir_lid, tinfo.loc.clone()));
                     returned_operands.push(idx);
@@ -194,7 +195,7 @@ impl<'toks> LayoutDb {
             LexToken::Addr | LexToken::AddrOffset | LexToken::SecOffset | LexToken::FileOffset => {
                 let mut lops = Vec::new();
                 let ir_lid = lz.new_ir(parent_nid, ast, tok_to_irkind(tok));
-                result &= lz.record_expr_children_r(rdepth + 1, parent_nid, &mut lops, diags, ast);
+                result &= lz.record_expr_children_r(parent_nid, &mut lops, diags, ast);
                 result &= lz.process_optional_operands(1, &mut lops, ir_lid, diags, tinfo);
                 let idx = lz.add_new_operand_to_ir(ir_lid, LinOperand::new_output(ir_lid, tinfo.loc.clone()));
                 returned_operands.push(idx);
@@ -208,7 +209,7 @@ impl<'toks> LayoutDb {
             | LexToken::Align => {
                 let mut lops = Vec::new();
                 let ir_lid = lz.new_ir(parent_nid, ast, tok_to_irkind(tok));
-                result &= lz.record_expr_children_r(rdepth + 1, parent_nid, &mut lops, diags, ast);
+                result &= lz.record_expr_children_r(parent_nid, &mut lops, diags, ast);
 
                 if lops.len() != 1 && lops.len() != 2 {
                     let m = format!(
@@ -254,7 +255,7 @@ impl<'toks> LayoutDb {
             | LexToken::Wrf
             | LexToken::Print => {
                 let mut lops = Vec::new();
-                result &= lz.record_expr_children_r(rdepth + 1, parent_nid, &mut lops, diags, ast);
+                result &= lz.record_expr_children_r(parent_nid, &mut lops, diags, ast);
                 let ir_lid = lz.new_ir(parent_nid, ast, tok_to_irkind(tok));
                 for idx in lops {
                     lz.add_existing_operand_to_ir(ir_lid, idx);
@@ -267,7 +268,6 @@ impl<'toks> LayoutDb {
                 let start_lid = lz.new_ir(parent_nid, ast, IRKind::SectionStart);
                 result &= Self::record_children_r(
                     lz,
-                    rdepth + 1,
                     parent_nid,
                     &mut lops,
                     diags,
@@ -314,14 +314,11 @@ impl<'toks> LayoutDb {
 
             // ── All expression tokens: delegate to the shared linearizer ──
             _ => {
-                result = lz.record_expr_r(rdepth, parent_nid, returned_operands, diags, ast);
+                result = lz.record_expr_r(parent_nid, returned_operands, diags, ast);
             }
         }
 
-        debug!(
-            "LayoutDb::record_r: EXIT({}) at depth {} for nid: {}",
-            result, rdepth, parent_nid
-        );
+        debug!("LayoutDb::record_r: EXIT({}) for nid: {}", result, parent_nid);
         result
     }
 
@@ -366,14 +363,14 @@ impl<'toks> LayoutDb {
         let section = ast_db.sections.get(output_sec_str.as_str()).unwrap();
         let sec_nid = section.nid;
         let mut lops = Vec::new();
-        if !Self::record_r(&mut layout_lz, 1, sec_nid, &mut lops, diags, ast, ast_db) {
+        if !Self::record_r(&mut layout_lz, sec_nid, &mut lops, diags, ast, ast_db) {
             anyhow::bail!("LayoutDb construction failed.");
         }
 
         // Linearize top-level assert statements into layout-time IR.
         for &nid in &ast_db.global_asserts {
             let mut lops = Vec::new();
-            if !Self::record_r(&mut layout_lz, 1, nid, &mut lops, diags, ast, ast_db) {
+            if !Self::record_r(&mut layout_lz, nid, &mut lops, diags, ast, ast_db) {
                 anyhow::bail!("LayoutDb construction failed.");
             }
         }

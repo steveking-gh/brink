@@ -5,6 +5,7 @@
 // The crate carries no knowledge of const vs. layout context.  Each caller
 // owns a Linearizer instance and the resulting IR/operand vectors.
 
+use depth_guard::{DepthGuard, MAX_RECURSION_DEPTH};
 use diags::Diags;
 use diags::SourceSpan;
 use indextree::NodeId;
@@ -231,30 +232,6 @@ impl Linearizer {
         self.ir_vec[ir_lid].add_operand(idx);
     }
 
-    /// Maximum expression nesting depth before LINEAR_1 fires.
-    const MAX_RECURSION_DEPTH: usize = 100;
-
-    /// Return false and emit an error if `rdepth` exceeds MAX_RECURSION_DEPTH.
-    pub fn depth_sanity(
-        &self,
-        rdepth: usize,
-        parent_nid: NodeId,
-        diags: &mut Diags,
-        ast: &Ast<'_>,
-    ) -> bool {
-        if rdepth > Self::MAX_RECURSION_DEPTH {
-            let tinfo = ast.get_tinfo(parent_nid);
-            let m = format!(
-                "Maximum recursion depth ({}) exceeded when processing '{}'.",
-                Self::MAX_RECURSION_DEPTH,
-                tinfo.val
-            );
-            diags.err1("LINEAR_1", &m, tinfo.span());
-            return false;
-        }
-        true
-    }
-
     /// Return false and emit an error if this IR does not have exactly the
     /// expected number of operands.
     pub fn operand_count_is_valid(
@@ -317,7 +294,6 @@ impl Linearizer {
     /// operand vector.
     pub fn record_expr_children_r(
         &mut self,
-        rdepth: usize,
         parent_nid: NodeId,
         lops: &mut Vec<usize>,
         diags: &mut Diags,
@@ -325,7 +301,7 @@ impl Linearizer {
     ) -> bool {
         let mut result = true;
         for nid in ast.children(parent_nid) {
-            result &= self.record_expr_r(rdepth, nid, lops, diags, ast);
+            result &= self.record_expr_r(nid, lops, diags, ast);
         }
         result
     }
@@ -340,20 +316,22 @@ impl Linearizer {
     /// returned_operands.
     pub fn record_expr_r(
         &mut self,
-        rdepth: usize,
         parent_nid: NodeId,
         returned_operands: &mut Vec<usize>,
         diags: &mut Diags,
         ast: &Ast<'_>,
     ) -> bool {
-        debug!(
-            "Linearizer::record_expr_r: ENTER at depth {} for nid: {}",
-            rdepth, parent_nid
-        );
+        debug!("Linearizer::record_expr_r: ENTER for nid: {}", parent_nid);
 
-        if !self.depth_sanity(rdepth, parent_nid, diags, ast) {
+        let Some(_guard) = DepthGuard::enter(MAX_RECURSION_DEPTH) else {
+            let tinfo = ast.get_tinfo(parent_nid);
+            let m = format!(
+                "Maximum recursion depth ({MAX_RECURSION_DEPTH}) exceeded when processing '{}'.",
+                tinfo.val
+            );
+            diags.err1("LINEAR_1", &m, tinfo.span());
             return false;
-        }
+        };
 
         let tinfo = ast.get_tinfo(parent_nid);
         let tok = tinfo.tok;
@@ -379,7 +357,7 @@ impl Linearizer {
                     // Now recursively add operands for the extension call arguments.
                     let mut lops = Vec::new();
                     for child in ast.children(parent_nid) {
-                        result &= self.record_expr_r(rdepth + 1, child, &mut lops, diags, ast);
+                        result &= self.record_expr_r(child, &mut lops, diags, ast);
                     }
                     for idx in lops {
                         self.add_existing_operand_to_ir(ir_lid, idx);
@@ -421,7 +399,7 @@ impl Linearizer {
 
                 let mut lops = Vec::new();
                 for child in children {
-                    result &= self.record_expr_r(rdepth + 1, child, &mut lops, diags, ast);
+                    result &= self.record_expr_r(child, &mut lops, diags, ast);
                 }
                 for idx in lops {
                     self.add_existing_operand_to_ir(ir_lid, idx);
@@ -451,7 +429,7 @@ impl Linearizer {
             LexToken::ToI64 | LexToken::ToU64 => {
                 let mut lops = Vec::new();
                 result &=
-                    self.record_expr_children_r(rdepth + 1, parent_nid, &mut lops, diags, ast);
+                    self.record_expr_children_r(parent_nid, &mut lops, diags, ast);
                 let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tok));
                 result &= self.process_operands(1, &mut lops, ir_lid, diags, tinfo);
                 let idx = self.add_new_operand_to_ir(ir_lid, LinOperand::new_output(ir_lid, tinfo.loc.clone()));
@@ -479,7 +457,7 @@ impl Linearizer {
             | LexToken::Plus => {
                 let mut lops = Vec::new();
                 result &=
-                    self.record_expr_children_r(rdepth + 1, parent_nid, &mut lops, diags, ast);
+                    self.record_expr_children_r(parent_nid, &mut lops, diags, ast);
                 let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tok));
                 result &= self.process_operands(2, &mut lops, ir_lid, diags, tinfo);
                 let idx = self.add_new_operand_to_ir(ir_lid, LinOperand::new_output(ir_lid, tinfo.loc.clone()));
@@ -511,7 +489,7 @@ impl Linearizer {
                     let mut lops = Vec::new();
                     let ir_lid = self.new_ir(parent_nid, ast, IRKind::Sizeof);
                     result &=
-                        self.record_expr_children_r(rdepth + 1, parent_nid, &mut lops, diags, ast);
+                        self.record_expr_children_r(parent_nid, &mut lops, diags, ast);
                     result &= self.process_operands(1, &mut lops, ir_lid, diags, tinfo);
                     let idx =
                         self.add_new_operand_to_ir(ir_lid, LinOperand::new_output(ir_lid, tinfo.loc.clone()));
@@ -524,7 +502,7 @@ impl Linearizer {
                 let mut lops = Vec::new();
                 let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tok));
                 result &=
-                    self.record_expr_children_r(rdepth + 1, parent_nid, &mut lops, diags, ast);
+                    self.record_expr_children_r(parent_nid, &mut lops, diags, ast);
                 result &= self.process_optional_operands(1, &mut lops, ir_lid, diags, tinfo);
                 let idx = self.add_new_operand_to_ir(ir_lid, LinOperand::new_output(ir_lid, tinfo.loc.clone()));
                 returned_operands.push(idx);
@@ -546,7 +524,7 @@ impl Linearizer {
                 let param_name = tinfo.val.to_string();
                 let before = returned_operands.len();
                 let child = ast.children(parent_nid).next().unwrap();
-                result &= self.record_expr_r(rdepth + 1, child, returned_operands, diags, ast);
+                result &= self.record_expr_r(child, returned_operands, diags, ast);
                 // Tag every operand added for this arg with the parameter name.
                 for idx in &returned_operands[before..] {
                     self.operand_vec[*idx].set_param_name(param_name.clone());
@@ -561,10 +539,7 @@ impl Linearizer {
             }
         }
 
-        debug!(
-            "Linearizer::record_expr_r: EXIT({}) at depth {} for nid: {}",
-            result, rdepth, parent_nid
-        );
+        debug!("Linearizer::record_expr_r: EXIT({}) for nid: {}", result, parent_nid);
         result
     }
 }

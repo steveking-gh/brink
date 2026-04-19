@@ -1,8 +1,12 @@
 use std::cell::Cell;
 use std::marker::PhantomData;
 
+/// Uniform recursion depth limit shared across all libraries. This is a
+/// Somewhat arbitrary limit large enough for practical use.
+pub const MAX_RECURSION_DEPTH: usize = 200;
+
 thread_local! {
-    static DEPTH: Cell<usize> = Cell::new(0);
+    static DEPTH: Cell<usize> = const { Cell::new(0) };
 }
 
 /// RAII guard for recursive descent depth tracking.
@@ -15,12 +19,10 @@ thread_local! {
 /// # Example
 ///
 /// ```
-/// use depth_guard::DepthGuard;
-///
-/// const MAX_DEPTH: usize = 100;
+/// use depth_guard::{DepthGuard, MAX_RECURSION_DEPTH};
 ///
 /// fn parse_expr() -> bool {
-///     let Some(_guard) = DepthGuard::enter(MAX_DEPTH) else {
+///     let Some(_guard) = DepthGuard::enter(MAX_RECURSION_DEPTH) else {
 ///         return false; // depth exceeded
 ///     };
 ///     // recursive calls here -- _guard decrements on any return
