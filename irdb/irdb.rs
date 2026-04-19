@@ -373,7 +373,7 @@ impl IRDb {
     // Expect 1 numeric operand (value) followed by one optional numeric operand (repeat count)
     fn validate_numeric_1_or_2(&self, ir: &IR, diags: &mut Diags) -> bool {
         let len = ir.operands.len();
-        if len < 1 || len > 2 {
+        if !(1..=2).contains(&len) {
             let m = format!(
                 "'{:?}' takes 1 or 2 arguments, found {}.",
                 ir.kind, len

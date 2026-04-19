@@ -255,6 +255,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "depth_guard"
+version = "6.0.0"
+
+[[package]]
 name = "diags"
 version = "6.0.0"
 dependencies = [

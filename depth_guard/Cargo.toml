@@ -1,0 +1,8 @@
+[package]
+name = "depth_guard"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[lib]
+path = "depth_guard.rs"

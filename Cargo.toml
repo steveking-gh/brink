@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "depth_guard",
     "ast",
     "ir",
     "symtable",
