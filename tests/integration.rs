@@ -2966,4 +2966,9 @@ mod tests {
         fs::remove_file("toplevel_if_nested_if.bin").unwrap();
     }
 
+    #[test]
+    fn layout_empty_sizeof() {
+        assert_brink_failure("tests/layout_empty_sizeof.brink", &["[AST_40]"]);
+    }
+
 } // mod tests

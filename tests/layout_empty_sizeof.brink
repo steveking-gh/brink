@@ -1,0 +1,5 @@
+section main {
+    wr8 sizeof();
+}
+
+output main;
