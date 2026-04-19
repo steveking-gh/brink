@@ -1,0 +1,14 @@
+output top;
+
+section top {
+    wr A;
+    wr B;
+}
+
+section A {
+    wr8 0, (sizeof(B) == 1) + 1;
+}
+
+section B {
+    wr8 0, (sizeof(A) == 2) + 1;
+}

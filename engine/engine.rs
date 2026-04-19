@@ -1454,6 +1454,7 @@ impl Engine {
         let mut old_locations = Vec::new();
         let mut stable = false;
         let mut iter_count = 0;
+        const MAX_ITERATIONS: usize = 100;
         while result && !stable {
             self.trace(format!("Engine::iterate: Iteration count {}", iter_count).as_str());
             iter_count += 1;
@@ -1566,6 +1567,20 @@ impl Engine {
             if self.ir_locs == old_locations {
                 stable = true;
             } else {
+                if iter_count >= MAX_ITERATIONS {
+                    let mut diff_i = 0;
+                    for i in 0..self.ir_locs.len() {
+                        if self.ir_locs[i] != old_locations[i] {
+                            diff_i = i;
+                            break;
+                        }
+                    }
+                    let culprit_idx = diff_i.saturating_sub(1);
+                    let msg = "Cyclic dependency detected: layout failed to stabilize after maximum iterations.";
+                    let src_loc = irdb.ir_vec[culprit_idx].src_loc.clone();
+                    diags.err1("EXEC_62", msg, src_loc);
+                    return false;
+                }
                 // Record the current location information
                 old_locations = self.ir_locs.clone();
             }

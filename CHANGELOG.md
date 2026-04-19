@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - BUG FIX: Fixed unlimited const evaluation recursion
 - BUG FIX: Fixed incorrect const substitution
 - BUG FIX: Support 8MB stack depth on Windows, which matches Linux default.
+- BUG FIX: Prevent infinite iteration in layout oscillations.
 - INTERNAL: Upgrade to latest md-5 crate.
 - INTERNAL: Upgrade to latest parse_int crate.
 - INTERNAL: Remove unused codespan-reporting crate
@@ -22,6 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - INTERNAL: Renamed and improved the fuzz_help.md
 - INTERNAL: Added DepthGaurd library for recursion limits
 - INTERNAL: Better linear operand enumeration
+- INTERNAL: Added mmap test with 0 length
 
 ## [6.0.0] - 2026-04-16
 

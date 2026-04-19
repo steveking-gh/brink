@@ -1278,7 +1278,8 @@ mod tests {
         Command::cargo_bin("brink")
             .unwrap()
             .arg("tests/extension_sizeof_arg.brink")
-            .arg("-o").arg(out)
+            .arg("-o")
+            .arg(out)
             .assert()
             .success();
         let bytes = fs::read(out).expect("output file missing");
@@ -1298,7 +1299,8 @@ mod tests {
         Command::cargo_bin("brink")
             .unwrap()
             .arg("tests/extension_8arg.brink")
-            .arg("-o").arg(out)
+            .arg("-o")
+            .arg(out)
             .assert()
             .success();
         let bytes = fs::read(out).expect("output file missing");
@@ -1318,7 +1320,8 @@ mod tests {
         Command::cargo_bin("brink")
             .unwrap()
             .arg("tests/extension_8arg_expr.brink")
-            .arg("-o").arg(out)
+            .arg("-o")
+            .arg(out)
             .assert()
             .success();
         let bytes = fs::read(out).expect("output file missing");
@@ -1425,10 +1428,7 @@ mod tests {
     /// fails when the extension rejects empty input.
     #[test]
     fn execute_extension_zero_length_section_failure() {
-        assert_brink_failure(
-            "tests/extension_zero_length_section_failure.brink",
-            &[],
-        );
+        assert_brink_failure("tests/extension_zero_length_section_failure.brink", &[]);
     }
 
     /// Global asserts (outside any section) pass through the validation phase
@@ -2674,11 +2674,16 @@ mod tests {
         Command::cargo_bin("brink")
             .unwrap()
             .arg("tests/named_arg_crc.brink")
-            .arg("-o").arg(out)
+            .arg("-o")
+            .arg(out)
             .assert()
             .success();
         let bytes = fs::read(out).expect("output file missing");
-        assert_eq!(bytes, vec![0x00, 0x00, 0x00, 0x2A], "42 must encode as big-endian u32");
+        assert_eq!(
+            bytes,
+            vec![0x00, 0x00, 0x00, 0x2A],
+            "42 must encode as big-endian u32"
+        );
         fs::remove_file(out).ok();
     }
 
@@ -2691,14 +2696,19 @@ mod tests {
         Command::cargo_bin("brink")
             .unwrap()
             .arg("tests/named_arg_section.brink")
-            .arg("-o").arg(out)
+            .arg("-o")
+            .arg(out)
             .assert()
             .success();
         let bytes = fs::read(out).expect("output file missing");
         assert_eq!(bytes.len(), 32, "expected 32 bytes total");
         for i in 0..16usize {
             assert_eq!(bytes[i], i as u8, "data byte {i} mismatch");
-            assert_eq!(bytes[16 + i], (i as u8).wrapping_add(1), "incremented byte {i} mismatch");
+            assert_eq!(
+                bytes[16 + i],
+                (i as u8).wrapping_add(1),
+                "incremented byte {i} mismatch"
+            );
         }
         fs::remove_file(out).ok();
     }
@@ -2712,11 +2722,16 @@ mod tests {
         Command::cargo_bin("brink")
             .unwrap()
             .arg("tests/named_arg_sum8_reorder.brink")
-            .arg("-o").arg(out)
+            .arg("-o")
+            .arg(out)
             .assert()
             .success();
         let bytes = fs::read(out).expect("output file missing");
-        assert_eq!(bytes, vec![36u8, 0, 0, 0, 0, 0, 0, 0], "sum of 1..8 must be 36 in little-endian u64");
+        assert_eq!(
+            bytes,
+            vec![36u8, 0, 0, 0, 0, 0, 0, 0],
+            "sum of 1..8 must be 36 in little-endian u64"
+        );
         fs::remove_file(out).ok();
     }
 
@@ -2971,4 +2986,13 @@ mod tests {
         assert_brink_failure("tests/layout_empty_sizeof.brink", &["[AST_40]"]);
     }
 
+    #[test]
+    fn engine_infinite_loop() {
+        assert_brink_failure("tests/engine_infinite_loop.brink", &["[EXEC_62]"]);
+    }
+
+    #[test]
+    fn engine_mmap_0_byte() {
+        assert_brink_failure("tests/engine_mmap_0_byte.brink", &["[EXEC_47]"]);
+    }
 } // mod tests
