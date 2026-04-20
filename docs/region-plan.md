@@ -329,14 +329,14 @@ This function walks each Region node's `RegionProp` children, evaluates their
 expression subtrees using the existing `eval_const_expr_r` machinery, and
 stores resolved `u64` values into `RegionEntry`. Expressions that reference
 other region properties (`FLASH.addr`) are deferred until all same-depth
-regions are resolved — a simple topological sort or two-pass approach handles
-this. Forward references to undefined regions produce `EXEC_62`.
+regions are resolved. The evaluator must implement cycle detection to trap cyclic dependencies and emit `EXEC_68`. Forward references to undefined regions produce `EXEC_62`.
 
 ### New error codes
 
-| Code    | Meaning                                               |
-|---------|-------------------------------------------------------|
+| Code    | Meaning                                                |
+|---------|--------------------------------------------------------|
 | EXEC_62 | Region property expression references undefined region |
+| EXEC_68 | Cyclic dependency in region properties                 |
 
 ---
 
@@ -436,9 +436,15 @@ actually exists in `ast_db.regions`. Unknown region reference produces `AST_49`.
 
 ---
 
-## Step 6 — Post-iterate region enforcement in Engine
+## Step 6 — Implicit Region Anchoring and Post-Iterate Enforcement
 
-After iterate converges and before execute begins, validate that every section
+### Implicit Anchor in Engine
+
+During the `iterate` loop, `iterate_section_start` processes sections. For sections declared `in REGION`, the engine checks the current location. If `current.addr_base` is uninitialized or differs from `region.addr`, the engine sets `current.addr_base = region.addr`. This action establishes the section as the root of the region, eliminating the need for an explicit `set_addr` instruction. Subsequent sections written to the same region inherit the updated address sequentially.
+
+### Post-Iterate Enforcement
+
+After `iterate` converges and before `execute` begins, the engine validates that every section
 annotated `in REGION` has its resolved address range fully within the region.
 
 ### Engine changes
@@ -644,3 +650,4 @@ Region-related EXEC codes begin at EXEC_62.
 | EXEC_65 | 4    | engine     | Sibling regions overlap                                   |
 | EXEC_66 | 6    | engine     | Section address range falls outside declared region       |
 | EXEC_67 | 6    | engine     | Two sections in same region overlap                       |
+| EXEC_68 | 3    | const_eval | Cyclic dependency in region properties                    |
