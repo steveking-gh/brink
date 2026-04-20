@@ -1,0 +1,7 @@
+// Tl       essions inm wrx
+section foo {
+    wr8  (2) + addr_offset() + addr(foo) , sizeof(foo); wr16 (1 + 2) + addr_offset() + addr(foo) + sizeof(foo); // offset36 = 77
+    assert sizeof(foo) == 37;
+}
+
+output foo 10        ;

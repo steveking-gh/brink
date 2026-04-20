@@ -21,7 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - INTERNAL: Upgrade to latest assert crate
 - INTERNAL: Upgrade to latest serial_test crate
 - INTERNAL: Renamed and improved the fuzz_help.md
-- INTERNAL: Added DepthGaurd library for recursion limits
+- INTERNAL: Added DepthGuard library for recursion limits
 - INTERNAL: Better linear operand enumeration
 - INTERNAL: Added mmap test with 0 length
 

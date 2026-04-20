@@ -392,6 +392,11 @@ mod tests {
         assert_brink_failure("tests/fuzz_found_25.brink", &["[IRDB_40]"]);
     }
 
+    #[test]
+    fn fuzz_found_26() {
+        assert_brink_failure("tests/fuzz_found_26.brink", &["[EXEC_62]"]);
+    }
+
     /// assert inside a top-level if body with a string condition panics -- latent bug.
     #[test]
     fn const_bool_string_assert() {
