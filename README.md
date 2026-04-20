@@ -15,13 +15,13 @@ creating FLASH, ROM or other non-volatile memory images.
 
 ## Install Prebuilt Binaries for Linux
 
-    curl --proto '=https' --tlsv1.2 -LsSf https://github.com/steveking-gh/brink/releases/download/6.0.0/brink-installer.sh | sh
+    curl --proto '=https' --tlsv1.2 -LsSf https://github.com/steveking-gh/brink/releases/download/6.1.0/brink-installer.sh | sh
 
 ## Install Prebuilt Binaries for Windows
 
 Start a command prompt and execute the following:
 
-    powershell -ExecutionPolicy Bypass -c "irm https://github.com/steveking-gh/brink/releases/download/6.0.0/brink-installer.ps1 | iex"
+    powershell -ExecutionPolicy Bypass -c "irm https://github.com/steveking-gh/brink/releases/download/6.1.0/brink-installer.ps1 | iex"
 
 ## Build From Source
 

@@ -4,25 +4,25 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [6.x.x] - 2026-04-17
+## [6.1.0] - 2026-04-17
 - FEATURE: added --max-output-size CLI option.
 - BUG FIX: Fixed assert when wrf had too man args
 - BUG FIX: Fixed assert when wr8..wr64 had too man args
 - BUG FIX: Fixed bad bool conversion assert
-- BUG FIX: Fixed unlimited const evaluation recursion
+- BUG FIX: Fixed various unlimited recursion bugs
 - BUG FIX: Fixed incorrect const substitution
 - BUG FIX: Support 8MB stack depth on Windows, which matches Linux default.
-- BUG FIX: Prevent infinite iteration in layout oscillations.
+- BUG FIX: Prevent infinite iteration in circular layout dependencies.
+- INTERNAL: Added DepthGuard library for recursion limits
+- INTERNAL: Better linear operand enumeration
 - INTERNAL: Upgrade to latest md-5 crate.
 - INTERNAL: Upgrade to latest parse_int crate.
-- INTERNAL: Remove unused codespan-reporting crate
 - INTERNAL: Upgrade to latest ariadne crate
 - INTERNAL: Upgrade to latest predicates crate
 - INTERNAL: Upgrade to latest assert crate
 - INTERNAL: Upgrade to latest serial_test crate
+- INTERNAL: Remove unused codespan-reporting crate
 - INTERNAL: Renamed and improved the fuzz_help.md
-- INTERNAL: Added DepthGuard library for recursion limits
-- INTERNAL: Better linear operand enumeration
 - INTERNAL: Added mmap test with 0 length
 
 ## [6.0.0] - 2026-04-16
