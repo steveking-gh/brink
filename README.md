@@ -8,8 +8,8 @@
 
 Brink is a domain specific language for linking and composing of an output file.
 Brink simplifies construction of complex files by managing sizes, offsets and
-ordering in a readable declarative style.  Brink tries to be especially useful when
-creating FLASH, ROM or other non-volatile memory images.
+ordering in a readable declarative style.  Brink tries to be especially useful
+when creating FLASH, ROM or other non-volatile memory images.
 
 # Quick Start
 
@@ -27,11 +27,14 @@ Start a command prompt and execute the following:
 
 ### Step 1: Install Rust
 
-Brink is written in rust, which works on all major operating systems.  Installing rust is simple and documented in the [Rust Getting Started](https://www.rust-lang.org/learn/get-started) guide.
+Brink is written in rust, which works on all major operating systems.
+Installing rust is simple and documented in the [Rust Getting
+Started](https://www.rust-lang.org/learn/get-started) guide.
 
 ### Step 2: Clone Brink
 
-From a command prompt, clone Brink and change directory to your clone.  For example:
+From a command prompt, clone Brink and change directory to your clone.  For
+example:
 
     git clone https://github.com/steveking-gh/brink.git
     cd brink
@@ -44,7 +47,9 @@ All tests should pass, 0 tests should fail.
 
 ### Step 4: Install Brink
 
-The previous build step created the Brink binary as `./target/release/brink`.  You can install the Brink binary anywhere on your system.  As a convenience, cargo provides a per-user installation as `$HOME/.cargo/bin/brink`.
+The previous build step created the Brink binary as `./target/release/brink`.
+You can install the Brink binary anywhere on your system.  As a convenience,
+cargo provides a per-user installation as `$HOME/.cargo/bin/brink`.
 
     cargo install --path ./
 
@@ -82,7 +87,8 @@ Brink can write your own strings and data defined within your Brink source file.
 
 ---
 
-Brink provides full featured assert and print statement support to help with debugging complex output files.
+Brink provides full featured assert and print statement support to help with
+debugging complex output files.
 
 <img src="./images/debug.svg" width="400">
 
@@ -109,9 +115,13 @@ Running Brink on the file produces the expected message:
     Hello World!
     $
 
-Brink also produced an empty file called `output.bin`.  This file is the default output when you don't specify some other name on the command line with the `-o` option.  Why is the file empty?  Because nothing in our program produced output file content -- we just printed the console message.
+Brink also produced an empty file called `output.bin`.  This file is the default
+output when you don't specify some other name on the command line with the `-o`
+option.  Why is the file empty?  Because nothing in our program produced output
+file content -- we just printed the console message.
 
-Let's fix that.  We can replace the `print` command with the `wrs` command, which is shorthand for 'write string':
+Let's fix that.  We can replace the `print` command with the `wrs` command,
+which is shorthand for 'write string':
 
     /*
      * A section defines part of an output.
@@ -133,7 +143,12 @@ Produces output.bin containing the string `Hello World!\n`.
 
 # Basic Structure of a Brink Program
 
-A Brink source file consists of one or more section definitions and exactly one output statement.  Each section has a unique name.  The output statement specifies the name of the top level section that defines the output file.  Starting from the top section, Brink recursively evaluates each section and produces the output file.  For example, we can define a section with a write-string (wrs) statement:
+A Brink source file consists of one or more section definitions and exactly one
+output statement.  Each section has a unique name.  The output statement
+specifies the name of the top level section that defines the output file.
+Starting from the top section, Brink recursively evaluates each section and
+produces the output file.  For example, we can define a section with a
+write-string (wrs) statement:
 
     section foo {        // Start a new section named 'foo'
         wrs "I'm foo";   // wrs writes a string into the section.
@@ -165,7 +180,9 @@ Produces `output.bin`:
     I'm bar
     I'm foo
 
-Users can extend Brink with custom data processing using [Brink Extension](#brink-extensions).  Users write the output of their extension call into a section with a `wr`.
+Users can extend Brink with custom data processing using [Brink
+Extension](#brink-extensions).  Users write the output of their extension call
+into a section with a `wr`.
 
     section foo {
         wrs "I'm foo\n";
@@ -188,9 +205,11 @@ Users can extend Brink with custom data processing using [Brink Extension](#brin
 
 # Assert and Print
 
-To aid in debug, Brink supports `assert` and `print` statements in your programs.
+To aid in debug, Brink supports `assert` and `print` statements in your
+programs.
 
-Assert expressions automate error checking.  This example verifies our expectation that section 'bar' is 13 bytes long.
+Assert expressions automate error checking.  This example verifies our
+expectation that section 'bar' is 13 bytes long.
 
     section bar {
         wrs "Hello World!\n";
@@ -198,7 +217,8 @@ Assert expressions automate error checking.  This example verifies our expectati
     }
     output bar;
 
-You can print this length information to the console during generation of your output:
+You can print this length information to the console during generation of your
+output:
 
     section bar {
         print "Output size is ", sizeof(bar), " bytes\n";
@@ -215,15 +235,30 @@ Prints the console message:
 
 # Addresses and Offsets
 
-Unlike the [GNU linker 'ld'](https://ftp.gnu.org/old-gnu/Manuals/ld-2.9.1/html_mono/ld.html) concept of a *location counter*, Brink uses *scoped addresses* and *scoped offsets* to track locations.  **Addresses and offsets are 64-bit unsigned values that mark the position of the *next* byte of output**.  Brink allows users to reference and manipulate these values, adding pad bytes as necessary.
+Unlike the [GNU linker
+'ld'](https://ftp.gnu.org/old-gnu/Manuals/ld-2.9.1/html_mono/ld.html) concept of
+a *location counter*, Brink uses *scoped addresses* and *scoped offsets* to
+track locations.  **Addresses and offsets are 64-bit unsigned values that mark
+the position of the *next* byte of output**.  Brink allows users to reference
+and manipulate these values, adding pad bytes as necessary.
 
-Importantly, addresses and offsets are *scoped* to their enclosing section.  When entering a nested (child) section, Brink saves the outer (parent) section's inflight address and offset values.  When exiting a child section, Brink restores and updates the parent's address and offset values.  From the perspective of the parent section, a child section is a `wr` with the parent's addresses and offsets updated per the size of the child.
+Importantly, addresses and offsets are *scoped* to their enclosing section.
+When entering a nested (child) section, Brink saves the outer (parent) section's
+inflight address and offset values.  When exiting a child section, Brink
+restores and updates the parent's address and offset values.  From the
+perspective of the parent section, a child section is a `wr` with the parent's
+addresses and offsets updated per the size of the child.
 
-For the specific case of the address and address offset, a child section inherits these values by default from the parent section.  If the child section does not use `set_addr`, then the address and address offset simply continue growing in step with the parent.
+For the specific case of the address and address offset, a child section
+inherits these values by default from the parent section.  If the child section
+does not use `set_addr`, then the address and address offset simply continue
+growing in step with the parent.
 
-The only global (non-scoped) offset is the `file_offset`.  Starting from 0, this value monotonically increases to the end of the output file.
+The only global (non-scoped) offset is the `file_offset`.  Starting from 0, this
+value monotonically increases to the end of the output file.
 
-The following table provides a summary of the addresses and offsets used in Brink.
+The following table provides a summary of the addresses and offsets used in
+Brink.
 
 | Variable       | Section Entry | Section Exit     | [`set_addr`](set_addr-expression) | [`set_sec_offset`](set_sec_offset-expression--pad-byte-value) | [`set_addr_offset`](set_addr_offset-expression--pad-byte-value) | [`set_file_offset`](set_file_offset-expression--pad-byte-value) |
 | -------------- | ------------- | ---------------- | --------------------------------- | ------------------------------------------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------- |
@@ -232,8 +267,9 @@ The following table provides a summary of the addresses and offsets used in Brin
 | Section Offset | Set to 0      | Restore & Update | No change                         | Pad Forward                                                   | Pad Forward                                                     | Pad Forward                                                     |
 | File Offset    | No Change     | No Change        | No Change                         | Pad Forward                                                   | Pad Forward                                                     | Pad Forward                                                     |
 
-
-The following diagram shows several address and offset concepts.  Users specify the starting logical address using an [output](#output-section-identifier-absolute-starting-address) statement.
+The following diagram shows several address and offset concepts.  Users specify
+the starting logical address using an
+[output](#output-section-identifier-absolute-starting-address) statement.
 
 <figure>
   <img src="./images/scoped_address_plain_no_text.svg" alt="Scoped Address and Offset Example Image">
@@ -243,31 +279,59 @@ The following diagram shows several address and offset concepts.  Users specify 
 
 ## Brink Disallows Address Overwrites
 
-By address, Brink tracks all bytes written to the output.  Brink reports an error if a program's offset or address manipulations cause more than one write to the same address.
+By address, Brink tracks all bytes written to the output.  Brink reports an
+error if a program's offset or address manipulations cause more than one write
+to the same address.
 
 ## Brink Disallows Negative Offset Changes
 
-Brink enforces that set offset commands must specify an offset change greater or equal to 0.  Brink emits pad bytes into the output for any offset change greater than 0.
+Brink enforces that set offset commands must specify an offset change greater or
+equal to 0.  Brink emits pad bytes into the output for any offset change greater
+than 0.
 
 ## Brink Disallows Address and Offset Overflows
 
-Brink emits an error if an address or offset change causes 64-bit unsigned overflow.  In other words, programs cannot use unsigned overflow wrapping back to 0.
+Brink emits an error if an address or offset change causes 64-bit unsigned
+overflow.  In other words, programs cannot use unsigned overflow wrapping back
+to 0.
 
 # Order of Execution
 
-As a mental model, user's can think of program execution as occurring in *output order*.  Output order means the sequence of operations that produce bytes in-order starting with the initial byte of the output file.  In other words, an operation producing the first byte of the output will execute before an operation producing the second byte.
+As a mental model, user's can think of program execution as occurring in *output
+order*.  Output order means the sequence of operations that produce bytes
+in-order starting with the initial byte of the output file.  In other words, an
+operation producing the first byte of the output will execute before an
+operation producing the second byte.
 
-Within a section definition, output order and source code order are the same.  However, outside of a section definition, output order and program order may differ.  For example, source code may define whole sections in a different order than instantiated into in the output.
+Within a section definition, output order and source code order are the same.
+However, outside of a section definition, output order and program order may
+differ.  For example, source code may define whole sections in a different order
+than instantiated into in the output.
 
 ## Output Creation Phases
 
 This section provides an overview of Brink's internal output creation phases.
 
-1. `const` **Evaluation Phase**: First, Brink evaluates all const expressions.  This phase includes evaluation of all `if/else` statements and the dependent const-time operations such as `include` statements in the taken path.
-2. **Layout Phase**: Next, Brink iteratively evaluates all expressions that affect output size and layout.  For example, Brink evaluates `align` expressions and extension `size()` calls during this phase.  Brink skips data generation, since knowing the size of operations suffices to determine the precise output structure.  This phase completes when successive layout iterations produce identical results.
-3. **Generate Phase 1**: Next, Brink begins populating data values into the output.  In this first generation phase, Brink first evaluates `wr` statements that do NOT call extensions.  Brink evaluates wr calls in output order.
-4. **Generate Phase 2**: Next, Brink evaluates `wr` statement that call an [extension](#brink-extensions).  Like before, brink evaluates extension calls in output order.  Brink executes all extension calls serially on the engine thread.
-5. **Validation Phase**: Finally, Brink evaluates `assert` statements, including those that call extensions.  Note that Brink may take an early exit in any phase if an `assert` statement will unambiguously fail.
+1. `const` **Evaluation Phase**: First, Brink evaluates all const expressions.
+   This phase includes evaluation of all `if/else` statements and the dependent
+   const-time operations such as `include` statements in the taken path.
+2. **Layout Phase**: Next, Brink iteratively evaluates all expressions that
+   affect output size and layout.  For example, Brink evaluates `align`
+   expressions and extension `size()` calls during this phase.  Brink skips data
+   generation, since knowing the size of operations suffices to determine the
+   precise output structure.  This phase completes when successive layout
+   iterations produce identical results.
+3. **Generate Phase 1**: Next, Brink begins populating data values into the
+   output.  In this first generation phase, Brink first evaluates `wr`
+   statements that do NOT call extensions.  Brink evaluates wr calls in output
+   order.
+4. **Generate Phase 2**: Next, Brink evaluates `wr` statement that call an
+   [extension](#brink-extensions).  Like before, brink evaluates extension calls
+   in output order.  Brink executes all extension calls serially on the engine
+   thread.
+5. **Validation Phase**: Finally, Brink evaluates `assert` statements, including
+   those that call extensions.  Note that Brink may take an early exit in any
+   phase if an `assert` statement will unambiguously fail.
 
 ---
 
@@ -275,7 +339,8 @@ This section provides an overview of Brink's internal output creation phases.
 
     brink [OPTIONS] <input>
 
-The required input file contains the brink source code to compile and build the output file.  Brink source files typically have a .brink file extension.
+The required input file contains the brink source code to compile and build the
+output file.  Brink source files typically have a .brink file extension.
 
 | Option              | Description                                                                                                                       |
 | ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
@@ -302,12 +367,16 @@ When the user does not specify a path, Brink writes map file(s) and the output t
 
 ## Command-Line Const Defines
 
-The `-D` option injects a [`const`](#const-identifier--expr) definition into the program from the command line.
-This option is modelled after the GCC `-D` preprocessor syntax.  You can specify `-D` multiple times, once per each definition.  For example:
+The `-D` option injects a [`const`](#const-identifier--expr) definition into the
+program from the command line. This option is modelled after the GCC `-D`
+preprocessor syntax.  You can specify `-D` multiple times, once per each
+definition.  For example:
 
     brink -DBASE=0x8000 -DCOUNT=16 firmware.brink
 
-The `name` must be a valid Brink [identifier](#identifiers).  The `value` is optional; without a value, Brink sets the `const` to 1, with type `Integer`, following the GCC boolean-flag convention.
+The `name` must be a valid Brink [identifier](#identifiers).  The `value` is
+optional; without a value, Brink sets the `const` to 1, with type `Integer`,
+following the GCC boolean-flag convention.
 
 `-D` **overrides** any same-named `const` definition in the source.
 
@@ -315,7 +384,8 @@ Map output lists all `const` definitions including `-D` consts.
 
 ### Value Type Inference
 
-Brink knows or infers the type from the value string using the same rules as source code for type inference.
+Brink knows or infers the type from the value string using the same rules as
+source code for type inference.
 
 | Example          | Value  | Type      | Description                                |
 | ---------------- | ------ | --------- | ------------------------------------------ |
@@ -363,17 +433,22 @@ Brink supports the following data types:
 * Integer: 64-bit integers with flexible sign treatment
 * String: UTF-8 string in double quotes
 
-Brink reports an error for under/overflow on arithmetic operations on U64, I64 and Integer types as described in [Arithmetic Operators](#arithmetic-operators).
+Brink reports an error for under/overflow on arithmetic operations on U64, I64
+and Integer types as described in [Arithmetic Operators](#arithmetic-operators).
 
 ## Identifiers
 
-An identifier begins with a letter (A–Z, a–z) or an underscore (_), followed by zero or more letters, digits (0–9), or underscores.  Identifiers are case-sensitive.
+An identifier begins with a letter (A–Z, a–z) or an underscore (_), followed by
+zero or more letters, digits (0–9), or underscores.  Identifiers are
+case-sensitive.
 
 ### Reserved Identifiers
 
-Brink reserves certain identifiers and rejects their use as section names, const names, or label names at compile time.
+Brink reserves certain identifiers and rejects their use as section names, const
+names, or label names at compile time.
 
-Brink also reserves two identifier *prefixes*.  Any user defined identifier beginning with a reserved prefix triggers an error.
+Brink also reserves two identifier *prefixes*.  Any user defined identifier
+beginning with a reserved prefix triggers an error.
 
 | Reserved Prefix | Reason                                                                                          |
 | --------------- | ----------------------------------------------------------------------------------------------- |
@@ -402,7 +477,10 @@ Keyword reservation is case-sensitive.  `Fill` and `FILL` are valid identifiers;
 
 ### Number Literals
 
-Brink supports number literals in decimal, hex (0x) and binary (0b) forms.  After the first digit, you can use '_' within number literals to help with readability.  Brink uses the [parse_int](https://crates.io/crates/parse_int) library for conversion from string to value.
+Brink supports number literals in decimal, hex (0x) and binary (0b) forms.
+After the first digit, you can use '_' within number literals to help with
+readability.  Brink uses the [parse_int](https://crates.io/crates/parse_int)
+library for conversion from string to value.
 
     assert 42 == 42;
     assert -42 == -42;
@@ -431,7 +509,8 @@ The following table summarizes how Brink determines the type of number literals.
 
 Brink does not support negative hex or binary literals.
 
-For convenience, the compiler casts the flexible `Integer` type to `U64` or `I64` as needed.
+For convenience, the compiler casts the flexible `Integer` type to `U64` or
+`I64` as needed.
 
     assert 42u == 42;  // U64 operates with Integer
     assert 42i == 42;  // I64 operates with Integer
@@ -449,11 +528,13 @@ Produces an error message:
        ·            ^^^    ^^^
     ───╯
 
-Users can explicitly cast a number literal or expression to the required signedness using the built-in `to_u64` to `to_i64` functions.  For example:
+Users can explicitly cast a number literal or expression to the required
+signedness using the built-in `to_u64` to `to_i64` functions.  For example:
 
     assert -42 != to_i64(42);  // comparing signed to unsigned
 
-The `to_u64` and `to_i64` functions **DO NOT** report an error if the runtime value under/overflows the destination type.
+The `to_u64` and `to_i64` functions **DO NOT** report an error if the runtime
+value under/overflows the destination type.
 
     assert 0xFFFF_FFFF_FFFF_FFFF == to_u64(-1); // OK
     assert to_i64(0xFFFF_FFFF_FFFF_FFFF) == -1; // OK
@@ -477,7 +558,9 @@ Newlines are Linux style, so "A\n" is a two byte string on all platforms.
 
 ## Arithmetic Operators
 
-Brink supports the following arithmetic operators with same relative precedence as the Rust language.  Where applicable, Brink checks for arithmetic under/overflow.
+Brink supports the following arithmetic operators with same relative precedence
+as the Rust language.  Where applicable, Brink checks for arithmetic
+under/overflow.
 
 | Precedence | Operator | Under/Overflow<br>Check? | Description                                  |
 | ---------- | -------- | ------------------------ | -------------------------------------------- |
@@ -496,9 +579,13 @@ Brink supports the following arithmetic operators with same relative precedence 
 
 ## `addr( [identifier] ) -> U64`
 
-When called with an identifier, returns the address of the identifier as a U64.  When called without an identifier, returns the current address.  See [Addresses and Offsets](#addresses-and-offsets) for more information.
+When called with an identifier, returns the address of the identifier as a U64.
+When called without an identifier, returns the current address.  See [Addresses
+and Offsets](#addresses-and-offsets) for more information.
 
-The following table shows the scoping rules for `addr`.  To summarize, Brink tracks **exactly one address value** per name.  An `addr(<name>)` command retrieves that one value regardless of the scope of the caller.
+The following table shows the scoping rules for `addr`.  To summarize, Brink
+tracks **exactly one address value** per name.  An `addr(<name>)` command
+retrieves that one value regardless of the scope of the caller.
 
 | Command Form                  | Scope used to determine address                         |
 | ----------------------------- | ------------------------------------------------------- |
@@ -543,11 +630,17 @@ Example:
 
 ## `addr_offset( [identifier] ) -> U64`
 
-Returns the offset from the `output` or most recent `set_addr` anchor as a U64.  When called without an identifier, returns the current address offset.  When called with an identifier, returns the address offset at the start of the named section or label.
+Returns the offset from the `output` or most recent `set_addr` anchor as a U64.
+When called without an identifier, returns the current address offset.  When
+called with an identifier, returns the address offset at the start of the named
+section or label.
 
 The offset resets to zero on each `set_addr` call.
 
-The following table shows the scoping rules for `addr_offset`.  To summarize, Brink tracks **exactly one address offset value** per name.  An `addr_offset(<name>)` command retrieves that one value regardless of the scope of the caller.
+The following table shows the scoping rules for `addr_offset`.  To summarize,
+Brink tracks **exactly one address offset value** per name.  An
+`addr_offset(<name>)` command retrieves that one value regardless of the scope
+of the caller.
 
 | Command Form                         | Scope used to determine address                         |
 | ------------------------------------ | ------------------------------------------------------- |
@@ -592,7 +685,9 @@ Example:
 
 ## `align <expression> [, <pad byte value>];`
 
-The align statement writes pad bytes into the current section until the absolute location counter reaches the specified alignment.  Align writes 0 as the default pad byte value, but the user may optionally specify a different value.
+The align statement writes pad bytes into the current section until the absolute
+location counter reaches the specified alignment.  Align writes 0 as the default
+pad byte value, but the user may optionally specify a different value.
 
 Example:
 
@@ -609,7 +704,9 @@ Example:
 
 ## `assert <expression>;`
 
-The assert statement reports an error if the specified expression does not evaluate to a true (non-zero) value.  Assert expressions provide a means of error checking and do not affect the output file.
+The assert statement reports an error if the specified expression does not
+evaluate to a true (non-zero) value.  Assert expressions provide a means of
+error checking and do not affect the output file.
 
 Example:
 
@@ -625,7 +722,11 @@ Example:
 
 ## `const <identifier> = <expr>;`
 
-A const expression creates an immutable user defined identifier for a value.  The value can consist of a number or string literal, or an expression composed of other constants and literals.  Const identifier names have global scope and must be globally unique.  Const identifiers cannot conflict with any other global identifiers such as section names.
+A const expression creates an immutable user defined identifier for a value.
+The value can consist of a number or string literal, or an expression composed
+of other constants and literals.  Const identifier names have global scope and
+must be globally unique.  Const identifiers cannot conflict with any other
+global identifiers such as section names.
 
 Example:
 
@@ -655,7 +756,9 @@ relationships between constants:
 
     output foo;
 
-A const value expression cannot depend on addresses, sizes, offsets or any other dynamic aspect of the output file.  Brink resolves all const values before starting layout of the output.  For example:
+A const value expression cannot depend on addresses, sizes, offsets or any other
+dynamic aspect of the output file.  Brink resolves all const values before
+starting layout of the output.  For example:
 
     const RAM_BASE = 0x8000_0000;         // OK, just a 64b unsigned literal.
     const RAM_SIZE = 32768;               // OK, just a 64b integer literal.
@@ -671,15 +774,20 @@ A const value expression cannot depend on addresses, sizes, offsets or any other
 
 ### Deferred Assignment
 
-`const` variables support deferred assignment.  This allows the user to declare a `const` variable, then assign a value to the variable *exactly once* in later code.  For example:
+`const` variables support deferred assignment.  This allows the user to declare
+a `const` variable, then assign a value to the variable *exactly once* in later
+code.  For example:
 
     const IO_START;
     ...
     IO_START = 0xF000_0000_0000_0000;
 
-Deferred assignment is primarily useful in [`if/else`](#if-expression----else---) statements, which allow users to conditionally determine the value to assign.
+Deferred assignment is primarily useful in
+[`if/else`](#if-expression----else---) statements, which allow users to
+conditionally determine the value to assign.
 
-To provide errors and warnings, Brink tracks the defined/undefined and used/unused state of each variable.
+To provide errors and warnings, Brink tracks the defined/undefined and
+used/unused state of each variable.
 
 ---
 
@@ -687,10 +795,15 @@ To provide errors and warnings, Brink tracks the defined/undefined and used/unus
 
 Allows conditional execution of other statements.
 
-> [!IMPORTANT]
-> As described in [Output Creation Phases](#output-creation-phases), Brink evaluates all `if/else` statements before starting layout of the output.  Therefore, an `if/else` expression must only depend on `const` variables and literal values.  In other words, `if/else` statements must not depend on dynamic addresses, sizes, offsets or any other layout dependent aspect of the output file.
+> [!IMPORTANT] As described in [Output Creation
+> Phases](#output-creation-phases), Brink evaluates all `if/else` statements
+> before starting layout of the output.  Therefore, an `if/else` expression must
+> only depend on `const` variables and literal values.  In other words,
+> `if/else` statements must not depend on dynamic addresses, sizes, offsets or
+> any other layout dependent aspect of the output file.
 
-Brink currently limits the conditional blocks of an `if/else` to the following statement types:
+Brink currently limits the conditional blocks of an `if/else` to the following
+statement types:
 
 * `const` assignments
 * `include` directives
@@ -700,7 +813,8 @@ Brink currently limits the conditional blocks of an `if/else` to the following s
 
 Any files the program loads via `include` must also follow these restrictions.
 
-Users must pre-declare `const` variables before conditionally assigning values to them. For example:
+Users must pre-declare `const` variables before conditionally assigning values
+to them. For example:
 
     // Assume the user specified -DMEM_CONFIG="BIG" on the command line.
 
@@ -731,7 +845,9 @@ Users must pre-declare `const` variables before conditionally assigning values t
         }
     }
 
-If the taken path in an `if/else` statement does not assign a value to a predeclared `const` variable, then Brink reports an error if any later program statement uses that variable.
+If the taken path in an `if/else` statement does not assign a value to a
+predeclared `const` variable, then Brink reports an error if any later program
+statement uses that variable.
 
 For compactness, user's may omit braces around an `else/if` block.  For example:
 
@@ -744,13 +860,23 @@ For compactness, user's may omit braces around an `else/if` block.  For example:
 
 ## `include "<file>";`
 
-Includes another Brink source file.  Brink processes the included file as if it were part of the current file.  For example, the included file can define sections, labels, constants and nested include files.
+Includes another Brink source file.  Brink processes the included file as if it
+were part of the current file.  For example, the included file can define
+sections, labels, constants and nested include files.
 
-An included file may contain an output statement.  Brink will enforce that the entire program after include file resolution contains only one output statement.  See the [`output` statement](#output-section-identifier-absolute-starting-address) for more information.
+An included file may contain an output statement.  Brink will enforce that the
+entire program after include file resolution contains only one output statement.
+See the [`output`
+statement](#output-section-identifier-absolute-starting-address) for more
+information.
 
-The default path for an included file is the directory of the source file that contains the include statement.  For example, if `main.brink` is in `/home/user/project/` and contains `include "sections.brink"`, then Brink will look for `/home/user/project/sections.brink`.
+The default path for an included file is the directory of the source file that
+contains the include statement.  For example, if `main.brink` is in
+`/home/user/project/` and contains `include "sections.brink"`, then Brink will
+look for `/home/user/project/sections.brink`.
 
-Include files starting with a `/` are absolute paths.  Likewise, Brink supports relative paths such as `../`.
+Include files starting with a `/` are absolute paths.  Likewise, Brink supports
+relative paths such as `../`.
 
 All paths use Linux style forward slashes.
 
@@ -774,7 +900,10 @@ Example:
 
 ## Labels
 
-Labels assign an identifier to a specific location in the output file.  Programs can then refer to the location of the label by name.  Labels names have global scope and label names must be globally unique.  Multiple different labels can refer to the same location.
+Labels assign an identifier to a specific location in the output file.  Programs
+can then refer to the location of the label by name.  Labels names have global
+scope and label names must be globally unique.  Multiple different labels can
+refer to the same location.
 
 Labels have the form `<label identifier>:` and can prefix most statement types.
 
@@ -797,19 +926,27 @@ For example:
 
 ## `output <section identifier> [absolute starting address];`
 
-An output statement specifies the top section to write to the output file and an optional absolute starting address.  Without a starting address, `output` defaults to a starting address of 0.
+An output statement specifies the top section to write to the output file and an
+optional absolute starting address.  Without a starting address, `output`
+defaults to a starting address of 0.
 
 **A Brink program must have exactly one output statement.**
 
-An `include` file may contain an output statement.  Brink will enforce that the entire program after include file resolution contains only one output statement.
+An `include` file may contain an output statement.  Brink will enforce that the
+entire program after include file resolution contains only one output statement.
 
 ---
 
 ## `print <expression> [, <expression>, ...];`
 
-The print statement evaluates the comma separated list of expressions and prints them to the console.  For expressions, print displays unsigned values in hex and signed values in decimal.  If needed, the `to_u64` and `to_i64` functions can control the output style.
+The print statement evaluates the comma separated list of expressions and prints
+them to the console.  For expressions, print displays unsigned values in hex and
+signed values in decimal.  If needed, the `to_u64` and `to_i64` functions can
+control the output style.
 
-Brink executes a given print statement for each instance found in the output file.  In other words, a print statement in a section written multiple times will execute multiple times in the order found.
+Brink executes a given print statement for each instance found in the output
+file.  In other words, a print statement in a section written multiple times
+will execute multiple times in the order found.
 
 Example:
 
@@ -841,7 +978,10 @@ Will result in the following console output:
 
 ## `sec_offset( [identifier] ) -> U64`
 
-When called with an identifier, returns the unsigned 64-bit offset of the identifier from the start of the section that contains the identifier.  When called without an identifier, returns the offset from the start of the current section.
+When called with an identifier, returns the unsigned 64-bit offset of the
+identifier from the start of the section that contains the identifier.  When
+called without an identifier, returns the offset from the start of the current
+section.
 
 Example:
 
@@ -873,7 +1013,8 @@ Example:
 
     output foo BASE;  // starting address is BASE
 
-When a section offset specifies an identifier, the identifier must be in the scope of the current section.  For example:
+When a section offset specifies an identifier, the identifier must be in the
+scope of the current section.  For example:
 
     section fiz {
         wrs "fiz";
@@ -896,13 +1037,28 @@ When a section offset specifies an identifier, the identifier must be in the sco
 
 ## `section <name> { ... }`
 
-A section is a named, reusable block of content.  Sections are the primary building block of a Brink program.  Each section defines a sequence of bytes, built up from write statements and location counter operations such as `align`.  Sections may also contain labels, assertions, print statements and so on.  Sections may write other sections into themselves so long as the nesting does not create a cycle.
+A section is a named, reusable block of content.  Sections are the primary
+building block of a Brink program.  Each section defines a sequence of bytes,
+built up from write statements and location counter operations such as `align`.
+Sections may also contain labels, assertions, print statements and so on.
+Sections may write other sections into themselves so long as the nesting does
+not create a cycle.
 
-Section names must be valid [identifiers](#identifiers), must be globally unique, and must not conflict with const names, label names, or [reserved identifiers](#rserved-identifiers).
+Section names must be valid [identifiers](#identifiers), must be globally
+unique, and must not conflict with const names, label names, or [reserved
+identifiers](#rserved-identifiers).
 
-Sections have their own section-relative location counter which resets to zero at the start of each section.  Sections can read and advance the section location counter with [`sec_offset()`](#sec-identifier----u64) and [`set_sec_offset()`](#set_sec_offset-expression--pad-byte-value) statements respectively.
+Sections have their own section-relative location counter which resets to zero
+at the start of each section.  Sections can read and advance the section
+location counter with [`sec_offset()`](#sec-identifier----u64) and
+[`set_sec_offset()`](#set_sec_offset-expression--pad-byte-value) statements
+respectively.
 
-The root section named in the [`output`](#output-section-identifier-absolute-starting-address) statement is the only section Brink writes to the output file.  Other sections can be directly or indirectly included via [`wr`](#wr-section-identifier) statements from the output section.  Unreachable sections produce a warning.
+The root section named in the
+[`output`](#output-section-identifier-absolute-starting-address) statement is
+the only section Brink writes to the output file.  Other sections can be
+directly or indirectly included via [`wr`](#wr-section-identifier) statements
+from the output section.  Unreachable sections produce a warning.
 
 Example:
 
@@ -929,11 +1085,17 @@ Example:
 
 ## `set_addr <expression>;`
 
-The `set_addr` command forces the current address to the specified value and resets the current `addr_offset` to zero.  These changes happen within the scope of the containing section.  Child sections inherit the new `addr` and `addr_offset` values unless they call `set_addr` themselves.
+The `set_addr` command forces the current address to the specified value and
+resets the current `addr_offset` to zero.  These changes happen within the scope
+of the containing section.  Child sections inherit the new `addr` and
+`addr_offset` values unless they call `set_addr` themselves.
 
-Using `set_addr` *does not* change the value of the section offset nor file offset.  A `set_addr` command *does not* add pad bytes to the output.
+Using `set_addr` *does not* change the value of the section offset nor file
+offset.  A `set_addr` command *does not* add pad bytes to the output.
 
-The `set_addr` command may move the address forward or backwards.  However, Brink tracks every output byte by address and reports an error if a program tries to write to the same address more than once.
+The `set_addr` command may move the address forward or backwards.  However,
+Brink tracks every output byte by address and reports an error if a program
+tries to write to the same address more than once.
 
 Example:
 
@@ -965,11 +1127,16 @@ Example:
 
 ## `set_addr_offset <expression> [, <pad byte value>];`
 
-Pads the output until `addr_offset` reaches the specified value.  Users may specify an optional pad byte value or use the default value of 0.
+Pads the output until `addr_offset` reaches the specified value.  Users may
+specify an optional pad byte value or use the default value of 0.
 
-If the specified value is less than the current `addr_offset`, Brink reports an error.
+If the specified value is less than the current `addr_offset`, Brink reports an
+error.
 
-`set_addr_offset` is most useful after a `set_addr` call, because `set_addr` resets `addr_offset` to zero.  This lets users pad to a size relative to their chosen address anchor without knowing what the surrounding section's `sec_offset` happens to be.
+`set_addr_offset` is most useful after a `set_addr` call, because `set_addr`
+resets `addr_offset` to zero.  This lets users pad to a size relative to their
+chosen address anchor without knowing what the surrounding section's
+`sec_offset` happens to be.
 
 Example:
 
@@ -999,7 +1166,9 @@ Example:
 
 ## `set_file_offset <expression> [, <pad byte value>];`
 
-The set_file_offset command pads the output file until the *file offset* reaches the specified value.  Users may specify an optional pad byte value or use the default value of 0.
+The set_file_offset command pads the output file until the *file offset* reaches
+the specified value.  Users may specify an optional pad byte value or use the
+default value of 0.
 
 If the specified offset is less the current offset, Brink reports an error.
 
@@ -1033,7 +1202,9 @@ Example:
 
 ## `set_sec_offset <expression> [, <pad byte value>];`
 
-The set_sec_offset command pads the current section until the *section offset* reaches the specified value.  Users may specify an optional pad byte value or use the default value of 0.
+The set_sec_offset command pads the current section until the *section offset*
+reaches the specified value.  Users may specify an optional pad byte value or
+use the default value of 0.
 
 If the specified offset is less the current offset, Brink reports an error.
 
@@ -1084,7 +1255,10 @@ Example:
 
 ## Built-in Variables
 
-Brink pre-defines built-in identifiers that begin with `__` (double underscore).  They can appear in any expression context that accepts the corresponding type.  As shown in the table below, some builtins cannot be used in `const` expressions because their values depend on dynamic layout values.
+Brink pre-defines built-in identifiers that begin with `__` (double underscore).
+They can appear in any expression context that accepts the corresponding type.
+As shown in the table below, some builtins cannot be used in `const` expressions
+because their values depend on dynamic layout values.
 
 | Variable                 | Type     | OK in `const`? | Description                                                              |
 | ------------------------ | -------- | -------------- | ------------------------------------------------------------------------ |
@@ -1119,11 +1293,17 @@ Example — write a 4-byte header field containing the total output size:
 
 ### `__OUTPUT_ADDR`
 
-Returns the absolute starting address of the output.  When the `output` statement specifies a base address, `__OUTPUT_ADDR` equals that address.  When `output` specifies no base address, `__OUTPUT_ADDR` is zero.  This behavior is identical to `addr(<output-section>)`.
+Returns the absolute starting address of the output.  When the `output`
+statement specifies a base address, `__OUTPUT_ADDR` equals that address.  When
+`output` specifies no base address, `__OUTPUT_ADDR` is zero.  This behavior is
+identical to `addr(<output-section>)`.
 
-Importantly, `__OUTPUT_ADDR` is fixed to the section start specified in the `output` statement, i.e. the entry point address, and does not “follow” an in-section `set_addr`.
+Importantly, `__OUTPUT_ADDR` is fixed to the section start specified in the
+`output` statement, i.e. the entry point address, and does not “follow” an
+in-section `set_addr`.
 
-Example — embed the output base address in a table without repeating the constant:
+Example — embed the output base address in a table without repeating the
+constant:
 
     section vtable {
         wr32 __OUTPUT_ADDR;  // base address of the output image
@@ -1143,7 +1323,8 @@ Example — embed the output base address in a table without repeating the const
 
 ### `__BRINK_VERSION_STRING`
 
-Returns the Brink tool version as a string (e.g. `"4.0.0"`).  The value is fixed at compile time and may be used in `const` expressions, `wrs`, and `print`.
+Returns the Brink tool version as a string (e.g. `"4.0.0"`).  The value is fixed
+at compile time and may be used in `const` expressions, `wrs`, and `print`.
 
 Example — stamp the tool version into a firmware header:
 
@@ -1160,7 +1341,9 @@ Example — stamp the tool version into a firmware header:
 
 ### `__BRINK_VERSION_MAJOR`, `__BRINK_VERSION_MINOR`, `__BRINK_VERSION_PATCH`
 
-Return the individual numeric components of the Brink version as `U64` values.  All three are fixed at compile time and may be used in `const` expressions and arithmetic.
+Return the individual numeric components of the Brink version as `U64` values.
+All three are fixed at compile time and may be used in `const` expressions and
+arithmetic.
 
 Example — pack the version into a 3-byte field and assert the tool is new enough:
 
@@ -1184,7 +1367,8 @@ Example — pack the version into a 3-byte field and assert the tool is new enou
 
 ## `to_i64( <expression> ) -> I64`
 
-Converts the specified expression to the I64 type without regard to under/overflow.
+Converts the specified expression to the I64 type without regard to
+under/overflow.
 
 Example:
 
@@ -1201,7 +1385,8 @@ Example:
 
 ## `to_u64( <expression> ) -> U64`
 
-Converts the specified expression to the U64 type without regard to under/overflow.
+Converts the specified expression to the U64 type without regard to
+under/overflow.
 
 Example:
 
@@ -1218,9 +1403,12 @@ Example:
 
 ## `wr <section identifier>;`
 
-Writes the contents of another section into the current section. Brink evaluates the referenced section and seamlessly copies its final output into the current location counter.
+Writes the contents of another section into the current section. Brink evaluates
+the referenced section and seamlessly copies its final output into the current
+location counter.
 
-Using `wr`, you can build complex outputs by composing smaller, modular sections together.
+Using `wr`, you can build complex outputs by composing smaller, modular sections
+together.
 
 Example:
 
@@ -1246,7 +1434,8 @@ Example:
 
 ## `wr <namespace>::<extension_name>(<arg1>, <arg2>, ...);`
 
-Evaluates the specified extension call and writes the result to the output.  The extension's `.size()` method specifies the size of the result.
+Evaluates the specified extension call and writes the result to the output.  The
+extension's `.size()` method specifies the size of the result.
 
 Example:
 
@@ -1268,7 +1457,10 @@ Example:
 ## `wr56 <expression> [, <expression>];`
 ## `wr64 <expression> [, <expression>];`
 
-Evaluates the first expression and writes the result as a little-endian binary value to the output file.  Upper bits of the result value are silently truncated to the specified bit length.  The optional second expression specifies the repetition count.
+Evaluates the first expression and writes the result as a little-endian binary
+value to the output file.  Upper bits of the result value are silently truncated
+to the specified bit length.  The optional second expression specifies the
+repetition count.
 
 Example:
 
@@ -1298,7 +1490,9 @@ Another example using the optional repetition expression.
 
 ## `wrf "<quoted file path>";`
 
-Write the file at the specified path into the output file.  Brink treats all input files as binary files.  Paths can be relative to the current directory or absolute.
+Write the file at the specified path into the output file.  Brink treats all
+input files as binary files.  Paths can be relative to the current directory or
+absolute.
 
 For example, given the file test_source_1.txt containing:
 
@@ -1317,9 +1511,14 @@ The following program simply copies these 6 UTF-8 characters to the output file.
 
 ## `wrs <expression> [, <expression>, ...];`
 
-Evaluates the comma separated list of expressions and writes the resulting string to the output file.  Wrs accepts the same expressions and operates similarly to the print statement.  For more information, see [print](#print-expression--expression-).
+Evaluates the comma separated list of expressions and writes the resulting
+string to the output file.  Wrs accepts the same expressions and operates
+similarly to the print statement.  For more information, see
+[print](#print-expression--expression-).
 
-The wrs statement does not implicitly write a terminating 0 byte after the string.  Users creating null terminated (C style) strings in an output file should add an explicit \0.
+The wrs statement does not implicitly write a terminating 0 byte after the
+string.  Users creating null terminated (C style) strings in an output file
+should add an explicit \0.
 
     wrs "my null terminated string\0";
 
@@ -1327,42 +1526,73 @@ The wrs statement does not implicitly write a terminating 0 byte after the strin
 
 # Brink Extensions
 
-Brink supports compile time extensions to simplify the addition of new functionality.
-This extension capability enables user defined hashing, compression, validation and other binary data processing tasks.  The following sections describe how extensions work and how to create them.
+Brink supports compile time extensions to simplify the addition of new
+functionality. This extension capability enables user defined hashing,
+compression, validation and other binary data processing tasks.  The following
+sections describe how extensions work and how to create them.
 
-The command line option `--list-extensions` outputs the names of all available extensions as enabled by Cargo feature flags.
+The command line option `--list-extensions` outputs the names of all available
+extensions as enabled by Cargo feature flags.
 
 ---
 
 ## Extensions Are A Compile-Time Feature
 
-Extensions build and link to Brink at compile time as controlled by Cargo feature flags.  Because Rust does not guarantee a stable ABI between versions, Brink requires compile time construction to eliminate ABI incompatibilities and enable the use of safe Rust.  The following bullets provide an overview of how extensions work:
+Extensions build and link to Brink at compile time as controlled by Cargo
+feature flags.  Because Rust does not guarantee a stable ABI between versions,
+Brink requires compile time construction to eliminate ABI incompatibilities and
+enable the use of safe Rust.  The following bullets provide an overview of how
+extensions work:
 
 * Extensions interact with Brink through the `BrinkExtension` trait.
 
-* Extensions can read directly from Brink's output buffer via zero-copy and safe-memory slices (`&[u8]`).  Brink allows some syntactic sugar to simplify the call site, but will always translate the specified memory range into a slice for the extension.
+* Extensions can read directly from Brink's output buffer via zero-copy and
+  safe-memory slices (`&[u8]`).  Brink allows some syntactic sugar to simplify
+  the call site, but will always translate the specified memory range into a
+  slice for the extension.
 
-* In addition to output buffer access, extensions can have their own input parameters like a normal function call.
+* In addition to output buffer access, extensions can have their own input
+  parameters like a normal function call.
 
-* Extensions are identified by a **name** in a **namespace**.  Brink reserves the namespaces `std` and `brink`.
+* Extensions are identified by a **name** in a **namespace**.  Brink reserves
+  the namespaces `std` and `brink`.
 
-* Extensions report their fixed length binary footprint by implementing the `.size()` trait method. Brink calls each extension's `.size()` method **exactly once** during output layout calculations and caches the result.  Brink always passes a mutable output slice (`&mut [u8]`) of the reported size to the extension's `.generate()` method.
+* Extensions report their fixed length binary footprint by implementing the
+  `.size()` trait method. Brink calls each extension's `.size()` method
+  **exactly once** during output layout calculations and caches the result.
+  Brink always passes a mutable output slice (`&mut [u8]`) of the reported size
+  to the extension's `.generate()` method.
 
-* Extensions register themselves at compile time in Brink's internal extension registry.
+* Extensions register themselves at compile time in Brink's internal extension
+  registry.
 
-* The `BrinkExtension` trait interface allows extensions to return logging and error diagnostics integrated with Brink's own diagnostic output.  See []
+* The `BrinkExtension` trait interface allows extensions to return logging and
+  error diagnostics integrated with Brink's own diagnostic output.  See []
 
 ---
 
 ## Invoking Extensions
 
-Users invoke extensions using function-style syntax.  For example, consider an extension named `crc` in a namespace called `custom`.  This `crc` extension takes two labels to define the start/end of the data section to hash and returns a 4-byte CRC value.
+Users invoke extensions using function-style syntax.  For example, consider an
+extension named `crc` in a namespace called `custom`.  This `crc` extension
+takes two labels to define the start/end of the data section to hash and returns
+a 4-byte CRC value.
 
-Users write the extension's result to the output using the generic `wr` command, for example `wr custom::crc(start_label, end_label);`.  Fixed-size write commands like `wr32` are invalid for extensions. If the designer needs to pad the extension's output to a specific size, they must follow the `wr` command with a `set_sec_offset` or `align` statement.
+Users write the extension's result to the output using the generic `wr` command,
+for example `wr custom::crc(start_label, end_label);`.  Fixed-size write
+commands like `wr32` are invalid for extensions. If the designer needs to pad
+the extension's output to a specific size, they must follow the `wr` command
+with a `set_sec_offset` or `align` statement.
 
 ### Named Parameters
 
-To help eliminate bugs, Brink extensions support named parameters.  Extensions define their parameter names when registered.  In the example below, we call the extension `custom::my_extension` passing it the required parameters `data_section` and `code_section`.  But which comes first?  With named parameters, we don't need to know.  The compiler passes the values by name in the order expected by the extension, regardless of the order given at the call site.
+To help eliminate bugs, Brink extensions support named parameters.  Extensions
+define their parameter names when registered.  In the example below, we call the
+extension `custom::my_extension` passing it the required parameters
+`data_section` and `code_section`.  But which comes first?  With named
+parameters, we don't need to know.  The compiler passes the values by name in
+the order expected by the extension, regardless of the order given at the call
+site.
 
     //
     // extension example
@@ -1386,13 +1616,19 @@ To help eliminate bugs, Brink extensions support named parameters.  Extensions d
 
 ## Size of Extension Output
 
-Users can query the size of an extension's output using the `sizeof` operator. For example, `assert sizeof(custom::crc) == 4;`.
+Users can query the size of an extension's output using the `sizeof` operator.
+For example, `assert sizeof(custom::crc) == 4;`.
 
 ---
 
 ## Ranged and Nonranged Extensions
 
-Extensions have two possible forms: *ranged* and *nonranged*. A ranged extension takes an immutable slice of the output buffer as an additional input parameter.  This allows a ranged extension to produce a result based on output data, such as a CRC extension hashing a range of bytes.  Brink invokes ranged extensions even when the specified input range is empty.  Extensions that require non-empty input should return an error in that case.
+Extensions have two possible forms: *ranged* and *nonranged*. A ranged extension
+takes an immutable slice of the output buffer as an additional input parameter.
+This allows a ranged extension to produce a result based on output data, such as
+a CRC extension hashing a range of bytes.  Brink invokes ranged extensions even
+when the specified input range is empty.  Extensions that require non-empty
+input should return an error in that case.
 
 ---
 
@@ -1404,9 +1640,9 @@ extension requires no changes outside `extensions/`.
 
 ### Step 1 — Create the extension crate
 
-Place new extensions under `std/` for proposed standard library extensions, or under a
-workspace path matching your namespace for third-party extensions.  Implement the
-`BrinkExtension` trait from the `brink_extension` crate.
+Place new extensions under `std/` for proposed standard library extensions, or
+under a workspace path matching your namespace for third-party extensions.
+Implement the `BrinkExtension` trait from the `brink_extension` crate.
 
     // my_extension/src/lib.rs
     use brink_extension::BrinkExtension;
@@ -1469,14 +1705,17 @@ Brink relies on 100's of unit tests to catch bugs.  You can run these with:
 
 ## Fuzz Testing
 
-Brink supports fuzz tests for several of its internal libraries.  Fuzz testing starts from
-a corpus of random inputs and then further randomizes those inputs to try to
-cause crashes and hangs.  At the time of writing, fuzz testing
-**requires the nightly build**.  See `fuzz_help.txt` in the source repo for more information.
+Brink supports fuzz tests for several of its internal libraries.  Fuzz testing
+starts from a corpus of random inputs and then further randomizes those inputs
+to try to cause crashes and hangs.  At the time of writing, fuzz testing
+**requires the nightly build**.  See `fuzz_help.txt` in the source repo for more
+information.
 
 ## Checking Test Code Coverage
 
-If you're using Windows as a development platform, then this worked for me to install the llvm-cov tool.  I have the free version of Microsoft Visual Studio installed.
+If you're using Windows as a development platform, then this worked for me to
+install the llvm-cov tool.  I have the free version of Microsoft Visual Studio
+installed.
 
     rustup component add llvm-tools
     cargo install cargo-llvm-cov --locked
@@ -1485,7 +1724,8 @@ To generate an ASCII table of coverage stats to the terminal:
 
     cargo llvm-cov --all-features --workspace
 
-To update the coverage table in this README from Windows, run `.\update_coverage.ps1`.
+To update the coverage table in this README from Windows, run
+`.\update_coverage.ps1`.
 
 <!-- COVERAGE_START -->
 ```text
