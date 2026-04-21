@@ -67,6 +67,13 @@ impl ExtensionRegistry {
     pub fn get(&self, name: &str) -> Option<&ExtensionEntry> {
         self.extensions.get(name)
     }
+
+    /// Returns all registered extension names in sorted order.
+    pub fn sorted_names(&self) -> Vec<&str> {
+        let mut names: Vec<&str> = self.extensions.keys().map(String::as_str).collect();
+        names.sort();
+        names
+    }
 }
 
 pub mod test_mocks;

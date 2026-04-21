@@ -31,7 +31,7 @@ fn parse_size(s: &str) -> Result<u64, String> {
 }
 
 // Local libraries
-use process::process;
+use process::{list_extensions, process};
 
 // Logging
 use tracing::{Level, info, warn};
@@ -61,8 +61,12 @@ fn init_log(verbosity: u64) -> Result<()> {
 #[command(version, author, about)]
 pub struct Cli {
     /// The input source file.
-    #[arg(index = 1)]
-    pub input: String,
+    #[arg(index = 1, required_unless_present = "list_extensions")]
+    pub input: Option<String>,
+
+    /// List all available extensions compiled into brink and exit.
+    #[arg(long = "list-extensions")]
+    pub list_extensions: bool,
 
     /// Sets the verbosity level. Use up to 4 times.
     #[arg(short = 'v', long = "verbose", action = clap::ArgAction::Count)]
@@ -128,7 +132,15 @@ fn main() -> Result<()> {
 
     info!("brink version {}", env!("CARGO_PKG_VERSION"));
 
-    let in_file_name = &cli.input;
+    if cli.list_extensions {
+        for name in list_extensions() {
+            println!("{}", name);
+        }
+        return Ok(());
+    }
+
+    // clap guarantees input is Some when --list-extensions is absent.
+    let in_file_name = cli.input.as_deref().expect("input required");
 
     // remove carriage return from line endings for windows platforms
     let str_in = fs::read_to_string(in_file_name)

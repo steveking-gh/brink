@@ -260,7 +260,7 @@ value monotonically increases to the end of the output file.
 The following table provides a summary of the addresses and offsets used in
 Brink.
 
-| Variable       | Section Entry | Section Exit     | [`set_addr`](set_addr-expression) | [`set_sec_offset`](set_sec_offset-expression--pad-byte-value) | [`set_addr_offset`](set_addr_offset-expression--pad-byte-value) | [`set_file_offset`](set_file_offset-expression--pad-byte-value) |
+| Variable       | Section Entry | Section Exit     | [`set_addr`](#set_addr) | [`set_sec_offset`](#set_sec_offset) | [`set_addr_offset`](#set_addr_offset) | [`set_file_offset`](#set_file_offset) |
 | -------------- | ------------- | ---------------- | --------------------------------- | ------------------------------------------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------- |
 | Address        | No Change     | Restore & Update | Set                               | Pad Forward                                                   | Pad Forward                                                     | Pad Forward                                                     |
 | Address Offset | No Change     | Restore & Update | Set to 0                          | Pad Forward                                                   | Pad Forward                                                     | Pad Forward                                                     |
@@ -269,7 +269,7 @@ Brink.
 
 The following diagram shows several address and offset concepts.  Users specify
 the starting logical address using an
-[output](#output-section-identifier-absolute-starting-address) statement.
+[output](#output) statement.
 
 <figure>
   <img src="./images/scoped_address_plain_no_text.svg" alt="Scoped Address and Offset Example Image">
@@ -342,32 +342,33 @@ This section provides an overview of Brink's internal output creation phases.
 The required input file contains the brink source code to compile and build the
 output file.  Brink source files typically have a .brink file extension.
 
-| Option              | Description                                                                                                                       |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `-D<name>[=value]`  | Defines a `const` value from the command line.<br>See [Command-Line Const Defines](#command-line-const-defines) below.            |
-| `--list-extensions` | List all available extensions compiled into brink as controlled by Cargo feature flags.                                           |
-| `--map-csv`         | Writes a CSV format map file `<stem>.map.csv` to the current directory.<br>For example: `firmware.brink` → `firmware.map.csv`.    |
-| `--map-csv=<file>`  | Writes a CSV map file to the specified file.                                                                                      |
-| `--map-csv=-`       | Writes a CSV map file to stdout.                                                                                                  |
-| `--map-c99`         | Writes a C99 header file `<stem>.map.h` to the current directory.<br>For example: `firmware.brink` → `firmware.map.h`.            |
-| `--map-c99=<file>`  | Writes a C99 header to the specified file.                                                                                        |
-| `--map-c99=-`       | Writes a C99 header to stdout.                                                                                                    |
-| `--map-json`        | Writes a JSON format map file `<stem>.map.json` to the current directory.<br>For example: `firmware.brink` → `firmware.map.json`. |
-| `--map-json=<file>` | Writes a JSON map to the specified file.                                                                                          |
-| `--map-json=-`      | Writes a JSON map to stdout.                                                                                                      |
-| `--map-rs`          | Writes a Rust module file `<stem>.map.rs` to the current directory.<br>For example: `firmware.brink` → `firmware.map.rs`.         |
-| `--map-rs=<file>`   | Writes a Rust module map to the specified file.                                                                                   |
-| `--map-rs=-`        | Writes a Rust module map to stdout.                                                                                               |
-| `--noprint`         | Suppress `print` statement output from the source program.                                                                        |
-| `-o <file>`         | Output file name. Defaults to `output.bin`.                                                                                       |
-| `-q`, `--quiet`     | Suppress all console output, including errors. Overrides `-v`. Useful for fuzz testing.                                           |
-| `-v`                | Increase verbosity. Repeat up to four times (`-v -v -v -v`).                                                                      |
+| Option                     | Description                                                                                                                                                            |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `-D<name>[=value]`         | Defines a `const` value from the command line.<br>See [Command-Line Const Defines](#command-line-const-defines) below.                                                 |
+| `--list-extensions`        | List all available extensions compiled into brink as controlled by Cargo feature flags.                                                                                |
+| `--max-output-size=<size>` | Reject the output if its size exceeds `<size>` bytes before writing data.<br>Accepts a plain integer or a K/M/G suffix (e.g. `64M`, `512K`, `1G`). Default is `256MB`. |
+| `--map-csv`                | Writes a CSV format map file `<stem>.map.csv` to the current directory.<br>For example: `firmware.brink` → `firmware.map.csv`.                                         |
+| `--map-csv=<file>`         | Writes a CSV map file to the specified file.                                                                                                                           |
+| `--map-csv=-`              | Writes a CSV map file to stdout.                                                                                                                                       |
+| `--map-c99`                | Writes a C99 header file `<stem>.map.h` to the current directory.<br>For example: `firmware.brink` → `firmware.map.h`.                                                 |
+| `--map-c99=<file>`         | Writes a C99 header to the specified file.                                                                                                                             |
+| `--map-c99=-`              | Writes a C99 header to stdout.                                                                                                                                         |
+| `--map-json`               | Writes a JSON format map file `<stem>.map.json` to the current directory.<br>For example: `firmware.brink` → `firmware.map.json`.                                      |
+| `--map-json=<file>`        | Writes a JSON map to the specified file.                                                                                                                               |
+| `--map-json=-`             | Writes a JSON map to stdout.                                                                                                                                           |
+| `--map-rs`                 | Writes a Rust module file `<stem>.map.rs` to the current directory.<br>For example: `firmware.brink` → `firmware.map.rs`.                                              |
+| `--map-rs=<file>`          | Writes a Rust module map to the specified file.                                                                                                                        |
+| `--map-rs=-`               | Writes a Rust module map to stdout.                                                                                                                                    |
+| `--noprint`                | Suppress `print` statement output from the source program.                                                                                                             |
+| `-o <file>`                | Output file name. Defaults to `output.bin`.                                                                                                                            |
+| `-q`, `--quiet`            | Suppress all console output, including errors. Overrides `-v`. Useful for fuzz testing.                                                                                |
+| `-v`                       | Increase verbosity. Repeat up to four times (`-v -v -v -v`).                                                                                                           |
 
 When the user does not specify a path, Brink writes map file(s) and the output to the current working directory.
 
 ## Command-Line Const Defines
 
-The `-D` option injects a [`const`](#const-identifier--expr) definition into the
+The `-D` option injects a [`const`](#const) definition into the
 program from the command line. This option is modelled after the GCC `-D`
 preprocessor syntax.  You can specify `-D` multiple times, once per each
 definition.  For example:
@@ -577,7 +578,9 @@ under/overflow.
 
 ---
 
-## `addr( [identifier] ) -> U64`
+## addr
+
+`addr( [identifier] ) -> U64`
 
 When called with an identifier, returns the address of the identifier as a U64.
 When called without an identifier, returns the current address.  See [Addresses
@@ -628,7 +631,9 @@ Example:
 
 ---
 
-## `addr_offset( [identifier] ) -> U64`
+## addr_offset
+
+`addr_offset( [identifier] ) -> U64`
 
 Returns the offset from the `output` or most recent `set_addr` anchor as a U64.
 When called without an identifier, returns the current address offset.  When
@@ -683,7 +688,9 @@ Example:
 
 ---
 
-## `align <expression> [, <pad byte value>];`
+## align
+
+`align <expression> [, <pad byte value>];`
 
 The align statement writes pad bytes into the current section until the absolute
 location counter reaches the specified alignment.  Align writes 0 as the default
@@ -702,7 +709,9 @@ Example:
 
 ---
 
-## `assert <expression>;`
+## assert
+
+`assert <expression>;`
 
 The assert statement reports an error if the specified expression does not
 evaluate to a true (non-zero) value.  Assert expressions provide a means of
@@ -720,7 +729,9 @@ Example:
 
 ---
 
-## `const <identifier> = <expr>;`
+## const
+
+`const <identifier> = <expr>;`
 
 A const expression creates an immutable user defined identifier for a value.
 The value can consist of a number or string literal, or an expression composed
@@ -783,7 +794,7 @@ code.  For example:
     IO_START = 0xF000_0000_0000_0000;
 
 Deferred assignment is primarily useful in
-[`if/else`](#if-expression----else---) statements, which allow users to
+[`if/else`](#ifelse) statements, which allow users to
 conditionally determine the value to assign.
 
 To provide errors and warnings, Brink tracks the defined/undefined and
@@ -791,16 +802,16 @@ used/unused state of each variable.
 
 ---
 
-## `if <expression> { ... } else { ... }`
+## if/else
 
-Allows conditional execution of other statements.
+`if <expression> { ... } else { ... }`
 
-> [!IMPORTANT] As described in [Output Creation
-> Phases](#output-creation-phases), Brink evaluates all `if/else` statements
-> before starting layout of the output.  Therefore, an `if/else` expression must
-> only depend on `const` variables and literal values.  In other words,
-> `if/else` statements must not depend on dynamic addresses, sizes, offsets or
-> any other layout dependent aspect of the output file.
+Allows conditional execution of other statements. As described in [Output
+Creation](#output-creation-phases), Brink evaluates all `if/else` statements
+before starting layout of the output.  Therefore, an `if/else` expression must
+only depend on `const` variables and literal values.  In other words, `if/else`
+statements must not depend on dynamic addresses, sizes, offsets or any other
+layout dependent aspect of the output file.
 
 Brink currently limits the conditional blocks of an `if/else` to the following
 statement types:
@@ -819,7 +830,8 @@ to them. For example:
     // Assume the user specified -DMEM_CONFIG="BIG" on the command line.
 
     // Pre-declare variables prior to conditional assignment in an if/else.
-    // Brink strictly tracks variable definitions to prevent use of uninitialized variables.
+    // Brink strictly tracks variable definitions to prevent use of
+    // uninitialized variables.
     const FLASH_SIZE;
     const RAM_SIZE;
 
@@ -858,7 +870,9 @@ For compactness, user's may omit braces around an `else/if` block.  For example:
 
 ---
 
-## `include "<file>";`
+## include
+
+`include "<file>";`
 
 Includes another Brink source file.  Brink processes the included file as if it
 were part of the current file.  For example, the included file can define
@@ -867,7 +881,7 @@ sections, labels, constants and nested include files.
 An included file may contain an output statement.  Brink will enforce that the
 entire program after include file resolution contains only one output statement.
 See the [`output`
-statement](#output-section-identifier-absolute-starting-address) for more
+statement](#output) for more
 information.
 
 The default path for an included file is the directory of the source file that
@@ -900,6 +914,8 @@ Example:
 
 ## Labels
 
+`<identifier>:`
+
 Labels assign an identifier to a specific location in the output file.  Programs
 can then refer to the location of the label by name.  Labels names have global
 scope and label names must be globally unique.  Multiple different labels can
@@ -924,7 +940,9 @@ For example:
     output foo 0x1000;
 ---
 
-## `output <section identifier> [absolute starting address];`
+## output
+
+`output <section identifier> [absolute starting address];`
 
 An output statement specifies the top section to write to the output file and an
 optional absolute starting address.  Without a starting address, `output`
@@ -937,7 +955,9 @@ entire program after include file resolution contains only one output statement.
 
 ---
 
-## `print <expression> [, <expression>, ...];`
+## print
+
+`print <expression> [, <expression>, ...];`
 
 The print statement evaluates the comma separated list of expressions and prints
 them to the console.  For expressions, print displays unsigned values in hex and
@@ -976,7 +996,18 @@ Will result in the following console output:
 
 ---
 
-## `sec_offset( [identifier] ) -> U64`
+## region
+
+`region <identifier> { ... }`
+
+A region describes a memory range on the target system.
+
+
+---
+
+## sec_offset
+
+`sec_offset( [identifier] ) -> U64`
 
 When called with an identifier, returns the unsigned 64-bit offset of the
 identifier from the start of the section that contains the identifier.  When
@@ -1035,7 +1066,9 @@ scope of the current section.  For example:
 
 ---
 
-## `section <name> { ... }`
+## section
+
+`section <name> { ... }`
 
 A section is a named, reusable block of content.  Sections are the primary
 building block of a Brink program.  Each section defines a sequence of bytes,
@@ -1046,18 +1079,18 @@ not create a cycle.
 
 Section names must be valid [identifiers](#identifiers), must be globally
 unique, and must not conflict with const names, label names, or [reserved
-identifiers](#rserved-identifiers).
+identifiers](#reserved-identifiers).
 
 Sections have their own section-relative location counter which resets to zero
 at the start of each section.  Sections can read and advance the section
-location counter with [`sec_offset()`](#sec-identifier----u64) and
-[`set_sec_offset()`](#set_sec_offset-expression--pad-byte-value) statements
+location counter with [`sec_offset()`](#sec_offset) and
+[`set_sec_offset()`](#set_sec_offset) statements
 respectively.
 
 The root section named in the
-[`output`](#output-section-identifier-absolute-starting-address) statement is
+[`output`](#output) statement is
 the only section Brink writes to the output file.  Other sections can be
-directly or indirectly included via [`wr`](#wr-section-identifier) statements
+directly or indirectly included via [`wr`](#wr) statements
 from the output section.  Unreachable sections produce a warning.
 
 Example:
@@ -1083,7 +1116,9 @@ Example:
 
 ---
 
-## `set_addr <expression>;`
+## set_addr
+
+`set_addr <expression>;`
 
 The `set_addr` command forces the current address to the specified value and
 resets the current `addr_offset` to zero.  These changes happen within the scope
@@ -1125,7 +1160,9 @@ Example:
 
 ---
 
-## `set_addr_offset <expression> [, <pad byte value>];`
+## set_addr_offset
+
+`set_addr_offset <expression> [, <pad byte value>];`
 
 Pads the output until `addr_offset` reaches the specified value.  Users may
 specify an optional pad byte value or use the default value of 0.
@@ -1164,7 +1201,9 @@ Example:
 
 ---
 
-## `set_file_offset <expression> [, <pad byte value>];`
+## set_file_offset
+
+`set_file_offset <expression> [, <pad byte value>];`
 
 The set_file_offset command pads the output file until the *file offset* reaches
 the specified value.  Users may specify an optional pad byte value or use the
@@ -1200,7 +1239,9 @@ Example:
 
 ---
 
-## `set_sec_offset <expression> [, <pad byte value>];`
+## set_sec_offset
+
+`set_sec_offset <expression> [, <pad byte value>];`
 
 The set_sec_offset command pads the current section until the *section offset*
 reaches the specified value.  Users may specify an optional pad byte value or
@@ -1236,7 +1277,9 @@ Example:
 
 ---
 
-## `sizeof( <identifier> ) -> U64`
+## sizeof
+
+`sizeof( <identifier> ) -> U64`
 
 Returns the size in bytes of the specified identifier.
 
@@ -1253,119 +1296,9 @@ Example:
     output foo;
 ---
 
-## Built-in Variables
+## to_i64
 
-Brink pre-defines built-in identifiers that begin with `__` (double underscore).
-They can appear in any expression context that accepts the corresponding type.
-As shown in the table below, some builtins cannot be used in `const` expressions
-because their values depend on dynamic layout values.
-
-| Variable                 | Type     | OK in `const`? | Description                                                              |
-| ------------------------ | -------- | -------------- | ------------------------------------------------------------------------ |
-| `__OUTPUT_SIZE`          | `U64`    | No             | Total output size in bytes.  Equivalent to `sizeof(<output-section>)`.   |
-| `__OUTPUT_ADDR`          | `U64`    | No             | Starting address of the output.  Equivalent to `addr(<output-section>)`. |
-| `__BRINK_VERSION_STRING` | `String` | Yes            | Brink version as a string, e.g. `"4.3.2"`.                               |
-| `__BRINK_VERSION_MAJOR`  | `U64`    | Yes            | Major version component, e.g. "4" in "4.3.2"                             |
-| `__BRINK_VERSION_MINOR`  | `U64`    | Yes            | Minor version component, e.g. "3" in "4.3.2"                             |
-| `__BRINK_VERSION_PATCH`  | `U64`    | Yes            | Patch version component, e.g. "2" in "4.3.2"                             |
-
-### `__OUTPUT_SIZE`
-
-Returns the total size of the output file in bytes.
-
-Example — write a 4-byte header field containing the total output size:
-
-    section payload {
-        wrs "Hello";
-    }
-
-    section hdr {
-        wr32 __OUTPUT_SIZE;  // filled with total image size at link time
-    }
-
-    section image {
-        wr hdr;
-        wr payload;
-        assert __OUTPUT_SIZE == sizeof(image);  // equivalent forms
-    }
-
-    output image;
-
-### `__OUTPUT_ADDR`
-
-Returns the absolute starting address of the output.  When the `output`
-statement specifies a base address, `__OUTPUT_ADDR` equals that address.  When
-`output` specifies no base address, `__OUTPUT_ADDR` is zero.  This behavior is
-identical to `addr(<output-section>)`.
-
-Importantly, `__OUTPUT_ADDR` is fixed to the section start specified in the
-`output` statement, i.e. the entry point address, and does not “follow” an
-in-section `set_addr`.
-
-Example — embed the output base address in a table without repeating the
-constant:
-
-    section vtable {
-        wr32 __OUTPUT_ADDR;  // base address of the output image
-    }
-
-    section code {
-        wrs "code";
-    }
-
-    section image {
-        wr vtable;
-        wr code;
-        assert __OUTPUT_ADDR == addr(image);  // equivalent forms
-    }
-
-    output image 0x0800_0000;
-
-### `__BRINK_VERSION_STRING`
-
-Returns the Brink tool version as a string (e.g. `"4.0.0"`).  The value is fixed
-at compile time and may be used in `const` expressions, `wrs`, and `print`.
-
-Example — stamp the tool version into a firmware header:
-
-    section hdr {
-        wrs __BRINK_VERSION_STRING;
-    }
-
-    section image {
-        wr hdr;
-        wrs "payload";
-    }
-
-    output image;
-
-### `__BRINK_VERSION_MAJOR`, `__BRINK_VERSION_MINOR`, `__BRINK_VERSION_PATCH`
-
-Return the individual numeric components of the Brink version as `U64` values.
-All three are fixed at compile time and may be used in `const` expressions and
-arithmetic.
-
-Example — pack the version into a 3-byte field and assert the tool is new enough:
-
-    const MIN_MAJOR = 4u;
-
-    section hdr {
-        assert __BRINK_VERSION_MAJOR >= MIN_MAJOR;
-        wr8 __BRINK_VERSION_MAJOR;
-        wr8 __BRINK_VERSION_MINOR;
-        wr8 __BRINK_VERSION_PATCH;
-    }
-
-    section image {
-        wr hdr;
-        wrs "payload";
-    }
-
-    output image;
-
----
-
-## `to_i64( <expression> ) -> I64`
+`to_i64( <expression> ) -> I64`
 
 Converts the specified expression to the I64 type without regard to
 under/overflow.
@@ -1383,7 +1316,9 @@ Example:
 
 ---
 
-## `to_u64( <expression> ) -> U64`
+## to_u64
+
+`to_u64( <expression> ) -> U64`
 
 Converts the specified expression to the U64 type without regard to
 under/overflow.
@@ -1401,11 +1336,28 @@ Example:
 
 ---
 
-## `wr <section identifier>;`
+## wr
 
-Writes the contents of another section into the current section. Brink evaluates
-the referenced section and seamlessly copies its final output into the current
-location counter.
+The `wr` command has two forms.  The first form writes the contents of another
+section into the current section. The second `wr` form invokes an extension and
+writes the output into the current section.
+
+### wr section
+
+`wr <section identifier>;`
+
+Brink adds the specified in section to the current section at the current
+section offset.
+
+### wr extension
+
+`wr <namespace>::<extension_name>(<arg1>, <arg2>, ...);`
+
+Evaluates the specified extension call and writes the result to the output.  The
+extension's `.size()` method specifies the size of the result.  See [Brink
+Extensions](#brink-extensions) for more information.
+
+### Example
 
 Using `wr`, you can build complex outputs by composing smaller, modular sections
 together.
@@ -1413,8 +1365,8 @@ together.
 Example:
 
     section header {
-        wrs "FILE";
-        wr8 0x01;
+        wrs "FILE";   // Write a string.
+        wr8 0x01;     // Write a byte.
     }
 
     section data {
@@ -1426,41 +1378,31 @@ Example:
     section my_firmware {
         wr header;
         wr data;
+        // Use an extension to append a CRC to a section.
+        // Extensions can refer to their containing section.
+        wr std::crc32c(my_firmware);
     }
 
     output my_firmware;
 
 ---
 
-## `wr <namespace>::<extension_name>(<arg1>, <arg2>, ...);`
+## wr8 to wr64
 
-Evaluates the specified extension call and writes the result to the output.  The
-extension's `.size()` method specifies the size of the result.
-
-Example:
-
-    section foo {
-        wr custom::crc(start_label, end_label);
-        assert sizeof(custom::crc) == 4;
-    }
-
-    output foo;
-
----
-
-## `wr8 <expression> [, <expression>];`
-## `wr16 <expression> [, <expression>];`
-## `wr24 <expression> [, <expression>];`
-## `wr32 <expression> [, <expression>];`
-## `wr40 <expression> [, <expression>];`
-## `wr48 <expression> [, <expression>];`
-## `wr56 <expression> [, <expression>];`
-## `wr64 <expression> [, <expression>];`
+`wr8 <expression> [, <expression>];`
+`wr16 <expression> [, <expression>];`
+`wr24 <expression> [, <expression>];`
+`wr32 <expression> [, <expression>];`
+`wr40 <expression> [, <expression>];`
+`wr48 <expression> [, <expression>];`
+`wr56 <expression> [, <expression>];`
+`wr64 <expression> [, <expression>];`
 
 Evaluates the first expression and writes the result as a little-endian binary
-value to the output file.  Upper bits of the result value are silently truncated
-to the specified bit length.  The optional second expression specifies the
+value to the output file.  The optional second expression specifies the
 repetition count.
+
+> [!IMPORTANT] Brink silently truncates the upper bits of the expression to fit the specified width.
 
 Example:
 
@@ -1514,13 +1456,125 @@ The following program simply copies these 6 UTF-8 characters to the output file.
 Evaluates the comma separated list of expressions and writes the resulting
 string to the output file.  Wrs accepts the same expressions and operates
 similarly to the print statement.  For more information, see
-[print](#print-expression--expression-).
+[print](#print).
 
 The wrs statement does not implicitly write a terminating 0 byte after the
 string.  Users creating null terminated (C style) strings in an output file
 should add an explicit \0.
 
     wrs "my null terminated string\0";
+
+---
+
+# Built-in Variables
+
+Brink pre-defines built-in identifiers that begin with `__` (double underscore).
+They can appear in any expression context that accepts the corresponding type.
+As shown in the table below, some builtins cannot be used in `const` expressions
+because their values depend on dynamic layout values.
+
+| Variable                 | Type     | OK in `const`? | Description                                                              |
+| ------------------------ | -------- | -------------- | ------------------------------------------------------------------------ |
+| `__OUTPUT_SIZE`          | `U64`    | No             | Total output size in bytes.  Equivalent to `sizeof(<output-section>)`.   |
+| `__OUTPUT_ADDR`          | `U64`    | No             | Starting address of the output.  Equivalent to `addr(<output-section>)`. |
+| `__BRINK_VERSION_STRING` | `String` | Yes            | Brink version as a string, e.g. `"4.3.2"`.                               |
+| `__BRINK_VERSION_MAJOR`  | `U64`    | Yes            | Major version component, e.g. "4" in "4.3.2"                             |
+| `__BRINK_VERSION_MINOR`  | `U64`    | Yes            | Minor version component, e.g. "3" in "4.3.2"                             |
+| `__BRINK_VERSION_PATCH`  | `U64`    | Yes            | Patch version component, e.g. "2" in "4.3.2"                             |
+
+## `__OUTPUT_SIZE`
+
+Returns the total size of the output file in bytes.
+
+Example — write a 4-byte header field containing the total output size:
+
+    section payload {
+        wrs "Hello";
+    }
+
+    section hdr {
+        wr32 __OUTPUT_SIZE;  // filled with total image size at link time
+    }
+
+    section image {
+        wr hdr;
+        wr payload;
+        assert __OUTPUT_SIZE == sizeof(image);  // equivalent forms
+    }
+
+    output image;
+
+## `__OUTPUT_ADDR`
+
+Returns the absolute starting address of the output.  When the `output`
+statement specifies a base address, `__OUTPUT_ADDR` equals that address.  When
+`output` specifies no base address, `__OUTPUT_ADDR` is zero.  This behavior is
+identical to `addr(<output-section>)`.
+
+Importantly, `__OUTPUT_ADDR` is fixed to the section start specified in the
+`output` statement, i.e. the entry point address, and does not “follow” an
+in-section `set_addr`.
+
+Example — embed the output base address in a table without repeating the
+constant:
+
+    section vtable {
+        wr32 __OUTPUT_ADDR;  // base address of the output image
+    }
+
+    section code {
+        wrs "code";
+    }
+
+    section image {
+        wr vtable;
+        wr code;
+        assert __OUTPUT_ADDR == addr(image);  // equivalent forms
+    }
+
+    output image 0x0800_0000;
+
+## `__BRINK_VERSION_STRING`
+
+Returns the Brink tool version as a string (e.g. `"4.0.0"`).  The value is fixed
+at compile time and may be used in `const` expressions, `wrs`, and `print`.
+
+Example — stamp the tool version into a firmware header:
+
+    section hdr {
+        wrs __BRINK_VERSION_STRING;
+    }
+
+    section image {
+        wr hdr;
+        wrs "payload";
+    }
+
+    output image;
+
+## `__BRINK_VERSION_MAJOR`, `__BRINK_VERSION_MINOR`, `__BRINK_VERSION_PATCH`
+
+Return the individual numeric components of the Brink version as `U64` values.
+All three are fixed at compile time and may be used in `const` expressions and
+arithmetic.
+
+Example — pack the version into a 3-byte field and assert the tool is new enough:
+
+    const MIN_MAJOR = 4u;
+
+    section hdr {
+        assert __BRINK_VERSION_MAJOR >= MIN_MAJOR;
+        wr8 __BRINK_VERSION_MAJOR;
+        wr8 __BRINK_VERSION_MINOR;
+        wr8 __BRINK_VERSION_PATCH;
+    }
+
+    section image {
+        wr hdr;
+        wrs "payload";
+    }
+
+    output image;
 
 ---
 
@@ -1780,9 +1834,12 @@ TOTAL                                          10878              1625    85.06%
 
 ## Rebuilding the vscode Syntax Highlighting Extension
 
-Rebuilding the extension require Node.js.  After you install Node.js, you may need to restart your command prompt.
+Rebuilding the extension require Node.js.  After you install Node.js, you may
+need to restart your command prompt.
 
-Building the extension requires Requires [vsce](https://github.com/microsoft/vscode-vsce).  One time, you'll need to use `npm` to install `vsce`
+Building the extension requires Requires
+[vsce](https://github.com/microsoft/vscode-vsce).  One time, you'll need to use
+`npm` to install `vsce`
 
     npm install -g @vscode/vsce
 

@@ -88,6 +88,19 @@ mod tests {
     }
 
     #[test]
+    fn list_extensions_flag() {
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("--list-extensions")
+            .assert()
+            .success()
+            .stdout(predicates::str::contains("std::crc32c"))
+            .stdout(predicates::str::contains("std::sha256"))
+            .stdout(predicates::str::contains("std::md5"))
+            .stderr(predicates::str::is_empty());
+    }
+
+    #[test]
     #[should_panic]
     fn no_cli_input() {
         let _cmd = Command::cargo_bin("brink").unwrap().unwrap();

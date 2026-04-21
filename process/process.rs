@@ -83,6 +83,14 @@ fn parse_define(s: &str) -> Result<(String, ParameterValue)> {
     Ok((name.to_string(), value))
 }
 
+/// Returns all compiled-in extension names in sorted order.
+/// Excludes test-only mock extensions.
+pub fn list_extensions() -> Vec<String> {
+    let mut registry = ExtensionRegistry::new();
+    extensions::register_all(&mut registry);
+    registry.sorted_names().iter().map(|s| s.to_string()).collect()
+}
+
 /// Entry point for all processing on the input source file.
 /// `name`        — source file path
 /// `fstr`        — source file contents
