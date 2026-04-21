@@ -18,8 +18,7 @@ Design decisions established before this plan:
   the `region` keyword implies immutability.
 - `in REGION` is the annotation syntax for both section-to-region and
   region-to-region (sub-region) relationships.
-- Region property access uses dot notation: `FLASH.addr`, `FLASH.size`,
-  `FLASH.end`.
+- Region property access uses existing functions: `addr(FLASH)`, `sizeof(FLASH)`.
 - `output` remains explicit; the address argument becomes optional when the
   output section is `in` a region.
 - `--max-output-size` and the region system are independent mechanisms.
@@ -182,12 +181,6 @@ In `ast/lexer.rs` `scan_word` keyword table:
 ```rust
 "region" => LexToken::Region,
 "in"     => LexToken::In,
-```
-
-`LexToken::Dot` is added to `scan_operator`:
-
-```rust
-b'.' => LexToken::Dot,
 ```
 
 ### Region AST structure
@@ -508,40 +501,10 @@ layout.
 
 ---
 
-## Step 7 — Region property dot-access expressions
+## Step 7 — Region property access
 
-`FLASH.addr`, `FLASH.size`, and `FLASH.end` must be usable in expressions
+`addr(FLASH)`, `sizeof(FLASH)` must be usable in expressions
 everywhere a const expression is valid.
-
-### Lexer
-
-`LexToken::Dot` already added in Step 2. No further lexer change needed.
-
-### Pratt parser — dot expression
-
-In `parse_pratt`, in the `LexToken::Identifier` branch, after the identifier
-is consumed, check for `Dot` followed by a property name:
-
-```rust
-if self.tv.peek().tok == LexToken::Dot {
-    self.tv.skip();  // consume '.'
-    let prop_tinfo = self.tv.peek();
-    let prop = prop_tinfo.val;
-    match prop {
-        "addr" | "size" | "end" => {
-            self.tv.skip();
-            // produce a RegionAccess AST node with (region_name, property)
-            let node = self.arena.new_node(region_name_tok_idx);
-            self.arena[node].get_mut() ...  // attach property as child
-        }
-        _ => {
-            self.err_expected_after(diags, "AST_50",
-                "dot notation: expected 'addr', 'size', or 'end'");
-            return self.dbg_exit("parse_pratt", false);
-        }
-    }
-}
-```
 
 ### IR
 
