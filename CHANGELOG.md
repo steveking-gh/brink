@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.x.x] - 2026-04-20
+
+- FEATURE: added missing --list-extensions command line option which was already
+  documented in the README.md
+- README: Removed obsolete text on if/else statement restrictions
+- README: Documented region feature
+- INTERNAL: Improved README.md formatting
+
+## [6.1.1] - 2026-04-20
+- BUG FIX: Fixed version to 6.1.1 in Cargo.toml
+
 ## [6.1.0] - 2026-04-17
 - FEATURE: added --max-output-size CLI option.
 - BUG FIX: Fixed assert when wrf had too man args

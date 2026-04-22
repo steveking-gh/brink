@@ -346,7 +346,7 @@ output file.  Brink source files typically have a .brink file extension.
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `-D<name>[=value]`         | Defines a `const` value from the command line.<br>See [Command-Line Const Defines](#command-line-const-defines) below.                                                 |
 | `--list-extensions`        | List all available extensions compiled into brink as controlled by Cargo feature flags.                                                                                |
-| `--max-output-size=<size>` | Reject the output if its size exceeds `<size>` bytes before writing data.<br>Accepts a plain integer or a K/M/G suffix (e.g. `64M`, `512K`, `1G`). Default is `256MB`. |
+| `--max-output-size=<size>` | Reject the output if its size exceeds `<size>` bytes before writing data.<br>Accepts a plain integer or a K/M/G suffix (e.g. `64M`, `512K`, `1G`). Default is `256M`. |
 | `--map-csv`                | Writes a CSV format map file `<stem>.map.csv` to the current directory.<br>For example: `firmware.brink` → `firmware.map.csv`.                                         |
 | `--map-csv=<file>`         | Writes a CSV map file to the specified file.                                                                                                                           |
 | `--map-csv=-`              | Writes a CSV map file to stdout.                                                                                                                                       |
@@ -754,18 +754,13 @@ Const expressions support the full set of arithmetic, bitwise and comparison ope
 Comparison operators evaluate to 1 (true) or 0 (false) and are useful for expressing
 relationships between constants:
 
-    const FLASH_BASE = 0x0800_0000u;
-    const FLASH_SIZE = 0x0008_0000u;
-    const RAM_BASE   = 0x2000_0000u;
+    const FLASH_BASE = 0x0800_0000;
+    const FLASH_SIZE = 0x0008_0000;
+    const RAM_BASE   = 0x2000_0000;
 
     // Verify flash and RAM regions do not overlap
     const NO_OVERLAP = (FLASH_BASE + FLASH_SIZE) <= RAM_BASE;
-
-    section foo {
-        assert NO_OVERLAP;
-    }
-
-    output foo;
+    assert NO_OVERLAP;
 
 A const value expression cannot depend on addresses, sizes, offsets or any other
 dynamic aspect of the output file.  Brink resolves all const values before
@@ -812,17 +807,6 @@ before starting layout of the output.  Therefore, an `if/else` expression must
 only depend on `const` variables and literal values.  In other words, `if/else`
 statements must not depend on dynamic addresses, sizes, offsets or any other
 layout dependent aspect of the output file.
-
-Brink currently limits the conditional blocks of an `if/else` to the following
-statement types:
-
-* `const` assignments
-* `include` directives
-* `print` statements
-* `assert` statements
-* Nested `if`/`else` blocks
-
-Any files the program loads via `include` must also follow these restrictions.
 
 Users must pre-declare `const` variables before conditionally assigning values
 to them. For example:
@@ -1000,8 +984,145 @@ Will result in the following console output:
 
 `region <identifier> { ... }`
 
-A region describes a memory range on the target system.
+A region defines the name and *static* properties of an address range. Regions
+provide a way to decouple memory placement and top-down layout control from the
+section content being placed.  Unlike sections, regions are stateless and do
+not track dynamic information during layout.
 
+Users place *exactly one* section `in` a region.  We refer to this section as
+the *top-level section* of the region.  The top-level section is a normal
+section with the following extra behaviors:
+
+* The region sets the starting address of the top-level section.
+* The region caps the size of the top-level section.
+* By default, the region aligns each write operation in the top-level section.
+* By default, the region sets the fill byte in the top-level section.
+
+For example:
+
+    // Define the properties of the FLASH memory region
+    region FLASH {
+        addr = 0xF000_0000;
+        size = 1M;
+        default_align = 4K;
+        default_fill = 0xFF;
+    }
+
+    // Define the properties of the EEPROM memory region
+    region EEPROM {
+        addr = 0xFF00_0000;
+        size = 64K;
+        // default align=1, aka no alignment
+        // default fill 0xFF, but this is moot with align=1
+    }
+
+    // Flash sections
+    section boot { ... }
+    section flash_code { ... }
+    section flash_data { ... }
+
+    // EEPROM sections
+    section eeprom_data1 { ... }
+    section eeprom_data2 { ... }
+
+    // FLASH_TOP is the top-level section in the FLASH region
+    section FLASH_TOP in FLASH {
+        // Starts at address 0xF000_0000
+        wr boot;
+        // automatic 4K alignment and fill
+        wr flash_code;
+        // automatic 4K alignment and fill
+        wr flash_data;
+    }
+
+    section EEPROM_TOP in EEPROM {
+        // Starts at address 0x0000_0000
+        wr runtime_code;
+        // Automatic 1-byte alignment and fill, so nothing to do
+        wr runtime_data;
+    }
+
+    // The output file contains the image for FLASH and EEPROM regions.
+    // This section is not a top-level section of a region and behaves
+    // like any other section.
+    section FIRMWARE_UPDATE_FILE {
+        wr file_offset(FLASH_TOP);    // Offset to the new FLASH image
+        wr file_offset(EEPROM_TOP);   // Offset to the EEPROM image
+        wr FLASH_TOP;                 // FLASH image
+        wr EEPROM_TOP;                // EEPROM image
+    }
+
+    output FIRMWARE_UPDATE_FILE;  // Write the output
+
+### Region Properties
+
+Regions support the following properties:
+
+* `addr` Starting address (required)
+* `size` Size in bytes (required)
+* `default_align` Default alignment in bytes (default = 1)
+* `default_fill` Default fill byte (default = 0xFF)
+
+### Region Property `addr`
+
+The `addr` property defines the region's absolute starting address.  The
+region's top-level section starts at this address.  Users can query the `addr`
+property of a region with `addr(<region name>)`.
+
+### Region Property `size`
+
+Specifies the size of the region in bytes.  Brink reports an error if the
+top-level section exceeds this value.
+
+Users can query the `size` property of a region with `sizeof(<region name>)`.
+To query how many bytes of the region are actually occupied, users should use
+`sizeof` on the region's top-level section.
+
+When specifying the size of a region, users can specify a number and optionally
+use a K/M/G suffix for multiples of 1024, being kilobytes, megabytes and
+gigabytes respectively.
+
+### Region Property `default_align`
+
+Specifies the default alignment of _all_ write operations in the top-level
+section.  An `align` operation in the top-level section overrides the default at
+that instance.  For example:
+
+    region STUFF {
+        addr = 0x4000;
+        size = 64K;
+        default_align = 4K;
+        default_fill = 0xFF;
+    }
+
+    section TOP in STUFF {
+        wrs "First";
+        // aligned to 4KB by default
+        wrs "Second";
+        // Override default alignment to 16 byte and override pad = 0
+        align 16, 0x00;
+        wrs "Third";
+        // Back to default 4KB default alignment
+        wrs "Fourth";
+    }
+
+The code above generates a section with the following layout:
+
+     | Address | Size | Content               | Description      |
+     | ------- | ---- | --------------------- | ---------------- |
+     | 0x4000  | 5    | First                 | wrs              |
+     | 0x4005  | 4091 | 0xFF, 0xFF, ..., 0xFF | default padding  |
+     | 0x5000  | 6    | Second                | wrs              |
+     | 0x5006  | 10   | 0x00, 0x00, ..., 0x00 | explicit padding |
+     | 0x5010  | 5    | Third                 | wrs              |
+     | 0x5015  | 4085 | 0xFF, 0xFF, ..., 0xFF | default padding  |
+     | 0x6000  | 6    | Fourth                | wrs              |
+
+### Region Property `default_fill`
+
+Specifies the default fill byte for any pad operations in the top-level section.
+The section may override the default pad byte with a pad byte specifier on any
+operation that causes padding.
 
 ---
 
@@ -1069,17 +1190,18 @@ scope of the current section.  For example:
 ## section
 
 `section <name> { ... }`
+`section <name> in <region> { ... }`
 
 A section is a named, reusable block of content.  Sections are the primary
 building block of a Brink program.  Each section defines a sequence of bytes,
-built up from write statements and location counter operations such as `align`.
+built up from write statements and padding operations such as `align`.
 Sections may also contain labels, assertions, print statements and so on.
 Sections may write other sections into themselves so long as the nesting does
 not create a cycle.
 
 Section names must be valid [identifiers](#identifiers), must be globally
-unique, and must not conflict with const names, label names, or [reserved
-identifiers](#reserved-identifiers).
+unique, and must not conflict with const names, label names, region name, or
+[reserved identifiers](#reserved-identifiers).
 
 Sections have their own section-relative location counter which resets to zero
 at the start of each section.  Sections can read and advance the section
@@ -1087,11 +1209,13 @@ location counter with [`sec_offset()`](#sec_offset) and
 [`set_sec_offset()`](#set_sec_offset) statements
 respectively.
 
-The root section named in the
-[`output`](#output) statement is
-the only section Brink writes to the output file.  Other sections can be
-directly or indirectly included via [`wr`](#wr) statements
-from the output section.  Unreachable sections produce a warning.
+The root section named in the [`output`](#output) statement is the only section
+Brink writes to the output file.  Other sections can be directly or indirectly
+included via [`wr`](#wr) statements from the output section.  Unreachable
+sections produce a warning.
+
+To help guide layout, users can place a section in a [region](#region) with `in
+<region name>` after the section name.
 
 Example:
 

@@ -2,178 +2,122 @@
 
 ## Overview
 
-This plan adds two related features to brink:
+This plan adds three related features to brink:
 
 1. **`--max-output-size` flag** (Step 1) — immediate fix for the fuzz-found
    infinite-loop bug caused by pathological `set_addr_offset` values.
-2. **`region` declaration system** (Steps 2–8) — first-class memory map
+2. **Remove `output` address argument** (Step 2) — simplification that
+   eliminates a redundant and conflict-prone feature before the region system
+   lands.
+3. **`region` declaration system** (Steps 3–7) — first-class memory map
    support for embedded targets, allowing sections to be spatially constrained
    to named hardware regions with automatic enforcement.
 
-Design decisions established before this plan:
+Design decisions established for this plan:
 
-- `region` uses `addr` and `size` as the two required properties; `end` is
-  a derived read-only expression (`addr + size`), not declarable.
+- `region` uses `addr` and `size` as the two required properties, plus optional
+  `default_align` and `default_fill`. `end` is derived: `addr + size`.
 - Region property values are not prefixed with `const` inside region blocks;
   the `region` keyword implies immutability.
-- `in REGION` is the annotation syntax for both section-to-region and
-  region-to-region (sub-region) relationships.
-- Region property access uses existing functions: `addr(FLASH)`, `sizeof(FLASH)`.
-- `output` remains explicit; the address argument becomes optional when the
-  output section is `in` a region.
+- `in REGION` is the annotation syntax for section-to-region binding only.
+  Nested regions (region-to-region) are explicitly deferred.
+- Region property access uses function-call style: `addr(FLASH)`,
+  `sizeof(FLASH)`. Dot notation (`FLASH.addr`) is not implemented.
+- `output` takes a section name only. Section placement uses `set_addr` or
+  `in REGION` binding. The address argument is removed in Step 2.
+- `set_addr` is not permitted inside a region-bound section. Regions control
+  section placement; a section bound to a region starts at `addr(region)`.
+  `set_addr` remains valid in sections not bound to a region.
 - `--max-output-size` and the region system are independent mechanisms.
   `--max-output-size` is a file-size failsafe; regions enforce spatial
   correctness. Neither implies the other.
 
 ---
 
-## Step 1 — `--max-output-size` flag  *(fixes fuzz bug immediately)*
+## Step 1 — `--max-output-size` flag  *(COMPLETE)*
 
-### Problem
-
-After iterate converges, `execute_wrx` writes pad bytes one-at-a-time in a
-`while repeat_count > 0` loop. A pathological `set_addr_offset 0xFFFFFFFFFFFFF`
-produces a pad repeat count of ~4.5 quadrillion, causing a hang. The fix is a
-pre-execute size check that rejects the output before any bytes are written.
-
-### Changes
-
-**`src/main.rs` — add CLI field to `Cli` struct:**
-
-```rust
-/// Maximum output file size in bytes.  Default is 256 MiB (268435456).
-/// Accepts a plain integer (e.g. 67108864) or a suffix: K, M, G
-/// (e.g. 64M, 512K, 1G).  Case-insensitive suffix.
-#[arg(
-    long = "max-output-size",
-    value_name = "SIZE",
-    default_value = "268435456",
-    value_parser = parse_size,
-)]
-pub max_output_size: u64,
-```
-
-Add a free function in `main.rs`:
-
-```rust
-/// Parse a size string with optional K/M/G suffix.
-/// "256M" -> 268435456, "64K" -> 65536, "1G" -> 1073741824, "1024" -> 1024.
-fn parse_size(s: &str) -> Result<u64, String> {
-    let s = s.trim();
-    let (digits, shift) = if let Some(n) = s.strip_suffix_ci('K') {
-        (n, 10)
-    } else if let Some(n) = s.strip_suffix_ci('M') {
-        (n, 20)
-    } else if let Some(n) = s.strip_suffix_ci('G') {
-        (n, 30)
-    } else {
-        (s, 0)
-    };
-    let base: u64 = parse_int::parse(digits)
-        .map_err(|e| format!("invalid size '{}': {}", s, e))?;
-    base.checked_shl(shift)
-        .ok_or_else(|| format!("size '{}' overflows u64", s))
-}
-```
-
-*(Implement `strip_suffix_ci` as a local helper or inline the case logic.)*
-
-Pass `max_output_size` to `process()`:
-
-```rust
-process(
-    in_file_name,
-    &str_in,
-    cli.output.as_deref(),
-    verbosity,
-    cli.noprint,
-    &cli.defines,
-    cli.max_output_size,   // new
-    map_csv,
-    ...
-)
-```
-
-**`process/process.rs` — add parameter and check:**
-
-```rust
-pub fn process(
-    name: &str,
-    fstr: &str,
-    output_file: Option<&str>,
-    verbosity: u64,
-    noprint: bool,
-    defines: &[String],
-    max_output_size: u64,   // new
-    map_csv: Option<&str>,
-    ...
-) -> Result<()>
-```
-
-After `Engine::new(...)` succeeds and before `engine.execute(...)`:
-
-```rust
-// Check image size against --max-output-size before writing any bytes.
-let final_size = engine
-    .wr_dispatches
-    .last()
-    .map_or(0, |d| d.file_offset + d.size);
-if final_size > max_output_size {
-    let msg = format!(
-        "Output image size {} bytes exceeds maximum {} bytes. \
-         Use --max-output-size to increase the limit.",
-        final_size, max_output_size
-    );
-    diags.err0("PROC_7", &msg);
-    return Err(anyhow!("[PROC_7]: Error detected, halting."));
-}
-```
-
-No `Engine` changes are needed. The final file size is already available via
-`engine.wr_dispatches` (populated by `build_dispatches()` at the end of
-`Engine::new()`). The last dispatch's `file_offset + size` equals total bytes
-that `execute()` would write.
-
-**`process/fuzz/fuzz_targets/fuzz_target_1.rs` — pass limit:**
-
-```rust
-let _ = process(
-    "fuzz_target",
-    str_in,
-    Some("/dev/null"),
-    0,       // verbosity
-    true,    // noprint
-    &[],     // defines
-    65_536,  // max_output_size: 64 KiB ceiling for fast fuzzing
-    None, None, None, None,
-);
-```
-
-### New error codes
-
-| Code   | Location   | Meaning                                       |
-|--------|------------|-----------------------------------------------|
-| PROC_7 | process.rs | Output size exceeds `--max-output-size` limit |
-
-### Tests
-
-- `tests/fuzz_found_19.brink` (the actual fuzz artifact): regression test
-  expecting `[PROC_7]`
-- `max_output_size_flag`: inline integration test; `--max-output-size 0` on
-  `wr_single.brink` (1-byte output) expects `[PROC_7]`
+Already implemented. Adds a CLI `--max-output-size SIZE` option that caps the
+output file size. Error code `PROC_7` fires if the computed image size exceeds
+the limit.
 
 ---
 
-## Step 2 — `region` keyword and AST parsing
+## Step 2 — Remove `output` address argument
 
-### New lexer token
+### Motivation
+
+The `output` statement currently accepts an optional absolute starting address:
+
+```brink
+output image 0x0800_0000;
+```
+
+This conflicts with the region system and with `set_addr`, creating two ways
+to specify the same thing with no rule for which wins. The output statement
+should name the root section only; placement belongs to `set_addr` or to a
+region binding.
+
+### Migration
+
+| Old form                        | Replacement                                           |
+|---------------------------------|-------------------------------------------------------|
+| `output foo 0x1000;`            | `set_addr 0x1000;` as first statement in `foo`        |
+| `output foo 0x1000;` + region   | bind `foo` `in REGION` where `region.addr = 0x1000`   |
+| `output foo;` (address omitted) | unchanged — continues to work                         |
+| `output foo 0;`                 | `output foo;` — address 0 is the default              |
+
+### Parser changes
+
+In `parse_output`, after parsing the section name, require `Semicolon`
+immediately. If an expression or integer literal follows the section name,
+emit `AST_54` with a message directing users to `set_addr`.
+
+### Engine changes
+
+Remove the `abs_start` parameter from `Engine::new()`. The section's resolved
+starting address — from `set_addr` or from a region binding (Step 5) — is
+already present in the iterate output. No engine arithmetic uses `abs_start`
+independently of section layout.
+
+### `__OUTPUT_ADDR` behavior
+
+`__OUTPUT_ADDR` already documents itself as equivalent to
+`addr(<output-section>)`. After this change that equivalence is the only
+definition: `__OUTPUT_ADDR` returns the resolved starting address of the
+output section, which is 0 if no `set_addr` or region binding applies.
+No behavior change for programs that did not supply an output address.
+
+### Test updates
+
+- Any integration test using `output SECTION 0xADDR;` must be updated to move
+  the address into the section via `set_addr`.
+- Add a regression test: `output foo 0x1000;` produces `AST_54`.
+- Confirm `output foo;` and `output foo 0;` (the latter now an error) behave
+  as expected.
+
+### README changes
+
+Update the `output` reference entry to remove the address syntax.  Update
+`__OUTPUT_ADDR` entry to remove references to the output-statement address.
+Update any examples that used `output section 0xADDR;`.
+
+### New error codes
+
+| Code   | Meaning                                                              |
+|--------|----------------------------------------------------------------------|
+| AST_54 | `output` address argument removed; use `set_addr` or region binding  |
+
+---
+
+## Step 3 — `region` keyword and AST parsing
+
+### New lexer tokens
 
 In `ast/ast.rs` `LexToken` enum:
 
 ```rust
 Region,          // region keyword
-In,              // in keyword (also used in Step 5 for sections)
-Dot,             // . for property access (FLASH.addr)
+In,              // in keyword (used in section-to-region binding)
 ```
 
 In `ast/lexer.rs` `scan_word` keyword table:
@@ -183,6 +127,9 @@ In `ast/lexer.rs` `scan_word` keyword table:
 "in"     => LexToken::In,
 ```
 
+Note: no `Dot` token. Property access uses `addr()` and `sizeof()` calls,
+not dot notation.
+
 ### Region AST structure
 
 A region node in the indextree has this shape:
@@ -190,48 +137,60 @@ A region node in the indextree has this shape:
 ```
 Region node  (tok = LexToken::Region)
   Identifier node  (region name, e.g. "FLASH")
-  [Identifier node]  (optional parent name after "in", e.g. "RAM")
   RegionProp node  (tok = LexToken::RegionProp, val = "addr")
     <expression subtree>
   RegionProp node  (tok = LexToken::RegionProp, val = "size")
     <expression subtree>
-  [RegionProp node]  (optional future properties: fill, warn_at, etc.)
+  [RegionProp node]  (val = "default_align")
+    <expression subtree>
+  [RegionProp node]  (val = "default_fill")
+    <expression subtree>
 ```
 
 Add to `LexToken`:
 
 ```rust
-RegionProp,   // a named property inside a region block (addr, size, fill, ...)
+RegionProp,   // a named property inside a region block
 ```
+
+### Recognized region properties
+
+| Property        | Required | Default | Meaning                                     |
+|-----------------|----------|---------|---------------------------------------------|
+| `addr`          | Yes      | —       | Starting address of the region              |
+| `size`          | Yes      | —       | Size in bytes                               |
+| `default_align` | No       | 1       | Default alignment for writes in top section |
+| `default_fill`  | No       | 0xFF    | Default fill byte for pad operations        |
 
 ### Parser — `parse_region`
 
 New method on `Ast`:
 
 ```rust
-/// Parse: region NAME [in PARENT_NAME] { PROPERTIES }
-/// Properties: addr = EXPR ; | size = EXPR ;
+/// Parse: region NAME { PROPERTIES }
+/// Properties: addr = EXPR ; | size = EXPR ; | default_align = EXPR ;
+///             | default_fill = EXPR ;
 fn parse_region(&mut self, diags: &mut Diags, parent: NodeId) -> bool
 ```
 
 Sequence:
 1. Consume `Region` token; add Region node to arena.
 2. `expect_name_leaf(...)` for the region name — produces Identifier child.
-3. If next token is `In`: consume it, `expect_name_leaf(...)` for parent
-   region name — produces second Identifier child flagged as parent reference.
-4. `expect_leaf(OpenBrace, ...)`
-5. Loop: consume `name = expr ;` property assignments until `CloseBrace`.
-   - Recognized property names: `"addr"`, `"size"` (future: `"fill"`,
-     `"warn_at"`, `"endian"`).
+3. `expect_leaf(OpenBrace, ...)`
+4. Loop: consume `name = expr ;` property assignments until `CloseBrace`.
+   - Recognized property names: `"addr"`, `"size"`, `"default_align"`,
+     `"default_fill"`.
    - Unknown property name: emit `AST_44` error, skip to next `;`.
    - Duplicate property: emit `AST_45` error.
    - Each property produces a `RegionProp` child node with the expression
      subtree beneath it.
+5. After parsing: verify both `addr` and `size` are present; emit `AST_46`
+   if either is absent.
 6. `expect_leaf(CloseBrace, ...)`
 
 ### Top-level parser hook
 
-In `parse_top_level` (or equivalent dispatch), add:
+In `parse_top_level` dispatch, add:
 
 ```rust
 LexToken::Region => self.parse_region(diags, root_nid),
@@ -244,14 +203,14 @@ LexToken::Region => self.parse_region(diags, root_nid),
 | AST_44 | Unknown region property name                             |
 | AST_45 | Duplicate region property                                |
 | AST_46 | Missing required region property (`addr` or `size`)      |
-| AST_47 | Region name conflicts with existing section or const name |
+| AST_47 | Region name conflicts with existing section or const name|
 
 ---
 
 ## Step 3 — Region evaluation and RegionDb
 
 Region property values are const expressions evaluated in the `const_eval`
-phase. This reuses the existing const evaluation infrastructure.
+phase, reusing the existing const evaluation infrastructure.
 
 ### New type in `ast` crate
 
@@ -263,8 +222,11 @@ pub struct RegionEntry {
     pub addr: u64,
     /// Size of the region in bytes.
     pub size: u64,
-    /// Optional parent region name (from `in PARENT`).
-    pub parent: Option<String>,
+    /// Default alignment for write operations in the top-level section.
+    /// 1 means no alignment (pack tightly).
+    pub default_align: u64,
+    /// Default fill byte for pad operations in the top-level section.
+    pub default_fill: u8,
     /// Source location of the region keyword, for diagnostics.
     pub src_loc: SourceSpan,
 }
@@ -275,7 +237,7 @@ impl RegionEntry {
         self.addr + self.size
     }
 
-    /// True if `addr` is within [self.addr, self.addr + self.size).
+    /// True if addr is within [self.addr, self.addr + self.size).
     pub fn contains_addr(&self, addr: u64) -> bool {
         addr >= self.addr && addr < self.end()
     }
@@ -298,9 +260,9 @@ Add to `AstDb`:
 pub regions: IndexMap<String, RegionEntry>,
 ```
 
-`AstDb::new()` traverses Region nodes at the root of the AST and records their
-names and source locations. Property expressions are NOT evaluated here —
-only structural validation (name uniqueness, required properties present).
+`AstDb::new()` traverses Region nodes at the root of the AST and records
+their names and source locations. Property expressions are NOT evaluated here
+— only structural validation (name uniqueness, required properties present).
 
 ### const_eval changes
 
@@ -308,8 +270,7 @@ After the existing const evaluation pass, a new sub-pass evaluates region
 property expressions using the already-resolved `SymbolTable`:
 
 ```rust
-/// Evaluate all region property expressions and populate RegionEntry.addr
-/// and RegionEntry.size in ast_db.regions.
+/// Evaluate all region property expressions and populate RegionEntry fields.
 pub fn evaluate_regions(
     diags: &mut Diags,
     ast: &Ast,
@@ -318,69 +279,27 @@ pub fn evaluate_regions(
 ) -> Result<()>
 ```
 
-This function walks each Region node's `RegionProp` children, evaluates their
-expression subtrees using the existing `eval_const_expr_r` machinery, and
-stores resolved `u64` values into `RegionEntry`. Expressions that reference
-other region properties (`FLASH.addr`) are deferred until all same-depth
-regions are resolved. The evaluator must implement cycle detection to trap cyclic dependencies and emit `EXEC_68`. Forward references to undefined regions produce `EXEC_62`.
+Walks each Region node's `RegionProp` children, evaluates their expression
+subtrees using `eval_const_expr_r`, and stores resolved values into
+`RegionEntry`.
+
+Validate `default_align` is a power of two and non-zero. Validate
+`default_fill` fits in a `u8`.
+
+Validate that no two regions have overlapping address ranges. Emit `EXEC_70`
+per overlapping pair.
 
 ### New error codes
 
 | Code    | Meaning                                                |
 |---------|--------------------------------------------------------|
-| EXEC_62 | Region property expression references undefined region |
-| EXEC_68 | Cyclic dependency in region properties                 |
+| EXEC_69 | `default_align` is not a power of two, or is zero      |
+| EXEC_70 | Two regions have overlapping address ranges            |
+| EXEC_71 | Cyclic dependency in region property expressions       |
 
 ---
 
-## Step 4 — Region-on-region containment validation
-
-After `evaluate_regions()` resolves all `RegionEntry` values, a validation
-pass checks that every sub-region is fully contained within its declared
-parent.
-
-```rust
-/// Validate that every region declared `in PARENT` is fully contained
-/// within PARENT's bounds.  Called immediately after evaluate_regions().
-pub fn validate_region_containment(
-    diags: &mut Diags,
-    ast_db: &AstDb,
-) -> Result<()>
-```
-
-For each `(name, entry)` in `ast_db.regions` where `entry.parent.is_some()`:
-
-```rust
-let parent_name = entry.parent.as_ref().unwrap();
-let Some(parent) = ast_db.regions.get(parent_name) else {
-    diags.err1("EXEC_63", &format!("region '{}': parent region '{}' not declared",
-        name, parent_name), entry.src_loc.clone());
-    continue;
-};
-if !parent.contains_range(entry.addr, entry.size) {
-    diags.err1("EXEC_64", &format!(
-        "region '{}' [0x{:X}..0x{:X}) is not contained within \
-         parent '{}' [0x{:X}..0x{:X})",
-        name, entry.addr, entry.end(),
-        parent_name, parent.addr, parent.end(),
-    ), entry.src_loc.clone());
-}
-```
-
-Overlap between sibling regions (two regions with the same parent that overlap
-each other) produces `EXEC_65`.
-
-### New error codes
-
-| Code    | Meaning                                                         |
-|---------|-----------------------------------------------------------------|
-| EXEC_63 | `in PARENT` references undeclared region                        |
-| EXEC_64 | Sub-region address range falls outside parent region            |
-| EXEC_65 | Sibling regions overlap within the same parent                  |
-
----
-
-## Step 5 — `section NAME in REGION` annotation
+## Step 4 — `section NAME in REGION` binding
 
 ### Parser changes
 
@@ -390,7 +309,6 @@ In `parse_section`, after parsing the section name, check for `In`:
 // After consuming the section name identifier:
 let region_name = if self.tv.peek().tok == LexToken::In {
     self.tv.skip();  // consume 'in'
-    // parse region name — must be a known identifier
     let tinfo = self.tv.peek();
     if tinfo.tok != LexToken::Identifier {
         self.err_expected_after(diags, "AST_48", "'in': expected region name");
@@ -405,40 +323,66 @@ let region_name = if self.tv.peek().tok == LexToken::In {
 ```
 
 The region name is stored as a synthetic child node of the Section AST node
-with a new token kind `LexToken::RegionRef`.
+with token kind `LexToken::RegionRef`.
 
 ### AstDb — Section entry gains region field
 
 ```rust
-pub struct SectionEntry {          // new wrapper (or extend existing map value)
+pub struct SectionEntry {
     pub node_id: NodeId,
-    pub region: Option<String>,    // name of declared region, if any
+    pub region: Option<String>,    // name of bound region, if any
     pub src_loc: SourceSpan,
 }
 ```
 
-`AstDb::new()` validates that any region name referenced in `section NAME in REGION`
-actually exists in `ast_db.regions`. Unknown region reference produces `AST_49`.
+`AstDb::new()` validates:
+
+- The region name referenced in `section NAME in REGION` exists in
+  `ast_db.regions`. Unknown reference produces `AST_49`.
+- At most one section is bound to each region. A second binding produces
+  `AST_53`.
 
 ### New error codes
 
-| Code   | Meaning                                            |
-|--------|----------------------------------------------------|
-| AST_48 | `in` keyword in section declaration not followed by region name |
-| AST_49 | Section references undeclared region               |
+| Code   | Meaning                                                         |
+|--------|-----------------------------------------------------------------|
+| AST_48 | `in` keyword not followed by region name in section declaration |
+| AST_49 | Section references undeclared region                            |
+| AST_53 | A second section declares `in` the same region                  |
 
 ---
 
-## Step 6 — Implicit Region Anchoring and Post-Iterate Enforcement
+## Step 5 — Implicit region anchoring and enforcement
 
-### Implicit Anchor in Engine
+### Implicit anchor in Engine
 
-During the `iterate` loop, `iterate_section_start` processes sections. For sections declared `in REGION`, the engine checks the current location. If `current.addr_base` is uninitialized or differs from `region.addr`, the engine sets `current.addr_base = region.addr`. This action establishes the section as the root of the region, eliminating the need for an explicit `set_addr` instruction. Subsequent sections written to the same region inherit the updated address sequentially.
+For sections declared `in REGION`, the engine sets the section's starting
+address to `region.addr` during the iterate loop in `iterate_section_start`.
+This replaces any need for an explicit `set_addr` instruction. Sections
+bound to a region must not contain `set_addr`; emit `EXEC_72` if one is
+encountered.
 
-### Post-Iterate Enforcement
+The `default_align` from the region applies to all write operations in the
+top-level section unless overridden by an explicit `align` statement at that
+site.  The `default_fill` from the region is the fill byte used for alignment
+padding unless a fill byte is specified on the individual operation.
 
-After `iterate` converges and before `execute` begins, the engine validates that every section
-annotated `in REGION` has its resolved address range fully within the region.
+### Post-iterate enforcement
+
+After `iterate` converges and before `execute` begins, validate that the
+region-bound section's resolved address range is fully within the region:
+
+```rust
+fn validate_section_regions(
+    &self,
+    ir_db: &IRDb,
+    regions: &IndexMap<String, RegionEntry>,
+    diags: &mut Diags,
+) -> bool
+```
+
+For each region-bound section, if `sizeof(section) > region.size`, emit
+`EXEC_73` with both sizes and the excess.
 
 ### Engine changes
 
@@ -450,119 +394,65 @@ pub fn new(
     ext_registry: &ExtensionRegistry,
     diags: &mut Diags,
     abs_start: usize,
-    regions: &IndexMap<String, RegionEntry>,   // new
+    regions: &IndexMap<String, RegionEntry>,
 ) -> Result<Self>
 ```
-
-After iterate converges, a new method runs:
-
-```rust
-fn validate_section_regions(
-    &self,
-    ir_db: &IRDb,
-    regions: &IndexMap<String, RegionEntry>,
-    diags: &mut Diags,
-) -> bool
-```
-
-For each `WrDispatch` entry (one per `wr section_name` site), if the
-corresponding section has a `region` annotation in `ir_db`, check:
-
-```rust
-let region = &regions[region_name];
-if !region.contains_range(dispatch.addr, dispatch.size) {
-    diags.err1("EXEC_66", &format!(
-        "section '{}' [0x{:X}..0x{:X}) lies outside region '{}' \
-         [0x{:X}..0x{:X})",
-        dispatch.name, dispatch.addr, dispatch.addr + dispatch.size,
-        region_name, region.addr, region.end(),
-    ), dispatch.src_loc.clone());
-    return false;
-}
-```
-
-Also check for overlap between sibling sections in the same region using the
-same `WrittenRanges` BTreeMap logic that already exists for execute-phase
-overlap detection — but applied here per-region rather than globally.
-
-### `set_addr` outside region bounds
-
-If a section annotated `in REGION` contains a `set_addr` that resolves to an
-address outside the region, the above range check catches it automatically
-because the final `WrDispatch` address and size reflect the post-`set_addr`
-layout.
 
 ### New error codes
 
 | Code    | Meaning                                                          |
 |---------|------------------------------------------------------------------|
-| EXEC_66 | Section address range falls outside its declared region          |
-| EXEC_67 | Two sections in the same region have overlapping address ranges  |
+| EXEC_72 | `set_addr` used inside a region-bound section                    |
+| EXEC_73 | Region-bound section exceeds region size                         |
 
 ---
 
-## Step 7 — Region property access
+## Step 6 — Region property access in expressions
 
-`addr(FLASH)`, `sizeof(FLASH)` must be usable in expressions
-everywhere a const expression is valid.
+`addr(FLASH)` and `sizeof(FLASH)` must work in expressions wherever a const
+expression is valid.  The existing `addr()` and `sizeof()` machinery resolves
+names against the section table; extend it to also resolve against the region
+table.
 
-### IR
+### Resolution order for `addr(NAME)` and `sizeof(NAME)`
 
-Add to `IRKind`:
+1. Check `ir_db` sections — if NAME is a section, existing behavior applies.
+2. Check `regions` — if NAME is a region, return `region.addr` or
+   `region.size`.
+3. Neither — existing error (undefined identifier).
 
-```rust
-RegionAddr,   // REGION.addr — yields u64
-RegionSize,   // REGION.size — yields u64
-RegionEnd,    // REGION.end  — yields u64 (addr + size)
-```
-
-Each carries the region name in the operand (stored as an Identifier
-`ParameterValue`).
-
-### Engine evaluation
-
-In `iterate_arithmetic` (or a new `iterate_region_access`):
+No new IR kinds are required if the existing `addr()` / `sizeof()` IR paths
+accept a name that may be either a section or a region. If separate IR kinds
+are cleaner in the implementation, add:
 
 ```rust
-IRKind::RegionAddr => {
-    let name = self.parms[ir.operands[0]].to_identifier();
-    let entry = &regions[name];
-    *self.parms[ir.operands[1]].to_u64_mut() = entry.addr;
-    true
-}
-IRKind::RegionSize => { ... entry.size ... }
-IRKind::RegionEnd  => { ... entry.addr + entry.size ... }
+RegionAddr,   // addr(REGION) -> u64: yields region.addr
+RegionSize,   // sizeof(REGION) -> u64: yields region.size
 ```
 
 ### New error codes
 
-| Code   | Meaning                                             |
-|--------|-----------------------------------------------------|
-| AST_50 | Invalid property name in dot-access expression      |
-| AST_51 | Dot-access on unknown region name                   |
+None beyond existing undefined-identifier errors, unless separate IR kinds
+are added.
 
 ---
 
-## Step 8 — `output` statement with optional address
+## Step 7 — `output` statement with optional address
 
-Today: `output section_name 0;`
+When the output section is declared `in REGION`, the address argument is
+redundant because the base address is encoded in the region. Make it optional:
 
-When the output section is declared `in REGION`, the address argument becomes
-redundant because the base address is already encoded in the region declaration
-and the section's `set_addr`. The argument should be optional:
-
-```
-output flash_image;           // address arg omitted — valid when section is in REGION
-output flash_image 0;         // still valid (backward compatible)
+```brink
+output flash_image;              // address omitted; valid when section is in REGION
+output flash_image 0;            // still valid (backward compatible)
 output flash_image 0xF000_0000;  // still valid
 ```
 
 ### Parser change
 
 In `parse_output`, after parsing the section name, check if the next token is
-`Semicolon`. If so, the address is omitted; default to `0`. If the output
-section is not `in` a region and the address is omitted, emit warning `AST_52`
-suggesting an explicit address.
+`Semicolon`. If so, address defaults to `0`. If the output section is not
+bound to a region and the address is omitted, emit warning `AST_52`.
 
 ### New error codes / warnings
 
@@ -572,45 +462,56 @@ suggesting an explicit address.
 
 ---
 
+## Nested Regions — Deferred
+
+Region-to-region nesting (`region FOO in FLASH { ... }`) was considered and
+explicitly deferred. The current design supports exactly one top-level section
+per region. If a user needs a fixed-address sub-range, the recommended pattern
+is two sibling top-level regions with non-overlapping address ranges, enforced
+by EXEC_70.
+
+When nested regions are added in the future, they slot in as an extension to
+`parse_region` (accept an optional `in PARENT` clause) and to Step 3's
+overlap validation, without breaking any existing region or section grammar.
+
+---
+
 ## Implementation Order and Dependencies
 
 ```
-Step 1  (no dependencies)       -- fixes immediate fuzz bug
+Step 1  (COMPLETE)
 Step 2  (no dependencies)       -- lexer + parser foundation
-Step 3  (requires Step 2)       -- region evaluation
-Step 4  (requires Step 3)       -- region-on-region containment
-Step 5  (requires Steps 2, 3)   -- section annotation
-Step 6  (requires Steps 3, 5)   -- engine enforcement
-Step 7  (requires Steps 2, 3)   -- dot-access expressions
-Step 8  (requires Steps 2, 5)   -- output simplification
+Step 3  (requires Step 2)       -- region evaluation and overlap check
+Step 4  (requires Steps 2, 3)   -- section-to-region binding
+Step 5  (requires Steps 3, 4)   -- engine anchoring and enforcement
+Step 6  (requires Steps 2, 3)   -- addr()/sizeof() region resolution
+Step 7  (requires Steps 2, 4)   -- output simplification
 ```
 
-Steps 2–8 can be developed incrementally. Each step is independently testable:
-a step is complete when its new tests pass and no existing tests regress.
+Each step is independently testable; a step is complete when its new tests
+pass and no existing tests regress.
 
 ---
 
 ## Error Code Summary
 
-Note: EXEC_57–EXEC_61 are already used in engine.rs for other purposes.
-Region-related EXEC codes begin at EXEC_62.
+Verify all EXEC codes against `engine.rs` before implementation — codes
+EXEC_57 through EXEC_62 are known to be occupied.  Region codes begin at
+EXEC_69 to leave room.
 
-| Code    | Step | Crate      | Meaning                                                   |
-|---------|------|------------|-----------------------------------------------------------|
-| AST_44  | 2    | ast        | Unknown region property name                              |
-| AST_45  | 2    | ast        | Duplicate region property                                 |
-| AST_46  | 2    | ast        | Missing required region property                          |
-| AST_47  | 2    | ast        | Region name conflicts with section or const               |
-| AST_48  | 5    | ast        | `in` not followed by region name in section declaration   |
-| AST_49  | 5    | ast        | Section references undeclared region                      |
-| AST_50  | 7    | ast        | Invalid property in dot-access expression                 |
-| AST_51  | 7    | ast        | Dot-access on unknown region name                         |
-| AST_52  | 8    | ast        | `output` address omitted on non-region section (warning)  |
-| PROC_7  | 1    | process    | Output size exceeds `--max-output-size`                   |
-| EXEC_62 | 3    | const_eval | Region property expression references undefined region    |
-| EXEC_63 | 4    | engine     | Sub-region parent not declared                            |
-| EXEC_64 | 4    | engine     | Sub-region falls outside parent bounds                    |
-| EXEC_65 | 4    | engine     | Sibling regions overlap                                   |
-| EXEC_66 | 6    | engine     | Section address range falls outside declared region       |
-| EXEC_67 | 6    | engine     | Two sections in same region overlap                       |
-| EXEC_68 | 3    | const_eval | Cyclic dependency in region properties                    |
+| Code    | Step | Crate      | Meaning                                              |
+|---------|------|------------|------------------------------------------------------|
+| AST_44  | 2    | ast        | Unknown region property name                         |
+| AST_45  | 2    | ast        | Duplicate region property                            |
+| AST_46  | 2    | ast        | Missing required region property                     |
+| AST_47  | 2    | ast        | Region name conflicts with section or const          |
+| AST_48  | 4    | ast        | `in` not followed by region name in section decl     |
+| AST_49  | 4    | ast        | Section references undeclared region                 |
+| AST_52  | 7    | ast        | `output` address omitted on non-region section (warn)|
+| AST_53  | 4    | ast        | Second section bound to same region                  |
+| PROC_7  | 1    | process    | Output size exceeds `--max-output-size` (COMPLETE)   |
+| EXEC_69 | 3    | const_eval | `default_align` not a power of two or is zero        |
+| EXEC_70 | 3    | const_eval | Two regions have overlapping address ranges          |
+| EXEC_71 | 3    | const_eval | Cyclic dependency in region property expressions     |
+| EXEC_72 | 5    | engine     | `set_addr` used inside a region-bound section        |
+| EXEC_73 | 5    | engine     | Region-bound section exceeds region size             |
