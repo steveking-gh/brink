@@ -261,11 +261,11 @@ The following table provides a summary of the addresses and offsets used in
 Brink.
 
 | Variable       | Section Entry | Section Exit     | [`set_addr`](#set_addr) | [`set_sec_offset`](#set_sec_offset) | [`set_addr_offset`](#set_addr_offset) | [`set_file_offset`](#set_file_offset) |
-| -------------- | ------------- | ---------------- | --------------------------------- | ------------------------------------------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------- |
-| Address        | No Change     | Restore & Update | Set                               | Pad Forward                                                   | Pad Forward                                                     | Pad Forward                                                     |
-| Address Offset | No Change     | Restore & Update | Set to 0                          | Pad Forward                                                   | Pad Forward                                                     | Pad Forward                                                     |
-| Section Offset | Set to 0      | Restore & Update | No change                         | Pad Forward                                                   | Pad Forward                                                     | Pad Forward                                                     |
-| File Offset    | No Change     | No Change        | No Change                         | Pad Forward                                                   | Pad Forward                                                     | Pad Forward                                                     |
+| -------------- | ------------- | ---------------- | ----------------------- | ----------------------------------- | ------------------------------------- | ------------------------------------- |
+| Address        | No Change     | Restore & Update | Set                     | Pad Forward                         | Pad Forward                           | Pad Forward                           |
+| Address Offset | No Change     | Restore & Update | Set to 0                | Pad Forward                         | Pad Forward                           | Pad Forward                           |
+| Section Offset | Set to 0      | Restore & Update | No change               | Pad Forward                         | Pad Forward                           | Pad Forward                           |
+| File Offset    | No Change     | No Change        | No Change               | Pad Forward                         | Pad Forward                           | Pad Forward                           |
 
 The following diagram shows several address and offset concepts.  Users specify
 the starting logical address of the output section `D` using a region.
@@ -273,7 +273,7 @@ Alternatively, users can change the address within `D` using
 [set_addr](#set_addr) at the top of the output section.
 
 <figure>
-  <img src="./images/scoped_address_plain_no_text.svg" alt="Scoped Address and Offset Example Image">
+  <img src="./images/scoped_address_plain_no_text.svg" width="100%"alt="Scoped Address and Offset Example Image">
   <figcaption>In this example, section D is the top level binary output and includes three other sections A, B and C.  The starting address of section D is 0x8000 because the user placed D in FLASH region.  Section C is special and defines its own starting address.  A boot loader can find section C using the pointer at the beginning of the file, then copy section C to its proper starting address of 0xF000.  Notice that <code>addr(D)</code> used in the context of section D returns 0x8C00, not the starting address value 0xF000 nested within section C.
   </figcaption>
 </figure>
@@ -343,27 +343,27 @@ This section provides an overview of Brink's internal output creation phases.
 The required input file contains the brink source code to compile and build the
 output file.  Brink source files typically have a .brink file extension.
 
-| Option                     | Description                                                                                                                                                            |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `-D<name>[=value]`         | Defines a `const` value from the command line.<br>See [Command-Line Const Defines](#command-line-const-defines) below.                                                 |
-| `--list-extensions`        | List all available extensions compiled into brink as controlled by Cargo feature flags.                                                                                |
+| Option                     | Description                                                                                                                                                           |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `-D<name>[=value]`         | Defines a `const` value from the command line.<br>See [Command-Line Const Defines](#command-line-const-defines) below.                                                |
+| `--list-extensions`        | List all available extensions compiled into brink as controlled by Cargo feature flags.                                                                               |
 | `--max-output-size=<size>` | Reject the output if its size exceeds `<size>` bytes before writing data.<br>Accepts a plain integer or a K/M/G suffix (e.g. `64M`, `512K`, `1G`). Default is `256M`. |
-| `--map-csv`                | Writes a CSV format map file `<stem>.map.csv` to the current directory.<br>For example: `firmware.brink` → `firmware.map.csv`.                                         |
-| `--map-csv=<file>`         | Writes a CSV map file to the specified file.                                                                                                                           |
-| `--map-csv=-`              | Writes a CSV map file to stdout.                                                                                                                                       |
-| `--map-c99`                | Writes a C99 header file `<stem>.map.h` to the current directory.<br>For example: `firmware.brink` → `firmware.map.h`.                                                 |
-| `--map-c99=<file>`         | Writes a C99 header to the specified file.                                                                                                                             |
-| `--map-c99=-`              | Writes a C99 header to stdout.                                                                                                                                         |
-| `--map-json`               | Writes a JSON format map file `<stem>.map.json` to the current directory.<br>For example: `firmware.brink` → `firmware.map.json`.                                      |
-| `--map-json=<file>`        | Writes a JSON map to the specified file.                                                                                                                               |
-| `--map-json=-`             | Writes a JSON map to stdout.                                                                                                                                           |
-| `--map-rs`                 | Writes a Rust module file `<stem>.map.rs` to the current directory.<br>For example: `firmware.brink` → `firmware.map.rs`.                                              |
-| `--map-rs=<file>`          | Writes a Rust module map to the specified file.                                                                                                                        |
-| `--map-rs=-`               | Writes a Rust module map to stdout.                                                                                                                                    |
-| `--noprint`                | Suppress `print` statement output from the source program.                                                                                                             |
-| `-o <file>`                | Output file name. Defaults to `output.bin`.                                                                                                                            |
-| `-q`, `--quiet`            | Suppress all console output, including errors. Overrides `-v`. Useful for fuzz testing.                                                                                |
-| `-v`                       | Increase verbosity. Repeat up to four times (`-v -v -v -v`).                                                                                                           |
+| `--map-csv`                | Writes a CSV format map file `<stem>.map.csv` to the current directory.<br>For example: `firmware.brink` → `firmware.map.csv`.                                        |
+| `--map-csv=<file>`         | Writes a CSV map file to the specified file.                                                                                                                          |
+| `--map-csv=-`              | Writes a CSV map file to stdout.                                                                                                                                      |
+| `--map-c99`                | Writes a C99 header file `<stem>.map.h` to the current directory.<br>For example: `firmware.brink` → `firmware.map.h`.                                                |
+| `--map-c99=<file>`         | Writes a C99 header to the specified file.                                                                                                                            |
+| `--map-c99=-`              | Writes a C99 header to stdout.                                                                                                                                        |
+| `--map-json`               | Writes a JSON format map file `<stem>.map.json` to the current directory.<br>For example: `firmware.brink` → `firmware.map.json`.                                     |
+| `--map-json=<file>`        | Writes a JSON map to the specified file.                                                                                                                              |
+| `--map-json=-`             | Writes a JSON map to stdout.                                                                                                                                          |
+| `--map-rs`                 | Writes a Rust module file `<stem>.map.rs` to the current directory.<br>For example: `firmware.brink` → `firmware.map.rs`.                                             |
+| `--map-rs=<file>`          | Writes a Rust module map to the specified file.                                                                                                                       |
+| `--map-rs=-`               | Writes a Rust module map to stdout.                                                                                                                                   |
+| `--noprint`                | Suppress `print` statement output from the source program.                                                                                                            |
+| `-o <file>`                | Output file name. Defaults to `output.bin`.                                                                                                                           |
+| `-q`, `--quiet`            | Suppress all console output, including errors. Overrides `-v`. Useful for fuzz testing.                                                                               |
+| `-v`                       | Increase verbosity. Repeat up to four times (`-v -v -v -v`).                                                                                                          |
 
 When the user does not specify a path, Brink writes map file(s) and the output to the current working directory.
 
@@ -1606,14 +1606,14 @@ They can appear in any expression context that accepts the corresponding type.
 As shown in the table below, some builtins cannot be used in `const` expressions
 because their values depend on dynamic layout values.
 
-| Variable                 | Type     | OK in `const`? | Description                                                              |
-| ------------------------ | -------- | -------------- | ------------------------------------------------------------------------ |
-| `__OUTPUT_SIZE`          | `U64`    | No             | Total output size in bytes.  Equivalent to `sizeof(<output-section>)`.   |
-| `__OUTPUT_ADDR`          | `U64`    | No             | Address of output section at SectionStart.  Equivalent to `addr(<output-section>)`.     |
-| `__BRINK_VERSION_STRING` | `String` | Yes            | Brink version as a string, e.g. `"4.3.2"`.                               |
-| `__BRINK_VERSION_MAJOR`  | `U64`    | Yes            | Major version component, e.g. "4" in "4.3.2"                             |
-| `__BRINK_VERSION_MINOR`  | `U64`    | Yes            | Minor version component, e.g. "3" in "4.3.2"                             |
-| `__BRINK_VERSION_PATCH`  | `U64`    | Yes            | Patch version component, e.g. "2" in "4.3.2"                             |
+| Variable                 | Type     | OK in `const`? | Description                                                                         |
+| ------------------------ | -------- | -------------- | ----------------------------------------------------------------------------------- |
+| `__OUTPUT_SIZE`          | `U64`    | No             | Total output size in bytes.  Equivalent to `sizeof(<output-section>)`.              |
+| `__OUTPUT_ADDR`          | `U64`    | No             | Address of output section at SectionStart.  Equivalent to `addr(<output-section>)`. |
+| `__BRINK_VERSION_STRING` | `String` | Yes            | Brink version as a string, e.g. `"4.3.2"`.                                          |
+| `__BRINK_VERSION_MAJOR`  | `U64`    | Yes            | Major version component, e.g. "4" in "4.3.2"                                        |
+| `__BRINK_VERSION_MINOR`  | `U64`    | Yes            | Minor version component, e.g. "3" in "4.3.2"                                        |
+| `__BRINK_VERSION_PATCH`  | `U64`    | Yes            | Patch version component, e.g. "2" in "4.3.2"                                        |
 
 ## `__OUTPUT_SIZE`
 
