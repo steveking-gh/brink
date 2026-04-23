@@ -12,4 +12,4 @@ section foo {
     assert sizeof(foo) == 36;
 }
 
-output foo 10;
+output foo;

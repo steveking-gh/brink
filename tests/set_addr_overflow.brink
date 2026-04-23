@@ -3,4 +3,4 @@ section main {
     set_addr 0xFFFFFFFFFFFFFFFF;
     wr8 0;
 }
-output main 0;
+output main;

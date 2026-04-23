@@ -4,6 +4,7 @@ section bar {
 
 // top level section
 section foo {
+    set_addr 0x1000;
     wr boo;
     // should fail since bar isn't in this section
     assert sec_offset(bar) == 3;
@@ -15,4 +16,4 @@ section boo {
     wr bar;
 }
 
-output foo 0x1000;
+output foo;

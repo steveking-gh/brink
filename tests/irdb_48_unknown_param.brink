@@ -3,4 +3,4 @@
 section top {
     wr brink::test_crc(no_such_param=42);
 }
-output top 0;
+output top;

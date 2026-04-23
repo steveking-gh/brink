@@ -1,7 +1,7 @@
 // Integration test source for --map-hf section and const output.
 // hdr is 2 bytes, body is 5 bytes, top wraps both (7 bytes total).
 // BASE and COUNT are constants with known values.
-const BASE = 0x2000u;
+const BASE = 0x2000;
 const COUNT = 8;
 
 section hdr {
@@ -14,8 +14,9 @@ section body {
 }
 
 section top {
+    set_addr BASE;
     wr hdr;
     wr body;
 }
 
-output top BASE;
+output top;

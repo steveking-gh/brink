@@ -4,13 +4,14 @@
 // child's lower addr_base.
 
 section child {
-    set_addr 0x0100u;                  // much lower than parent's 0x1000 context
+    set_addr 0x0100;    // much lower than parent's 0x1000 context
     wr8 0xAA, 4;
     assert addr() == 0x0104;
     assert addr_offset() == 4;
 }
 
 section parent {
+    set_addr 0x1000;
     wr8 0x11, 6;
     assert addr() == 0x1006;
     wr child;
@@ -20,4 +21,4 @@ section parent {
     assert sec_offset() == 10;
 }
 
-output parent 0x1000;
+output parent;

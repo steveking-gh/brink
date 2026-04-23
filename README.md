@@ -268,12 +268,13 @@ Brink.
 | File Offset    | No Change     | No Change        | No Change                         | Pad Forward                                                   | Pad Forward                                                     | Pad Forward                                                     |
 
 The following diagram shows several address and offset concepts.  Users specify
-the starting logical address using an
-[output](#output) statement.
+the starting logical address of the output section `D` using a region.
+Alternatively, users can change the address within `D` using
+[set_addr](#set_addr) at the top of the output section.
 
 <figure>
   <img src="./images/scoped_address_plain_no_text.svg" alt="Scoped Address and Offset Example Image">
-  <figcaption>In this example, section D is the top level binary output and includes three other sections A, B and C.  The user specified a starting address of 0x8000 in the <code>output</code> statement for this binary.  Section C is special and defines its own starting address.  A boot loader can find section C using the pointer at the beginning of the file, then copy section C to its proper starting address of 0xF000.  Notice that <code>addr(D)</code> used in the context of section D returns 0x8C00, not the starting address value 0xF000 nested within section C.
+  <figcaption>In this example, section D is the top level binary output and includes three other sections A, B and C.  The starting address of section D is 0x8000 because the user placed D in FLASH region.  Section C is special and defines its own starting address.  A boot loader can find section C using the pointer at the beginning of the file, then copy section C to its proper starting address of 0xF000.  Notice that <code>addr(D)</code> used in the context of section D returns 0x8C00, not the starting address value 0xF000 nested within section C.
   </figcaption>
 </figure>
 
@@ -406,8 +407,8 @@ Define a base address and section count at the command line:
 The source can reference `BASE` as an ordinary const:
 
     section entry { wr8 0x01; }
-    section top   { wr entry; }
-    output top BASE;
+    section top   { set_addr BASE; wr entry; }
+    output top;
 
 ---
 
@@ -618,6 +619,7 @@ Example:
 
     // top level section
     section foo {
+        set_addr BASE;
         assert addr() == BASE;
         wrs "foo";
         assert addr() == BASE + 3;
@@ -627,7 +629,7 @@ Example:
         assert addr(bar) == BASE + 3;
     }
 
-    output foo BASE;  // starting address is BASE
+    output foo;
 
 ---
 
@@ -675,6 +677,7 @@ Example:
 
     // top level section
     section foo {
+        set_addr BASE;
         assert addr_offset() == 0;
         wrs "foo";
         assert addr_offset() == 3;
@@ -684,7 +687,7 @@ Example:
         assert addr_offset(bar) == 3;
     }
 
-    output foo BASE;  // starting address is BASE
+    output foo;
 
 ---
 
@@ -744,11 +747,12 @@ Example:
     const RAM_BASE = 0x8000_0000u;  // User defined unsigned constant.
 
     section foo {
+        set_addr RAM_BASE;
         wr64 RAM_BASE;
         print "RAM base address is ", RAM_BASE, "\n";
     }
 
-    output foo RAM_BASE;
+    output foo;
 
 Const expressions support the full set of arithmetic, bitwise and comparison operators.
 Comparison operators evaluate to 1 (true) or 0 (false) and are useful for expressing
@@ -776,7 +780,7 @@ starting layout of the output.  For example:
 
     const RAM_USED = sizeof(foo);         // ERROR!  Const cannot depend on section properties.
 
-    output foo RAM_BASE;
+    output foo;
 
 ### Deferred Assignment
 
@@ -884,13 +888,14 @@ Example:
     include "../constants.brink";
     include "sections.brink";
 
-    output main_rom 0x1000;
+    output main_rom;
 
     // file: ../constants.brink
     const RAM_BASE = 0x8000_0000u;
 
     // file: sections.brink
     section main_rom {
+        set_addr 0x1000;
         wrs "Hello\n";
     }
 
@@ -910,6 +915,7 @@ Labels have the form `<label identifier>:` and can prefix most statement types.
 For example:
 
     section foo {
+        set_addr 0x1000;
         // assign the label 'lab1' to the current location
         lab1: wrs "Wow!";
         // assign the label 'lab2' to the current location
@@ -921,16 +927,16 @@ For example:
         lab3:
     }
 
-    output foo 0x1000;
+    output foo;
 ---
 
 ## output
 
-`output <section identifier> [absolute starting address];`
+`output <section identifier>;`
 
-An output statement specifies the top section to write to the output file and an
-optional absolute starting address.  Without a starting address, `output`
-defaults to a starting address of 0.
+An output statement specifies the top section to write to the output file. Use
+`set_addr` inside the section to control the absolute starting address, or place
+the top section in region with a start address.
 
 **A Brink program must have exactly one output statement.**
 
@@ -954,6 +960,8 @@ will execute multiple times in the order found.
 
 Example:
 
+    const BASE = 0x1000;
+
     section bar {
         print "Section 'bar' starts at ", addr(), "\n";
         wrs "bar";
@@ -961,7 +969,8 @@ Example:
 
     // top level section
     section foo {
-        print "Output spans address range ", addr(foo), "-", addr(foo) + sizeof(foo),
+        set_addr BASE;
+        print "Output spans address range ", BASE, "-", BASE + sizeof(foo),
               " (", to_i64(sizeof(foo)), " bytes)\n";
         wrs "foo";
         wr bar;
@@ -969,7 +978,7 @@ Example:
         wr bar;
     }
 
-    output foo 0x1000;  // starting address is 0x1000
+    output foo;
 
 Will result in the following console output:
 
@@ -1152,8 +1161,6 @@ Example:
         assert sec_offset(fiz) == 3;
     }
 
-    const BASE = 0x1000u;
-
     // top level section
     section foo {
         assert sec_offset() == 0;
@@ -1163,7 +1170,7 @@ Example:
         assert sec_offset() == 9;
     }
 
-    output foo BASE;  // starting address is BASE
+    output foo;
 
 When a section offset specifies an identifier, the identifier must be in the
 scope of the current section.  For example:
@@ -1183,7 +1190,7 @@ scope of the current section.  For example:
         assert sec_offset(fiz) == 0; // ERROR, fiz is out of scope in section foo
     }
 
-    output foo 0x1000;
+    output foo;
 
 ---
 
@@ -1236,7 +1243,7 @@ Example:
         assert sizeof(image) == 272;  // 256 + 16
     }
 
-    output image 0x0800_0000u;
+    output image;
 
 ---
 
@@ -1301,7 +1308,7 @@ chosen address anchor without knowing what the surrounding section's
 
 Example:
 
-    const BASE = 0x1000u;
+    const BASE = 0x1000;
 
     section header {
         wrs "FIRM";           // 4-byte magic number
@@ -1309,10 +1316,11 @@ Example:
     }                         // addr_offset == 5 on exit
 
     section body {
+        set_addr BASE;
         wr header;
         // Relocate body to its target load address.
         // addr_offset resets to 0.
-        set_addr 0xF000u;
+        set_addr 0xF000;
         wr8 0xAA, 3;          // 3 bytes of payload
         // Pad to 0x20 bytes from the 0xF000 anchor.
         set_addr_offset 0x20;
@@ -1321,7 +1329,7 @@ Example:
         assert sec_offset() == 0x25;  // 5 (header) + 3 (payload) + 29 (pad) = 0x25
     }
 
-    output body BASE;
+    output body;
 
 ---
 
@@ -1530,8 +1538,9 @@ repetition count.
 
 Example:
 
-    // Test expressions in wrx
-    section foo {
+    // Test expressions in wrx; addr(foo) == 10 as set by region TOP
+    region TOP { addr = 10; size = 64K; }
+    section foo in TOP {
         wr8  (1 + 2) + file_offset() + addr(foo) + sizeof(foo); // 3 + 0 + 10 + 36  = 49
         wr16 (1 + 2) + file_offset() + addr(foo) + sizeof(foo); // 3 + 1 + 10 + 36  = 50 00
         wr24 (1 + 2) + file_offset() + addr(foo) + sizeof(foo); // 3 + 3 + 10 + 36  = 52 00 00
@@ -1543,7 +1552,7 @@ Example:
         assert sizeof(foo) == 36;
     }
 
-    output foo 10;
+    output foo;
 
 Another example using the optional repetition expression.
 
@@ -1600,7 +1609,7 @@ because their values depend on dynamic layout values.
 | Variable                 | Type     | OK in `const`? | Description                                                              |
 | ------------------------ | -------- | -------------- | ------------------------------------------------------------------------ |
 | `__OUTPUT_SIZE`          | `U64`    | No             | Total output size in bytes.  Equivalent to `sizeof(<output-section>)`.   |
-| `__OUTPUT_ADDR`          | `U64`    | No             | Starting address of the output.  Equivalent to `addr(<output-section>)`. |
+| `__OUTPUT_ADDR`          | `U64`    | No             | Address of output section at SectionStart.  Equivalent to `addr(<output-section>)`.     |
 | `__BRINK_VERSION_STRING` | `String` | Yes            | Brink version as a string, e.g. `"4.3.2"`.                               |
 | `__BRINK_VERSION_MAJOR`  | `U64`    | Yes            | Major version component, e.g. "4" in "4.3.2"                             |
 | `__BRINK_VERSION_MINOR`  | `U64`    | Yes            | Minor version component, e.g. "3" in "4.3.2"                             |
@@ -1630,17 +1639,19 @@ Example — write a 4-byte header field containing the total output size:
 
 ## `__OUTPUT_ADDR`
 
-Returns the absolute starting address of the output.  When the `output`
-statement specifies a base address, `__OUTPUT_ADDR` equals that address.  When
-`output` specifies no base address, `__OUTPUT_ADDR` is zero.  This behavior is
-identical to `addr(<output-section>)`.
+Returns the absolute starting address of the output section.  Equivalent to
+`addr(<output-section>)`.  **Without placing the section in region,
+`__OUTPUT_ADDR` is zero regardless of `set_addr` command internal to the output
+section**.  This occurs because `set_addr` is a scoped operation.  A `set_addr`
+within a section affects address calculations for subsequent writes internal to
+the section, not the logical start of the section itself.
 
-Importantly, `__OUTPUT_ADDR` is fixed to the section start specified in the
-`output` statement, i.e. the entry point address, and does not “follow” an
-in-section `set_addr`.
+If user places the output section in a [`region`](#region), then `__OUTPUT_ADDR`
+is the starting address of the region.
 
-Example — embed the output base address in a table without repeating the
-constant:
+Example — embed the output base address in a table:
+
+    region TOP { addr = 0x0800_0000; size = 64K; }
 
     section vtable {
         wr32 __OUTPUT_ADDR;  // base address of the output image
@@ -1650,13 +1661,13 @@ constant:
         wrs "code";
     }
 
-    section image {
+    section image in TOP {
         wr vtable;
         wr code;
-        assert __OUTPUT_ADDR == addr(image);  // equivalent forms
+        assert __OUTPUT_ADDR == addr(image);  // equivalent expressions
     }
 
-    output image 0x0800_0000;
+    output image;
 
 ## `__BRINK_VERSION_STRING`
 

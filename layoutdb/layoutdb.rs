@@ -34,8 +34,6 @@ pub struct LayoutDb {
 
     pub output_sec_str: String,
     pub output_sec_loc: SourceSpan,
-    pub output_addr_str: Option<String>,
-    pub output_addr_loc: Option<SourceSpan>,
 
     /// Names of every section declared in the source (used by irdb).
     pub section_names: HashSet<String>,
@@ -326,25 +324,6 @@ impl<'toks> LayoutDb {
         let output_sec_loc = output_sec_tinfo.loc.clone();
         debug!("LayoutDb::new: Output section name is {}", output_sec_str);
 
-        let output_addr_nid = ast_db.output.addr_nid;
-        let mut output_addr_str = None;
-        let mut output_addr_loc = None;
-        if output_addr_nid.is_some() {
-            let output_addr_tinfo = ast.get_tinfo(ast_db.output.addr_nid.unwrap());
-            if [LexToken::U64, LexToken::Integer, LexToken::Identifier]
-                .contains(&output_addr_tinfo.tok)
-            {
-                output_addr_str = Some(output_addr_tinfo.val.to_string());
-                output_addr_loc = Some(output_addr_tinfo.loc.clone());
-                debug!(
-                    "LayoutDb::new: Output address is {}",
-                    output_addr_str.as_ref().unwrap()
-                );
-            } else {
-                assert!(output_addr_tinfo.tok == LexToken::Semicolon);
-            }
-        }
-
         let section_names: HashSet<String> =
             ast_db.sections.keys().map(|s| s.to_string()).collect();
 
@@ -372,8 +351,6 @@ impl<'toks> LayoutDb {
             operand_vec: layout_lz.operand_vec,
             output_sec_str,
             output_sec_loc,
-            output_addr_str,
-            output_addr_loc,
             section_names,
         };
 

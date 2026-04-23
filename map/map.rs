@@ -442,8 +442,6 @@ impl MapDb {
     /// Constructs a MapDb from the post-iterate engine and irdb.
     /// `output_file` is the path of the output binary, used for display only.
     pub fn new(engine: &Engine, irdb: &IRDb, output_file: &str) -> MapDb {
-        let base_addr = engine.start_addr;
-
         let mut sections: Vec<SectionEntry> = engine
             .wr_dispatches
             .iter()
@@ -486,6 +484,9 @@ impl MapDb {
             .map(|s| s.file_offset + s.size)
             .max()
             .unwrap_or(0);
+
+        // base_addr is the address of the first byte written in the output image.
+        let base_addr = sections.first().map(|s| s.abs_start).unwrap_or(0);
 
         MapDb {
             output_file: output_file.to_string(),

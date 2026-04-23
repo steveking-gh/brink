@@ -282,3 +282,42 @@ Regression tests: `fuzz_found_23` (250-level `f(f(...))` fires AST_43),
 `fuzz_found_24` (5000-term flat `1 + 1 + ...` fires LINEAR_1).
 
 314 tests pass.
+
+---
+
+## 2026-04-21 — Remove output address argument (region plan step 2)
+
+**output statement address removed**
+`output <section> <addr>;` syntax removed.  Use `set_addr <addr>;` as the first
+statement inside the section instead.  Old syntax emits AST_55.
+
+**Pipeline cleanup**
+Removed: `Output.addr_nid`, `LayoutDb.output_addr_str/loc`,
+`IRDb.start_addr`, `Engine.start_addr`, `Engine::new abs_start` param,
+`Engine::iterate abs_start` param.  `MapDb.base_addr` now derived from
+the first WrDispatch address rather than `engine.start_addr`.
+
+**build_dispatches: leading set_addr skipped for section address**
+When a section starts with one or more `set_addr` instructions,
+`build_dispatches` now scans past them (to `content_idx`) so the
+WrDispatch `addr` field reflects the address after the first `set_addr`
+rather than the address at SectionStart (before set_addr runs).
+This keeps map output consistent with what `addr()` reads inside the section.
+
+**`__OUTPUT_ADDR` behavior**
+`__OUTPUT_ADDR` is now always `addr(<output-section>)`, which equals 0 at
+SectionStart before any `set_addr`.  It no longer tracks a separate base set
+in the output statement.
+
+**New error code**
+AST_55: `output` address argument; use `set_addr` or region binding.
+
+**Test migration**
+~80 `.brink` test files updated.  Zero-address files: remove address.
+Non-zero-address files: remove address + add `set_addr <addr>;` as first
+statement inside the output section.  Special cases: `wrx_4` expected byte
+values recalculated with `addr(foo)=0`; `output_addr_1` and
+`output_addr_section_set_addr_with_output_base` repurposed to test
+`__OUTPUT_ADDR == 0`; `const_as_output_addr_1` uses `set_addr LOAD_ADDR;`.
+
+320 tests pass.

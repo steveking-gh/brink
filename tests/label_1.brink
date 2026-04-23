@@ -1,4 +1,5 @@
 section foo {
+    set_addr 0x1000;
     lab1: wrs "Wow!";
     lab2:
     assert addr(lab1) == 0x1000;
@@ -13,4 +14,4 @@ section foo {
     lab3:
 }
 
-output foo 0x1000;
+output foo;

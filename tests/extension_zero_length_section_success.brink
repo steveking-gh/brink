@@ -8,4 +8,4 @@ section top {
     wr brink::test_ranged_sum(empty);
     assert sizeof(top) == 8;
 }
-output top 0;
+output top;

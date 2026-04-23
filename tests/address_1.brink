@@ -53,4 +53,4 @@ section boo {
     assert sec_offset() == 3;
 }
 
-output foo 0;
+output foo;

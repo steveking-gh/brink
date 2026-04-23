@@ -5,4 +5,4 @@ section top {
     assert sizeof(brink::test_crc(0xAABBCCDD)) == 4;
 }
 
-output top 0;
+output top;

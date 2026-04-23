@@ -3,4 +3,4 @@
 section top {
     wr brink::test_increment(nonexistent_section);
 }
-output top 0;
+output top;

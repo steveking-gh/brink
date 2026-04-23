@@ -1,12 +1,16 @@
 section foo {
-    // Output base is set to 0x1000_0000; __OUTPUT_ADDR should preserve that.
+    // Without a region, __OUTPUT_ADDR is always addr(output_section) = 0 at
+    // SectionStart. set_addr inside the section does not influence
+    // __OUTPUT_ADDR.
+    assert __OUTPUT_ADDR == 0;
+
     set_addr 0x8000_0000u;
 
     assert addr() == 0x8000_0000;
-    assert __OUTPUT_ADDR == 0x1000_0000;
+    assert __OUTPUT_ADDR == 0;
 
     wr8 0xBB, 1;
     assert addr() == 0x8000_0001;
 }
 
-output foo 0x1000_0000;
+output foo;

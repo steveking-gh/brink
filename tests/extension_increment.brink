@@ -13,4 +13,4 @@ section top {
 
 assert sizeof(brink::test_increment) == 16;
 
-output top 0;
+output top;

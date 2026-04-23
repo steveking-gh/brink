@@ -5,4 +5,4 @@ section top {
     wr brink::test_ranged_sum();
 }
 
-output top 0;
+output top;

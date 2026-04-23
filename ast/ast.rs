@@ -1593,11 +1593,10 @@ impl<'toks> Ast<'toks> {
     /// is written to the output file and an optional absolute base address.
     ///
     /// ```text
-    /// output <name> [<addr>];
+    /// output <name>;
     ///
     ///   output               <- root node for the output declaration
-    ///   ├── <Identifier>     <- name of the section to emit
-    ///   └── [<U64|Integer>]  <- optional absolute start address
+    ///   └── <Identifier>     <- name of the section to emit
     /// ```
     fn parse_output(&mut self, parent: NodeId, diags: &mut Diags) -> bool {
         self.dbg_enter("parse_output");
@@ -1613,16 +1612,26 @@ impl<'toks> Ast<'toks> {
             "AST_7",
             "Expected a section name after output",
         ) {
-            // After the section identifier, an optional absolute starting address
-            // (which may be a literal or a const identifier)
-            result = self.optional_token(
-                &[LexToken::U64, LexToken::Integer, LexToken::Identifier],
-                diags,
-                output_nid,
-            );
+            // Reject old syntax: output <name> <addr>;
+            // The address argument was removed; use set_addr inside the section.
+            let tinfo = self.tv.peek();
+            if matches!(tinfo.tok, LexToken::U64 | LexToken::Integer | LexToken::Identifier) {
+                let msg = format!(
+                    "output no longer accepts a starting address ('{}'); use set_addr inside the section instead",
+                    tinfo.val
+                );
+                diags.err1("AST_55", &msg, tinfo.span());
+                // Consume the address token and the trailing semicolon so that
+                // the parser does not emit cascading errors for those tokens.
+                self.tv.skip();
+                if self.tv.peek().tok == LexToken::Semicolon {
+                    self.tv.skip();
+                }
+                return self.dbg_exit("parse_output", false);
+            }
 
             // finally a semicolon
-            result &= self.expect_semi(diags, output_nid);
+            result = self.expect_semi(diags, output_nid);
         }
 
         self.dbg_exit("parse_output", result)
@@ -2035,7 +2044,6 @@ pub struct Output<'toks> {
     pub tinfo: &'toks TokenInfo<'toks>,
     pub nid: NodeId,
     pub sec_nid: NodeId,
-    pub addr_nid: Option<NodeId>,
 }
 
 impl<'toks> Output<'toks> {
@@ -2045,14 +2053,10 @@ impl<'toks> Output<'toks> {
         // the section name is the first child of the output
         // AST processing guarantees this exists.
         let sec_nid = children.next().unwrap();
-
-        // Optional start address is the second child.
-        let addr_nid = children.next();
         Output {
             tinfo: ast.get_tinfo(nid),
             nid,
             sec_nid,
-            addr_nid,
         }
     }
 }

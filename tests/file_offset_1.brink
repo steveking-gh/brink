@@ -35,6 +35,7 @@ section inner {
 }
 
 section top {
+    set_addr 0x1000;
     assert file_offset() == 0;
     assert sec_offset() == 0;
     assert addr() == 0x1000;
@@ -99,4 +100,4 @@ section top {
     assert file_offset(lab_after_pad) == 16;
 }
 
-output top 0x1000;
+output top;

@@ -11,4 +11,4 @@ section top {
 
 assert sizeof(brink::test_ranged_sum) == 8;
 
-output top 0;
+output top;

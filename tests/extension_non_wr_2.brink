@@ -2,4 +2,4 @@ section top {
     wr64 brink::test_crc(0xAABBCCDD);
 }
 
-output top 0;
+output top;

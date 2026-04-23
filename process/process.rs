@@ -169,7 +169,7 @@ pub fn process(
         ir_db.dump();
     }
 
-    let engine = Engine::new(&ir_db, &ext_registry, &mut diags, 0)
+    let engine = Engine::new(&ir_db, &ext_registry, &mut diags)
         .context("[PROC_6]: Error detected, halting.")?;
     if verbosity > 2 {
         engine.dump_locations();

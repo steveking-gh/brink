@@ -8,6 +8,7 @@ section empty_relocatable {
 }
 
 section parent {
+    set_addr 0x1000;
     wr8 0x11, 3;
     assert addr() == 0x1003;
     assert addr_offset() == 3;
@@ -21,4 +22,4 @@ section parent {
     assert sizeof(parent) == 5;
 }
 
-output parent 0x1000;
+output parent;

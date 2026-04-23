@@ -42,7 +42,7 @@ the limit.
 
 ---
 
-## Step 2 — Remove `output` address argument
+## Step 2 — Remove `output` address argument [DONE 2026-04-21]
 
 ### Motivation
 
@@ -70,7 +70,7 @@ region binding.
 
 In `parse_output`, after parsing the section name, require `Semicolon`
 immediately. If an expression or integer literal follows the section name,
-emit `AST_54` with a message directing users to `set_addr`.
+emit `AST_55` with a message directing users to `set_addr`.
 
 ### Engine changes
 
@@ -91,7 +91,7 @@ No behavior change for programs that did not supply an output address.
 
 - Any integration test using `output SECTION 0xADDR;` must be updated to move
   the address into the section via `set_addr`.
-- Add a regression test: `output foo 0x1000;` produces `AST_54`.
+- Add a regression test: `output foo 0x1000;` produces `AST_55`.
 - Confirm `output foo;` and `output foo 0;` (the latter now an error) behave
   as expected.
 
@@ -105,7 +105,7 @@ Update any examples that used `output section 0xADDR;`.
 
 | Code   | Meaning                                                              |
 |--------|----------------------------------------------------------------------|
-| AST_54 | `output` address argument removed; use `set_addr` or region binding  |
+| AST_55 | `output` address argument removed; use `set_addr` or region binding  |
 
 ---
 
@@ -509,6 +509,7 @@ EXEC_69 to leave room.
 | AST_49  | 4    | ast        | Section references undeclared region                 |
 | AST_52  | 7    | ast        | `output` address omitted on non-region section (warn)|
 | AST_53  | 4    | ast        | Second section bound to same region                  |
+| AST_55  | 2    | ast        | `output` address arg removed; use `set_addr` (DONE)  |
 | PROC_7  | 1    | process    | Output size exceeds `--max-output-size` (COMPLETE)   |
 | EXEC_69 | 3    | const_eval | `default_align` not a power of two or is zero        |
 | EXEC_70 | 3    | const_eval | Two regions have overlapping address ranges          |

@@ -34,14 +34,14 @@ pub struct Location {
     /// Total bytes written to the output file.  Internal use only; drives
     /// WrDispatch offsets and mmap slicing.  Never resets.
     file_offset: u64,
-    /// Offset from the most recent `set_addr` base (or `start_addr` if
-    /// `set_addr` has never been called).  Exposed to scripts as `addr_offset()`.
+    /// Offset from the most recent `set_addr` base (or 0 if `set_addr` has
+    /// never been called).  Exposed to scripts as `addr_offset()`.
     /// Resets to 0 on each `set_addr` call.
     addr_offset: u64,
     /// Offset within the current section.  Pushed/popped at section boundaries.
     sec_offset: u64,
-    /// The address base established by the last `set_addr` call, or
-    /// `start_addr` at image start.  `addr() == addr_base + addr_offset`.
+    /// The address base established by the last `set_addr` call, or 0 at
+    /// image start.  `addr() == addr_base + addr_offset`.
     addr_base: u64,
 }
 
@@ -132,9 +132,6 @@ pub struct Engine {
     /// instruction are deduplicated independently.  Prevents duplicate
     /// diagnostics across iterate passes.
     warned_lids: HashSet<(usize, &'static str)>,
-
-    /// Starting absolute address, just copied from irdb for convenience.
-    pub start_addr: u64,
 
     /// One entry per section write in output order, including repeated writes.
     /// Populated by `build_dispatches` after iterate converges.
@@ -1325,7 +1322,6 @@ impl Engine {
         irdb: &IRDb,
         ext_registry: &ExtensionRegistry,
         diags: &mut Diags,
-        abs_start: usize,
     ) -> anyhow::Result<Self> {
         // The first iterate loop may access any IR location, so initialize all
         // ir_locs locations to zero.
@@ -1334,7 +1330,7 @@ impl Engine {
                 file_offset: 0,
                 addr_offset: 0,
                 sec_offset: 0,
-                addr_base: irdb.start_addr
+                addr_base: 0,
             };
             irdb.ir_vec.len()
         ];
@@ -1344,7 +1340,6 @@ impl Engine {
             ir_locs,
             scope_stack: Vec::new(),
             warned_lids: HashSet::new(),
-            start_addr: irdb.start_addr,
             wr_dispatches: Vec::new(),
             label_dispatches: Vec::new(),
         };
@@ -1356,7 +1351,7 @@ impl Engine {
             engine.parms.push(opnd.clone_val());
         }
 
-        let result = engine.iterate(irdb, ext_registry, diags, abs_start);
+        let result = engine.iterate(irdb, ext_registry, diags);
         if !result {
             anyhow::bail!("Engine construction failed.");
         }
@@ -1386,11 +1381,18 @@ impl Engine {
                 }
                 IRKind::SectionEnd => {
                     let (name, start_idx) = stack.pop().expect("Unmatched SectionEnd in ir_vec");
-                    let start_loc = &self.ir_locs[start_idx];
-                    let file_start = start_loc.file_offset;
+                    let file_start = self.ir_locs[start_idx].file_offset;
                     let file_end = self.ir_locs[i].file_offset;
-                    let addr_offset = start_loc.addr_offset;
-                    let Some(addr) = start_loc.addr_base.checked_add(addr_offset) else {
+
+                    // Compute the section's effective starting address by skipping
+                    // any leading set_addr instructions.  This ensures that a
+                    // set_addr at the top of a section is reflected in the map.
+                    let content_idx = ((start_idx + 1)..i)
+                        .find(|&j| irdb.ir_vec[j].kind != IRKind::SetAddr)
+                        .unwrap_or(i);
+                    let content_loc = &self.ir_locs[content_idx];
+                    let addr_offset = content_loc.addr_offset;
+                    let Some(addr) = content_loc.addr_base.checked_add(addr_offset) else {
                         diags.err1(
                             "EXEC_60",
                             "Section address overflows u64",
@@ -1439,17 +1441,14 @@ impl Engine {
     /// section offset recorded after each instruction.  Because an alignment or
     /// `sizeof` expression may change the size of an earlier region on a later
     /// pass, iteration continues until two consecutive passes produce identical
-    /// location vectors.  `abs_start` sets the base image address for the first
-    /// section.  Returns `false` and emits diagnostics if any instruction fails
-    /// validation or execution during the loop.
+    /// location vectors.  Returns `false` and emits diagnostics if any instruction
+    /// fails validation or execution during the loop.
     pub fn iterate(
         &mut self,
         irdb: &IRDb,
         ext_registry: &ExtensionRegistry,
         diags: &mut Diags,
-        abs_start: usize,
     ) -> bool {
-        self.trace(format!("Engine::iterate: abs_start = {}", abs_start).as_str());
         let mut result = true;
         let mut old_locations = Vec::new();
         let mut stable = false;
@@ -1462,7 +1461,7 @@ impl Engine {
                 file_offset: 0,
                 addr_offset: 0,
                 sec_offset: 0,
-                addr_base: self.start_addr,
+                addr_base: 0,
             };
 
             // make sure we exited as many sections as we entered on each iteration

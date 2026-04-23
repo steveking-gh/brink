@@ -1,6 +1,7 @@
 include "include_nested_a.brink";
 section main {
+    set_addr 0x2000;
     wr8 MY_A_VAL;
     wr8 MY_B_VAL;
 }
-output main 0x2000;
+output main;

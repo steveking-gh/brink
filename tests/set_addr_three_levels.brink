@@ -28,6 +28,7 @@ section child {
 }
 
 section top {
+    set_addr 0x1000;
     wr8 0xAA, 4;
     assert addr() == 0x1004;
     wr child;                          // +5 bytes; addr_base restored to 0x1000
@@ -37,4 +38,4 @@ section top {
     assert sizeof(top) == 9;
 }
 
-output top 0x1000;
+output top;

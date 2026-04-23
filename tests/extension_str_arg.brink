@@ -5,4 +5,4 @@ const LABEL = "hello";
 section top {
     wr brink::test_crc(LABEL);
 }
-output top 0;
+output top;

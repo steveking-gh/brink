@@ -3,4 +3,4 @@
 section top {
     wr brink::test_sum8(h=8);
 }
-output top 0;
+output top;

@@ -5,4 +5,4 @@ const BASE = 9;
 section top {
     wr brink::test_sum8(BASE - 8, BASE - 7, BASE - 6, BASE - 5, BASE - 4, BASE - 3, BASE - 2, BASE - 1);
 }
-output top 0;
+output top;

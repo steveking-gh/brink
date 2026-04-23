@@ -4,4 +4,4 @@
 section top {
     wr brink::test_crc(value=42);
 }
-output top 0;
+output top;

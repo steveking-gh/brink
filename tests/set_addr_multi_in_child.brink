@@ -15,6 +15,7 @@ section bouncy {
 }
 
 section outer {
+    set_addr 0x1000;
     wr8 0x00, 4;
     assert addr() == 0x1004;
     wr bouncy;                         // child_size=6; addr_base restored to 0x1000
@@ -24,4 +25,4 @@ section outer {
     assert sizeof(outer) == 10;
 }
 
-output outer 0x1000;
+output outer;

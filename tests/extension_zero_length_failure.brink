@@ -4,4 +4,4 @@
 section top {
     wr brink::test_reject_empty(0, 0);
 }
-output top 0;
+output top;

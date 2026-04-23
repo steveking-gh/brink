@@ -3,4 +3,4 @@ section main {
     set_addr_offset 0xFFFFFFFFFFFFFFFE;
     align 4;
 }
-output main 0;
+output main;

@@ -17,6 +17,7 @@ section sib_b {
 }
 
 section parent {
+    set_addr 0x1000;
     wr8 0x11, 2;
     assert addr() == 0x1002;
     wr sib_a;
@@ -31,4 +32,4 @@ section parent {
     assert sizeof(parent) == 10;
 }
 
-output parent 0x1000;
+output parent;

@@ -11,4 +11,4 @@ section foo {
 assert sizeof(foo) == 6;
 assert sizeof(brink::test_crc) == 4;
 
-output foo 0;
+output foo;

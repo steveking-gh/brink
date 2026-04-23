@@ -9,4 +9,4 @@ section top {
     wr data;
     wr brink::test_crc(sizeof(data));
 }
-output top 0;
+output top;

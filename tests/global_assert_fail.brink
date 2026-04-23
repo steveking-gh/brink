@@ -6,4 +6,4 @@ section foo {
 
 assert sizeof(foo) == 99;
 
-output foo 0;
+output foo;

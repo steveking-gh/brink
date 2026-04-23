@@ -12,4 +12,4 @@ section main {
     wr padding;
     wr target;
 }
-output main 0x0;
+output main;

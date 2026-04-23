@@ -3,4 +3,4 @@
         print to_i64(sizeof(foo));
     }
     
-    output foo 0x1000;  // starting absolute address is 0x1000
+output foo;

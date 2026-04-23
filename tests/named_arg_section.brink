@@ -9,4 +9,4 @@ section top {
     wr brink::test_increment(data=top);
     assert sizeof(top) == 32;
 }
-output top 0;
+output top;

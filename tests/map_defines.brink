@@ -10,8 +10,9 @@ section body {
 }
 
 section top {
+    set_addr BASE;
     wr hdr;
     wr body;
 }
 
-output top BASE;
+output top;

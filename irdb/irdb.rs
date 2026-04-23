@@ -20,7 +20,6 @@ use tracing::{debug, error, info, trace, warn};
 
 use extension_registry::{ExtensionRegistry, ParamKind};
 use ir::{DataType, IR, IRKind, IROperand, ParameterValue};
-use parse_int::parse;
 use std::{
     collections::{HashMap, HashSet},
     fs,
@@ -42,10 +41,6 @@ pub struct IRDb {
 
     /// Map a file path to the file info object
     pub files: HashMap<String, FileInfo>,
-
-    /// The optional absolute starting address specified
-    /// in the output statement.  Zero by default.
-    pub start_addr: u64,
 
     /// Maps an identifier to the (start,stop) indices in the ir_vec.
     /// Used for items with a size (potentially zero) such as sections.
@@ -771,30 +766,10 @@ impl IRDb {
             parms: Vec::new(),
             sized_locs: HashMap::new(),
             addressed_locs: HashMap::new(),
-            start_addr: 0,
             files: HashMap::new(),
             symbol_table,
             output_sec_str: lin_db.output_sec_str.clone(),
         };
-
-        // Parse the optional output starting address.  If it is a const name,
-        // look it up in the now-resolved symbol table.
-        let start_addr = if let Some(addr_str) = lin_db.output_addr_str.as_ref() {
-            if let Ok(addr) = parse::<u64>(addr_str) {
-                addr
-            } else if let Some(cv) = ir_db.symbol_table.get(addr_str.as_str()).cloned() {
-                ir_db.symbol_table.mark_used(addr_str.as_str());
-                cv.to_u64()
-            } else {
-                let m = format!("Malformed integer operand {}", addr_str);
-                let loc = lin_db.output_addr_loc.as_ref().unwrap();
-                diags.err1("IRDB_3", &m, loc.clone());
-                anyhow::bail!("IRDb construction failed.");
-            }
-        } else {
-            0
-        };
-        ir_db.start_addr = start_addr;
 
         if !ir_db.process_lin_operands(lin_db, diags) {
             anyhow::bail!("IRDb construction failed");

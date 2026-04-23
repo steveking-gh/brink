@@ -534,13 +534,7 @@ mod tests {
         assert_brink_success("tests/output_size_2.brink", None, None);
     }
 
-    /// __OUTPUT_ADDR equals addr(output_section) with a non-zero base address.
-    #[test]
-    fn output_addr_1() {
-        assert_brink_success("tests/output_addr_1.brink", None, None);
-    }
-
-    /// __OUTPUT_ADDR is zero when no base address is specified.
+    /// __OUTPUT_ADDR is zero with no region
     #[test]
     fn output_addr_2() {
         assert_brink_success("tests/output_addr_2.brink", None, None);
@@ -883,43 +877,43 @@ mod tests {
         // Verify output file is correct.  If so, then clean up.
         let bytevec = fs::read("wrx_4.bin").unwrap();
         assert!(bytevec.len() == 36);
-        // wr8
-        assert_eq!(bytevec[0], 49);
-        // wr16
-        assert_eq!(bytevec[1], 50);
+        // wr8:  3+0+addr(foo)+sizeof(foo) = 3+0+0+36 = 39
+        assert_eq!(bytevec[0], 39);
+        // wr16: 3+1+0+36 = 40
+        assert_eq!(bytevec[1], 40);
         assert_eq!(bytevec[2], 00);
-        // wr24
-        assert_eq!(bytevec[3], 52);
+        // wr24: 3+3+0+36 = 42
+        assert_eq!(bytevec[3], 42);
         assert_eq!(bytevec[4], 00);
         assert_eq!(bytevec[5], 00);
-        // wr32
-        assert_eq!(bytevec[6], 55);
+        // wr32: 3+6+0+36 = 45
+        assert_eq!(bytevec[6], 45);
         assert_eq!(bytevec[7], 00);
         assert_eq!(bytevec[8], 00);
         assert_eq!(bytevec[9], 00);
-        // wr40
-        assert_eq!(bytevec[10], 59);
+        // wr40: 3+10+0+36 = 49
+        assert_eq!(bytevec[10], 49);
         assert_eq!(bytevec[11], 00);
         assert_eq!(bytevec[12], 00);
         assert_eq!(bytevec[13], 00);
         assert_eq!(bytevec[14], 00);
-        // wr48
-        assert_eq!(bytevec[15], 64);
+        // wr48: 3+15+0+36 = 54
+        assert_eq!(bytevec[15], 54);
         assert_eq!(bytevec[16], 00);
         assert_eq!(bytevec[17], 00);
         assert_eq!(bytevec[18], 00);
         assert_eq!(bytevec[19], 00);
         assert_eq!(bytevec[20], 00);
-        // wr56
-        assert_eq!(bytevec[21], 70);
+        // wr56: 3+21+0+36 = 60
+        assert_eq!(bytevec[21], 60);
         assert_eq!(bytevec[22], 00);
         assert_eq!(bytevec[23], 00);
         assert_eq!(bytevec[24], 00);
         assert_eq!(bytevec[25], 00);
         assert_eq!(bytevec[26], 00);
         assert_eq!(bytevec[27], 00);
-        // wr64
-        assert_eq!(bytevec[28], 77);
+        // wr64: 3+28+0+36 = 67
+        assert_eq!(bytevec[28], 67);
         assert_eq!(bytevec[29], 00);
         assert_eq!(bytevec[30], 00);
         assert_eq!(bytevec[31], 00);
@@ -1150,7 +1144,7 @@ mod tests {
 
     #[test]
     fn output_addr_root_anchors_with_output_base_after_set_addr() {
-        // __OUTPUT_ADDR should remain output base when output has a base and first statement is set_addr.
+        // __OUTPUT_ADDR remains 0 even when set_addr is used inside the section.
         assert_brink_success(
             "tests/output_addr_section_set_addr_with_output_base.brink",
             None,
@@ -1650,7 +1644,7 @@ mod tests {
         );
     }
 
-    /// A const identifier is used as the base address in the output statement.
+    /// A const identifier is used as the starting address via set_addr inside the section.
     #[test]
     fn const_as_output_addr_1() {
         assert_brink_success(
@@ -2274,7 +2268,7 @@ mod tests {
         let src = "tests/map_defines_flag.brink";
         fs::write(
             src,
-            "const FLAG = 0;\nsection s { wr8 0x01; }\noutput s 0x1000;\n",
+            "const FLAG = 0;\nsection s { set_addr 0x1000; wr8 0x01; }\noutput s;\n",
         )
         .unwrap();
 

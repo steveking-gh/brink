@@ -25,6 +25,7 @@ section bar {
 
 // top level section
 section foo {
+    set_addr 0x1000;
     assert addr() == 0x1000;
     assert addr_offset() == 0x0;
     assert sec_offset() == 0x0;
@@ -57,4 +58,4 @@ section boo {
     assert sec_offset() == 0x3;
 }
 
-output foo 0x1000;
+output foo;

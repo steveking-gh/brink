@@ -1,6 +1,7 @@
 include "include_success_sub.brink";
 section main {
+    set_addr 0x1000;
     wr8 MY_VAL;
     wr8 0xBB;
 }
-output main 0x1000;
+output main;
