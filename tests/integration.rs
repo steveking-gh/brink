@@ -1469,7 +1469,9 @@ mod tests {
             "ir/ir.rs",
             "layoutdb/layoutdb.rs",
             "irdb/irdb.rs",
-            "engine/engine.rs",
+            "layout_phase/layout_phase.rs",
+            "map_phase/map_phase.rs",
+            "exec_phase/exec_phase.rs",
             "process/process.rs",
             "src/main.rs",
         ];

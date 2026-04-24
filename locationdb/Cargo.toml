@@ -1,0 +1,11 @@
+[package]
+name = "locationdb"
+version = "6.1.1"
+edition = "2021"
+
+[lib]
+path = "locationdb.rs"
+
+[dependencies]
+diags = { path = "../diags" }
+ir = { path = "../ir" }

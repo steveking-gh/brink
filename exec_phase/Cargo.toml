@@ -1,21 +1,19 @@
 [package]
-name = "engine"
+name = "exec_phase"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
-path = "engine.rs"
+path = "exec_phase.rs"
 
 [dependencies]
 anyhow = "1.0.34"
-
-# local dependencies
 diags = { path = "../diags" }
-ast = { path = "../ast" }
 ir = { path = "../ir" }
 irdb = { path = "../irdb" }
+locationdb = { path = "../locationdb" }
+mapdb = { path = "../mapdb" }
 extension_registry = { path = "../extension_registry" }
 tracing = "0.1.44"
 memmap2 = "0.9.10"

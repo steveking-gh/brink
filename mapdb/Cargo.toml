@@ -1,0 +1,11 @@
+[package]
+name = "mapdb"
+version = "6.1.1"
+edition = "2021"
+
+[lib]
+path = "mapdb.rs"
+
+[dependencies]
+ir = { path = "../ir" }
+diags = { path = "../diags" }

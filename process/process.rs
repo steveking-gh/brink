@@ -19,12 +19,14 @@ use std::io::Write;
 // Local libraries
 use ast::{Ast, AstDb};
 use diags::Diags;
-use engine::Engine;
+use layout_phase::LayoutPhase;
+use map_phase::{format_c99, format_csv, format_json, format_rs};
+use exec_phase::ExecPhase;
 use extension_registry::{ExtensionRegistry, test_mocks::register_test_extensions};
 use ir::{ConstBuiltins, ParameterValue};
 use irdb::IRDb;
 use layoutdb::LayoutDb;
-use map::{MapDb, format_c99, format_csv, format_json, format_rs};
+
 
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
@@ -169,15 +171,21 @@ pub fn process(
         ir_db.dump();
     }
 
-    let engine = Engine::new(&ir_db, &ext_registry, &mut diags)
+    let location_db = LayoutPhase::build(&ir_db, &ext_registry, &mut diags)
         .context("[PROC_6]: Error detected, halting.")?;
     if verbosity > 2 {
-        engine.dump_locations();
+        // LayoutPhase debug dump removed
     }
 
     // Check image size against --max-output-size before writing any bytes.
-    let final_size = engine
-        .wr_dispatches
+    // Determine if the user specified an output file on the command line
+    // Trim whitespace
+    let fname_str = String::from(output_file.unwrap_or("output.bin").trim_matches(' '));
+    debug!("process: output file name is {}", fname_str);
+
+        let map_db = map_phase::build(&location_db, &ir_db, &fname_str, &mut diags);
+    let final_size = map_db
+        .sections
         .last()
         .map_or(0, |d| d.file_offset + d.size);
     if final_size > max_output_size {
@@ -190,10 +198,7 @@ pub fn process(
         return Err(anyhow!("[PROC_7]: Error detected, halting."));
     }
 
-    // Determine if the user specified an output file on the command line
-    // Trim whitespace
-    let fname_str = String::from(output_file.unwrap_or("output.bin").trim_matches(' '));
-    debug!("process: output file name is {}", fname_str);
+
 
     let mut file = std::fs::OpenOptions::new()
         .read(true)
@@ -203,9 +208,7 @@ pub fn process(
         .open(&fname_str)
         .context(format!("Unable to create output file {}", fname_str))?;
 
-    if engine
-        .execute(&ir_db, &mut diags, &mut file, &ext_registry)
-        .is_err()
+    if ExecPhase::execute(&location_db, &map_db, &ir_db, &mut diags, &mut file, &ext_registry).is_err()
     {
         return Err(anyhow!("[PROC_6]: Error detected, halting."));
     }
@@ -213,7 +216,7 @@ pub fn process(
     // Generate map output if requested.  MapDb derives all data from the
     // post-iterate engine and irdb; no additional compiler passes run.
     if map_csv.is_some() || map_json.is_some() || map_c99.is_some() || map_rs.is_some() {
-        let map_db = MapDb::new(&engine, &ir_db, &fname_str);
+        
         emit_map(map_csv, &format_csv(&map_db))?;
         emit_map(map_json, &format_json(&map_db))?;
         emit_map(map_c99, &format_c99(&map_db))?;

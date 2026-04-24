@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - README: Removed obsolete text on if/else statement restrictions
 - README: Documented region feature
 - INTERNAL: Improved README.md formatting
+- INTERNAL: Better division of responsiblity now with distinct layout, map and exec phases.
 
 ## [6.1.1] - 2026-04-20
 - BUG FIX: Fixed version to 6.1.1 in Cargo.toml

@@ -1,16 +1,19 @@
 [workspace]
 members = [
+    "locationdb",
+    "mapdb",
     "depth_guard",
     "ast",
     "ir",
     "symtable",
     "linearizer",
     "layoutdb",
-    "engine",
+    "layout_phase",
     "process",
     "irdb",
     "diags",
-    "map",
+    "map_phase",
+    "exec_phase",
     "extension_registry",
     "const_eval",
     "brink_extension",
@@ -18,7 +21,7 @@ members = [
     "std/sha256",
     "std/md5",
     "extensions",
-    "prune",
+    "prune", "locationdb", "mapdb",
 ]
 
 [workspace.package]

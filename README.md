@@ -144,11 +144,11 @@ Produces output.bin containing the string `Hello World!\n`.
 # Basic Structure of a Brink Program
 
 A Brink source file consists of one or more section definitions and exactly one
-output statement.  Each section has a unique name.  The output statement
-specifies the name of the top level section that defines the output file.
-Starting from the top section, Brink recursively evaluates each section and
-produces the output file.  For example, we can define a section with a
-write-string (wrs) statement:
+[output](#output-statement) statement. The output statement specifies the
+top-level section that defines the output file. Starting from this top section,
+Brink recursively evaluates each nested section and command to produce the
+output file.  For example, we can define a section with a write-string
+([wrs](#write-string)) command:
 
     section foo {        // Start a new section named 'foo'
         wrs "I'm foo";   // wrs writes a string into the section.
@@ -161,7 +161,7 @@ Produces a default output named `output.bin`.
     $ cat output.bin
     I'm foo
 
-Using a write (wr) statement, sections can write other sections:
+Using the [wr](#write) command, sections can embed other sections:
 
     section foo {
         wrs "I'm foo\n";
@@ -181,7 +181,7 @@ Produces `output.bin`:
     I'm foo
 
 Users can extend Brink with custom data processing using [Brink
-Extension](#brink-extensions).  Users write the output of their extension call
+extensions](#brink-extensions).  Users write the output of their extension call
 into a section with a `wr`.
 
     section foo {

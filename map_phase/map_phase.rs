@@ -1,71 +1,18 @@
 // Output map construction for brink.
 //
-// MapDb collects the semantic payload for all map output formats.
-// All data derives from the Engine and IRDb after iteration completes.
-// No additional compiler passes run.
+// MapDb collects the semantic payload for all map output formats. All data
+// derives from the LocationDb and IRDb after layout_phase completes.
 //
-// Three format functions render MapDb to string output:
-//   format_human  — tabular, human-readable
-//   format_gnu    — GNU linker memory-map style
-//   format_json   — structured JSON
-//
-// Order of operations: MapDb::new runs after engine.execute() in process.rs.
 
-use engine::Engine;
+use diags::Diags;
+use ir::IRKind;
 use ir::ParameterValue;
 use irdb::IRDb;
+use locationdb::LocationDb;
+use mapdb::{ConstEntry, LabelEntry, MapDb, SectionEntry};
 
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
-
-/// One occurrence of a section write in the output image.
-/// A section written N times via `wr` produces N entries.
-/// Entries sort by `file_offset` (output order).
-#[derive(Clone, Debug)]
-pub struct SectionEntry {
-    pub name: String,
-    /// Byte offset from the start of the output file where this section begins.
-    pub file_offset: u64,
-    /// Offset from the most recent `set_addr` anchor at the point this section begins.
-    pub off: u64,
-    /// Absolute address at the point this section begins (`abs_base + off`).
-    pub abs_start: u64,
-    pub size: u64,
-}
-
-/// Position of a label in the output image.
-/// Entries sort by `file_offset` (output order).
-#[derive(Clone, Debug)]
-pub struct LabelEntry {
-    pub name: String,
-    /// Byte offset from the start of the output file where this label appears.
-    pub file_offset: u64,
-    /// Offset from the most recent `set_addr` anchor at this label.
-    pub off: u64,
-    /// Absolute address at this label (`abs_base + off`).
-    pub abs_addr: u64,
-}
-
-/// A resolved const name/value pair.
-/// Entries sort alphabetically by name.
-#[derive(Clone, Debug)]
-pub struct ConstEntry {
-    pub name: String,
-    pub value: ParameterValue,
-    /// True if the const was referenced at least once in the program.
-    pub used: bool,
-}
-
-/// Complete semantic payload of the output map.
-#[derive(Clone, Debug)]
-pub struct MapDb {
-    pub output_file: String,
-    pub base_addr: u64,
-    pub total_size: u64,
-    pub sections: Vec<SectionEntry>,
-    pub labels: Vec<LabelEntry>,
-    pub consts: Vec<ConstEntry>,
-}
 
 // -- Private formatting helpers -----------------------------------------------
 
@@ -477,67 +424,77 @@ pub fn format_rs(map: &MapDb) -> String {
 
 // -- MapDb construction --------------------------------------------------------
 
-impl MapDb {
-    /// Constructs a MapDb from the post-iterate engine and irdb.
-    /// `output_file` is the path of the output binary, used for display only.
-    pub fn new(engine: &Engine, irdb: &IRDb, output_file: &str) -> MapDb {
-        let mut sections: Vec<SectionEntry> = engine
-            .wr_dispatches
-            .iter()
-            .map(|wd| SectionEntry {
-                name: wd.name.clone(),
-                file_offset: wd.file_offset,
-                off: wd.addr_offset,
-                abs_start: wd.addr,
-                size: wd.size,
-            })
-            .collect();
-        sections.sort_by_key(|s| s.file_offset);
+pub fn build(
+    location_db: &LocationDb,
+    irdb: &IRDb,
+    output_file: &str,
+    _diags: &mut Diags,
+) -> MapDb {
+    let mut sections: Vec<SectionEntry> = Vec::new();
+    let mut labels: Vec<LabelEntry> = Vec::new();
 
-        let mut labels: Vec<LabelEntry> = engine
-            .label_dispatches
-            .iter()
-            .map(|ld| LabelEntry {
-                name: ld.name.clone(),
-                file_offset: ld.file_offset,
-                off: ld.addr_offset,
-                abs_addr: ld.addr,
-            })
-            .collect();
-        labels.sort_by_key(|l| l.file_offset);
+    let mut stack: Vec<(String, usize)> = Vec::new();
+    for (ir_index, ir) in irdb.ir_vec.iter().enumerate() {
+        match ir.kind {
+            IRKind::SectionStart => {
+                let name = irdb.get_opnd_as_identifier(ir, 0).to_string();
+                stack.push((name, ir_index));
+            }
+            IRKind::SectionEnd => {
+                let (name, start_ir) = stack.pop().unwrap();
+                let file_start = location_db.ir_locs[start_ir].file_offset;
+                let file_end = location_db.ir_locs[ir_index].file_offset;
 
-        let mut consts: Vec<ConstEntry> = irdb
-            .symbol_table
-            .iter_defined_with_used()
-            .map(|(name, pv, used)| ConstEntry {
-                name: name.to_string(),
-                value: pv.clone(),
-                used,
-            })
-            .collect();
-        consts.sort_by(|a, b| a.name.cmp(&b.name));
+                let content_idx = ((start_ir + 1)..ir_index)
+                    .find(|&j| irdb.ir_vec[j].kind != IRKind::SetAddr)
+                    .unwrap_or(ir_index);
+                let content_loc = &location_db.ir_locs[content_idx];
 
-        // Total output size: maximum extent of any section (file_offset + size).
-        let total_size = sections
-            .iter()
-            .map(|s| s.file_offset + s.size)
-            .max()
-            .unwrap_or(0);
-
-        // base_addr is the address of the first byte written in the output image.
-        let base_addr = sections.first().map(|s| s.abs_start).unwrap_or(0);
-
-        MapDb {
-            output_file: output_file.to_string(),
-            base_addr,
-            total_size,
-            sections,
-            labels,
-            consts,
+                sections.push(SectionEntry {
+                    name,
+                    file_offset: file_start,
+                    off: content_loc.addr.addr_offset,
+                    abs_start: content_loc.addr.addr_base + content_loc.addr.addr_offset,
+                    size: file_end - file_start,
+                });
+            }
+            IRKind::Label => {
+                let name = irdb.get_opnd_as_identifier(ir, 0).to_string();
+                let loc = &location_db.ir_locs[ir_index];
+                labels.push(LabelEntry {
+                    name,
+                    file_offset: loc.file_offset,
+                    off: loc.addr.addr_offset,
+                    abs_addr: loc.addr.addr_base + loc.addr.addr_offset,
+                });
+            }
+            _ => {}
         }
     }
-}
 
+    let mut consts: Vec<ConstEntry> = irdb
+        .symbol_table
+        .iter_defined_with_used()
+        .map(|(name, pv, used)| ConstEntry {
+            name: name.to_string(),
+            value: pv.clone(),
+            used,
+        })
+        .collect();
+    consts.sort_by(|a, b| a.name.cmp(&b.name));
+
+    let base_addr = sections.first().map(|s| s.abs_start).unwrap_or(0);
+    let total_size = sections.last().map(|s| s.file_offset + s.size).unwrap_or(0);
+
+    MapDb {
+        output_file: output_file.to_string(),
+        base_addr,
+        total_size,
+        sections,
+        labels,
+        consts,
+    }
+}
 // -- Unit tests ----------------------------------------------------------------
 
 #[cfg(test)]

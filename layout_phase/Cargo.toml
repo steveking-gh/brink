@@ -1,0 +1,22 @@
+[package]
+name = "layout_phase"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+path = "layout_phase.rs"
+
+[dependencies]
+anyhow = "1.0.34"
+
+# local dependencies
+diags = { path = "../diags" }
+ast = { path = "../ast" }
+ir = { path = "../ir" }
+irdb = { path = "../irdb" }
+extension_registry = { path = "../extension_registry" }
+tracing = "0.1.44"
+memmap2 = "0.9.10"
+locationdb = { path = "../locationdb" }

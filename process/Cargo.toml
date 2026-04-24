@@ -25,8 +25,11 @@ layoutdb = { path = "../layoutdb" }
 const_eval = { path = "../const_eval" }
 prune = { path = "../prune" }
 irdb = { path = "../irdb" }
-engine = { path = "../engine" }
-map = { path = "../map" }
+layout_phase = { path = "../layout_phase" }
+map_phase = { path = "../map_phase" }
+exec_phase = { path = "../exec_phase" }
 extension_registry = { path = "../extension_registry" }
 extensions = { path = "../extensions" }
 tracing = "0.1.44"
+locationdb = { path = "../locationdb" }
+mapdb = { path = "../mapdb" }

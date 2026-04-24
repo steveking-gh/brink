@@ -1,15 +1,17 @@
 [package]
-name = "map"
+name = "map_phase"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
 
 [lib]
-path = "map.rs"
+path = "map_phase.rs"
 
 [dependencies]
-engine = { path = "../engine" }
+locationdb = { path = "../locationdb" }
 irdb = { path = "../irdb" }
 ir = { path = "../ir" }
+diags = { path = "../diags" }
 serde_json = "1"
 tracing = "0.1.44"
+mapdb = { path = "../mapdb" }
