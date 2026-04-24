@@ -144,6 +144,7 @@ impl ExecPhase {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn execute_wrs(
         location_db: &LocationDb,
         paramval_db: &ParmValDb,
@@ -178,6 +179,7 @@ impl ExecPhase {
         result
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn execute_wrf(
         location_db: &LocationDb,
         paramval_db: &ParmValDb,
@@ -259,7 +261,6 @@ impl ExecPhase {
         written_ranges: &mut WrittenRanges,
         lid: usize,
         ir: &IR,
-        _irdb: &IRDb,
         diags: &mut Diags,
         file: &mut File,
     ) -> Result<()> {
@@ -343,7 +344,7 @@ impl ExecPhase {
         let mut error_count = 0;
         for (lid, ir) in irdb.ir_vec.iter().enumerate() {
             result = match ir.kind {
-                IRKind::Wr(_) => Self::execute_wrx(location_db, paramval_db, written_ranges, lid, ir, irdb, diags, file),
+                IRKind::Wr(_) => Self::execute_wrx(location_db, paramval_db, written_ranges, lid, ir, diags, file),
                 IRKind::Print => Self::execute_print(paramval_db, ir, irdb, diags, file),
                 IRKind::Wrs => Self::execute_wrs(location_db, paramval_db, written_ranges, lid, ir, irdb, diags, file),
                 IRKind::Wrf => Self::execute_wrf(location_db, paramval_db, written_ranges, lid, ir, irdb, diags, file),
