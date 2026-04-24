@@ -1,5 +1,4 @@
 use diags::{Diags, SourceSpan};
-use ir::ParameterValue;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct AddressState {
@@ -59,5 +58,4 @@ impl std::fmt::Display for Location {
 
 pub struct LocationDb {
     pub ir_locs: Vec<Location>,
-    pub parms: Vec<ParameterValue>,
 }

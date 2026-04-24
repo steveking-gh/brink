@@ -33,3 +33,4 @@ extensions = { path = "../extensions" }
 tracing = "0.1.44"
 locationdb = { path = "../locationdb" }
 mapdb = { path = "../mapdb" }
+paramval_db = { path = "../paramval_db" }

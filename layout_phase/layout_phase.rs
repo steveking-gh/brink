@@ -15,6 +15,7 @@ use diags::Diags;
 use extension_registry::ExtensionRegistry;
 use ir::{ConstBuiltins, DataType, IR, IRKind, ParameterValue};
 use irdb::IRDb;
+use paramval_db::ParmValDb;
 use std::collections::HashSet;
 
 #[allow(unused_imports)]
@@ -1184,7 +1185,7 @@ impl LayoutPhase {
         irdb: &IRDb,
         ext_registry: &ExtensionRegistry,
         diags: &mut Diags,
-    ) -> anyhow::Result<LocationDb> {
+    ) -> anyhow::Result<(LocationDb, ParmValDb)> {
         // The first iterate loop may access any IR location, so initialize all
         // ir_locs locations to zero.
         let ir_locs = vec![
@@ -1222,10 +1223,12 @@ impl LayoutPhase {
 
         // No that locations are known, we build the location database.
         layout_phase.trace(format_args!("LayoutPhase::new: EXIT"));
-        Ok(LocationDb {
-            ir_locs: layout_phase.ir_locs,
-            parms: layout_phase.parms,
-        })
+        Ok((
+            LocationDb {
+                ir_locs: layout_phase.ir_locs,
+            },
+            ParmValDb::new(layout_phase.parms),
+        ))
     }
 
     pub fn dump_locations(&self) {

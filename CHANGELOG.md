@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - README: Documented region feature
 - INTERNAL: Improved README.md formatting
 - INTERNAL: Better division of responsiblity now with distinct layout, map and exec phases.
+- INTERNAL: Refactor parameter values into their own module.
 
 ## [6.1.1] - 2026-04-20
 - BUG FIX: Fixed version to 6.1.1 in Cargo.toml

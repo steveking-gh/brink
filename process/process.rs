@@ -19,14 +19,13 @@ use std::io::Write;
 // Local libraries
 use ast::{Ast, AstDb};
 use diags::Diags;
-use layout_phase::LayoutPhase;
-use map_phase::{format_c99, format_csv, format_json, format_rs};
 use exec_phase::ExecPhase;
 use extension_registry::{ExtensionRegistry, test_mocks::register_test_extensions};
 use ir::{ConstBuiltins, ParameterValue};
 use irdb::IRDb;
+use layout_phase::LayoutPhase;
 use layoutdb::LayoutDb;
-
+use map_phase::{format_c99, format_csv, format_json, format_rs};
 
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
@@ -90,7 +89,11 @@ fn parse_define(s: &str) -> Result<(String, ParameterValue)> {
 pub fn list_extensions() -> Vec<String> {
     let mut registry = ExtensionRegistry::new();
     extensions::register_all(&mut registry);
-    registry.sorted_names().iter().map(|s| s.to_string()).collect()
+    registry
+        .sorted_names()
+        .iter()
+        .map(|s| s.to_string())
+        .collect()
 }
 
 /// Entry point for all processing on the input source file.
@@ -171,7 +174,7 @@ pub fn process(
         ir_db.dump();
     }
 
-    let location_db = LayoutPhase::build(&ir_db, &ext_registry, &mut diags)
+    let (location_db, parmval_db) = LayoutPhase::build(&ir_db, &ext_registry, &mut diags)
         .context("[PROC_6]: Error detected, halting.")?;
     if verbosity > 2 {
         // LayoutPhase debug dump removed
@@ -183,11 +186,8 @@ pub fn process(
     let fname_str = String::from(output_file.unwrap_or("output.bin").trim_matches(' '));
     debug!("process: output file name is {}", fname_str);
 
-        let map_db = map_phase::build(&location_db, &ir_db, &fname_str, &mut diags);
-    let final_size = map_db
-        .sections
-        .last()
-        .map_or(0, |d| d.file_offset + d.size);
+    let map_db = map_phase::build(&location_db, &ir_db, &fname_str, &mut diags);
+    let final_size = map_db.sections.last().map_or(0, |d| d.file_offset + d.size);
     if final_size > max_output_size {
         let msg = format!(
             "Output image size {} bytes exceeds maximum {} bytes. \
@@ -198,8 +198,6 @@ pub fn process(
         return Err(anyhow!("[PROC_7]: Error detected, halting."));
     }
 
-
-
     let mut file = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
@@ -208,7 +206,16 @@ pub fn process(
         .open(&fname_str)
         .context(format!("Unable to create output file {}", fname_str))?;
 
-    if ExecPhase::execute(&location_db, &map_db, &ir_db, &mut diags, &mut file, &ext_registry).is_err()
+    if ExecPhase::execute(
+        &location_db,
+        &parmval_db,
+        &map_db,
+        &ir_db,
+        &mut diags,
+        &mut file,
+        &ext_registry,
+    )
+    .is_err()
     {
         return Err(anyhow!("[PROC_6]: Error detected, halting."));
     }
@@ -216,7 +223,6 @@ pub fn process(
     // Generate map output if requested.  MapDb derives all data from the
     // post-iterate engine and irdb; no additional compiler passes run.
     if map_csv.is_some() || map_json.is_some() || map_c99.is_some() || map_rs.is_some() {
-        
         emit_map(map_csv, &format_csv(&map_db))?;
         emit_map(map_json, &format_json(&map_db))?;
         emit_map(map_c99, &format_c99(&map_db))?;
