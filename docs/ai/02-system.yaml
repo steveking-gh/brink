@@ -50,11 +50,15 @@ pipeline:
       output: typed IR (Vec<IRItem>)
       notes: Validates types, resolves extensions, handles sizeof/addr builtins.
 
-    - name: Engine
-      crate: engine
+    - name: LayoutPhase + ValidationPhase + ExecPhase
+      crates: [layout_phase, validation_phase, exec_phase]
       input: IRDb, ExtensionRegistry
       output: binary byte vector written to output file
-      notes: Iterative evaluator; reruns until sizes/addresses stabilize.
+      notes: >
+        LayoutPhase iterates until sizes/addresses stabilize, producing
+        LocationDb and ParmValDb.  ValidationPhase evaluates assert
+        instructions against ParmValDb (layout-computed values only).
+        ExecPhase writes core bytes and patches extension output via mmap.
 
   error_codes:
     PROC_1: AST parse failure
@@ -62,8 +66,9 @@ pipeline:
     PROC_3: prune or second AstDb failure
     PROC_4: LayoutDb failure
     PROC_5: IRDb failure
-    PROC_6: Engine failure
+    PROC_6: LayoutPhase failure
     PROC_7: Output image size exceeds --max-output-size limit
+    PROC_8: ValidationPhase failure (assert evaluation)
 
 extensions:
   api_crate: brink_extension

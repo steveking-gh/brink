@@ -27,7 +27,8 @@ prune = { path = "../prune" }
 irdb = { path = "../irdb" }
 layout_phase = { path = "../layout_phase" }
 map_phase = { path = "../map_phase" }
-exec_phase = { path = "../exec_phase" }
+exec_phase        = { path = "../exec_phase" }
+validation_phase  = { path = "../validation_phase" }
 extension_registry = { path = "../extension_registry" }
 extensions = { path = "../extensions" }
 tracing = "0.1.44"

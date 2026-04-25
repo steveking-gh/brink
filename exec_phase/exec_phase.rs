@@ -1,13 +1,12 @@
 // Binary generation and extension execution.
 //
-// ExecPhase forms the final stage of the compiler pipeline. ExecPhase consumes
-// LocationDb and MapDb to construct the output binary file. Core operations
+// ExecPhase forms the final stage of the compiler pipeline.  ExecPhase consumes
+// LocationDb and MapDb to construct the output binary file.  Core operations
 // include writing inline data, padding bytes, and referenced file contents.
 //
 // ExecPhase invokes compiler extensions, granting direct memory-mapped write
-// access to the binary output. Extension calls evaluate sequentially after core
-// operations complete. ExecPhase performs final validation checks, evaluating
-// assert instructions against the completed binary state.
+// access to the binary output.  Extension calls evaluate sequentially after
+// core operations complete.
 
 use anyhow::{Result, anyhow};
 use diags::{Diags, SourceSpan};
@@ -66,58 +65,6 @@ impl ExecPhase {
             file,
             ext_registry,
         )?;
-        Self::execute_validation(argvaldb, irdb, diags)?;
-
-        Ok(())
-    }
-
-    fn execute_validation(argvaldb: &ParmValDb, irdb: &IRDb, diags: &mut Diags) -> Result<()> {
-        trace!("Engine::execute_validation:");
-        let mut error_count = 0;
-        for ir in &irdb.ir_vec {
-            if ir.kind == IRKind::Assert
-                && Self::execute_assert(argvaldb, ir, irdb, diags).is_err()
-            {
-                error_count += 1;
-                if error_count > 10 {
-                    break;
-                }
-            }
-        }
-        if error_count > 0 {
-            return Err(anyhow!("Error detected"));
-        }
-        Ok(())
-    }
-
-    fn execute_assert(
-        argvaldb: &ParmValDb,
-        ir: &IR,
-        irdb: &IRDb,
-        diags: &mut Diags,
-    ) -> Result<()> {
-        trace!("Engine::execute_assert:");
-        let opnd_num = ir.operands[0];
-        trace!(
-            "{}",
-            format!("engine::execute_assert: checking operand {}", opnd_num).as_str()
-        );
-        let parm = &argvaldb.parms[opnd_num];
-        if !parm
-            .to_bool()
-            .expect("assert operand must be numeric; IRDb type check failed")
-        {
-            // assert failed
-            let msg = "Assert expression failed".to_string();
-            diags.err1("EXEC_2", &msg, ir.src_loc.clone());
-
-            // If the boolean the assertion failed on is an output of an operation,
-            // then backtrack to print information about that operation.  To backtrack
-            // we get the Option<src_lid> for the assert.
-            let src_lid = irdb.get_operand_ir_lid(opnd_num);
-            Self::assert_info(argvaldb, src_lid, irdb, diags);
-            return Err(anyhow!("Assert failed"));
-        }
 
         Ok(())
     }
@@ -348,7 +295,7 @@ impl ExecPhase {
                 IRKind::Print => Self::execute_print(argvaldb, ir, irdb, diags, file),
                 IRKind::Wrs => Self::execute_wrs(location_db, argvaldb, written_ranges, lid, ir, irdb, diags, file),
                 IRKind::Wrf => Self::execute_wrf(location_db, argvaldb, written_ranges, lid, ir, irdb, diags, file),
-                // Assert runs in the validation phase, after all bytes are written.
+                // Assert evaluates in the validation phase, before byte generation.
                 IRKind::Assert => Ok(()),
                 // the rest of these operations are computed during iteration
                 IRKind::SetSecOffset
@@ -804,41 +751,4 @@ impl ExecPhase {
         if result { Some(xstr) } else { None }
     }
 
-    fn assert_info(
-        argvaldb: &ParmValDb,
-        src_lid: Option<usize>,
-        irdb: &IRDb,
-        diags: &mut Diags,
-    ) {
-        let Some(src_lid) = src_lid else {
-            // No extra info available.  Source was presumably a constant.
-            return;
-        };
-        // get the operation at the source lid
-        let operation = irdb.ir_vec.get(src_lid).unwrap();
-        let num_operands = operation.operands.len();
-        // This is an assert, so the last operation is a boolean that we
-        // presume to be false, necessitating this diagnostic.
-        for (idx, opnd) in operation.operands.iter().enumerate() {
-            if idx < num_operands - 1 {
-                Self::assert_info_operand(argvaldb, *opnd, irdb, diags);
-            }
-        }
-    }
-
-    fn assert_info_operand(
-        argvaldb: &ParmValDb,
-        opnd_num: usize,
-        irdb: &IRDb,
-        diags: &mut Diags,
-    ) {
-        let opnd = &argvaldb.parms[opnd_num];
-        let ir_opnd = &irdb.parms[opnd_num];
-        if opnd.data_type() == DataType::U64 {
-            let val = opnd.to_u64();
-            let msg = format!("Operand has value {}", val);
-            let primary_code_ref = ir_opnd.src_loc.clone();
-            diags.note1("EXEC_8", &msg, primary_code_ref);
-        }
-    }
 }

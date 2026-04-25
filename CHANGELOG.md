@@ -15,11 +15,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - INTERNAL: Improved README.md formatting
 - INTERNAL: Better division of responsibility now with distinct layout, map and exec phases.
 - INTERNAL: Refactor parameter values into their own module.
+- INTERNAL: Refactor validation as a dedicated phase.
 
 ## [6.1.1] - 2026-04-20
+
 - BUG FIX: Fixed version to 6.1.1 in Cargo.toml
 
 ## [6.1.0] - 2026-04-17
+
 - FEATURE: added --max-output-size CLI option.
 - BUG FIX: Fixed assert when wrf had too man args
 - BUG FIX: Fixed assert when wr8..wr64 had too man args

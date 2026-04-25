@@ -20,6 +20,7 @@ use std::io::Write;
 use ast::{Ast, AstDb};
 use diags::Diags;
 use exec_phase::ExecPhase;
+use validation_phase::ValidationPhase;
 use extension_registry::{ExtensionRegistry, test_mocks::register_test_extensions};
 use ir::{ConstBuiltins, ParameterValue};
 use irdb::IRDb;
@@ -197,6 +198,9 @@ pub fn process(
         diags.err0("PROC_7", &msg);
         return Err(anyhow!("[PROC_7]: Error detected, halting."));
     }
+
+    ValidationPhase::validate(&argval_db, &ir_db, &mut diags)
+        .context("[PROC_8]: Error detected, halting.")?;
 
     let mut file = std::fs::OpenOptions::new()
         .read(true)

@@ -1,0 +1,16 @@
+[package]
+name = "validation_phase"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[lib]
+path = "validation_phase.rs"
+
+[dependencies]
+anyhow   = "1.0.34"
+diags    = { path = "../diags" }
+ir       = { path = "../ir" }
+irdb     = { path = "../irdb" }
+argvaldb = { path = "../argvaldb" }
+tracing  = "0.1.44"

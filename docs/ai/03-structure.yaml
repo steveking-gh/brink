@@ -46,15 +46,29 @@ crates:
     role: Typed IR construction and validation
     key_types: [IRDb, IRItem]
 
-  engine:
-    path: engine/engine.rs (approx)
-    role: Iterative binary executor; writes output file
-    key_types: [Engine]
+  exec_phase:
+    path: exec_phase/exec_phase.rs
+    role: Binary generation; writes core operations and invokes extensions
+    key_types: [ExecPhase]
+    key_fns: [ExecPhase::execute, execute_core_operations, execute_extensions]
     notes: >
-      ExtensionCall/ExtensionCallSection are write statements: iterate_ext
-      advances location, execute_core_operations pre-pads zeroed bytes,
-      execute_extensions patches the mmap at ir_locs[idx].  No WrExt, no
-      operand_consumer reverse-lookup map.
+      execute_core_operations writes Wr/Wrs/Wrf bytes and pre-pads zeroed
+      space for extension output regions.  execute_extensions memory-maps the
+      file and patches each extension's output in place.  Assert instructions
+      are skipped here; validation runs in validation_phase before exec.
+
+  validation_phase:
+    path: validation_phase/validation_phase.rs
+    role: Assert evaluation after layout, before byte generation
+    key_types: [ValidationPhase]
+    key_fns: [ValidationPhase::validate]
+    notes: >
+      Reads only ParmValDb and IRDb -- both layout outputs, neither mutated
+      during exec.  No IR operation reads bytes from the output file, so
+      asserts evaluate layout-computed values exclusively.
+      CAUTION: if extension return values are implemented, keep ValidationPhase
+      ordered after execute_extensions so extension output populates ParmValDb
+      before assert evaluation.
 
   linearizer:
     path: linearizer/linearizer.rs
@@ -104,7 +118,8 @@ crates:
     role: Pipeline orchestrator; single entry point for the binary
     notes: >
       Calls stages in order: Ast → AstDb(false) → const_eval → prune →
-      AstDb(true) → LayoutDb → IRDb → Engine → map output.
+      AstDb(true) → LayoutDb → IRDb → LayoutPhase → ValidationPhase →
+      ExecPhase → map output.
 
 # ── Standard library extensions ───────────────────────────────────────────────
 std_extensions:
