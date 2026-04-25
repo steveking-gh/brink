@@ -1082,11 +1082,9 @@ property of a region with `addr(<region name>)`.
 ### Region Property `size`
 
 Specifies the size of the region in bytes.  Brink reports an error if the
-top-level section exceeds this value.
+size of the top-level section exceeds this value.
 
 Users can query the `size` property of a region with `sizeof(<region name>)`.
-To query how many bytes of the region are actually occupied, users should use
-`sizeof` on the region's top-level section.
 
 When specifying the size of a region, users can specify a number and optionally
 use a K/M/G suffix for multiples of 1024, being kilobytes, megabytes and
@@ -1133,6 +1131,71 @@ The code above generates a section with the following layout:
 Specifies the default fill byte for any pad operations in the top-level section.
 The section may override the default pad byte with a pad byte specifier on any
 operation that causes padding.
+
+### Region Boundary Enforcement
+
+Regions provide automatic size and boundary checking for all operations in the
+region.  In practical terms this means:
+
+* Write commands in a region cannot extend outside the region
+* Address manipulation in a region cannot result in an address outside the
+  region
+* Offset manipulations in a region cannot result in a offset outside the
+  region.
+
+For example, the following `wr32` command would extend outside the region by one
+byte, resulting in an error:
+
+    region LITTLE_ROM {
+        addr = 0;
+        size = 7;
+    }
+
+    section data in LITTLE_ROM {
+        // occupies bytes 0-3
+        wr32 0x12345678;
+        // Occupies bytes 4-7, which extends 1 byte outside the region
+        wr32 0x87654321;  // ERROR!
+    }
+
+Of course, region enforcement occurs not just in the region's top-level section,
+but in any reachable section.
+
+    region LITTLE_ROM {
+        addr = 0;
+        size = 7;
+    }
+
+    section nested_stuff {
+        set_sec_offset 6;  // pad to last byte of region
+        wr more_nested;
+    }
+
+    section more_nested {
+        wr std::crc32c(more_nested);  // 4 bytes of output
+    }
+
+    section data in LITTLE_ROM {
+        wr nested_stuff;  // ERROR!  Data written outside of region
+    }
+
+
+The [set_addr](#set_addr) command and any offset manipulation commands are also
+constrained to fit in the region.
+
+    region FLASH {
+        addr = 0xF000_0000;
+        size = 1M;
+    }
+
+    section foo {
+        set_addr 0xA000_0000;  // ERROR, address outside region
+        wrs "Outside region!";
+    }
+
+    section flash_top_level in FLASH {
+        wr foo;
+    }
 
 ---
 
