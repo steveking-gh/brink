@@ -1159,7 +1159,7 @@ byte, resulting in an error:
     }
 
 Of course, region enforcement occurs not just in the region's top-level section,
-but in any reachable section.
+but in any reachable section.  For example:
 
     region LITTLE_ROM {
         addr = 0;
@@ -1179,9 +1179,8 @@ but in any reachable section.
         wr nested_stuff;  // ERROR!  Data written outside of region
     }
 
-
 The [set_addr](#set_addr) command and any offset manipulation commands are also
-constrained to fit in the region.
+constrained to fit in the region.  For example:
 
     region FLASH {
         addr = 0xF000_0000;
