@@ -1004,8 +1004,9 @@ section with the following extra behaviors:
 
 * The region sets the starting address of the top-level section.
 * The region caps the size of the top-level section.
-* By default, the region aligns each write operation in the top-level section.
-* By default, the region sets the fill byte in the top-level section.
+* The region can optionally set the default alignment each write operation in
+  the top-level section.
+* The region can optionally set the default fill byte in the top-level section.
 
 For example:
 
@@ -1221,8 +1222,11 @@ Brink writes to the output file.  Other sections can be directly or indirectly
 included via [`wr`](#wr) statements from the output section.  Unreachable
 sections produce a warning.
 
-To help guide layout, users can place a section in a [region](#region) with `in
-<region name>` after the section name.
+### Sections In Regions
+
+To help guide layout, users can place a exactly one section `in` a
+[region](#region) with `in <region name>` after the section name.  We call a
+section placed in a region as the *top-level section* of the region.
 
 Example:
 
@@ -1253,8 +1257,8 @@ Example:
 
 The `set_addr` command forces the current address to the specified value and
 resets the current `addr_offset` to zero.  These changes happen within the scope
-of the containing section.  Child sections inherit the new `addr` and
-`addr_offset` values unless they call `set_addr` themselves.
+of the containing section.  Child sections inherit the parent section's `addr`
+and `addr_offset` values.
 
 Using `set_addr` *does not* change the value of the section offset nor file
 offset.  A `set_addr` command *does not* add pad bytes to the output.
@@ -1288,6 +1292,8 @@ Example:
     }
 
     output foo;
+
+When used in a section in a [region](#region), Brink reports an error if the `set_addr` command sets the address outside of a region.
 
 ---
 
@@ -1426,6 +1432,19 @@ Example:
     }
 
     output foo;
+---
+
+When called with an [extension](#extensions) identifier, `sizeof` returns the size of the
+extension's output.  For example:
+
+    print "CRC size=", sizeof(std::crc32c);  // returns "CRC size=4"
+
+When called with a [region](#region) identifier, `sizeof` returns the fixed size of the region.
+
+    region FLASH { ...; size = 8K; ... }
+    ...
+    print "FLASH size=", sizeof(FLASH);  // returns "FLASH size=8192"
+
 ---
 
 ## to_i64
