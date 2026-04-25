@@ -68,6 +68,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
 
 [[package]]
+name = "argvaldb"
+version = "6.1.1"
+dependencies = [
+ "ir",
+]
+
+[[package]]
 name = "ariadne"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -295,6 +302,7 @@ name = "exec_phase"
 version = "6.1.1"
 dependencies = [
  "anyhow",
+ "argvaldb",
  "diags",
  "extension_registry",
  "ir",
@@ -302,7 +310,6 @@ dependencies = [
  "locationdb",
  "mapdb",
  "memmap2",
- "paramvaldb",
  "tracing",
 ]
 
@@ -460,6 +467,7 @@ name = "layout_phase"
 version = "6.1.1"
 dependencies = [
  "anyhow",
+ "argvaldb",
  "ast",
  "diags",
  "extension_registry",
@@ -467,7 +475,6 @@ dependencies = [
  "irdb",
  "locationdb",
  "memmap2",
- "paramvaldb",
  "tracing",
 ]
 
@@ -536,12 +543,12 @@ checksum = "5e5032e24019045c762d3c0f28f5b6b8bbf38563a65908389bf7978758920897"
 name = "map_phase"
 version = "6.1.1"
 dependencies = [
+ "argvaldb",
  "diags",
  "ir",
  "irdb",
  "locationdb",
  "mapdb",
- "paramvaldb",
  "serde_json",
  "tracing",
 ]
@@ -614,13 +621,6 @@ name = "once_cell_polyfill"
 version = "1.70.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
-
-[[package]]
-name = "paramvaldb"
-version = "6.1.1"
-dependencies = [
- "ir",
-]
 
 [[package]]
 name = "parking_lot"
@@ -704,6 +704,7 @@ name = "process"
 version = "6.1.1"
 dependencies = [
  "anyhow",
+ "argvaldb",
  "ast",
  "const_eval",
  "diags",
@@ -717,7 +718,6 @@ dependencies = [
  "locationdb",
  "map_phase",
  "mapdb",
- "paramvaldb",
  "parse_int",
  "prune",
  "tracing",

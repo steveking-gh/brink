@@ -15,7 +15,7 @@ use diags::Diags;
 use extension_registry::ExtensionRegistry;
 use ir::{ConstBuiltins, DataType, IR, IRKind, ParameterValue};
 use irdb::IRDb;
-use paramvaldb::ParmValDb;
+use argvaldb::ParmValDb;
 use std::collections::HashSet;
 
 #[allow(unused_imports)]

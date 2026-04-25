@@ -25,9 +25,10 @@ Design decisions established for this plan:
   `sizeof(FLASH)`. Dot notation (`FLASH.addr`) is not implemented.
 - `output` takes a section name only. Section placement uses `set_addr` or
   `in REGION` binding. The address argument is removed in Step 2.
-- `set_addr` is not permitted inside a region-bound section. Regions control
-  section placement; a section bound to a region starts at `addr(region)`.
-  `set_addr` remains valid in sections not bound to a region.
+- `set_addr` is permitted inside a region-bound section. Brink reports an error
+  if the `set_addr` target address falls outside the region. Regions set the
+  starting address of the top-level section; `set_addr` may adjust the address
+  within the section, but only within region bounds.
 - `--max-output-size` and the region system are independent mechanisms.
   `--max-output-size` is a file-size failsafe; regions enforce spatial
   correctness. Neither implies the other.
@@ -36,76 +37,8 @@ Design decisions established for this plan:
 
 ## Step 1 — `--max-output-size` flag  *(COMPLETE)*
 
-Already implemented. Adds a CLI `--max-output-size SIZE` option that caps the
-output file size. Error code `PROC_7` fires if the computed image size exceeds
-the limit.
-
----
 
 ## Step 2 — Remove `output` address argument [DONE 2026-04-21]
-
-### Motivation
-
-The `output` statement currently accepts an optional absolute starting address:
-
-```brink
-output image 0x0800_0000;
-```
-
-This conflicts with the region system and with `set_addr`, creating two ways
-to specify the same thing with no rule for which wins. The output statement
-should name the root section only; placement belongs to `set_addr` or to a
-region binding.
-
-### Migration
-
-| Old form                        | Replacement                                           |
-|---------------------------------|-------------------------------------------------------|
-| `output foo 0x1000;`            | `set_addr 0x1000;` as first statement in `foo`        |
-| `output foo 0x1000;` + region   | bind `foo` `in REGION` where `region.addr = 0x1000`   |
-| `output foo;` (address omitted) | unchanged — continues to work                         |
-| `output foo 0;`                 | `output foo;` — address 0 is the default              |
-
-### Parser changes
-
-In `parse_output`, after parsing the section name, require `Semicolon`
-immediately. If an expression or integer literal follows the section name,
-emit `AST_55` with a message directing users to `set_addr`.
-
-### Engine changes
-
-Remove the `abs_start` parameter from `Engine::new()`. The section's resolved
-starting address — from `set_addr` or from a region binding (Step 5) — is
-already present in the iterate output. No engine arithmetic uses `abs_start`
-independently of section layout.
-
-### `__OUTPUT_ADDR` behavior
-
-`__OUTPUT_ADDR` already documents itself as equivalent to
-`addr(<output-section>)`. After this change that equivalence is the only
-definition: `__OUTPUT_ADDR` returns the resolved starting address of the
-output section, which is 0 if no `set_addr` or region binding applies.
-No behavior change for programs that did not supply an output address.
-
-### Test updates
-
-- Any integration test using `output SECTION 0xADDR;` must be updated to move
-  the address into the section via `set_addr`.
-- Add a regression test: `output foo 0x1000;` produces `AST_55`.
-- Confirm `output foo;` and `output foo 0;` (the latter now an error) behave
-  as expected.
-
-### README changes
-
-Update the `output` reference entry to remove the address syntax.  Update
-`__OUTPUT_ADDR` entry to remove references to the output-statement address.
-Update any examples that used `output section 0xADDR;`.
-
-### New error codes
-
-| Code   | Meaning                                                              |
-|--------|----------------------------------------------------------------------|
-| AST_55 | `output` address argument removed; use `set_addr` or region binding  |
 
 ---
 
@@ -358,9 +291,8 @@ pub struct SectionEntry {
 
 For sections declared `in REGION`, the engine sets the section's starting
 address to `region.addr` during the iterate loop in `iterate_section_start`.
-This replaces any need for an explicit `set_addr` instruction. Sections
-bound to a region must not contain `set_addr`; emit `EXEC_72` if one is
-encountered.
+`set_addr` is permitted inside a region-bound section, but Brink reports
+`EXEC_72` if the target address falls outside the region bounds.
 
 The `default_align` from the region applies to all write operations in the
 top-level section unless overridden by an explicit `align` statement at that
@@ -402,7 +334,7 @@ pub fn new(
 
 | Code    | Meaning                                                          |
 |---------|------------------------------------------------------------------|
-| EXEC_72 | `set_addr` used inside a region-bound section                    |
+| EXEC_72 | `set_addr` targets an address outside the containing region      |
 | EXEC_73 | Region-bound section exceeds region size                         |
 
 ---
@@ -437,28 +369,13 @@ are added.
 
 ---
 
-## Step 7 — `output` statement with optional address
+## Step 7 — *(Superseded by Step 2)*
 
-When the output section is declared `in REGION`, the address argument is
-redundant because the base address is encoded in the region. Make it optional:
-
-```brink
-output flash_image;              // address omitted; valid when section is in REGION
-output flash_image 0;            // still valid (backward compatible)
-output flash_image 0xF000_0000;  // still valid
-```
-
-### Parser change
-
-In `parse_output`, after parsing the section name, check if the next token is
-`Semicolon`. If so, address defaults to `0`. If the output section is not
-bound to a region and the address is omitted, emit warning `AST_52`.
-
-### New error codes / warnings
-
-| Code   | Meaning                                                          |
-|--------|------------------------------------------------------------------|
-| AST_52 | `output` address omitted on section not associated with a region |
+Step 2 removed the `output` address argument entirely (error `AST_55`).
+Step 7 had proposed making that argument optional for region-bound sections,
+but Step 2 completed first and established the authoritative design: `output`
+takes a section name only; placement uses `set_addr` or an `in REGION`
+binding. No work remains here.
 
 ---
 
@@ -507,12 +424,11 @@ EXEC_69 to leave room.
 | AST_47  | 2    | ast        | Region name conflicts with section or const          |
 | AST_48  | 4    | ast        | `in` not followed by region name in section decl     |
 | AST_49  | 4    | ast        | Section references undeclared region                 |
-| AST_52  | 7    | ast        | `output` address omitted on non-region section (warn)|
 | AST_53  | 4    | ast        | Second section bound to same region                  |
 | AST_55  | 2    | ast        | `output` address arg removed; use `set_addr` (DONE)  |
 | PROC_7  | 1    | process    | Output size exceeds `--max-output-size` (COMPLETE)   |
 | EXEC_69 | 3    | const_eval | `default_align` not a power of two or is zero        |
 | EXEC_70 | 3    | const_eval | Two regions have overlapping address ranges          |
 | EXEC_71 | 3    | const_eval | Cyclic dependency in region property expressions     |
-| EXEC_72 | 5    | engine     | `set_addr` used inside a region-bound section        |
+| EXEC_72 | 5    | engine     | `set_addr` targets an address outside the region     |
 | EXEC_73 | 5    | engine     | Region-bound section exceeds region size             |

@@ -174,7 +174,7 @@ pub fn process(
         ir_db.dump();
     }
 
-    let (location_db, parmval_db) = LayoutPhase::build(&ir_db, &ext_registry, &mut diags)
+    let (location_db, argval_db) = LayoutPhase::build(&ir_db, &ext_registry, &mut diags)
         .context("[PROC_6]: Error detected, halting.")?;
     if verbosity > 2 {
         // LayoutPhase debug dump removed
@@ -208,7 +208,7 @@ pub fn process(
 
     if ExecPhase::execute(
         &location_db,
-        &parmval_db,
+        &argval_db,
         &map_db,
         &ir_db,
         &mut diags,
