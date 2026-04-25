@@ -20,4 +20,4 @@ extension_registry = { path = "../extension_registry" }
 tracing = "0.1.44"
 memmap2 = "0.9.10"
 locationdb = { path = "../locationdb" }
-paramval_db = { path = "../paramval_db" }
+paramvaldb = { path = "../paramvaldb" }

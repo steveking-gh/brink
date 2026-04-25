@@ -1,10 +1,10 @@
 [package]
-name = "paramval_db"
+name = "paramvaldb"
 version = "6.1.1"
 edition = "2021"
 
 [lib]
-path = "paramval_db.rs"
+path = "paramvaldb.rs"
 
 [dependencies]
 ir = { path = "../ir" }

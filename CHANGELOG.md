@@ -12,7 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - README: Removed obsolete text on if/else statement restrictions
 - README: Documented region feature
 - INTERNAL: Improved README.md formatting
-- INTERNAL: Better division of responsiblity now with distinct layout, map and exec phases.
+- INTERNAL: Better division of responsibility now with distinct layout, map and exec phases.
 - INTERNAL: Refactor parameter values into their own module.
 
 ## [6.1.1] - 2026-04-20

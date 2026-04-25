@@ -17,12 +17,12 @@ members = [
     "extension_registry",
     "const_eval",
     "brink_extension",
-    "paramval_db",
+    "paramvaldb",
     "std/crc32c",
     "std/sha256",
     "std/md5",
     "extensions",
-    "prune", "locationdb", "mapdb",
+    "prune",
 ]
 
 [workspace.package]

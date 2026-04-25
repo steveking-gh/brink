@@ -16,7 +16,7 @@ use ir::{DataType, IR, IRKind, ParameterValue};
 use irdb::IRDb;
 use locationdb::LocationDb;
 use mapdb::MapDb;
-use paramval_db::ParmValDb;
+use paramvaldb::ParmValDb;
 use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
 use std::io::{Read, Write};
@@ -38,7 +38,7 @@ pub struct ExecPhase {}
 impl ExecPhase {
     pub fn execute(
         location_db: &LocationDb,
-        paramval_db: &ParmValDb,
+        paramvaldb: &ParmValDb,
         map_db: &MapDb,
         irdb: &IRDb,
         diags: &mut Diags,
@@ -50,7 +50,7 @@ impl ExecPhase {
 
         Self::execute_core_operations(
             location_db,
-            paramval_db,
+            paramvaldb,
             &mut written_ranges,
             irdb,
             diags,
@@ -59,24 +59,24 @@ impl ExecPhase {
         )?;
         Self::execute_extensions(
             location_db,
-            paramval_db,
+            paramvaldb,
             map_db,
             irdb,
             diags,
             file,
             ext_registry,
         )?;
-        Self::execute_validation(paramval_db, irdb, diags)?;
+        Self::execute_validation(paramvaldb, irdb, diags)?;
 
         Ok(())
     }
 
-    fn execute_validation(paramval_db: &ParmValDb, irdb: &IRDb, diags: &mut Diags) -> Result<()> {
+    fn execute_validation(paramvaldb: &ParmValDb, irdb: &IRDb, diags: &mut Diags) -> Result<()> {
         trace!("Engine::execute_validation:");
         let mut error_count = 0;
         for ir in &irdb.ir_vec {
             if ir.kind == IRKind::Assert
-                && Self::execute_assert(paramval_db, ir, irdb, diags).is_err()
+                && Self::execute_assert(paramvaldb, ir, irdb, diags).is_err()
             {
                 error_count += 1;
                 if error_count > 10 {
@@ -91,7 +91,7 @@ impl ExecPhase {
     }
 
     fn execute_assert(
-        paramval_db: &ParmValDb,
+        paramvaldb: &ParmValDb,
         ir: &IR,
         irdb: &IRDb,
         diags: &mut Diags,
@@ -102,7 +102,7 @@ impl ExecPhase {
             "{}",
             format!("engine::execute_assert: checking operand {}", opnd_num).as_str()
         );
-        let parm = &paramval_db.parms[opnd_num];
+        let parm = &paramvaldb.parms[opnd_num];
         if !parm
             .to_bool()
             .expect("assert operand must be numeric; IRDb type check failed")
@@ -115,7 +115,7 @@ impl ExecPhase {
             // then backtrack to print information about that operation.  To backtrack
             // we get the Option<src_lid> for the assert.
             let src_lid = irdb.get_operand_ir_lid(opnd_num);
-            Self::assert_info(paramval_db, src_lid, irdb, diags);
+            Self::assert_info(paramvaldb, src_lid, irdb, diags);
             return Err(anyhow!("Assert failed"));
         }
 
@@ -123,7 +123,7 @@ impl ExecPhase {
     }
 
     fn execute_print(
-        paramval_db: &ParmValDb,
+        paramvaldb: &ParmValDb,
         ir: &IR,
         irdb: &IRDb,
         diags: &mut Diags,
@@ -135,7 +135,7 @@ impl ExecPhase {
             return Ok(());
         }
 
-        let Some(xstr) = Self::evaluate_string_expr(paramval_db, ir, irdb, diags) else {
+        let Some(xstr) = Self::evaluate_string_expr(paramvaldb, ir, irdb, diags) else {
             let msg = "Evaluating string expression failed.".to_string();
             diags.err1("EXEC_16", &msg, ir.src_loc.clone());
             return Err(anyhow!("Wrs failed"));
@@ -147,7 +147,7 @@ impl ExecPhase {
     #[allow(clippy::too_many_arguments)]
     fn execute_wrs(
         location_db: &LocationDb,
-        paramval_db: &ParmValDb,
+        paramvaldb: &ParmValDb,
         written_ranges: &mut WrittenRanges,
         lid: usize,
         ir: &IR,
@@ -156,7 +156,7 @@ impl ExecPhase {
         file: &mut File,
     ) -> Result<()> {
         trace!("Engine::execute_wrs:");
-        let Some(xstr) = Self::evaluate_string_expr(paramval_db, ir, irdb, diags) else {
+        let Some(xstr) = Self::evaluate_string_expr(paramvaldb, ir, irdb, diags) else {
             let msg = "Evaluating string expression failed.".to_string();
             diags.err1("EXEC_15", &msg, ir.src_loc.clone());
             return Err(anyhow!("Wrs failed"));
@@ -182,7 +182,7 @@ impl ExecPhase {
     #[allow(clippy::too_many_arguments)]
     fn execute_wrf(
         location_db: &LocationDb,
-        paramval_db: &ParmValDb,
+        paramvaldb: &ParmValDb,
         written_ranges: &mut WrittenRanges,
         lid: usize,
         ir: &IR,
@@ -192,7 +192,7 @@ impl ExecPhase {
     ) -> Result<()> {
         trace!("Engine::execute_wrf:");
 
-        let path = paramval_db.parms[ir.operands[0]].to_str().to_owned();
+        let path = paramvaldb.parms[ir.operands[0]].to_str().to_owned();
 
         // we already verified this is a legit file path,
         // so unwrap is ok.
@@ -257,7 +257,7 @@ impl ExecPhase {
 
     fn execute_wrx(
         location_db: &LocationDb,
-        paramval_db: &ParmValDb,
+        paramvaldb: &ParmValDb,
         written_ranges: &mut WrittenRanges,
         lid: usize,
         ir: &IR,
@@ -272,7 +272,7 @@ impl ExecPhase {
             "{}",
             format!("engine::execute_wrx: checking operand {}", opnd_num).as_str()
         );
-        let parm = &paramval_db.parms[opnd_num];
+        let parm = &paramvaldb.parms[opnd_num];
 
         // Extract bytes as little-endian.  One a big-endian machine, the LSB will
         // bit the highest address location, which is wrong since we're writing
@@ -297,7 +297,7 @@ impl ExecPhase {
             // Yes, we have a repeat count
             // We already validated the operands in IRDB.
             let repeat_opnd_num = ir.operands[1];
-            let op = &paramval_db.parms[repeat_opnd_num];
+            let op = &paramvaldb.parms[repeat_opnd_num];
             repeat_count = op.to_u64();
         }
 
@@ -332,7 +332,7 @@ impl ExecPhase {
 
     fn execute_core_operations(
         location_db: &LocationDb,
-        paramval_db: &ParmValDb,
+        paramvaldb: &ParmValDb,
         written_ranges: &mut WrittenRanges,
         irdb: &IRDb,
         diags: &mut Diags,
@@ -344,10 +344,10 @@ impl ExecPhase {
         let mut error_count = 0;
         for (lid, ir) in irdb.ir_vec.iter().enumerate() {
             result = match ir.kind {
-                IRKind::Wr(_) => Self::execute_wrx(location_db, paramval_db, written_ranges, lid, ir, diags, file),
-                IRKind::Print => Self::execute_print(paramval_db, ir, irdb, diags, file),
-                IRKind::Wrs => Self::execute_wrs(location_db, paramval_db, written_ranges, lid, ir, irdb, diags, file),
-                IRKind::Wrf => Self::execute_wrf(location_db, paramval_db, written_ranges, lid, ir, irdb, diags, file),
+                IRKind::Wr(_) => Self::execute_wrx(location_db, paramvaldb, written_ranges, lid, ir, diags, file),
+                IRKind::Print => Self::execute_print(paramvaldb, ir, irdb, diags, file),
+                IRKind::Wrs => Self::execute_wrs(location_db, paramvaldb, written_ranges, lid, ir, irdb, diags, file),
+                IRKind::Wrf => Self::execute_wrf(location_db, paramvaldb, written_ranges, lid, ir, irdb, diags, file),
                 // Assert runs in the validation phase, after all bytes are written.
                 IRKind::Assert => Ok(()),
                 // the rest of these operations are computed during iteration
@@ -403,7 +403,7 @@ impl ExecPhase {
                 IRKind::ExtensionCall => {
                     // Pre-pad zeroed bytes to expand the output file to cover
                     // the extension's output region before memory mapping.
-                    let ext_name = paramval_db.parms[ir.operands[0]].to_identifier();
+                    let ext_name = paramvaldb.parms[ir.operands[0]].to_identifier();
                     if let Some(entry) = ext_registry.get(ext_name) {
                         let buf = vec![0u8; entry.cached_size];
                         file.write_all(&buf).map_err(|e| {
@@ -436,7 +436,7 @@ impl ExecPhase {
 
     fn execute_extensions(
         location_db: &LocationDb,
-        paramval_db: &ParmValDb,
+        paramvaldb: &ParmValDb,
         map_db: &MapDb,
         irdb: &IRDb,
         diags: &mut Diags,
@@ -488,7 +488,7 @@ impl ExecPhase {
         let mut error_count = 0;
         for &idx in &extension_nodes {
             let ir = &irdb.ir_vec[idx];
-            let name = paramval_db.parms[ir.operands[0]].to_identifier();
+            let name = paramvaldb.parms[ir.operands[0]].to_identifier();
 
             let Some(entry) = ext_registry.get(name) else {
                 unreachable!("Extension '{}' not found in registry", name);
@@ -529,7 +529,7 @@ impl ExecPhase {
                 // resolve it to ParamArg::Slice.
                 if last > 1 {
                     if let ParameterValue::Identifier(ref sec_name) =
-                        paramval_db.parms[ir.operands[1]]
+                        paramvaldb.parms[ir.operands[1]]
                     {
                         let indices = sec_dispatch_map
                             .get(sec_name.as_str())
@@ -572,7 +572,7 @@ impl ExecPhase {
                 // Operands arrive in declaration order after irdb canonicalization.
                 for (i, p) in cached_params.iter().enumerate() {
                     if p.kind == ParamKind::Slice {
-                        let sec_name = paramval_db.parms[ir.operands[1 + i]]
+                        let sec_name = paramvaldb.parms[ir.operands[1 + i]]
                             .to_identifier()
                             .to_string();
                         let indices = sec_dispatch_map
@@ -642,7 +642,7 @@ impl ExecPhase {
                         1
                     };
                     for &op in &ir.operands[user_arg_start..last] {
-                        let parm = &paramval_db.parms[op];
+                        let parm = &paramvaldb.parms[op];
                         let arg = match parm {
                             ParameterValue::U64(v) => ParamArg::Int(*v),
                             ParameterValue::I64(v) | ParameterValue::Integer(v) => {
@@ -665,7 +665,7 @@ impl ExecPhase {
                                 });
                             }
                         } else {
-                            let parm = &paramval_db.parms[ir.operands[1 + i]];
+                            let parm = &paramvaldb.parms[ir.operands[1 + i]];
                             let arg = match parm {
                                 ParameterValue::U64(v) => ParamArg::Int(*v),
                                 ParameterValue::I64(v) | ParameterValue::Integer(v) => {
@@ -767,7 +767,7 @@ impl ExecPhase {
     }
 
     fn evaluate_string_expr(
-        paramval_db: &ParmValDb,
+        paramvaldb: &ParmValDb,
         ir: &IR,
         irdb: &IRDb,
         diags: &mut Diags,
@@ -775,7 +775,7 @@ impl ExecPhase {
         let mut result = true;
         let mut xstr = String::new();
         for (local_op_num, &op_num) in ir.operands.iter().enumerate() {
-            let op = &paramval_db.parms[op_num];
+            let op = &paramvaldb.parms[op_num];
             debug!(
                 "Processing string expr operand {} with data type {:?}",
                 local_op_num,
@@ -805,7 +805,7 @@ impl ExecPhase {
     }
 
     fn assert_info(
-        paramval_db: &ParmValDb,
+        paramvaldb: &ParmValDb,
         src_lid: Option<usize>,
         irdb: &IRDb,
         diags: &mut Diags,
@@ -821,18 +821,18 @@ impl ExecPhase {
         // presume to be false, necessitating this diagnostic.
         for (idx, opnd) in operation.operands.iter().enumerate() {
             if idx < num_operands - 1 {
-                Self::assert_info_operand(paramval_db, *opnd, irdb, diags);
+                Self::assert_info_operand(paramvaldb, *opnd, irdb, diags);
             }
         }
     }
 
     fn assert_info_operand(
-        paramval_db: &ParmValDb,
+        paramvaldb: &ParmValDb,
         opnd_num: usize,
         irdb: &IRDb,
         diags: &mut Diags,
     ) {
-        let opnd = &paramval_db.parms[opnd_num];
+        let opnd = &paramvaldb.parms[opnd_num];
         let ir_opnd = &irdb.parms[opnd_num];
         if opnd.data_type() == DataType::U64 {
             let val = opnd.to_u64();

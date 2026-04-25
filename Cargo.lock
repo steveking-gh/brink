@@ -302,7 +302,7 @@ dependencies = [
  "locationdb",
  "mapdb",
  "memmap2",
- "paramval_db",
+ "paramvaldb",
  "tracing",
 ]
 
@@ -467,7 +467,7 @@ dependencies = [
  "irdb",
  "locationdb",
  "memmap2",
- "paramval_db",
+ "paramvaldb",
  "tracing",
 ]
 
@@ -541,7 +541,7 @@ dependencies = [
  "irdb",
  "locationdb",
  "mapdb",
- "paramval_db",
+ "paramvaldb",
  "serde_json",
  "tracing",
 ]
@@ -616,7 +616,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
-name = "paramval_db"
+name = "paramvaldb"
 version = "6.1.1"
 dependencies = [
  "ir",
@@ -717,7 +717,7 @@ dependencies = [
  "locationdb",
  "map_phase",
  "mapdb",
- "paramval_db",
+ "paramvaldb",
  "parse_int",
  "prune",
  "tracing",

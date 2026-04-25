@@ -15,4 +15,4 @@ diags = { path = "../diags" }
 serde_json = "1"
 tracing = "0.1.44"
 mapdb = { path = "../mapdb" }
-paramval_db = { path = "../paramval_db" }
+paramvaldb = { path = "../paramvaldb" }
