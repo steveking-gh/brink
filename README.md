@@ -1259,8 +1259,7 @@ scope of the current section.  For example:
 
 ## section
 
-`section <name> { ... }`
-`section <name> in <region> { ... }`
+`section <name> [in <region>] { ... }`
 
 A section is a named, reusable block of content.  Sections are the primary
 building block of a Brink program.  Each section defines a sequence of bytes,

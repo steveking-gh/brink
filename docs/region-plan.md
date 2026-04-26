@@ -42,7 +42,7 @@ Design decisions established for this plan:
 
 ---
 
-## Step 3 — `region` keyword and AST parsing
+## Step 3 — `region` keyword and AST parsing  *(AST layer COMPLETE)*
 
 ### New lexer tokens
 
@@ -232,7 +232,7 @@ per overlapping pair.
 
 ---
 
-## Step 4 — `section NAME in REGION` binding
+## Step 4 — `section NAME in REGION` binding  *(AST layer COMPLETE)*
 
 ### Parser changes
 
@@ -412,23 +412,30 @@ pass and no existing tests regress.
 
 ## Error Code Summary
 
-Verify all EXEC codes against `engine.rs` before implementation — codes
-EXEC_57 through EXEC_62 are known to be occupied.  Region codes begin at
-EXEC_69 to leave room.
+AST_44 and AST_53 were already occupied before region work began.
+Region codes are shifted accordingly.
 
-| Code    | Step | Crate      | Meaning                                              |
-|---------|------|------------|------------------------------------------------------|
-| AST_44  | 2    | ast        | Unknown region property name                         |
-| AST_45  | 2    | ast        | Duplicate region property                            |
-| AST_46  | 2    | ast        | Missing required region property                     |
-| AST_47  | 2    | ast        | Region name conflicts with section or const          |
-| AST_48  | 4    | ast        | `in` not followed by region name in section decl     |
-| AST_49  | 4    | ast        | Section references undeclared region                 |
-| AST_53  | 4    | ast        | Second section bound to same region                  |
-| AST_55  | 2    | ast        | `output` address arg removed; use `set_addr` (DONE)  |
-| PROC_7  | 1    | process    | Output size exceeds `--max-output-size` (COMPLETE)   |
-| EXEC_69 | 3    | const_eval | `default_align` not a power of two or is zero        |
-| EXEC_70 | 3    | const_eval | Two regions have overlapping address ranges          |
-| EXEC_71 | 3    | const_eval | Cyclic dependency in region property expressions     |
-| EXEC_72 | 5    | engine     | `set_addr` targets an address outside the region     |
-| EXEC_73 | 5    | engine     | Region-bound section exceeds region size             |
+| Code    | Step | Crate           | Meaning                                                    |
+|---------|------|-----------------|------------------------------------------------------------|
+| AST_45  | 3    | ast             | Unknown region property name                               |
+| AST_46  | 3    | ast             | Duplicate region property                                  |
+| AST_47  | 3    | ast             | Missing required region property (addr or size)            |
+| AST_48  | 3    | ast             | Region name conflicts with a section name                  |
+| AST_49  | 4    | ast             | `in` not followed by region name in section declaration    |
+| AST_55  | 2    | ast             | `output` address arg removed; use `set_addr` (DONE)        |
+| AST_56  | 4    | ast             | Section references undeclared region                       |
+| AST_57  | 4    | ast             | Second section bound to same region                        |
+| AST_58  | 3    | ast             | Expected identifier after `region` keyword                 |
+| AST_59  | 3    | ast             | Expected `{` after region name                             |
+| AST_60  | 3    | ast             | Duplicate region name                                      |
+| AST_61  | 3    | ast             | Reserved identifier used as region name                    |
+| AST_62  | 3    | ast             | Expected `=` after region property name                    |
+| AST_63  | 3    | ast             | Region name conflicts with a const name                    |
+| AST_64  | 3    | ast             | Region is missing required property `size`                 |
+| PROC_7  | 1    | process         | Output size exceeds `--max-output-size` (COMPLETE)         |
+| PROC_8  | —    | process         | ValidationPhase failure (assert evaluation)                |
+| EXEC_69 | 3    | const_eval      | `default_align` not a power of two or is zero              |
+| EXEC_70 | 3    | const_eval      | Two regions have overlapping address ranges                |
+| EXEC_71 | 3    | const_eval      | Cyclic dependency in region property expressions           |
+| EXEC_72 | 5    | engine          | `set_addr` targets an address outside the region           |
+| EXEC_73 | 5    | engine          | Region-bound section exceeds region size                   |

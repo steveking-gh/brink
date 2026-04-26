@@ -41,6 +41,8 @@ pub enum LexToken {
     BuiltinVersionMinor,
     BuiltinVersionPatch,
     Include,
+    In,
+    Region,
     Section,
     Align,
     SetSecOffset,
@@ -109,6 +111,15 @@ pub enum LexToken {
     /// sees Identifier followed immediately by Eq inside a call argument
     /// list.  The token val is the parameter name (without the `=`).
     NamedArg,
+    /// A property assignment inside a region block.
+    /// Synthesized by parse_region_contents; tok = RegionProp, val = property
+    /// name ("addr", "size", "default_align", "default_fill").
+    /// The single child is the expression value.
+    RegionProp,
+    /// Section-to-region binding recorded during parse_section.
+    /// Synthesized when `section NAME in REGION` is parsed; tok = RegionRef,
+    /// val = region name.  No children.
+    RegionRef,
     /// Catch-all for unrecognized input.
     Unknown,
 }
@@ -152,6 +163,8 @@ pub fn is_reserved_identifier(name: &str) -> bool {
             | "extern"
             | "let"
             | "fill"
+            | "region"
+            | "in"
     )
 }
 
@@ -168,6 +181,8 @@ pub const fn has_useful_debug_value(tok: LexToken) -> bool {
             | LexToken::U64
             | LexToken::I64
             | LexToken::NamedArg
+            | LexToken::RegionProp
+            | LexToken::RegionRef
     )
 }
 
@@ -609,6 +624,7 @@ impl<'toks> Ast<'toks> {
             debug_peek!("Ast::parse", self.tv);
             result &= match tinfo.tok {
                 LexToken::Section => self.parse_section(self.root, diags),
+                LexToken::Region => self.parse_region(self.root, diags),
                 LexToken::Output => self.parse_output(self.root, diags),
                 LexToken::Const => self.parse_const(self.root, diags),
                 LexToken::If => self.parse_if_r(self.root, diags, ParseIfContext::TopLevel),
@@ -863,6 +879,169 @@ impl<'toks> Ast<'toks> {
         false
     }
 
+    /// Parses a `region` declaration and attaches it to the AST.
+    ///
+    /// ```text
+    /// region <name> { <statements> }
+    ///
+    ///   region              <- root node for a region declaration
+    ///   ├── <Identifier>     <- region name
+    ///   ├── {                <- syntactic delimiter, marks start of body
+    ///   ├── addr
+    ///   ├── size
+    ///   ├── [default_align]  <- default alignment (optional)
+    ///   ├── [default_fill]   <- default fill (optional)
+    ///   └── }                <- syntactic delimiter, marks end of body
+    /// ```
+    fn parse_region(&mut self, parent: NodeId, diags: &mut Diags) -> bool {
+        self.dbg_enter("parse_region");
+        let mut result = false;
+        // Regions are always children of the root node, but no need to make
+        // that a special case here.
+        let reg_nid = self.add_to_parent_and_advance(parent);
+
+        // After 'region' an identifier is expected.  expect_name_leaf also accepts
+        // keyword tokens so AstDb can emit the specific reserved-identifier error.
+        if self.expect_name_leaf(
+            diags,
+            reg_nid,
+            "AST_58",
+            "Expected an identifier after region",
+        ) {
+            // After a region identifier, expect an open brace.
+            // Remember the location of the opening brace to help with
+            // user missing brace errors.
+            let brace_toknum = self.tv.get_index();
+            if self.expect_leaf(
+                diags,
+                reg_nid,
+                LexToken::OpenBrace,
+                "AST_59",
+                "Expected { after region name",
+            ) {
+                result = self.parse_region_contents(reg_nid, diags, brace_toknum);
+            }
+        }
+        self.dbg_exit("parse_region", result)
+    }
+
+    /// Parses the body of a `region` block.
+    ///
+    /// Recognizes `name = expr ;` property assignments until `}`.
+    /// Recognized names: `addr`, `size`, `default_align`, `default_fill`.
+    /// Unknown names produce AST_45; duplicates produce AST_46.
+    /// Missing required properties (`addr`, `size`) produce AST_47 after
+    /// the closing brace is consumed.
+    fn parse_region_contents(
+        &mut self,
+        reg_nid: NodeId,
+        diags: &mut Diags,
+        brace_toknum: usize,
+    ) -> bool {
+        self.dbg_enter("parse_region_contents");
+        let mut result = true;
+        let mut seen_addr = false;
+        let mut seen_size = false;
+        let mut seen_default_align = false;
+        let mut seen_default_fill = false;
+
+        loop {
+            let tinfo = self.tv.peek();
+
+            if tinfo.tok == LexToken::EOF {
+                self.err_no_close_brace(diags, brace_toknum);
+                return self.dbg_exit("parse_region_contents", false);
+            }
+
+            if tinfo.tok == LexToken::CloseBrace {
+                self.add_to_parent_and_advance(reg_nid);
+                break;
+            }
+
+            // Match by val so that "addr" (LexToken::Addr) and string-named
+            // properties both dispatch correctly regardless of token kind.
+            let prop_val = tinfo.val;
+            let prop_loc = tinfo.loc.clone();
+
+            let already_seen = match prop_val {
+                "addr" => Some(&mut seen_addr),
+                "size" => Some(&mut seen_size),
+                "default_align" => Some(&mut seen_default_align),
+                "default_fill" => Some(&mut seen_default_fill),
+                _ => None,
+            };
+
+            let Some(flag) = already_seen else {
+                let msg = format!(
+                    "Unknown region property '{}'; expected addr, size, default_align, or default_fill",
+                    prop_val
+                );
+                diags.err1("AST_45", &msg, tinfo.span());
+                self.advance_past_semicolon();
+                result = false;
+                continue;
+            };
+
+            if *flag {
+                let msg = format!("Duplicate region property '{}'", prop_val);
+                diags.err1("AST_46", &msg, tinfo.span());
+                self.advance_past_semicolon();
+                result = false;
+                continue;
+            }
+            *flag = true;
+            self.tv.skip(); // consume property name
+
+            // Consume '=' without adding it to the AST.
+            let eq_tinfo = self.tv.peek();
+            if eq_tinfo.tok == LexToken::EOF {
+                self.err_no_input(diags);
+                return self.dbg_exit("parse_region_contents", false);
+            }
+            if eq_tinfo.tok != LexToken::Eq {
+                let msg = format!("Expected '=' after region property '{}'", prop_val);
+                diags.err1("AST_62", &msg, eq_tinfo.span());
+                self.advance_past_semicolon();
+                result = false;
+                continue;
+            }
+            self.tv.skip(); // consume '='
+
+            // Synthesize a RegionProp node; the expression is its only child.
+            let prop_node = TokenInfo {
+                tok: LexToken::RegionProp,
+                loc: prop_loc,
+                val: prop_val,
+            };
+            let prop_nid = self.arena.new_node(prop_node);
+            reg_nid.append(prop_nid, &mut self.arena);
+
+            if !self.expect_expr(prop_nid, diags) {
+                self.advance_past_semicolon();
+                result = false;
+                continue;
+            }
+
+            if !self.expect_semi(diags, prop_nid) {
+                result = false;
+            }
+        }
+
+        // Verify required properties are present.
+        if !seen_addr {
+            let reg_tinfo = self.get_tinfo(reg_nid);
+            diags.err1("AST_47", "Region is missing required property 'addr'", reg_tinfo.span());
+            result = false;
+        }
+        if !seen_size {
+            let reg_tinfo = self.get_tinfo(reg_nid);
+            diags.err1("AST_64", "Region is missing required property 'size'", reg_tinfo.span());
+            result = false;
+        }
+
+        self.dbg_exit("parse_region_contents", result)
+    }
+
     /// Parses a `section` declaration and attaches it to the AST.
     ///
     /// ```text
@@ -889,7 +1068,41 @@ impl<'toks> Ast<'toks> {
             "AST_1",
             "Expected an identifier after section",
         ) {
-            // After a section identifier, expect an open brace.
+            // Optional `in REGION` binding between the name and opening brace.
+            let peek = self.tv.peek();
+            if peek.tok == LexToken::In {
+                self.tv.skip(); // consume 'in'
+                let tinfo = self.tv.peek();
+                if tinfo.tok == LexToken::EOF {
+                    self.err_no_input(diags);
+                    return self.dbg_exit("parse_section", false);
+                }
+                // Accept any word-like token so AstDb can produce a better error
+                // for reserved names; reject clearly non-identifier tokens.
+                let val_is_name = {
+                    let mut chars = tinfo.val.chars();
+                    matches!(chars.next(), Some(c) if c.is_ascii_alphabetic() || c == '_')
+                };
+                if !val_is_name {
+                    self.err_expected_after(
+                        diags,
+                        "AST_49",
+                        "'in': expected region name after 'in'",
+                    );
+                    return self.dbg_exit("parse_section", false);
+                }
+                // Synthesize a RegionRef node to record the binding.
+                let ref_node = TokenInfo {
+                    tok: LexToken::RegionRef,
+                    loc: tinfo.loc.clone(),
+                    val: tinfo.val,
+                };
+                self.tv.skip(); // consume region name token
+                let ref_nid = self.arena.new_node(ref_node);
+                sec_nid.append(ref_nid, &mut self.arena);
+            }
+
+            // After the name (and optional region binding), expect an open brace.
             // Remember the location of the opening brace to help with
             // user missing brace errors.
             let brace_toknum = self.tv.get_index();
@@ -2014,13 +2227,29 @@ impl<'toks> Ast<'toks> {
 pub struct Section<'toks> {
     pub tinfo: &'toks TokenInfo<'toks>,
     pub nid: NodeId,
+    /// Region name from an `in REGION` binding, if present.
+    pub region: Option<String>,
 }
 
 impl<'toks> Section<'toks> {
     pub fn new(ast: &'toks Ast, nid: NodeId) -> Section<'toks> {
+        // Second child is RegionRef when `section NAME in REGION` was parsed.
+        let region = {
+            let mut children = nid.children(&ast.arena);
+            let _name = children.next(); // skip section name (first child)
+            children.next().and_then(|child_nid| {
+                let ti = ast.get_tinfo(child_nid);
+                if ti.tok == LexToken::RegionRef {
+                    Some(ti.val.to_string())
+                } else {
+                    None
+                }
+            })
+        };
         Section {
             tinfo: ast.get_tinfo(nid),
             nid,
+            region,
         }
     }
 }
@@ -2061,6 +2290,64 @@ impl<'toks> Output<'toks> {
     }
 }
 
+/*******************************
+ * RegionEntry
+ ******************************/
+/// Fully resolved region declaration.
+///
+/// Populated in two phases:
+///   1. AstDb::new -- records nid and src_loc; addr/size/default_align/
+///      default_fill hold sentinel defaults.
+///   2. const_eval::evaluate_regions -- evaluates property expressions and
+///      fills addr, size, default_align, default_fill.
+#[derive(Clone, Debug)]
+pub struct RegionEntry {
+    /// AST node ID of the region root; used by const_eval to find properties.
+    pub nid: NodeId,
+    /// Source location of the region keyword, for diagnostics.
+    pub src_loc: SourceSpan,
+    /// Starting address of the region.  Populated by const_eval.
+    pub addr: u64,
+    /// Size of the region in bytes.  Populated by const_eval.
+    pub size: u64,
+    /// Default alignment for writes in the top-level section.
+    /// 1 means pack tightly.  Populated by const_eval; sentinel default 1.
+    pub default_align: u64,
+    /// Default fill byte for pad operations.
+    /// Populated by const_eval; sentinel default 0xFF.
+    pub default_fill: u8,
+}
+
+impl RegionEntry {
+    pub fn new(nid: NodeId, src_loc: SourceSpan) -> Self {
+        RegionEntry {
+            nid,
+            src_loc,
+            addr: 0,
+            size: 0,
+            default_align: 1,
+            default_fill: 0xFF,
+        }
+    }
+
+    /// Exclusive end address: addr + size.
+    pub fn end(&self) -> u64 {
+        self.addr + self.size
+    }
+
+    /// True if `addr` falls within [self.addr, self.addr + self.size).
+    pub fn contains_addr(&self, addr: u64) -> bool {
+        addr >= self.addr && addr < self.end()
+    }
+
+    /// True if the range [addr, addr+size) is fully within this region.
+    pub fn contains_range(&self, addr: u64, size: u64) -> bool {
+        addr >= self.addr
+            && size <= self.size
+            && addr - self.addr <= self.size - size
+    }
+}
+
 /*****************************************************************************
  * AstDb
  * The AstDb contains a map of various items in the AST.
@@ -2077,9 +2364,45 @@ pub struct AstDb<'toks> {
     pub const_statements: Vec<NodeId>,
     /// Set of all const names for collision detection.
     pub const_names: HashMap<&'toks str, SourceSpan>,
+    /// All region declarations, keyed by name, in encounter order.
+    pub regions: HashMap<String, RegionEntry>,
 }
 
 impl<'toks> AstDb<'toks> {
+    /// Records a region declaration into the regions map.
+    /// Checks for reserved identifier use (AST_61) and duplicate names (AST_60).
+    fn record_region(
+        diags: &mut Diags,
+        reg_nid: NodeId,
+        ast: &'toks Ast,
+        regions: &mut HashMap<String, RegionEntry>,
+    ) -> bool {
+        debug!("AstDb::record_region: NodeId {}", reg_nid);
+
+        let mut children = reg_nid.children(&ast.arena);
+        let name_nid = children.next().unwrap();
+        let name_tinfo = ast.get_tinfo(name_nid);
+        let name_str = name_tinfo.val;
+
+        if is_reserved_identifier(name_str) {
+            let m = format!(
+                "'{}' is a reserved identifier and cannot be used as a region name",
+                name_str
+            );
+            diags.err1("AST_61", &m, name_tinfo.span());
+            return false;
+        }
+        if let Some(existing) = regions.get(name_str) {
+            let m = format!("Duplicate region name '{}'", name_str);
+            diags.err2("AST_60", &m, name_tinfo.span(), existing.src_loc.clone());
+            return false;
+        }
+
+        let entry = RegionEntry::new(reg_nid, name_tinfo.span());
+        regions.insert(name_str.to_string(), entry);
+        true
+    }
+
     /// Processes a section in the AST
     /// All section names are also label names
     fn record_section(
@@ -2309,6 +2632,8 @@ impl<'toks> AstDb<'toks> {
         let mut const_statements: Vec<NodeId> = Vec::new();
         // All declared const names and their locations for duplicate detection.
         let mut const_names: HashMap<&'toks str, SourceSpan> = HashMap::new();
+        // All region declarations, keyed by name.
+        let mut regions: HashMap<String, RegionEntry> = HashMap::new();
 
         // First phase, record all sections, files, and the output.
         // These are defined only at top level so no need for recursion.
@@ -2317,6 +2642,7 @@ impl<'toks> AstDb<'toks> {
             result = result
                 && match tinfo.tok {
                     LexToken::Section => Self::record_section(diags, nid, ast, &mut sections),
+                    LexToken::Region => Self::record_region(diags, nid, ast, &mut regions),
                     LexToken::Output => Self::record_output(diags, nid, ast, &mut output),
                     LexToken::Const => {
                         const_statements.push(nid);
@@ -2369,6 +2695,50 @@ impl<'toks> AstDb<'toks> {
             }
         }
 
+        // Check for region names that conflict with section or const names.
+        for (reg_name, reg_entry) in &regions {
+            if let Some(sec_item) = sections.get(reg_name.as_str()) {
+                let m = format!("Region name '{}' conflicts with a section name", reg_name);
+                diags.err2("AST_48", &m, reg_entry.src_loc.clone(), sec_item.tinfo.span());
+                result = false;
+            }
+            if let Some(const_span) = const_names.get(reg_name.as_str()) {
+                let m = format!("Region name '{}' conflicts with a const name", reg_name);
+                diags.err2("AST_63", &m, reg_entry.src_loc.clone(), const_span.clone());
+                result = false;
+            }
+        }
+
+        // Validate section region references.
+        // Track which regions are already bound to detect duplicate bindings.
+        let mut bound_regions: HashMap<&str, SourceSpan> = HashMap::new();
+        for (sec_name, sec_entry) in &sections {
+            let Some(ref reg_name) = sec_entry.region else {
+                continue;
+            };
+            if let Some(reg_entry) = regions.get(reg_name) {
+                // Region exists — check for a second binding to the same region.
+                if let Some(prev_span) = bound_regions.get(reg_name.as_str()) {
+                    let m = format!(
+                        "Section '{}' binds to region '{}' which is already bound to another section",
+                        sec_name, reg_name
+                    );
+                    diags.err2("AST_57", &m, sec_entry.tinfo.span(), prev_span.clone());
+                    result = false;
+                } else {
+                    bound_regions.insert(reg_name.as_str(), sec_entry.tinfo.span());
+                }
+                let _ = reg_entry; // suppress unused warning; accessed by get() above
+            } else {
+                let m = format!(
+                    "Section '{}' references undeclared region '{}'",
+                    sec_name, reg_name
+                );
+                diags.err1("AST_56", &m, sec_entry.tinfo.span());
+                result = false;
+            }
+        }
+
         if !result {
             bail!("AST construction failed");
         }
@@ -2381,6 +2751,7 @@ impl<'toks> AstDb<'toks> {
             global_asserts,
             const_statements,
             const_names,
+            regions,
         };
 
         if !ast_db.validate_section_name(0, output_nid, ast, diags) {

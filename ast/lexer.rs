@@ -276,6 +276,8 @@ impl<'src> Lexer<'src> {
             "__BRINK_VERSION_MINOR"  => LexToken::BuiltinVersionMinor,
             "__BRINK_VERSION_PATCH"  => LexToken::BuiltinVersionPatch,
             "include"                => LexToken::Include,
+            "region"                 => LexToken::Region,
+            "in"                     => LexToken::In,
             "section"                => LexToken::Section,
             "align"                  => LexToken::Align,
             "set_sec_offset"         => LexToken::SetSecOffset,

@@ -5,14 +5,30 @@ crates:
   ast:
     path: ast/ast.rs
     role: Lexer, parser, AST, AstDb
-    key_types: [Ast, AstDb, LexToken, Section, Output, ParseIfContext]
+    key_types: [Ast, AstDb, LexToken, Section, Output, ParseIfContext, RegionEntry]
     key_fns: [Ast::new, AstDb::new(validate:bool), parse_if_r, parse_if_body_r,
-              try_parse_section_stmt, is_section_expr_tok]
+              parse_region, parse_region_contents, try_parse_section_stmt,
+              is_section_expr_tok]
     notes: >
       AstDb::new validate=false skips nesting validation (used pre-prune).
       ParseIfContext (TopLevel | Section) threads through parse_if_r and
       parse_if_body_r.  Section token allowed in TopLevel if/else bodies.
       Ast nodes hold TokenInfo by value (rustc-style), avoiding arena index lookups.
+
+      Region AST layer (Steps 3+4 COMPLETE):
+        LexToken::Region and LexToken::In are keywords (lexer-mapped).
+        LexToken::RegionProp — synthetic; tok=RegionProp, val=property name,
+          one child (expression).  Children of the Region root node.
+        LexToken::RegionRef — synthetic; tok=RegionRef, val=region name, no
+          children.  Second child of a Section root node when bound with `in`.
+        RegionEntry — holds nid, src_loc, addr/size/default_align/default_fill;
+          addr/size populated to 0/0 by AstDb; filled by const_eval::evaluate_regions.
+        Section::region — Option<String> set from RegionRef child if present.
+        AstDb::regions — HashMap<String, RegionEntry>; name conflicts with
+          sections (AST_48) and consts (AST_63) detected in AstDb::new.
+        Section binding validation: undeclared region → AST_56; duplicate
+          binding to same region → AST_57.
+        linearizer treats RegionRef as syntactic noise (no IR emitted).
 
   const_eval:
     path: const_eval/const_eval.rs

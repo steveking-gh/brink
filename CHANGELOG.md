@@ -2,18 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic
+Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [7.x.x] - 2026-04-20
 
-- DEFEATURE: With `region` incoming, remove starting address from `output` statement.
+- DEFEATURE: With `region` incoming, remove starting address from `output`
+  statement.
 - FEATURE: added missing --list-extensions command line option which was already
   documented in the README.md
 - README: Removed obsolete text on if/else statement restrictions
 - README: Documented region feature
 - README: Improved extension documentation
 - INTERNAL: Improved README.md formatting
-- INTERNAL: Better division of responsibility now with distinct layout, map and exec phases.
+- INTERNAL: Better division of responsibility now with distinct layout, map and
+  exec phases.
 - INTERNAL: Refactor parameter values into their own module.
 - INTERNAL: Refactor validation as a dedicated phase.
 

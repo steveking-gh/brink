@@ -552,7 +552,10 @@ impl Linearizer {
             | LexToken::OpenParen
             | LexToken::CloseParen
             | LexToken::OpenBrace
-            | LexToken::CloseBrace => {}
+            | LexToken::CloseBrace
+            // RegionRef is a structural annotation on a section node; not a
+            // layout statement and never reaches expression evaluation.
+            | LexToken::RegionRef => {}
 
             // ── Named argument: name=expr ─────────────────────────────────
             // A NamedArg node (synthesized by the parser) wraps one RHS expression
