@@ -367,6 +367,18 @@ AstDb changes:
 
 Linearizer: `RegionRef` added to syntactic noise (no IR emitted).
 
-New error codes: AST_45–49, AST_56–63, PROC_8.
+New error codes: AST_45–49, AST_56–64, PROC_8.
 
-319 tests pass.
+**Region integration tests**
+15 new test fixtures and functions covering all region error codes (AST_45–64)
+plus one success case (`region_valid`).
+
+**Bug fix: infinite loop in AST_45/AST_46 paths**
+`parse_region_contents` error paths for unknown and duplicate property names
+called `advance_past_semicolon()` while the property name token was still the
+current (not yet consumed) token.  `advance_past_semicolon` checked the
+previous token, saw a `;` from the preceding valid property, and did nothing,
+looping forever.  Fix: `self.tv.skip()` before `advance_past_semicolon()` in
+both paths.
+
+334 tests pass.

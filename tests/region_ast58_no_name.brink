@@ -1,0 +1,10 @@
+// "region" keyword not followed by an identifier.
+// AST_58: expected a region name.
+region {
+    addr = 0x1000;
+    size = 0x100;
+}
+section top {
+    wr8 0x00;
+}
+output top;

@@ -1,0 +1,6 @@
+// Section bound to a region name that was never declared.
+// AST_56: "NOWHERE" is not a known region.
+section top in NOWHERE {
+    wr8 0x00;
+}
+output top;

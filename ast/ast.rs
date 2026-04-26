@@ -925,13 +925,7 @@ impl<'toks> Ast<'toks> {
         self.dbg_exit("parse_region", result)
     }
 
-    /// Parses the body of a `region` block.
-    ///
-    /// Recognizes `name = expr ;` property assignments until `}`.
-    /// Recognized names: `addr`, `size`, `default_align`, `default_fill`.
-    /// Unknown names produce AST_45; duplicates produce AST_46.
-    /// Missing required properties (`addr`, `size`) produce AST_47 after
-    /// the closing brace is consumed.
+    /// Parses the body of a `region` block: `name = expr ;` assignments until `}`.
     fn parse_region_contents(
         &mut self,
         reg_nid: NodeId,
@@ -958,88 +952,96 @@ impl<'toks> Ast<'toks> {
                 break;
             }
 
-            // Match by val so that "addr" (LexToken::Addr) and string-named
-            // properties both dispatch correctly regardless of token kind.
             let prop_val = tinfo.val;
-            let prop_loc = tinfo.loc.clone();
+            let prop_loc = tinfo.span(); // owned SourceSpan; tinfo borrow ends here
 
-            let already_seen = match prop_val {
-                "addr" => Some(&mut seen_addr),
-                "size" => Some(&mut seen_size),
-                "default_align" => Some(&mut seen_default_align),
-                "default_fill" => Some(&mut seen_default_fill),
-                _ => None,
+            // Route each recognized property to its seen-flag.
+            // The _ arm emits AST_45 and skips to the next ';' before continuing.
+            let prop_seen: &mut bool = match prop_val {
+                "addr"          => &mut seen_addr,
+                "size"          => &mut seen_size,
+                "default_align" => &mut seen_default_align,
+                "default_fill"  => &mut seen_default_fill,
+                _ => {
+                    let msg = format!(
+                        "Unknown region property '{}'; expected addr, size, default_align, or default_fill",
+                        prop_val
+                    );
+                    diags.err1("AST_45", &msg, prop_loc);
+                    self.tv.skip();
+                    self.advance_past_semicolon();
+                    result = false;
+                    continue;
+                }
             };
 
-            let Some(flag) = already_seen else {
-                let msg = format!(
-                    "Unknown region property '{}'; expected addr, size, default_align, or default_fill",
-                    prop_val
-                );
-                diags.err1("AST_45", &msg, tinfo.span());
-                self.advance_past_semicolon();
-                result = false;
-                continue;
-            };
-
-            if *flag {
+            if *prop_seen {
                 let msg = format!("Duplicate region property '{}'", prop_val);
-                diags.err1("AST_46", &msg, tinfo.span());
-                self.advance_past_semicolon();
-                result = false;
-                continue;
-            }
-            *flag = true;
-            self.tv.skip(); // consume property name
-
-            // Consume '=' without adding it to the AST.
-            let eq_tinfo = self.tv.peek();
-            if eq_tinfo.tok == LexToken::EOF {
-                self.err_no_input(diags);
-                return self.dbg_exit("parse_region_contents", false);
-            }
-            if eq_tinfo.tok != LexToken::Eq {
-                let msg = format!("Expected '=' after region property '{}'", prop_val);
-                diags.err1("AST_62", &msg, eq_tinfo.span());
-                self.advance_past_semicolon();
-                result = false;
-                continue;
-            }
-            self.tv.skip(); // consume '='
-
-            // Synthesize a RegionProp node; the expression is its only child.
-            let prop_node = TokenInfo {
-                tok: LexToken::RegionProp,
-                loc: prop_loc,
-                val: prop_val,
-            };
-            let prop_nid = self.arena.new_node(prop_node);
-            reg_nid.append(prop_nid, &mut self.arena);
-
-            if !self.expect_expr(prop_nid, diags) {
+                diags.err1("AST_46", &msg, prop_loc);
+                self.tv.skip();
                 self.advance_past_semicolon();
                 result = false;
                 continue;
             }
 
-            if !self.expect_semi(diags, prop_nid) {
+            *prop_seen = true;
+            if !self.parse_region_property(reg_nid, diags, prop_val, prop_loc) {
                 result = false;
             }
         }
 
         // Verify required properties are present.
+        let reg_tinfo = self.get_tinfo(reg_nid);
         if !seen_addr {
-            let reg_tinfo = self.get_tinfo(reg_nid);
             diags.err1("AST_47", "Region is missing required property 'addr'", reg_tinfo.span());
             result = false;
         }
         if !seen_size {
-            let reg_tinfo = self.get_tinfo(reg_nid);
             diags.err1("AST_64", "Region is missing required property 'size'", reg_tinfo.span());
             result = false;
         }
 
         self.dbg_exit("parse_region_contents", result)
+    }
+
+    /// Parses `= expr ;` for one validated, non-duplicate region property.
+    /// Consumes the property name token, then expects `=`, an expression, and `;`.
+    /// On success, appends a RegionProp node (with the expression as a child) to reg_nid.
+    fn parse_region_property(
+        &mut self,
+        reg_nid: NodeId,
+        diags: &mut Diags,
+        prop_val: &'toks str,
+        prop_loc: SourceSpan,
+    ) -> bool {
+        self.dbg_enter("parse_region_property");
+        self.tv.skip(); // consume property name
+
+        let eq_tinfo = self.tv.peek();
+        if eq_tinfo.tok == LexToken::EOF {
+            self.err_no_input(diags);
+            return self.dbg_exit("parse_region_property", false);
+        }
+        if eq_tinfo.tok != LexToken::Eq {
+            let msg = format!("Expected '=' after region property '{}'", prop_val);
+            diags.err1("AST_62", &msg, eq_tinfo.span());
+            self.advance_past_semicolon();
+            return self.dbg_exit("parse_region_property", false);
+        }
+        self.tv.skip(); // consume '='
+
+        // Synthesize a RegionProp node; the expression is its only child.
+        let prop_node = TokenInfo { tok: LexToken::RegionProp, loc: prop_loc, val: prop_val };
+        let prop_nid = self.arena.new_node(prop_node);
+        reg_nid.append(prop_nid, &mut self.arena);
+
+        if !self.expect_expr(prop_nid, diags) {
+            self.advance_past_semicolon();
+            return self.dbg_exit("parse_region_property", false);
+        }
+
+        let ok = self.expect_semi(diags, prop_nid);
+        self.dbg_exit("parse_region_property", ok)
     }
 
     /// Parses a `section` declaration and attaches it to the AST.

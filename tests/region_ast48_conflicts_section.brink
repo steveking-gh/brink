@@ -1,0 +1,10 @@
+// Region name conflicts with an existing section name.
+// AST_48: "FLASH" is already declared as a section.
+section FLASH {
+    wr8 0x01;
+}
+region FLASH {
+    addr = 0x1000;
+    size = 0x100;
+}
+output FLASH;

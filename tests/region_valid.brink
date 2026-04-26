@@ -1,0 +1,10 @@
+// Valid region declaration and section binding.
+// This is the happy path for the region AST layer.
+region FLASH {
+    addr = 0x08000000;
+    size = 0x00100000;
+}
+section top in FLASH {
+    wr8 0xFF;
+}
+output top;

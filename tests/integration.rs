@@ -3009,4 +3009,81 @@ mod tests {
     fn engine_mmap_0_byte() {
         assert_brink_failure("tests/engine_mmap_0_byte.brink", &["[EXEC_47]"]);
     }
+
+    // ── Region system (Steps 3+4 AST layer) ─────────────────────────────────
+
+    #[test]
+    fn region_valid() {
+        assert_brink_success("tests/region_valid.brink", None, None);
+    }
+
+    #[test]
+    fn region_ast45_unknown_prop() {
+        assert_brink_failure("tests/region_ast45_unknown_prop.brink", &["[AST_45]"]);
+    }
+
+    #[test]
+    fn region_ast46_dup_prop() {
+        assert_brink_failure("tests/region_ast46_dup_prop.brink", &["[AST_46]"]);
+    }
+
+    #[test]
+    fn region_ast47_missing_addr() {
+        assert_brink_failure("tests/region_ast47_missing_addr.brink", &["[AST_47]"]);
+    }
+
+    #[test]
+    fn region_ast48_conflicts_section() {
+        assert_brink_failure("tests/region_ast48_conflicts_section.brink", &["[AST_48]"]);
+    }
+
+    #[test]
+    fn region_ast49_in_no_name() {
+        assert_brink_failure("tests/region_ast49_in_no_name.brink", &["[AST_49]"]);
+    }
+
+    #[test]
+    fn region_ast56_undeclared() {
+        assert_brink_failure("tests/region_ast56_undeclared.brink", &["[AST_56]"]);
+    }
+
+    #[test]
+    fn region_ast57_dup_binding() {
+        assert_brink_failure("tests/region_ast57_dup_binding.brink", &["[AST_57]"]);
+    }
+
+    #[test]
+    fn region_ast58_no_name() {
+        assert_brink_failure("tests/region_ast58_no_name.brink", &["[AST_58]"]);
+    }
+
+    #[test]
+    fn region_ast59_no_brace() {
+        assert_brink_failure("tests/region_ast59_no_brace.brink", &["[AST_59]"]);
+    }
+
+    #[test]
+    fn region_ast60_dup_name() {
+        assert_brink_failure("tests/region_ast60_dup_name.brink", &["[AST_60]"]);
+    }
+
+    #[test]
+    fn region_ast61_reserved_name() {
+        assert_brink_failure("tests/region_ast61_reserved_name.brink", &["[AST_61]"]);
+    }
+
+    #[test]
+    fn region_ast62_missing_eq() {
+        assert_brink_failure("tests/region_ast62_missing_eq.brink", &["[AST_62]"]);
+    }
+
+    #[test]
+    fn region_ast63_conflicts_const() {
+        assert_brink_failure("tests/region_ast63_conflicts_const.brink", &["[AST_63]"]);
+    }
+
+    #[test]
+    fn region_ast64_missing_size() {
+        assert_brink_failure("tests/region_ast64_missing_size.brink", &["[AST_64]"]);
+    }
 } // mod tests
