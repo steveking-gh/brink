@@ -955,13 +955,33 @@ impl<'toks> Ast<'toks> {
             let prop_val = tinfo.val;
             let prop_loc = tinfo.span(); // owned SourceSpan; tinfo borrow ends here
 
-            // Route each recognized property to its seen-flag.
-            // The _ arm emits AST_45 and skips to the next ';' before continuing.
-            let prop_seen: &mut bool = match prop_val {
-                "addr"          => &mut seen_addr,
-                "size"          => &mut seen_size,
-                "default_align" => &mut seen_default_align,
-                "default_fill"  => &mut seen_default_fill,
+            let mut duplicate_property = false;
+
+            match prop_val {
+                "addr" => {
+                    if seen_addr {
+                        duplicate_property = true;
+                    }
+                    seen_addr = true;
+                }
+                "size" => {
+                    if seen_size {
+                        duplicate_property = true;
+                    }
+                    seen_size = true;
+                }
+                "default_align" => {
+                    if seen_default_align {
+                        duplicate_property = true;
+                    }
+                    seen_default_align = true;
+                }
+                "default_fill" => {
+                    if seen_default_fill {
+                        duplicate_property = true;
+                    }
+                    seen_default_fill = true;
+                }
                 _ => {
                     let msg = format!(
                         "Unknown region property '{}'; expected addr, size, default_align, or default_fill",
@@ -973,9 +993,9 @@ impl<'toks> Ast<'toks> {
                     result = false;
                     continue;
                 }
-            };
+            }
 
-            if *prop_seen {
+            if duplicate_property {
                 let msg = format!("Duplicate region property '{}'", prop_val);
                 diags.err1("AST_46", &msg, prop_loc);
                 self.tv.skip();
@@ -984,7 +1004,6 @@ impl<'toks> Ast<'toks> {
                 continue;
             }
 
-            *prop_seen = true;
             if !self.parse_region_property(reg_nid, diags, prop_val, prop_loc) {
                 result = false;
             }
