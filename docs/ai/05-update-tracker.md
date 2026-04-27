@@ -417,3 +417,47 @@ PROC_9: evaluate_regions failure halt.
 `region_exec66.brink`: string-valued region property triggers EXEC_66.
 
 336 tests pass.
+
+---
+
+## 2026-04-26 — Region plan Steps 4-5 (RegionBinding, size enforcement, EXEC_70)
+
+**RegionBinding on IRDb**
+Removed `section_anchors: HashMap<String, u64>` from `LayoutPhase`.  Added
+`RegionBinding { addr: u64, size: u64 }` to `ir/ir.rs` and
+`section_regions: HashMap<String, RegionBinding>` to `IRDb`.  Built in
+`process.rs` from `pruned_ast_db.sections` and `pruned_ast_db.regions`.
+All downstream phases read region data from `irdb.section_regions`.
+
+**default_align and default_fill removed**
+These region properties were unimplemented and had no planned use in the
+near term.  Removed from `RegionEntry`, `parse_region_contents`, and
+`evaluate_regions`.  AST_45 message updated to "expected addr or size".
+
+**Region size enforcement (EXEC_72, EXEC_73, EXEC_74)**
+`iterate_set_addr` in `layout_phase.rs` now accepts `irdb`, `lid`, and
+`diags`.  For region-bound sections:
+
+- EXEC_72: `set_addr` target is outside `[binding.addr, binding.addr+binding.size)`.
+- EXEC_74: `binding.addr + binding.size` overflows u64 (uses `checked_add`).
+
+`validate_section_regions` called after `iterate` converges:
+
+- EXEC_73: `sizeof(section)` exceeds `binding.size`.
+
+Deduplication via `warned_lids: HashSet<(usize, &'static str)>` prevents
+repeated errors across iterate passes.
+
+**Overlapping region detection (EXEC_70)**
+`evaluate_regions` now checks all region pairs after property evaluation.
+Two regions with non-zero size that share any address range emit EXEC_70.
+`region_nested_2.brink` converted from a success fixture to an EXEC_70
+error fixture.
+
+**New error codes**
+EXEC_70: overlapping regions.
+EXEC_72: set_addr target outside region bounds.
+EXEC_73: section size exceeds region size.
+EXEC_74: region addr + size overflows u64.
+
+342 tests pass.

@@ -1,0 +1,10 @@
+// region_exec72.brink: set_addr targets an address outside the region.
+region FLASH {
+    addr = 0x08000000;
+    size = 0x00001000;
+}
+section top in FLASH {
+    set_addr(0x09000000);
+    wr8 0x00;
+}
+output top;

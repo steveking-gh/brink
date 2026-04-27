@@ -1,0 +1,30 @@
+region FLASH {
+    addr = 0x08000000;
+    size = 4;
+}
+section top in FLASH {
+    wr nest1;
+}
+section nest1 {
+    wr8 0x01;
+    wr nest2;
+}
+section nest2 {
+    wr8 0x02;
+    wr nest3;
+}
+section nest3 {
+    wr8 0x03;
+    wr nest4;
+}
+section nest4 {
+    wr8 0x04;
+    wr nest5;
+}
+
+// This byte exceeds the region size.
+section nest5 {
+    wr8 0x05;
+}
+
+output top;

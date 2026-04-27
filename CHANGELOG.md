@@ -10,6 +10,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 - DEFEATURE: With `region` incoming, remove starting address from `output`
   statement.
+- FEATURE: Region support
 - FEATURE: added missing --list-extensions command line option which was already
   documented in the README.md
 - README: Removed obsolete text on if/else statement restrictions
@@ -20,6 +21,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   exec phases.
 - INTERNAL: Refactor parameter values into their own module.
 - INTERNAL: Refactor validation as a dedicated phase.
+- BUG FIX: Fixed bad string conversion assert in verbose output
 
 ## [6.1.1] - 2026-04-20
 

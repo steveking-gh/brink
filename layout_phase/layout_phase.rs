@@ -1008,7 +1008,14 @@ impl LayoutPhase {
     /// Handle `set_addr(X)`: pure cursor rebase.
     /// Sets abs_base = X and resets off = 0.  No bytes are emitted.
     /// Backward rebase is valid (firmware load-address use case).
-    fn iterate_set_addr(&mut self, ir: &IR, current: &mut Location) -> bool {
+    fn iterate_set_addr(
+        &mut self,
+        ir: &IR,
+        irdb: &IRDb,
+        lid: usize,
+        diags: &mut Diags,
+        current: &mut Location,
+    ) -> bool {
         let set_parm_num = ir.operands[0];
         let set_val = self.parms[set_parm_num].to_u64();
 
@@ -1024,6 +1031,28 @@ impl LayoutPhase {
         } else {
             ir.operands[2]
         };
+
+        // Check that the target address is within the enclosing region, if any.
+        if let Some(frame) = self.scope_stack.last()
+            && let Some(binding) = irdb.section_regions.get(&frame.sec_name)
+        {
+            let Some(region_end) = binding.addr.checked_add(binding.size) else {
+                if self.warned_lids.insert((lid, "EXEC_74")) {
+                    diags.err1("EXEC_74", "Region addr + size overflows u64.", ir.src_loc.clone());
+                }
+                return false;
+            };
+            if set_val < binding.addr || set_val >= region_end {
+                if self.warned_lids.insert((lid, "EXEC_72")) {
+                    let msg = format!(
+                        "set_addr target {:#X} is outside region bounds [{:#X}, {:#X}).",
+                        set_val, binding.addr, region_end
+                    );
+                    diags.err1("EXEC_72", &msg, ir.src_loc.clone());
+                }
+                return false;
+            }
+        }
 
         // Record that set_addr was called mid-section if sec_offset is non-zero.
         // This arms the warning for any subsequent set_sec_offset in this scope.
@@ -1228,7 +1257,11 @@ impl LayoutPhase {
             anyhow::bail!("LayoutPhase construction failed.");
         }
 
-        // No that locations are known, we build the location database.
+        if !layout_phase.validate_section_regions(irdb, diags) {
+            anyhow::bail!("LayoutPhase construction failed.");
+        }
+
+        // Now that locations are known, we build the location database.
         layout_phase.trace(format_args!("LayoutPhase::new: EXIT"));
         Ok((
             LocationDb {
@@ -1236,6 +1269,31 @@ impl LayoutPhase {
             },
             ParmValDb::new(layout_phase.parms),
         ))
+    }
+
+    /// After iterate converges, verify each region-bound section fits within
+    /// its region.  Emits EXEC_73 for any section whose byte count exceeds
+    /// the region size.
+    fn validate_section_regions(&self, irdb: &IRDb, diags: &mut Diags) -> bool {
+        let mut result = true;
+        for (sec_name, binding) in &irdb.section_regions {
+            let Some(ir_rng) = irdb.sized_locs.get(sec_name) else {
+                continue;
+            };
+            let start_loc = &self.ir_locs[ir_rng.start];
+            let end_loc = &self.ir_locs[ir_rng.end];
+            let sec_size = end_loc.file_offset.saturating_sub(start_loc.file_offset);
+            if sec_size > binding.size {
+                let excess = sec_size - binding.size;
+                let msg = format!(
+                    "Section '{}' size {} bytes exceeds region size {} bytes by {} bytes.",
+                    sec_name, sec_size, binding.size, excess
+                );
+                diags.err1("EXEC_73", &msg, irdb.ir_vec[ir_rng.start].src_loc.clone());
+                result = false;
+            }
+        }
+        result
     }
 
     pub fn dump_locations(&self) {
@@ -1361,7 +1419,7 @@ impl LayoutPhase {
                                 }
                         self.iterate_set(ir, irdb, diags, &current)
                     }
-                    IRKind::SetAddr => self.iterate_set_addr(ir, &mut current),
+                    IRKind::SetAddr => self.iterate_set_addr(ir, irdb, lid, diags, &mut current),
 
                     IRKind::Wrf => self.iterate_wrf(ir, irdb, diags, &mut current),
 

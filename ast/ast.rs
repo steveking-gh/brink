@@ -1033,7 +1033,7 @@ impl<'toks> Ast<'toks> {
         }
         self.tv.skip(); // consume '='
 
-        // Synthesize a RegionProp node; the expression is its only child.
+        // Synthesize a RegionProp node.  Children: expression root, then ';'.
         let prop_node = TokenInfo { tok: LexToken::RegionProp, loc: prop_loc, val: prop_val };
         let prop_nid = self.arena.new_node(prop_node);
         reg_nid.append(prop_nid, &mut self.arena);

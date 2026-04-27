@@ -3101,4 +3101,27 @@ mod tests {
     fn region_exec66() {
         assert_brink_failure("tests/region_exec66.brink", &["[EXEC_66]"]);
     }
+
+    #[test]
+    fn region_exec72() {
+        assert_brink_failure("tests/region_exec72.brink", &["[EXEC_72]"]);
+    }
+
+    #[test]
+    fn region_exec73() {
+        assert_brink_failure("tests/region_exec73.brink", &["[EXEC_73]"]);
+    }
+    #[test]
+    fn region_nested() {
+        assert_brink_success("tests/region_nested.brink", None, None);
+    }
+    #[test]
+    fn region_nested_2() {
+        assert_brink_failure("tests/region_nested_2.brink", &["[EXEC_70]"]);
+    }
+
+    #[test]
+    fn region_nested_overflow() {
+        assert_brink_failure("tests/region_nested_overflow.brink", &["[EXEC_73]"]);
+    }
 } // mod tests

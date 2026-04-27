@@ -146,7 +146,7 @@ impl ParameterValue {
             ParameterValue::I64(v) | ParameterValue::Integer(v) => *v as u64,
             ParameterValue::U64(v) => *v,
             _ => {
-                panic!("Internal error: Invalid type conversion to u64");
+                panic!("Internal error: Invalid type conversion from {:?} to u64", self);
             }
         }
     }
@@ -155,7 +155,7 @@ impl ParameterValue {
         match self {
             ParameterValue::U64(v) => v,
             _ => {
-                panic!("Internal error: Invalid type conversion to &mut u64");
+                panic!("Internal error: Invalid type conversion from {:?} to &mut u64", self);
             }
         }
     }
@@ -164,7 +164,7 @@ impl ParameterValue {
         match self {
             ParameterValue::I64(v) | ParameterValue::Integer(v) => *v,
             _ => {
-                panic!("Internal error: Invalid type conversion to i64");
+                panic!("Internal error: Invalid type conversion from {:?} to i64", self);
             }
         }
     }
@@ -173,7 +173,7 @@ impl ParameterValue {
         match self {
             ParameterValue::I64(v) | ParameterValue::Integer(v) => v,
             _ => {
-                panic!("Internal error: Invalid type conversion to &mut i64");
+                panic!("Internal error: Invalid type conversion from {:?} to &mut i64", self);
             }
         }
     }
@@ -182,7 +182,7 @@ impl ParameterValue {
         match self {
             ParameterValue::QuotedString(s) => s,
             _ => {
-                panic!("Internal error: Invalid type conversion to str");
+                panic!("Internal error: Invalid type conversion from {:?} to str", self);
             }
         }
     }
@@ -191,7 +191,7 @@ impl ParameterValue {
         match self {
             ParameterValue::Identifier(s) => s,
             _ => {
-                panic!("Internal error: Invalid type conversion to identifier");
+                panic!("Internal error: Invalid type conversion from {:?} to identifier", self);
             }
         }
     }

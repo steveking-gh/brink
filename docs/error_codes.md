@@ -1,7 +1,7 @@
 # Error Codes
 
 One entry per code in use, sorted numerically within each prefix.
-Next available per prefix: AST_65, EXEC_68, IR_5, IRDB_60, LINEAR_18, PROC_10, SYMTAB_5.
+Next available per prefix: AST_65, EXEC_76, IR_5, IRDB_60, LINEAR_18, PROC_10, SYMTAB_5.
 
 ## AST
 
@@ -120,6 +120,11 @@ EXEC_59
 EXEC_62
 EXEC_66
 EXEC_67
+EXEC_70
+EXEC_72
+EXEC_73
+EXEC_74
+EXEC_75
 
 ## IR
 

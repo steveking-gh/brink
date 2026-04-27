@@ -1,0 +1,18 @@
+// region_nested_2.brink: overlapping regions must be rejected (EXEC_70).
+region FLASH {
+    addr = 0x08000000;
+    size = 4;
+}
+region FLASH1 {
+    addr = 0x08000000;
+    size = 1;
+}
+
+section top in FLASH {
+    wr nest1;
+}
+section nest1 in FLASH1 {
+    wr8 0x01;
+}
+
+output top;

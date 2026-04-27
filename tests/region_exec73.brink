@@ -1,0 +1,9 @@
+// region_exec73.brink: section byte count exceeds region size.
+region FLASH {
+    addr = 0x08000000;
+    size = 4;
+}
+section top in FLASH {
+    wr8 0x00, 8;
+}
+output top;

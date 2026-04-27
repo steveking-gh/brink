@@ -814,7 +814,8 @@ impl IRDb {
                     ));
                 } else {
                     match operand.val.data_type() {
-                        DataType::U64 | DataType::Identifier => {
+                        DataType::U64 => {
+                            // Display U64 as hex since that's generally most helpful.
                             let v = operand.val.to_u64();
                             op.push_str(&format!(" ({:?}){:#X}", operand.val.data_type(), v));
                         }
@@ -826,8 +827,12 @@ impl IRDb {
                             let v = operand.val.to_str();
                             op.push_str(&format!(" ({:?}){}", operand.val.data_type(), v));
                         }
+                        DataType::Identifier => {
+                            let v = operand.val.to_identifier();
+                            op.push_str(&format!(" ({:?}){}", operand.val.data_type(), v));
+                        }
                         DataType::Extension => {
-                            op.push_str(" (Extension)");
+                            op.push_str(&format!("({:?}){}", operand.val.data_type(), operand.val.to_str()));
                         }
                         DataType::Unknown => {
                             println!("Dump: Found unknown Data Type operand {:?}", operand);

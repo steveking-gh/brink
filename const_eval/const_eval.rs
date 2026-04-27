@@ -21,7 +21,7 @@ use std::collections::HashMap;
 #[allow(unused_imports)]
 use tracing::{debug, trace};
 
-use ast::{Ast, AstDb, LexToken};
+use ast::{Ast, AstDb, LexToken, RegionEntry};
 use ir::{ConstBuiltins, IRKind, ParameterValue};
 
 use linearizer::{LinIR, LinOperand, Linearizer, tok_to_irkind};
@@ -453,7 +453,9 @@ impl<'toks> ConstIR {
                         const_db,
                         diags,
                         &src_loc,
-                    ).and_then(|v| v.to_bool()) {
+                    )
+                    .and_then(|v| v.to_bool())
+                    {
                         Some(false) => {
                             diags.err1(
                                 "IRDB_32",
@@ -646,11 +648,19 @@ impl<'toks> ConstIR {
                         err_loc,
                     )?;
                     let Some(lhs_b) = lhs_val.to_bool() else {
-                        diags.err1("IRDB_58", "'&&'/'||' operands must be numeric", err_loc.clone());
+                        diags.err1(
+                            "IRDB_58",
+                            "'&&'/'||' operands must be numeric",
+                            err_loc.clone(),
+                        );
                         return None;
                     };
                     let Some(rhs_b) = rhs_val.to_bool() else {
-                        diags.err1("IRDB_58", "'&&'/'||' operands must be numeric", err_loc.clone());
+                        diags.err1(
+                            "IRDB_58",
+                            "'&&'/'||' operands must be numeric",
+                            err_loc.clone(),
+                        );
                         return None;
                     };
                     let result = if op == IRKind::LogicalAnd {
@@ -690,8 +700,15 @@ impl<'toks> ConstIR {
         }
 
         // Literal operands: evaluate directly from tok and sval.
-        let LinOperand::Literal { tok, sval, src_loc, .. } = lop else {
-            unreachable!()
+        // Output and Ref variants are handled above; NameDef is the only
+        // remaining variant, but const expression lowering never produces
+        // NameDef operands -- those are only emitted for structural identifiers
+        // in non-const IR (extension names, section names).
+        let LinOperand::Literal {
+            tok, sval, src_loc, ..
+        } = lop
+        else {
+            unreachable!("NameDef operand in const expression; lowering invariant violated");
         };
         let sval = sval.clone();
         let src_loc = src_loc.clone();
@@ -968,12 +985,10 @@ impl<'toks> ConstIR {
     }
 }
 
-// ── Region property evaluator ─────────────────────────────────────────────────
-
 /// Evaluate region property expressions and store resolved values into AstDb.
 ///
-/// Called after const_eval::evaluate and prune, using the fully resolved
-/// symbol table.  Fills RegionEntry.addr and .size.  Returns true on success.
+/// Called after const_eval::evaluate and prune, using the fully resolved symbol
+/// table.  Fills RegionEntry addr and size properties. Returns true on success.
 pub fn evaluate_regions<'toks>(
     diags: &mut Diags,
     ast: &'toks Ast,
@@ -984,20 +999,26 @@ pub fn evaluate_regions<'toks>(
     let mut result = true;
 
     for name in &region_names {
+        debug!("Evaluating properties of region {}", name);
         let reg_nid = ast_db.regions[name].nid;
         let mut resolved: Vec<(String, u64)> = Vec::new();
 
         for prop_nid in ast.children(reg_nid) {
             let tinfo = ast.get_tinfo(prop_nid);
             if tinfo.tok != LexToken::RegionProp {
+                // Skip region name and structural tokens like {} around the
+                // region properties.
                 continue;
             }
             let prop_name = tinfo.val.to_string();
             let prop_loc = tinfo.loc.clone();
+            debug!("Evaluating region {}, property {}", name, prop_name);
 
-            // First child of RegionProp is the expression root; second is ';'.
+            // First child of RegionProp is the expression root.
             let Some(expr_nid) = ast.children(prop_nid).next() else {
-                continue;
+                unreachable!(
+                    "RegionProp has no expression child; parser guarantees one on success"
+                );
             };
             let expr_loc = ast.get_tinfo(expr_nid).loc.clone();
 
@@ -1014,7 +1035,10 @@ pub fn evaluate_regions<'toks>(
                     lops.len()
                 );
             }
-            let const_ir = ConstIR { ir_vec: lz.ir_vec, operand_vec: lz.operand_vec };
+            let const_ir = ConstIR {
+                ir_vec: lz.ir_vec,
+                operand_vec: lz.operand_vec,
+            };
             match ConstIR::eval_const_expr_r(symbol_table, lops[0], &const_ir, diags, &prop_loc) {
                 None => {
                     result = false;
@@ -1043,6 +1067,54 @@ pub fn evaluate_regions<'toks>(
             }
         }
     }
+
+    // Detect overlapping regions (EXEC_70).  Skip zero-size regions.
+    // Pre-compute exclusive end addresses; EXEC_75 if addr+size overflows u64.
+    let region_list: Vec<(&str, &RegionEntry)> = ast_db
+        .regions
+        .iter()
+        .map(|(n, e)| (n.as_str(), e))
+        .collect();
+    let mut region_ends: Vec<Option<u64>> = Vec::with_capacity(region_list.len());
+    for (_, entry) in &region_list {
+        if entry.size == 0 {
+            region_ends.push(None);
+        } else {
+            match entry.addr.checked_add(entry.size) {
+                Some(end) => region_ends.push(Some(end)),
+                None => {
+                    let msg = format!(
+                        "Region addr {:#X} + size {:#X} overflows u64.",
+                        entry.addr, entry.size
+                    );
+                    diags.err1("EXEC_75", &msg, entry.src_loc.clone());
+                    result = false;
+                    region_ends.push(None);
+                }
+            }
+        }
+    }
+    for i in 0..region_list.len() {
+        let Some(end_a) = region_ends[i] else {
+            continue;
+        };
+        for j in (i + 1)..region_list.len() {
+            let Some(end_b) = region_ends[j] else {
+                continue;
+            };
+            let (name_a, entry_a) = region_list[i];
+            let (name_b, entry_b) = region_list[j];
+            if entry_a.addr < end_b && entry_b.addr < end_a {
+                let msg = format!(
+                    "Region '{}' [{:#X}, {:#X}) overlaps region '{}' [{:#X}, {:#X}).",
+                    name_a, entry_a.addr, end_a, name_b, entry_b.addr, end_b
+                );
+                diags.err1("EXEC_70", &msg, entry_a.src_loc.clone());
+                result = false;
+            }
+        }
+    }
+
     result
 }
 
@@ -1082,7 +1154,11 @@ pub fn eval_ast_condition(
     match val.to_bool() {
         Some(b) => Some(b),
         None => {
-            diags.err1("IRDB_56", "if condition must evaluate to a numeric type", src_loc);
+            diags.err1(
+                "IRDB_56",
+                "if condition must evaluate to a numeric type",
+                src_loc,
+            );
             None
         }
     }
