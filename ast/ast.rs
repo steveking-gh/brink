@@ -2296,51 +2296,22 @@ impl<'toks> Output<'toks> {
 }
 
 /*******************************
- * RegionEntry
+ * Region
  ******************************/
-/// Fully resolved region declaration.
-///
-/// Populated in two phases:
-///   1. AstDb::new -- records nid and src_loc; addr and size hold sentinel 0.
-///   2. const_eval::evaluate_regions -- evaluates property expressions and
-///      fills addr and size.
+/// AST-phase record of a region declaration.
+/// Holds the parse-tree position and source location; evaluated properties
+/// (addr, size) are produced by const_eval::evaluate_regions.
 #[derive(Clone, Debug)]
-pub struct RegionEntry {
+pub struct Region {
     /// AST node ID of the region root; used by const_eval to find properties.
     pub nid: NodeId,
     /// Source location of the region keyword, for diagnostics.
     pub src_loc: SourceSpan,
-    /// Starting address of the region.  Populated by const_eval.
-    pub addr: u64,
-    /// Size of the region in bytes.  Populated by const_eval.
-    pub size: u64,
 }
 
-impl RegionEntry {
+impl Region {
     pub fn new(nid: NodeId, src_loc: SourceSpan) -> Self {
-        RegionEntry {
-            nid,
-            src_loc,
-            addr: 0,
-            size: 0,
-        }
-    }
-
-    /// Exclusive end address: addr + size.
-    pub fn end(&self) -> u64 {
-        self.addr + self.size
-    }
-
-    /// True if `addr` falls within [self.addr, self.addr + self.size).
-    pub fn contains_addr(&self, addr: u64) -> bool {
-        addr >= self.addr && addr < self.end()
-    }
-
-    /// True if the range [addr, addr+size) is fully within this region.
-    pub fn contains_range(&self, addr: u64, size: u64) -> bool {
-        addr >= self.addr
-            && size <= self.size
-            && addr - self.addr <= self.size - size
+        Region { nid, src_loc }
     }
 }
 
@@ -2361,7 +2332,7 @@ pub struct AstDb<'toks> {
     /// Set of all const names for collision detection.
     pub const_names: HashMap<&'toks str, SourceSpan>,
     /// All region declarations, keyed by name, in encounter order.
-    pub regions: HashMap<String, RegionEntry>,
+    pub regions: HashMap<String, Region>,
 }
 
 impl<'toks> AstDb<'toks> {
@@ -2371,7 +2342,7 @@ impl<'toks> AstDb<'toks> {
         diags: &mut Diags,
         reg_nid: NodeId,
         ast: &'toks Ast,
-        regions: &mut HashMap<String, RegionEntry>,
+        regions: &mut HashMap<String, Region>,
     ) -> bool {
         debug!("AstDb::record_region: NodeId {}", reg_nid);
 
@@ -2394,7 +2365,7 @@ impl<'toks> AstDb<'toks> {
             return false;
         }
 
-        let entry = RegionEntry::new(reg_nid, name_tinfo.span());
+        let entry = Region::new(reg_nid, name_tinfo.span());
         regions.insert(name_str.to_string(), entry);
         true
     }
@@ -2629,7 +2600,7 @@ impl<'toks> AstDb<'toks> {
         // All declared const names and their locations for duplicate detection.
         let mut const_names: HashMap<&'toks str, SourceSpan> = HashMap::new();
         // All region declarations, keyed by name.
-        let mut regions: HashMap<String, RegionEntry> = HashMap::new();
+        let mut regions: HashMap<String, Region> = HashMap::new();
 
         // First phase, record all sections, files, and the output.
         // These are defined only at top level so no need for recursion.

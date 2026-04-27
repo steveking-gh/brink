@@ -19,6 +19,7 @@ use parse_int::parse;
 
 /// Region properties bound to a section via `section NAME in REGION`.
 /// Stored on IRDb; consumed by LayoutPhase and later execution phases.
+#[derive(Clone, Copy, Debug)]
 pub struct RegionBinding {
     pub addr: u64,
     pub size: u64,

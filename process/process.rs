@@ -154,31 +154,25 @@ pub fn process(
 
     // Second AstDb: built from the pruned AST with full nesting validation.
     // Sections promoted from top-level if/else blocks are now at root level.
-    let mut pruned_ast_db =
+    let pruned_ast_db =
         AstDb::new(&mut diags, &pruned_ast, true).context("[PROC_3]: Error detected, halting.")?;
 
-    if !const_eval::evaluate_regions(
+    let Some(region_bindings) = const_eval::evaluate_regions(
         &mut diags,
         &pruned_ast,
-        &mut pruned_ast_db,
+        &pruned_ast_db,
         &mut symbol_table,
-    ) {
+    ) else {
         return Err(anyhow!("[PROC_9]: Error detected, halting."));
-    }
+    };
 
     // Build the section-to-region map from sections with a region binding.
     let mut section_regions: HashMap<String, RegionBinding> = HashMap::new();
     for (sec_name, section) in &pruned_ast_db.sections {
         if let Some(region_name) = &section.region
-            && let Some(region) = pruned_ast_db.regions.get(region_name)
+            && let Some(binding) = region_bindings.get(region_name)
         {
-            section_regions.insert(
-                sec_name.to_string(),
-                RegionBinding {
-                    addr: region.addr,
-                    size: region.size,
-                },
-            );
+            section_regions.insert(sec_name.to_string(), *binding);
         }
     }
 

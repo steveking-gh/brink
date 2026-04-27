@@ -21,8 +21,8 @@ use std::collections::HashMap;
 #[allow(unused_imports)]
 use tracing::{debug, trace};
 
-use ast::{Ast, AstDb, LexToken, RegionEntry};
-use ir::{ConstBuiltins, IRKind, ParameterValue};
+use ast::{Ast, AstDb, LexToken};
+use ir::{ConstBuiltins, IRKind, ParameterValue, RegionBinding};
 
 use linearizer::{LinIR, LinOperand, Linearizer, tok_to_irkind};
 use symtable::SymbolTable;
@@ -985,25 +985,24 @@ impl<'toks> ConstIR {
     }
 }
 
-/// Evaluate region property expressions and store resolved values into AstDb.
+/// Evaluate region property expressions and return a map of resolved bindings.
 ///
 /// Called after const_eval::evaluate and prune, using the fully resolved symbol
-/// table.  Fills RegionEntry addr and size properties. Returns true on success.
+/// table.  Returns Some(map) on success, None on failure (errors in diags).
 pub fn evaluate_regions<'toks>(
     diags: &mut Diags,
     ast: &'toks Ast,
-    ast_db: &mut AstDb<'toks>,
+    ast_db: &AstDb<'toks>,
     symbol_table: &mut SymbolTable,
-) -> bool {
-    let region_names: Vec<String> = ast_db.regions.keys().cloned().collect();
-    let mut result = true;
+) -> Option<HashMap<String, RegionBinding>> {
+    let mut bindings: HashMap<String, RegionBinding> = HashMap::new();
+    let mut ok = true;
 
-    for name in &region_names {
+    for (name, region) in &ast_db.regions {
         debug!("Evaluating properties of region {}", name);
-        let reg_nid = ast_db.regions[name].nid;
-        let mut resolved: Vec<(String, u64)> = Vec::new();
+        let mut binding = RegionBinding { addr: 0, size: 0 };
 
-        for prop_nid in ast.children(reg_nid) {
+        for prop_nid in ast.children(region.nid) {
             let tinfo = ast.get_tinfo(prop_nid);
             if tinfo.tok != LexToken::RegionProp {
                 // Skip region name and structural tokens like {} around the
@@ -1025,7 +1024,7 @@ pub fn evaluate_regions<'toks>(
             let mut lz = Linearizer::new();
             let mut lops: Vec<usize> = Vec::new();
             if !lz.record_expr_r(expr_nid, &mut lops, diags, ast) {
-                result = false;
+                ok = false;
                 continue;
             }
             if lops.len() != 1 {
@@ -1035,13 +1034,10 @@ pub fn evaluate_regions<'toks>(
                     lops.len()
                 );
             }
-            let const_ir = ConstIR {
-                ir_vec: lz.ir_vec,
-                operand_vec: lz.operand_vec,
-            };
+            let const_ir = ConstIR { ir_vec: lz.ir_vec, operand_vec: lz.operand_vec };
             match ConstIR::eval_const_expr_r(symbol_table, lops[0], &const_ir, diags, &prop_loc) {
                 None => {
-                    result = false;
+                    ok = false;
                 }
                 Some(val) => {
                     if val.to_bool().is_none() {
@@ -1050,72 +1046,62 @@ pub fn evaluate_regions<'toks>(
                             prop_name
                         );
                         diags.err1("EXEC_66", &msg, expr_loc);
-                        result = false;
+                        ok = false;
                         continue;
                     }
-                    resolved.push((prop_name, val.to_u64()));
+                    match prop_name.as_str() {
+                        "addr" => binding.addr = val.to_u64(),
+                        "size" => binding.size = val.to_u64(),
+                        _ => unreachable!("unexpected region property name '{}'", prop_name),
+                    }
                 }
             }
         }
 
-        let entry = ast_db.regions.get_mut(name).unwrap();
-        for (prop_name, val) in resolved {
-            match prop_name.as_str() {
-                "addr" => entry.addr = val,
-                "size" => entry.size = val,
-                _ => unreachable!("unexpected region property name '{}'", prop_name),
-            }
-        }
+        bindings.insert(name.clone(), binding);
     }
 
     // Detect overlapping regions (EXEC_70).  Skip zero-size regions.
     // Pre-compute exclusive end addresses; EXEC_75 if addr+size overflows u64.
-    let region_list: Vec<(&str, &RegionEntry)> = ast_db
-        .regions
-        .iter()
-        .map(|(n, e)| (n.as_str(), e))
-        .collect();
+    let region_list: Vec<(&str, &RegionBinding)> =
+        bindings.iter().map(|(n, b)| (n.as_str(), b)).collect();
     let mut region_ends: Vec<Option<u64>> = Vec::with_capacity(region_list.len());
-    for (_, entry) in &region_list {
-        if entry.size == 0 {
+    for (name, binding) in &region_list {
+        if binding.size == 0 {
             region_ends.push(None);
         } else {
-            match entry.addr.checked_add(entry.size) {
+            match binding.addr.checked_add(binding.size) {
                 Some(end) => region_ends.push(Some(end)),
                 None => {
                     let msg = format!(
                         "Region addr {:#X} + size {:#X} overflows u64.",
-                        entry.addr, entry.size
+                        binding.addr, binding.size
                     );
-                    diags.err1("EXEC_75", &msg, entry.src_loc.clone());
-                    result = false;
+                    diags.err1("EXEC_75", &msg, ast_db.regions[*name].src_loc.clone());
+                    ok = false;
                     region_ends.push(None);
                 }
             }
         }
     }
     for i in 0..region_list.len() {
-        let Some(end_a) = region_ends[i] else {
-            continue;
-        };
+        let Some(end_a) = region_ends[i] else { continue; };
         for j in (i + 1)..region_list.len() {
-            let Some(end_b) = region_ends[j] else {
-                continue;
-            };
-            let (name_a, entry_a) = region_list[i];
-            let (name_b, entry_b) = region_list[j];
-            if entry_a.addr < end_b && entry_b.addr < end_a {
+            let Some(end_b) = region_ends[j] else { continue; };
+            let (name_a, binding_a) = region_list[i];
+            let (name_b, binding_b) = region_list[j];
+            if binding_a.addr < end_b && binding_b.addr < end_a {
                 let msg = format!(
                     "Region '{}' [{:#X}, {:#X}) overlaps region '{}' [{:#X}, {:#X}).",
-                    name_a, entry_a.addr, end_a, name_b, entry_b.addr, end_b
+                    name_a, binding_a.addr, end_a, name_b, binding_b.addr, end_b
                 );
-                diags.err1("EXEC_70", &msg, entry_a.src_loc.clone());
-                result = false;
+                diags.err1("EXEC_70", &msg, ast_db.regions[name_a].src_loc.clone());
+                ok = false;
             }
         }
     }
 
-    result
+    if ok { Some(bindings) } else { None }
 }
 
 // ── AST condition evaluator for the prune pass ───────────────────────────────
