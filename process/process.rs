@@ -177,8 +177,6 @@ pub fn process(
                 RegionBinding {
                     addr: region.addr,
                     size: region.size,
-                    default_align: region.default_align,
-                    default_fill: region.default_fill,
                 },
             );
         }

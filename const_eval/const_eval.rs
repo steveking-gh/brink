@@ -973,8 +973,7 @@ impl<'toks> ConstIR {
 /// Evaluate region property expressions and store resolved values into AstDb.
 ///
 /// Called after const_eval::evaluate and prune, using the fully resolved
-/// symbol table.  Fills RegionEntry.addr, .size, .default_align, .default_fill.
-/// Returns true on success.
+/// symbol table.  Fills RegionEntry.addr and .size.  Returns true on success.
 pub fn evaluate_regions<'toks>(
     diags: &mut Diags,
     ast: &'toks Ast,
@@ -1040,8 +1039,6 @@ pub fn evaluate_regions<'toks>(
             match prop_name.as_str() {
                 "addr" => entry.addr = val,
                 "size" => entry.size = val,
-                "default_align" => entry.default_align = val,
-                "default_fill" => entry.default_fill = val as u8,
                 _ => unreachable!("unexpected region property name '{}'", prop_name),
             }
         }

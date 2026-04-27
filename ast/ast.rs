@@ -113,7 +113,7 @@ pub enum LexToken {
     NamedArg,
     /// A property assignment inside a region block.
     /// Synthesized by parse_region_contents; tok = RegionProp, val = property
-    /// name ("addr", "size", "default_align", "default_fill").
+    /// name ("addr" or "size").
     /// The single child is the expression value.
     RegionProp,
     /// Section-to-region binding recorded during parse_section.
@@ -889,8 +889,6 @@ impl<'toks> Ast<'toks> {
     ///   ├── {                <- syntactic delimiter, marks start of body
     ///   ├── addr
     ///   ├── size
-    ///   ├── [default_align]  <- default alignment (optional)
-    ///   ├── [default_fill]   <- default fill (optional)
     ///   └── }                <- syntactic delimiter, marks end of body
     /// ```
     fn parse_region(&mut self, parent: NodeId, diags: &mut Diags) -> bool {
@@ -936,8 +934,6 @@ impl<'toks> Ast<'toks> {
         let mut result = true;
         let mut seen_addr = false;
         let mut seen_size = false;
-        let mut seen_default_align = false;
-        let mut seen_default_fill = false;
 
         loop {
             let tinfo = self.tv.peek();
@@ -970,21 +966,9 @@ impl<'toks> Ast<'toks> {
                     }
                     seen_size = true;
                 }
-                "default_align" => {
-                    if seen_default_align {
-                        duplicate_property = true;
-                    }
-                    seen_default_align = true;
-                }
-                "default_fill" => {
-                    if seen_default_fill {
-                        duplicate_property = true;
-                    }
-                    seen_default_fill = true;
-                }
                 _ => {
                     let msg = format!(
-                        "Unknown region property '{}'; expected addr, size, default_align, or default_fill",
+                        "Unknown region property '{}'; expected addr or size",
                         prop_val
                     );
                     diags.err1("AST_45", &msg, prop_loc);
@@ -2317,10 +2301,9 @@ impl<'toks> Output<'toks> {
 /// Fully resolved region declaration.
 ///
 /// Populated in two phases:
-///   1. AstDb::new -- records nid and src_loc; addr/size/default_align/
-///      default_fill hold sentinel defaults.
+///   1. AstDb::new -- records nid and src_loc; addr and size hold sentinel 0.
 ///   2. const_eval::evaluate_regions -- evaluates property expressions and
-///      fills addr, size, default_align, default_fill.
+///      fills addr and size.
 #[derive(Clone, Debug)]
 pub struct RegionEntry {
     /// AST node ID of the region root; used by const_eval to find properties.
@@ -2331,12 +2314,6 @@ pub struct RegionEntry {
     pub addr: u64,
     /// Size of the region in bytes.  Populated by const_eval.
     pub size: u64,
-    /// Default alignment for writes in the top-level section.
-    /// 1 means pack tightly.  Populated by const_eval; sentinel default 1.
-    pub default_align: u64,
-    /// Default fill byte for pad operations.
-    /// Populated by const_eval; sentinel default 0xFF.
-    pub default_fill: u8,
 }
 
 impl RegionEntry {
@@ -2346,8 +2323,6 @@ impl RegionEntry {
             src_loc,
             addr: 0,
             size: 0,
-            default_align: 1,
-            default_fill: 0xFF,
         }
     }
 

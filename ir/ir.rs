@@ -22,8 +22,6 @@ use parse_int::parse;
 pub struct RegionBinding {
     pub addr: u64,
     pub size: u64,
-    pub default_align: u64,
-    pub default_fill: u8,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

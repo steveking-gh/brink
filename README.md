@@ -1004,9 +1004,6 @@ section with the following extra behaviors:
 
 * The region sets the starting address of the top-level section.
 * The region caps the size of the top-level section.
-* The region can optionally set the default alignment each write operation in
-  the top-level section.
-* The region can optionally set the default fill byte in the top-level section.
 
 For example:
 
@@ -1014,16 +1011,12 @@ For example:
     region FLASH {
         addr = 0xF000_0000;
         size = 1M;
-        default_align = 4K;
-        default_fill = 0xFF;
     }
 
     // Define the properties of the EEPROM memory region
     region EEPROM {
         addr = 0xFF00_0000;
         size = 64K;
-        // default align=1, aka no alignment
-        // default fill 0xFF, but this is moot with align=1
     }
 
     // Flash sections
@@ -1039,16 +1032,13 @@ For example:
     section FLASH_TOP in FLASH {
         // Starts at address 0xF000_0000
         wr boot;
-        // automatic 4K alignment and fill
         wr flash_code;
-        // automatic 4K alignment and fill
         wr flash_data;
     }
 
     section EEPROM_TOP in EEPROM {
         // Starts at address 0x0000_0000
         wr runtime_code;
-        // Automatic 1-byte alignment and fill, so nothing to do
         wr runtime_data;
     }
 
@@ -1070,8 +1060,6 @@ Regions support the following properties:
 
 * `addr` Starting address (required)
 * `size` Size in bytes (required)
-* `default_align` Default alignment in bytes (default = 1)
-* `default_fill` Default fill byte (default = 0xFF)
 
 ### Region Property `addr`
 
@@ -1089,48 +1077,6 @@ Users can query the `size` property of a region with `sizeof(<region name>)`.
 When specifying the size of a region, users can specify a number and optionally
 use a K/M/G suffix for multiples of 1024, being kilobytes, megabytes and
 gigabytes respectively.
-
-### Region Property `default_align`
-
-Specifies the default alignment of _all_ write operations in the top-level
-section.  An `align` operation in the top-level section overrides the default at
-that instance.  For example:
-
-    region STUFF {
-        addr = 0x4000;
-        size = 64K;
-        default_align = 4K;
-        default_fill = 0xFF;
-    }
-
-    section TOP in STUFF {
-        wrs "First";
-        // aligned to 4KB by default
-        wrs "Second";
-        // Override default alignment to 16 byte and override pad = 0
-        align 16, 0x00;
-        wrs "Third";
-        // Back to default 4KB default alignment
-        wrs "Fourth";
-    }
-
-The code above generates a section with the following layout:
-
-     | Address | Size | Content               | Description      |
-     | ------- | ---- | --------------------- | ---------------- |
-     | 0x4000  | 5    | First                 | wrs              |
-     | 0x4005  | 4091 | 0xFF, 0xFF, ..., 0xFF | default padding  |
-     | 0x5000  | 6    | Second                | wrs              |
-     | 0x5006  | 10   | 0x00, 0x00, ..., 0x00 | explicit padding |
-     | 0x5010  | 5    | Third                 | wrs              |
-     | 0x5015  | 4085 | 0xFF, 0xFF, ..., 0xFF | default padding  |
-     | 0x6000  | 6    | Fourth                | wrs              |
-
-### Region Property `default_fill`
-
-Specifies the default fill byte for any pad operations in the top-level section.
-The section may override the default pad byte with a pad byte specifier on any
-operation that causes padding.
 
 ### Region Boundary Enforcement
 
