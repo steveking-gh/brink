@@ -188,7 +188,7 @@ impl ParameterValue {
         }
     }
 
-    pub fn to_identifier(&self) -> &str {
+    pub fn identifier_to_str(&self) -> &str {
         match self {
             ParameterValue::Identifier(s) => s,
             _ => {

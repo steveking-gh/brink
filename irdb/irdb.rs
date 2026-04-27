@@ -69,7 +69,7 @@ impl IRDb {
     pub fn get_opnd_as_identifier(&self, ir: &IR, opnd_num: usize) -> &str {
         let &op_num = ir.operands.get(opnd_num).unwrap();
         let opnd = self.parms.get(op_num).unwrap();
-        opnd.val.to_identifier()
+        opnd.val.identifier_to_str()
     }
 
     pub fn get_operand_ir_lid(&self, opnd_num: usize) -> Option<usize> {
@@ -828,7 +828,7 @@ impl IRDb {
                             op.push_str(&format!(" ({:?}){}", operand.val.data_type(), v));
                         }
                         DataType::Identifier => {
-                            let v = operand.val.to_identifier();
+                            let v = operand.val.identifier_to_str();
                             op.push_str(&format!(" ({:?}){}", operand.val.data_type(), v));
                         }
                         DataType::Extension => {

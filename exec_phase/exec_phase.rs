@@ -350,7 +350,7 @@ impl ExecPhase {
                 IRKind::ExtensionCall => {
                     // Pre-pad zeroed bytes to expand the output file to cover
                     // the extension's output region before memory mapping.
-                    let ext_name = argvaldb.parms[ir.operands[0]].to_identifier();
+                    let ext_name = argvaldb.parms[ir.operands[0]].identifier_to_str();
                     if let Some(entry) = ext_registry.get(ext_name) {
                         let buf = vec![0u8; entry.cached_size];
                         file.write_all(&buf).map_err(|e| {
@@ -435,7 +435,7 @@ impl ExecPhase {
         let mut error_count = 0;
         for &idx in &extension_nodes {
             let ir = &irdb.ir_vec[idx];
-            let name = argvaldb.parms[ir.operands[0]].to_identifier();
+            let name = argvaldb.parms[ir.operands[0]].identifier_to_str();
 
             let Some(entry) = ext_registry.get(name) else {
                 unreachable!("Extension '{}' not found in registry", name);
@@ -520,7 +520,7 @@ impl ExecPhase {
                 for (i, p) in cached_params.iter().enumerate() {
                     if p.kind == ParamKind::Slice {
                         let sec_name = argvaldb.parms[ir.operands[1 + i]]
-                            .to_identifier()
+                            .identifier_to_str()
                             .to_string();
                         let indices = sec_dispatch_map
                             .get(sec_name.as_str())

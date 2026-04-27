@@ -101,7 +101,7 @@ impl LayoutPhase {
     ) -> bool {
         self.trace(format_args!("LayoutPhase::iterate_ext: {}", current));
 
-        let ext_name = self.parms[ir.operands[0]].to_identifier();
+        let ext_name = self.parms[ir.operands[0]].identifier_to_str();
         if let Some(entry) = ext_registry.get(ext_name) {
             let size = entry.cached_size as u64;
             return current.advance(size, &ir.src_loc, diags);
@@ -694,7 +694,7 @@ impl LayoutPhase {
         let in_parm = &self.parms[in_parm_num0];
 
         if in_parm.data_type() == DataType::Identifier {
-            let sec_name = in_parm.to_identifier().to_string();
+            let sec_name = in_parm.identifier_to_str().to_string();
 
             // We've already verified that the section identifier exists, but
             // unless the section actually got used in the output, then we won't
@@ -748,7 +748,7 @@ impl LayoutPhase {
         // SizeofExt has 2 operands: [0] = extension name (Identifier), [1] = output U64
         assert!(ir.operands.len() == 2);
         let out_parm_num = ir.operands[1];
-        let name = self.parms[ir.operands[0]].to_identifier().to_string();
+        let name = self.parms[ir.operands[0]].identifier_to_str().to_string();
         if let Some(entry) = ext_registry.get(&name) {
             *self.parms[out_parm_num].to_u64_mut() = entry.cached_size as u64;
             true
@@ -1091,7 +1091,7 @@ impl LayoutPhase {
         let in_parm_num0 = ir.operands[0]; // identifier
         let out_parm_num = ir.operands[1];
 
-        let name = self.parms[in_parm_num0].to_identifier().to_string();
+        let name = self.parms[in_parm_num0].identifier_to_str().to_string();
 
         let out_parm = &mut self.parms[out_parm_num];
         let out = out_parm.to_u64_mut();
