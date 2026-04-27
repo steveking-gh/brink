@@ -38,19 +38,21 @@ Design decisions established for this plan:
 ## Step 1 — `--max-output-size` flag  *(COMPLETE)*
 
 
-## Step 2 — Remove `output` address argument [DONE 2026-04-21]
+## Step 2 — Remove `output` address argument  *(COMPLETE 2026-04-21)*
 
 ---
 
-## Step 3 — `region` keyword and AST parsing  *(AST layer COMPLETE)*
+## Step 3 — `region` keyword, parsing, and AstDb  *(COMPLETE)*
 
 ### New lexer tokens
 
 In `ast/ast.rs` `LexToken` enum:
 
 ```rust
-Region,          // region keyword
-In,              // in keyword (used in section-to-region binding)
+Region,      // region keyword
+In,          // in keyword (used in section-to-region binding)
+RegionProp,  // synthetic; val = property name; one expression child
+RegionRef,   // synthetic; val = region name; no children
 ```
 
 In `ast/lexer.rs` `scan_word` keyword table:
@@ -80,12 +82,6 @@ Region node  (tok = LexToken::Region)
     <expression subtree>
 ```
 
-Add to `LexToken`:
-
-```rust
-RegionProp,   // a named property inside a region block
-```
-
 ### Recognized region properties
 
 | Property        | Required | Default | Meaning                                     |
@@ -95,144 +91,138 @@ RegionProp,   // a named property inside a region block
 | `default_align` | No       | 1       | Default alignment for writes in top section |
 | `default_fill`  | No       | 0xFF    | Default fill byte for pad operations        |
 
-### Parser — `parse_region`
+### Parser functions
 
-New method on `Ast`:
+`parse_region` — top-level entry point. Consumes the `Region` token, calls
+`expect_name_leaf` (AST_58), calls `expect_leaf(OpenBrace)` (AST_59), delegates
+the body to `parse_region_contents`.
 
-```rust
-/// Parse: region NAME { PROPERTIES }
-/// Properties: addr = EXPR ; | size = EXPR ; | default_align = EXPR ;
-///             | default_fill = EXPR ;
-fn parse_region(&mut self, diags: &mut Diags, parent: NodeId) -> bool
-```
+`parse_region_contents` — body loop. Iterates `name = expr ;` assignments.
+Dispatches on `prop_val` with one match arm per recognized property name; the
+`_` arm emits AST_45 and skips to the next `;`. Checks for duplicates (AST_46).
+Calls `parse_region_property` for each valid, non-duplicate property. After the
+loop, verifies `addr` (AST_47) and `size` (AST_64) were present.
 
-Sequence:
-1. Consume `Region` token; add Region node to arena.
-2. `expect_name_leaf(...)` for the region name — produces Identifier child.
-3. `expect_leaf(OpenBrace, ...)`
-4. Loop: consume `name = expr ;` property assignments until `CloseBrace`.
-   - Recognized property names: `"addr"`, `"size"`, `"default_align"`,
-     `"default_fill"`.
-   - Unknown property name: emit `AST_44` error, skip to next `;`.
-   - Duplicate property: emit `AST_45` error.
-   - Each property produces a `RegionProp` child node with the expression
-     subtree beneath it.
-5. After parsing: verify both `addr` and `size` are present; emit `AST_46`
-   if either is absent.
-6. `expect_leaf(CloseBrace, ...)`
+`parse_region_property` — per-property helper. Consumes the property name token,
+expects `=` (AST_62), synthesizes a `RegionProp` node, parses the expression,
+and parses the terminating `;`.
 
 ### Top-level parser hook
 
-In `parse_top_level` dispatch, add:
+In `parse_top_level` dispatch:
 
 ```rust
 LexToken::Region => self.parse_region(diags, root_nid),
 ```
 
+### `RegionEntry` struct
+
+```rust
+pub struct RegionEntry {
+    pub nid: NodeId,           // Region node in the arena
+    pub src_loc: SourceSpan,   // location of the region keyword
+    pub addr: u64,             // sentinel 0; filled by evaluate_regions
+    pub size: u64,             // sentinel 0; filled by evaluate_regions
+    pub default_align: u64,    // sentinel 1
+    pub default_fill: u8,      // sentinel 0xFF
+}
+```
+
+Methods: `end()`, `contains_addr()`, `contains_range()`.
+
+### AstDb changes
+
+```rust
+pub regions: HashMap<String, RegionEntry>,
+```
+
+`AstDb::new` processes Region nodes at root; calls `record_region` per node,
+which checks for reserved names (AST_61) and duplicate names (AST_60).
+After all root nodes are recorded, checks for region/section name conflicts
+(AST_48) and region/const name conflicts (AST_63).
+
+`Section::region: Option<String>` — set from the `RegionRef` child when a
+`section NAME in REGION` binding is parsed.
+
 ### New error codes
 
 | Code   | Meaning                                                  |
 |--------|----------------------------------------------------------|
-| AST_44 | Unknown region property name                             |
-| AST_45 | Duplicate region property                                |
-| AST_46 | Missing required region property (`addr` or `size`)      |
-| AST_47 | Region name conflicts with existing section or const name|
+| AST_45 | Unknown region property name                             |
+| AST_46 | Duplicate region property                                |
+| AST_47 | Region is missing required property `addr`               |
+| AST_48 | Region name conflicts with a section name                |
+| AST_58 | Expected identifier after `region` keyword               |
+| AST_59 | Expected `{` after region name                           |
+| AST_60 | Duplicate region name                                    |
+| AST_61 | Reserved identifier used as region name                  |
+| AST_62 | Expected `=` after region property name                  |
+| AST_63 | Region name conflicts with a const name                  |
+| AST_64 | Region is missing required property `size`               |
+
+### Integration tests
+
+15 fixtures and test functions cover all error codes above plus one success
+case (`region_valid.brink`).
 
 ---
 
-## Step 3 — Region evaluation and RegionDb
+## Step 3 — Region evaluation  *(PARTIAL — anchor complete; validation pending)*
 
 Region property values are const expressions evaluated in the `const_eval`
 phase, reusing the existing const evaluation infrastructure.
 
-### New type in `ast` crate
+### const_eval changes  *(COMPLETE)*
 
-```rust
-/// Fully resolved region declaration, stored in AstDb after const_eval.
-#[derive(Clone, Debug)]
-pub struct RegionEntry {
-    /// Base address of the region.
-    pub addr: u64,
-    /// Size of the region in bytes.
-    pub size: u64,
-    /// Default alignment for write operations in the top-level section.
-    /// 1 means no alignment (pack tightly).
-    pub default_align: u64,
-    /// Default fill byte for pad operations in the top-level section.
-    pub default_fill: u8,
-    /// Source location of the region keyword, for diagnostics.
-    pub src_loc: SourceSpan,
-}
-
-impl RegionEntry {
-    /// Exclusive end address: addr + size.
-    pub fn end(&self) -> u64 {
-        self.addr + self.size
-    }
-
-    /// True if addr is within [self.addr, self.addr + self.size).
-    pub fn contains_addr(&self, addr: u64) -> bool {
-        addr >= self.addr && addr < self.end()
-    }
-
-    /// True if the range [addr, addr+size) is fully contained.
-    pub fn contains_range(&self, addr: u64, size: u64) -> bool {
-        addr >= self.addr
-            && size <= self.size
-            && addr - self.addr <= self.size - size
-    }
-}
-```
-
-### AstDb changes
-
-Add to `AstDb`:
-
-```rust
-/// Regions declared in this source, keyed by name, in declaration order.
-pub regions: IndexMap<String, RegionEntry>,
-```
-
-`AstDb::new()` traverses Region nodes at the root of the AST and records
-their names and source locations. Property expressions are NOT evaluated here
-— only structural validation (name uniqueness, required properties present).
-
-### const_eval changes
-
-After the existing const evaluation pass, a new sub-pass evaluates region
+After the existing const evaluation pass, `evaluate_regions` evaluates region
 property expressions using the already-resolved `SymbolTable`:
 
 ```rust
-/// Evaluate all region property expressions and populate RegionEntry fields.
-pub fn evaluate_regions(
+pub fn evaluate_regions<'toks>(
     diags: &mut Diags,
-    ast: &Ast,
-    ast_db: &mut AstDb,
-    symbol_table: &SymbolTable,
-) -> Result<()>
+    ast: &'toks Ast,
+    ast_db: &mut AstDb<'toks>,
+    symbol_table: &mut SymbolTable,
+) -> bool
 ```
 
 Walks each Region node's `RegionProp` children, evaluates their expression
 subtrees using `eval_const_expr_r`, and stores resolved values into
-`RegionEntry`.
+`RegionEntry`.  Emits EXEC_66 for non-numeric property values.
 
-Validate `default_align` is a power of two and non-zero. Validate
-`default_fill` fits in a `u8`.
+Called in `process.rs` after `AstDb::new(true)` and before `LayoutDb::new`.
+`process.rs` then builds `section_anchors: HashMap<String, u64>` (section name
+→ `region.addr`) and passes it to `LayoutPhase::build`.
 
-Validate that no two regions have overlapping address ranges. Emit `EXEC_70`
-per overlapping pair.
+### layout_phase changes  *(COMPLETE — address anchor only)*
+
+`LayoutPhase` gains `section_anchors: HashMap<String, u64>`.
+`build()` accepts `section_anchors` as a parameter.
+`iterate_section_start` applies the anchor for region-bound sections:
+sets `current.addr.addr_base = anchor` and `current.addr.addr_offset = 0`.
+`ir_locs[lid]` is re-recorded after `iterate_section_start` so that
+`addr(section_name)` returns the anchored address.
+
+### Validation still pending
+
+The following validations are deferred to a later step:
+
+- `default_align` must be a power of two and non-zero (EXEC_69).
+- No two regions may have overlapping address ranges (EXEC_70).
+- Cyclic dependency detection in region property expressions (EXEC_71).
 
 ### New error codes
 
-| Code    | Meaning                                                |
-|---------|--------------------------------------------------------|
-| EXEC_69 | `default_align` is not a power of two, or is zero      |
-| EXEC_70 | Two regions have overlapping address ranges            |
-| EXEC_71 | Cyclic dependency in region property expressions       |
+| Code    | Meaning                                                       |
+|---------|---------------------------------------------------------------|
+| EXEC_66 | Region property value is not numeric                          |
+| EXEC_69 | default_align not a power of two or zero (pending)            |
+| EXEC_70 | Two regions have overlapping address ranges (pending)         |
+| EXEC_71 | Cyclic dependency in region property expressions (pending)    |
 
 ---
 
-## Step 4 — `section NAME in REGION` binding  *(AST layer COMPLETE)*
+## Step 4 — `section NAME in REGION` binding  *(COMPLETE)*
 
 ### Parser changes
 
@@ -244,7 +234,7 @@ let region_name = if self.tv.peek().tok == LexToken::In {
     self.tv.skip();  // consume 'in'
     let tinfo = self.tv.peek();
     if tinfo.tok != LexToken::Identifier {
-        self.err_expected_after(diags, "AST_48", "'in': expected region name");
+        self.err_expected_after(diags, "AST_49", "'in': expected region name");
         return self.dbg_exit("parse_section", false);
     }
     let name = tinfo.val.to_string();
@@ -255,33 +245,25 @@ let region_name = if self.tv.peek().tok == LexToken::In {
 };
 ```
 
-The region name is stored as a synthetic child node of the Section AST node
-with token kind `LexToken::RegionRef`.
+The region name is stored as a `RegionRef` synthetic child node of the Section
+AST node. The linearizer treats `RegionRef` as syntactic noise (no IR emitted).
 
-### AstDb — Section entry gains region field
+### AstDb — Section gains region field
 
-```rust
-pub struct SectionEntry {
-    pub node_id: NodeId,
-    pub region: Option<String>,    // name of bound region, if any
-    pub src_loc: SourceSpan,
-}
-```
-
-`AstDb::new()` validates:
+`Section::region: Option<String>` is populated from the `RegionRef` child
+during `Section::new`. `AstDb::new` validates:
 
 - The region name referenced in `section NAME in REGION` exists in
-  `ast_db.regions`. Unknown reference produces `AST_49`.
-- At most one section is bound to each region. A second binding produces
-  `AST_53`.
+  `ast_db.regions`. Unknown reference produces AST_56.
+- At most one section is bound to each region. A second binding produces AST_57.
 
 ### New error codes
 
 | Code   | Meaning                                                         |
 |--------|-----------------------------------------------------------------|
-| AST_48 | `in` keyword not followed by region name in section declaration |
-| AST_49 | Section references undeclared region                            |
-| AST_53 | A second section declares `in` the same region                  |
+| AST_49 | `in` keyword not followed by region name in section declaration |
+| AST_56 | Section references undeclared region                            |
+| AST_57 | Second section bound to same region                             |
 
 ---
 
@@ -308,27 +290,13 @@ region-bound section's resolved address range is fully within the region:
 fn validate_section_regions(
     &self,
     ir_db: &IRDb,
-    regions: &IndexMap<String, RegionEntry>,
+    regions: &HashMap<String, RegionEntry>,
     diags: &mut Diags,
 ) -> bool
 ```
 
 For each region-bound section, if `sizeof(section) > region.size`, emit
 `EXEC_73` with both sizes and the excess.
-
-### Engine changes
-
-`Engine::new()` receives the region table:
-
-```rust
-pub fn new(
-    ir_db: &IRDb,
-    ext_registry: &ExtensionRegistry,
-    diags: &mut Diags,
-    abs_start: usize,
-    regions: &IndexMap<String, RegionEntry>,
-) -> Result<Self>
-```
 
 ### New error codes
 
@@ -397,12 +365,13 @@ overlap validation, without breaking any existing region or section grammar.
 
 ```
 Step 1  (COMPLETE)
-Step 2  (no dependencies)       -- lexer + parser foundation
-Step 3  (requires Step 2)       -- region evaluation and overlap check
-Step 4  (requires Steps 2, 3)   -- section-to-region binding
-Step 5  (requires Steps 3, 4)   -- engine anchoring and enforcement
-Step 6  (requires Steps 2, 3)   -- addr()/sizeof() region resolution
-Step 7  (requires Steps 2, 4)   -- output simplification
+Step 2  (COMPLETE)
+Step 3  parser + AstDb  (COMPLETE)  -- region keyword, parsing, RegionEntry, AstDb
+Step 3  evaluation      (PARTIAL)   -- evaluate_regions + anchor COMPLETE; EXEC_69/70/71 pending
+Step 4  (COMPLETE)                  -- section-to-region binding
+Step 5  (requires Step 3 eval)      -- bounds enforcement (EXEC_72, EXEC_73)
+Step 6  (requires Step 3 eval)      -- addr()/sizeof() region resolution
+Step 7  (SUPERSEDED by Step 2)
 ```
 
 Each step is independently testable; a step is complete when its new tests
@@ -412,30 +381,29 @@ pass and no existing tests regress.
 
 ## Error Code Summary
 
-AST_44 and AST_53 were already occupied before region work began.
-Region codes are shifted accordingly.
-
-| Code    | Step | Crate           | Meaning                                                    |
-|---------|------|-----------------|------------------------------------------------------------|
-| AST_45  | 3    | ast             | Unknown region property name                               |
-| AST_46  | 3    | ast             | Duplicate region property                                  |
-| AST_47  | 3    | ast             | Missing required region property (addr or size)            |
-| AST_48  | 3    | ast             | Region name conflicts with a section name                  |
-| AST_49  | 4    | ast             | `in` not followed by region name in section declaration    |
-| AST_55  | 2    | ast             | `output` address arg removed; use `set_addr` (DONE)        |
-| AST_56  | 4    | ast             | Section references undeclared region                       |
-| AST_57  | 4    | ast             | Second section bound to same region                        |
-| AST_58  | 3    | ast             | Expected identifier after `region` keyword                 |
-| AST_59  | 3    | ast             | Expected `{` after region name                             |
-| AST_60  | 3    | ast             | Duplicate region name                                      |
-| AST_61  | 3    | ast             | Reserved identifier used as region name                    |
-| AST_62  | 3    | ast             | Expected `=` after region property name                    |
-| AST_63  | 3    | ast             | Region name conflicts with a const name                    |
-| AST_64  | 3    | ast             | Region is missing required property `size`                 |
-| PROC_7  | 1    | process         | Output size exceeds `--max-output-size` (COMPLETE)         |
-| PROC_8  | —    | process         | ValidationPhase failure (assert evaluation)                |
-| EXEC_69 | 3    | const_eval      | `default_align` not a power of two or is zero              |
-| EXEC_70 | 3    | const_eval      | Two regions have overlapping address ranges                |
-| EXEC_71 | 3    | const_eval      | Cyclic dependency in region property expressions           |
-| EXEC_72 | 5    | engine          | `set_addr` targets an address outside the region           |
-| EXEC_73 | 5    | engine          | Region-bound section exceeds region size                   |
+| Code    | Step | Crate      | Meaning                                                    |
+|---------|------|------------|------------------------------------------------------------|
+| AST_45  | 3    | ast        | Unknown region property name                               |
+| AST_46  | 3    | ast        | Duplicate region property                                  |
+| AST_47  | 3    | ast        | Region is missing required property `addr`                 |
+| AST_48  | 3    | ast        | Region name conflicts with a section name                  |
+| AST_49  | 4    | ast        | `in` not followed by region name in section declaration    |
+| AST_55  | 2    | ast        | `output` address arg removed; use `set_addr` (COMPLETE)    |
+| AST_56  | 4    | ast        | Section references undeclared region                       |
+| AST_57  | 4    | ast        | Second section bound to same region                        |
+| AST_58  | 3    | ast        | Expected identifier after `region` keyword                 |
+| AST_59  | 3    | ast        | Expected `{` after region name                             |
+| AST_60  | 3    | ast        | Duplicate region name                                      |
+| AST_61  | 3    | ast        | Reserved identifier used as region name                    |
+| AST_62  | 3    | ast        | Expected `=` after region property name                    |
+| AST_63  | 3    | ast        | Region name conflicts with a const name                    |
+| AST_64  | 3    | ast        | Region is missing required property `size`                 |
+| PROC_7  | 1    | process    | Output size exceeds `--max-output-size` (COMPLETE)         |
+| PROC_8  | —    | process    | ValidationPhase failure (assert evaluation)                |
+| PROC_9  | 3    | process    | evaluate_regions failed                                    |
+| EXEC_66 | 3    | const_eval | Region property value is not numeric                       |
+| EXEC_69 | 3    | const_eval | `default_align` not a power of two or is zero (pending)    |
+| EXEC_70 | 3    | const_eval | Two regions have overlapping address ranges (pending)      |
+| EXEC_71 | 3    | const_eval | Cyclic dependency in region property expressions (pending) |
+| EXEC_72 | 5    | engine     | `set_addr` targets an address outside the region           |
+| EXEC_73 | 5    | engine     | Region-bound section exceeds region size                   |

@@ -3086,4 +3086,19 @@ mod tests {
     fn region_ast64_missing_size() {
         assert_brink_failure("tests/region_ast64_missing_size.brink", &["[AST_64]"]);
     }
+
+    #[test]
+    fn region_anchor() {
+        assert_brink_success("tests/region_anchor.brink", None, None);
+    }
+
+    #[test]
+    fn region_if_addr() {
+        assert_brink_success("tests/region_if_addr.brink", None, None);
+    }
+
+    #[test]
+    fn region_exec66() {
+        assert_brink_failure("tests/region_exec66.brink", &["[EXEC_66]"]);
+    }
 } // mod tests

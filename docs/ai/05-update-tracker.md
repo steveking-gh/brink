@@ -382,3 +382,38 @@ looping forever.  Fix: `self.tv.skip()` before `advance_past_semicolon()` in
 both paths.
 
 334 tests pass.
+
+---
+
+## 2026-04-26 — Region plan Step 3 evaluation (address anchor)
+
+**const_eval::evaluate_regions**
+New public function in `const_eval/const_eval.rs`.  Called in `process.rs` after
+`AstDb::new(true)` and before `LayoutDb::new`.  Walks each RegionProp child of
+each Region node, lowers the expression subtree with `Linearizer::record_expr_r`,
+evaluates with `ConstIR::eval_const_expr_r`, and stores `addr`, `size`,
+`default_align`, `default_fill` into the matching `RegionEntry`.  Emits EXEC_66
+for non-numeric property values.
+
+**Section address anchoring in LayoutPhase**
+`LayoutPhase` gains `section_anchors: HashMap<String, u64>` (section name to
+region addr).  `build()` accepts this map as a new parameter.  `process.rs`
+builds it from the resolved `pruned_ast_db` after `evaluate_regions` and passes
+it to `LayoutPhase::build`.
+
+`iterate_section_start` applies the anchor for region-bound sections:
+sets `current.addr.addr_base = anchor` and `current.addr.addr_offset = 0`.
+`ir_locs[lid]` is re-recorded after the anchor is applied so that
+`addr(section_name)` returns the region-anchored address, not the pre-entry
+parent address.
+
+**New error codes**
+EXEC_66: region property value is not numeric.
+PROC_9: evaluate_regions failure halt.
+
+**Tests**
+`region_anchor.brink`: writes `addr(top)` as `wr32`; verifies bytes equal
+`0x08000000` LE, confirming the anchor is applied correctly.
+`region_exec66.brink`: string-valued region property triggers EXEC_66.
+
+336 tests pass.

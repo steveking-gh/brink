@@ -20,13 +20,13 @@ use std::io::Write;
 use ast::{Ast, AstDb};
 use diags::Diags;
 use exec_phase::ExecPhase;
-use validation_phase::ValidationPhase;
 use extension_registry::{ExtensionRegistry, test_mocks::register_test_extensions};
-use ir::{ConstBuiltins, ParameterValue};
+use ir::{ConstBuiltins, ParameterValue, RegionBinding};
 use irdb::IRDb;
 use layout_phase::LayoutPhase;
 use layoutdb::LayoutDb;
 use map_phase::{format_c99, format_csv, format_json, format_rs};
+use validation_phase::ValidationPhase;
 
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
@@ -154,8 +154,35 @@ pub fn process(
 
     // Second AstDb: built from the pruned AST with full nesting validation.
     // Sections promoted from top-level if/else blocks are now at root level.
-    let pruned_ast_db =
+    let mut pruned_ast_db =
         AstDb::new(&mut diags, &pruned_ast, true).context("[PROC_3]: Error detected, halting.")?;
+
+    if !const_eval::evaluate_regions(
+        &mut diags,
+        &pruned_ast,
+        &mut pruned_ast_db,
+        &mut symbol_table,
+    ) {
+        return Err(anyhow!("[PROC_9]: Error detected, halting."));
+    }
+
+    // Build the section-to-region map from sections with a region binding.
+    let mut section_regions: HashMap<String, RegionBinding> = HashMap::new();
+    for (sec_name, section) in &pruned_ast_db.sections {
+        if let Some(region_name) = &section.region
+            && let Some(region) = pruned_ast_db.regions.get(region_name)
+        {
+            section_regions.insert(
+                sec_name.to_string(),
+                RegionBinding {
+                    addr: region.addr,
+                    size: region.size,
+                    default_align: region.default_align,
+                    default_fill: region.default_fill,
+                },
+            );
+        }
+    }
 
     let layout_db = LayoutDb::new(&mut diags, &pruned_ast, &pruned_ast_db)
         .context("[PROC_4]: Error detected, halting.")?;
@@ -167,8 +194,14 @@ pub fn process(
     register_test_extensions(&mut ext_registry);
     extensions::register_all(&mut ext_registry);
 
-    let ir_db = IRDb::new(symbol_table, &layout_db, &mut diags, &ext_registry)
-        .context("[PROC_5]: Error detected, halting.")?;
+    let ir_db = IRDb::new(
+        symbol_table,
+        &layout_db,
+        &mut diags,
+        &ext_registry,
+        section_regions,
+    )
+    .context("[PROC_5]: Error detected, halting.")?;
 
     debug!("Dumping ir_db");
     if verbosity > 2 {

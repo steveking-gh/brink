@@ -741,7 +741,7 @@ impl ExecPhase {
                 bad => {
                     let msg = format!("Cannot stringify type '{:?}'", bad);
                     let src_loc = irdb.parms[op_num].src_loc.clone();
-                    diags.err1("EXEC_1014", &msg, src_loc);
+                    diags.err1("EXEC_67", &msg, src_loc);
                     result = false;
                 }
             }

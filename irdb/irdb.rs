@@ -19,7 +19,7 @@ use layoutdb::LayoutDb;
 use tracing::{debug, error, info, trace, warn};
 
 use extension_registry::{ExtensionRegistry, ParamKind};
-use ir::{DataType, IR, IRKind, IROperand, ParameterValue};
+use ir::{DataType, IR, IRKind, IROperand, ParameterValue, RegionBinding};
 use std::{
     collections::{HashMap, HashSet},
     fs,
@@ -56,6 +56,10 @@ pub struct IRDb {
     /// Name of the section designated by the `output` statement.
     /// Used by the engine to evaluate `__OUTPUT_SIZE` and `__OUTPUT_ADDR`.
     pub output_sec_str: String,
+
+    /// Region properties for sections declared `section NAME in REGION`.
+    /// Keyed by section name; consumed by LayoutPhase and later execution phases.
+    pub section_regions: HashMap<String, RegionBinding>,
 }
 
 impl IRDb {
@@ -760,6 +764,7 @@ impl IRDb {
         lin_db: &LayoutDb,
         diags: &mut Diags,
         ext_registry: &ExtensionRegistry,
+        section_regions: HashMap<String, RegionBinding>,
     ) -> anyhow::Result<Self> {
         let mut ir_db = IRDb {
             ir_vec: Vec::new(),
@@ -769,6 +774,7 @@ impl IRDb {
             files: HashMap::new(),
             symbol_table,
             output_sec_str: lin_db.output_sec_str.clone(),
+            section_regions,
         };
 
         if !ir_db.process_lin_operands(lin_db, diags) {

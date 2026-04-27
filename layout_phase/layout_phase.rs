@@ -1152,6 +1152,13 @@ impl LayoutPhase {
         ));
         current.addr.sec_offset = 0;
 
+        // For region-bound sections, anchor the absolute base address to the
+        // region's starting address and reset the offset to zero.
+        if let Some(binding) = irdb.section_regions.get(sec_name) {
+            current.addr.addr_base = binding.addr;
+            current.addr.addr_offset = 0;
+        }
+
         true
     }
 
@@ -1321,7 +1328,11 @@ impl LayoutPhase {
                     }
                     IRKind::Wrs => self.iterate_wrs(ir, irdb, diags, &mut current),
                     IRKind::SectionStart => {
-                        self.iterate_section_start(ir, irdb, diags, &mut current)
+                        let ok = self.iterate_section_start(ir, irdb, diags, &mut current);
+                        // Re-record after iterate_section_start so that addr(section_name)
+                        // reflects the anchored address, not the pre-entry address.
+                        self.ir_locs[lid] = current.clone();
+                        ok
                     }
                     IRKind::SectionEnd => self.iterate_section_end(ir, irdb, diags, &mut current),
 

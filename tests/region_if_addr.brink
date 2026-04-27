@@ -1,0 +1,23 @@
+// region_if_addr.brink: region address selected by an if/else const assignment.
+// Verifies that a region addr resolved from an if/else-assigned const correctly
+// anchors the bound section.
+const USE_FLASH = 1;
+const BASE;
+
+if USE_FLASH == 1 {
+    BASE = 0x08000000;
+} else {
+    BASE = 0x20000000;
+}
+
+region MEM {
+    addr = BASE;
+    size = 0x00100000;
+}
+
+section top in MEM {
+    wr8 0x00;
+}
+
+assert(addr(top) == 0x08000000);
+output top;

@@ -17,6 +17,15 @@ use diags::Diags;
 use diags::SourceSpan;
 use parse_int::parse;
 
+/// Region properties bound to a section via `section NAME in REGION`.
+/// Stored on IRDb; consumed by LayoutPhase and later execution phases.
+pub struct RegionBinding {
+    pub addr: u64,
+    pub size: u64,
+    pub default_align: u64,
+    pub default_fill: u8,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DataType {
     U64,

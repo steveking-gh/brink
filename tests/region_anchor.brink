@@ -1,0 +1,11 @@
+// region_anchor.brink: section bound to a region is anchored to region.addr.
+// Writes addr(top) as a LE wr32 to prove the anchor value is correct.
+region FLASH {
+    addr = 0x08000000;
+    size = 0x00100000;
+}
+section top in FLASH {
+    wr32 addr(top);
+}
+assert(addr(top) == 0x08000000);
+output top;

@@ -968,6 +968,87 @@ impl<'toks> ConstIR {
     }
 }
 
+// ── Region property evaluator ─────────────────────────────────────────────────
+
+/// Evaluate region property expressions and store resolved values into AstDb.
+///
+/// Called after const_eval::evaluate and prune, using the fully resolved
+/// symbol table.  Fills RegionEntry.addr, .size, .default_align, .default_fill.
+/// Returns true on success.
+pub fn evaluate_regions<'toks>(
+    diags: &mut Diags,
+    ast: &'toks Ast,
+    ast_db: &mut AstDb<'toks>,
+    symbol_table: &mut SymbolTable,
+) -> bool {
+    let region_names: Vec<String> = ast_db.regions.keys().cloned().collect();
+    let mut result = true;
+
+    for name in &region_names {
+        let reg_nid = ast_db.regions[name].nid;
+        let mut resolved: Vec<(String, u64)> = Vec::new();
+
+        for prop_nid in ast.children(reg_nid) {
+            let tinfo = ast.get_tinfo(prop_nid);
+            if tinfo.tok != LexToken::RegionProp {
+                continue;
+            }
+            let prop_name = tinfo.val.to_string();
+            let prop_loc = tinfo.loc.clone();
+
+            // First child of RegionProp is the expression root; second is ';'.
+            let Some(expr_nid) = ast.children(prop_nid).next() else {
+                continue;
+            };
+            let expr_loc = ast.get_tinfo(expr_nid).loc.clone();
+
+            let mut lz = Linearizer::new();
+            let mut lops: Vec<usize> = Vec::new();
+            if !lz.record_expr_r(expr_nid, &mut lops, diags, ast) {
+                result = false;
+                continue;
+            }
+            if lops.len() != 1 {
+                unreachable!(
+                    "record_expr_r returned {} operands for region property; \
+                     parser guarantees exactly one expression node",
+                    lops.len()
+                );
+            }
+            let const_ir = ConstIR { ir_vec: lz.ir_vec, operand_vec: lz.operand_vec };
+            match ConstIR::eval_const_expr_r(symbol_table, lops[0], &const_ir, diags, &prop_loc) {
+                None => {
+                    result = false;
+                }
+                Some(val) => {
+                    if val.to_bool().is_none() {
+                        let msg = format!(
+                            "Region property '{}' must evaluate to a numeric value.",
+                            prop_name
+                        );
+                        diags.err1("EXEC_66", &msg, expr_loc);
+                        result = false;
+                        continue;
+                    }
+                    resolved.push((prop_name, val.to_u64()));
+                }
+            }
+        }
+
+        let entry = ast_db.regions.get_mut(name).unwrap();
+        for (prop_name, val) in resolved {
+            match prop_name.as_str() {
+                "addr" => entry.addr = val,
+                "size" => entry.size = val,
+                "default_align" => entry.default_align = val,
+                "default_fill" => entry.default_fill = val as u8,
+                _ => unreachable!("unexpected region property name '{}'", prop_name),
+            }
+        }
+    }
+    result
+}
+
 // ── AST condition evaluator for the prune pass ───────────────────────────────
 
 /// Evaluate an AST if-condition expression against a resolved symbol table.
