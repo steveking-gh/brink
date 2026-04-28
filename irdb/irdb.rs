@@ -57,17 +57,24 @@ pub struct IRDb {
     /// Used by the engine to evaluate `__OUTPUT_SIZE` and `__OUTPUT_ADDR`.
     pub output_sec_str: String,
 
-    /// Region properties for sections declared `section NAME in REGION`.
+    /// Maps each bound section name to its region name (foreign key into region_bindings).
     /// Keyed by section name; consumed by LayoutPhase and later execution phases.
-    pub section_regions: HashMap<String, RegionBinding>,
+    pub section_region_names: HashMap<String, String>,
 
-    /// All declared regions, keyed by region name.
-    /// Allows addr(REGION) and sizeof(REGION) to resolve directly to the
-    /// region's const-evaluated addr and size without a layout-time lookup.
+    /// All declared regions, keyed by region name.  Single source of truth for
+    /// region addr/size; use region_for_section() to look up a section's binding.
     pub region_bindings: HashMap<String, RegionBinding>,
 }
 
 impl IRDb {
+    /// Return the RegionBinding for a section, or None if the section is not
+    /// bound to a region.
+    pub fn region_for_section(&self, sec_name: &str) -> Option<&RegionBinding> {
+        self.section_region_names.get(sec_name)
+            .and_then(|rname| self.region_bindings.get(rname))
+    }
+
+
     /// Returns the value of the specified operand for the specified IR.
     /// The operand number is for the *IR*, not the absolute operand
     /// index in the central operands vector.
@@ -769,7 +776,7 @@ impl IRDb {
         lin_db: &LayoutDb,
         diags: &mut Diags,
         ext_registry: &ExtensionRegistry,
-        section_regions: HashMap<String, RegionBinding>,
+        section_region_names: HashMap<String, String>,
         region_bindings: HashMap<String, RegionBinding>,
     ) -> anyhow::Result<Self> {
         let mut ir_db = IRDb {
@@ -780,7 +787,7 @@ impl IRDb {
             files: HashMap::new(),
             symbol_table,
             output_sec_str: lin_db.output_sec_str.clone(),
-            section_regions,
+            section_region_names,
             region_bindings,
         };
 

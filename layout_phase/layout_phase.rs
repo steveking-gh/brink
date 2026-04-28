@@ -1036,7 +1036,7 @@ impl LayoutPhase {
 
         // Check that the target address is within the enclosing region, if any.
         if let Some(frame) = self.scope_stack.last()
-            && let Some(binding) = irdb.section_regions.get(&frame.sec_name)
+            && let Some(binding) = irdb.region_for_section(&frame.sec_name)
         {
             let Some(region_end) = binding.addr.checked_add(binding.size) else {
                 if self.warned_lids.insert((lid, "EXEC_74")) {
@@ -1213,7 +1213,7 @@ impl LayoutPhase {
 
         // For region-bound sections, anchor the absolute base address to the
         // region's starting address and reset the offset to zero.
-        if let Some(binding) = irdb.section_regions.get(sec_name) {
+        if let Some(binding) = irdb.region_for_section(sec_name) {
             current.addr.addr_base = binding.addr;
             current.addr.addr_offset = 0;
         }
@@ -1306,7 +1306,8 @@ impl LayoutPhase {
     /// the region size.
     fn validate_section_regions(&self, irdb: &IRDb, diags: &mut Diags) -> bool {
         let mut result = true;
-        for (sec_name, binding) in &irdb.section_regions {
+        for sec_name in irdb.section_region_names.keys() {
+            let Some(binding) = irdb.region_for_section(sec_name) else { continue; };
             let Some(ir_rng) = irdb.sized_locs.get(sec_name) else {
                 continue;
             };

@@ -21,7 +21,7 @@ use ast::{Ast, AstDb};
 use diags::Diags;
 use exec_phase::ExecPhase;
 use extension_registry::{ExtensionRegistry, test_mocks::register_test_extensions};
-use ir::{ConstBuiltins, ParameterValue, RegionBinding};
+use ir::{ConstBuiltins, ParameterValue};
 use irdb::IRDb;
 use layout_phase::LayoutPhase;
 use layoutdb::LayoutDb;
@@ -166,13 +166,11 @@ pub fn process(
         return Err(anyhow!("[PROC_9]: Error detected, halting."));
     };
 
-    // Build the section-to-region map from sections with a region binding.
-    let mut section_regions: HashMap<String, RegionBinding> = HashMap::new();
+    // Build the section-to-region-name map (foreign key into region_bindings).
+    let mut section_region_names: HashMap<String, String> = HashMap::new();
     for (sec_name, section) in &pruned_ast_db.sections {
-        if let Some(region_name) = &section.region
-            && let Some(binding) = region_bindings.get(region_name)
-        {
-            section_regions.insert(sec_name.to_string(), binding.clone());
+        if let Some(region_name) = &section.region {
+            section_region_names.insert(sec_name.to_string(), region_name.clone());
         }
     }
 
@@ -191,7 +189,7 @@ pub fn process(
         &layout_db,
         &mut diags,
         &ext_registry,
-        section_regions,
+        section_region_names,
         region_bindings,
     )
     .context("[PROC_5]: Error detected, halting.")?;
