@@ -1,0 +1,20 @@
+// K/M/G magnitude suffixes: basic success cases.
+// 1K = 1024, 2M = 2097152, 1G = 1073741824.
+// Tests bare (Integer), u (U64), and i (I64) type suffixes.
+
+const A = 1K;
+const B = 2M;
+const C = 1G;
+const D = 4Ku;
+const E = 8Mi;
+
+section foo {
+    assert A == 1024;
+    assert B == 2097152;
+    assert C == 1073741824;
+    assert D == 4096;
+    assert E == 8388608;
+    wr8 0;
+}
+
+output foo;

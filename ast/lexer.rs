@@ -147,13 +147,16 @@ impl<'src> Lexer<'src> {
     // Numeric literals
     // -----------------------------------------------------------------------
 
-    /// Lex `-[1-9][_0-9]*i?` — always an I64.
+    /// Lex `-[1-9][_0-9]*[KMG]?i?` — always an I64.
     fn scan_negative_i64(&mut self) -> LexToken {
         self.pos += 1; // '-'
         while self.pos < self.src.len()
             && (self.src.as_bytes()[self.pos].is_ascii_digit()
                 || self.src.as_bytes()[self.pos] == b'_')
         {
+            self.pos += 1;
+        }
+        if self.pos < self.src.len() && matches!(self.src.as_bytes()[self.pos], b'K' | b'M' | b'G') {
             self.pos += 1;
         }
         if self.pos < self.src.len() && self.src.as_bytes()[self.pos] == b'i' {
@@ -224,9 +227,23 @@ impl<'src> Lexer<'src> {
         LexToken::U64
     }
 
-    /// After consuming decimal digits, check for a u/i suffix.
+    /// After consuming decimal digits, check for an optional K/M/G magnitude
+    /// suffix followed by an optional u/i type suffix.
     /// Default (no suffix) for decimal is Integer.
     fn consume_decimal_suffix(&mut self) -> LexToken {
+        if self.pos < self.src.len()
+            && matches!(self.src.as_bytes()[self.pos], b'K' | b'M' | b'G')
+        {
+            self.pos += 1;
+            if self.pos < self.src.len() {
+                match self.src.as_bytes()[self.pos] {
+                    b'u' => { self.pos += 1; return LexToken::U64; }
+                    b'i' => { self.pos += 1; return LexToken::I64; }
+                    _ => {}
+                }
+            }
+            return LexToken::Integer;
+        }
         if self.pos < self.src.len() {
             match self.src.as_bytes()[self.pos] {
                 b'u' => { self.pos += 1; return LexToken::U64; }

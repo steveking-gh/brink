@@ -198,6 +198,17 @@ impl ParameterValue {
     }
 }
 
+/// Strip a trailing K/M/G magnitude suffix from a numeric string.
+/// Returns the stripped string and the magnitude multiplier.
+pub fn strip_kmg(s: &str) -> (&str, u64) {
+    match s.as_bytes().last() {
+        Some(b'K') => (&s[..s.len() - 1], 1024),
+        Some(b'M') => (&s[..s.len() - 1], 1024 * 1024),
+        Some(b'G') => (&s[..s.len() - 1], 1024 * 1024 * 1024),
+        _ => (s, 1),
+    }
+}
+
 #[derive(Debug)]
 pub struct IROperand {
     /// The linear ID of the IR instruction whose output this operand carries,
@@ -282,14 +293,14 @@ impl IROperand {
             }
             DataType::U64 => {
                 if is_immediate {
-                    // Strip the trailing 'u' if any
                     let sval_no_u = sval.strip_suffix('u').unwrap_or(sval);
-                    let res = parse::<u64>(sval_no_u);
-                    if let Ok(v) = res {
-                        return Some(ParameterValue::U64(v));
-                    } else {
-                        let m = format!("Malformed integer operand {}", sval);
-                        diags.err1("IR_1", &m, src_loc.clone());
+                    let (sval_base, mult) = strip_kmg(sval_no_u);
+                    match parse::<u64>(sval_base).ok().and_then(|v| v.checked_mul(mult)) {
+                        Some(v) => return Some(ParameterValue::U64(v)),
+                        None => {
+                            let m = format!("Malformed integer operand {}", sval);
+                            diags.err1("IR_1", &m, src_loc.clone());
+                        }
                     }
                 } else {
                     // We don't know variable value, so initialize to zero
@@ -299,14 +310,14 @@ impl IROperand {
 
             DataType::I64 => {
                 if is_immediate {
-                    // Strip the trailing 's' if any
                     let sval_no_i = sval.strip_suffix('i').unwrap_or(sval);
-                    let res = parse::<i64>(sval_no_i);
-                    if let Ok(v) = res {
-                        return Some(ParameterValue::I64(v));
-                    } else {
-                        let m = format!("Malformed integer operand {}", sval);
-                        diags.err1("IR_3", &m, src_loc.clone());
+                    let (sval_base, mult) = strip_kmg(sval_no_i);
+                    match parse::<i64>(sval_base).ok().and_then(|v| v.checked_mul(mult as i64)) {
+                        Some(v) => return Some(ParameterValue::I64(v)),
+                        None => {
+                            let m = format!("Malformed integer operand {}", sval);
+                            diags.err1("IR_3", &m, src_loc.clone());
+                        }
                     }
                 } else {
                     // We don't know variable value, so initialize to zero
@@ -316,14 +327,14 @@ impl IROperand {
 
             DataType::Integer => {
                 if is_immediate {
-                    // We have to store Integer as a real Rust type.  Storing as i64
-                    // is least surprising since expectations like 1 - 2 == -1 hold.
-                    let res = parse::<i64>(sval);
-                    if let Ok(v) = res {
-                        return Some(ParameterValue::Integer(v));
-                    } else {
-                        let m = format!("Malformed integer operand {}", sval);
-                        diags.err1("IR_4", &m, src_loc.clone());
+                    // Store as i64: expectations like 1 - 2 == -1 hold.
+                    let (sval_base, mult) = strip_kmg(sval);
+                    match parse::<i64>(sval_base).ok().and_then(|v| v.checked_mul(mult as i64)) {
+                        Some(v) => return Some(ParameterValue::Integer(v)),
+                        None => {
+                            let m = format!("Malformed integer operand {}", sval);
+                            diags.err1("IR_4", &m, src_loc.clone());
+                        }
                     }
                 } else {
                     // We don't know variable value, so initialize to zero

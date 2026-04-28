@@ -481,8 +481,7 @@ Keyword reservation is case-sensitive.  `Fill` and `FILL` are valid identifiers;
 
 Brink supports number literals in decimal, hex (0x) and binary (0b) forms.
 After the first digit, you can use '_' within number literals to help with
-readability.  Brink uses the [parse_int](https://crates.io/crates/parse_int)
-library for conversion from string to value.
+readability.
 
     assert 42 == 42;
     assert -42 == -42;
@@ -495,7 +494,7 @@ library for conversion from string to value.
     assert 0b01000010 == 0x42;
     assert 0b0100_0010 == 0x42;
     assert 0b101000010 == 0x142;
-    assert 0b0000000001000010 == 0x42;
+    assert 0b0000_0000_0100_0010 == 0x42;
 
 The following table summarizes how Brink determines the type of number literals.
 
@@ -540,6 +539,20 @@ value under/overflows the destination type.
 
     assert 0xFFFF_FFFF_FFFF_FFFF == to_u64(-1); // OK
     assert to_i64(0xFFFF_FFFF_FFFF_FFFF) == -1; // OK
+
+### Number Magnitude
+
+Decimal number literals accept an optional K/M/G magnitude suffix (case
+sensitive) before the type suffix.
+
+| Suffix | Multiplier         | Example | Value      |
+| ------ | ------------------ | ------- | ---------- |
+| `K`    | 1024               | `64K`   | 65536      |
+| `M`    | 1024 × 1024        | `1M`    | 1048576    |
+| `G`    | 1024 × 1024 × 1024 | `2G`    | 2147483648 |
+
+Magnitude and type suffixes combine: `4Ku` is 4096 as a U64, `-1Ki` is -1024 as
+an I64.
 
 ### True and False
 
@@ -1074,9 +1087,7 @@ size of the bound section exceeds this value.
 
 Users can query the `size` property of a region with `sizeof(<region name>)`.
 
-When specifying the size of a region, users can specify a number and optionally
-use a K/M/G suffix for multiples of 1024, being kilobytes, megabytes and
-gigabytes respectively.
+The size value accepts a [K/M/G magnitude suffix](#number-magnitude).
 
 ### Region Boundary Enforcement
 
@@ -2084,24 +2095,28 @@ TOTAL                                          10878              1625    85.06%
 
 ## Brink Source Code Overview
 
-| File                                     | Stage         | Summary                                                                       |
-| ---------------------------------------- | ------------- | ----------------------------------------------------------------------------- |
-| ast/ast.rs                               | Stage 1       | Logos lexer → token stream → arena AST → AstDb validation                     |
-| const_eval/const_eval.rs                 | Stage 2       | Lowers const AST statements to LinIR, evaluates them, returns a SymbolTable   |
-| layoutdb/layoutdb.rs                     | Stage 3       | AST flattening into linear IR and operand vectors; values are still strings   |
-| irdb/irdb.rs                             | Stage 4       | String to typed value conversion, operand and file validation                 |
-| engine/engine.rs                         | Stage 5       | Layout iteration loop, then execute pass to write binary output               |
-| symtable/symtable.rs                     | Shared types  | SymbolTable tracking every compile-time const from declaration through use    |
-| linearizer/linearizer.rs                 | Shared types  | LinIR and LinOperand types; shared lowering infrastructure for stages 2 and 3 |
-| ir/ir.rs                                 | Shared types  | IRKind, ParameterValue, IROperand, IR — the data flowing between stages 3–5   |
-| map/map.rs                               | Map output    | Constructs MapDb and renders human-friendly map text                          |
-| process/process.rs                       | Orchestrator  | Orchestration of all stages, parses `-D` defines, opens the output file       |
-| diags/diags.rs                           | Cross-cutting | Ariadne-backed diagnostic output channel used by every stage                  |
-| extensions/src/lib.rs                    | Extensions    | Single registration point for all extensions                                  |
-| brink_extension/lib.rs                   | Extensions    | Public API for extension authors                                              |
-| extension_registry/extension_registry.rs | Extensions    | Runtime extension registry and dispatch wrapper                               |
-| std/crc32c/src/lib.rs                    | std extension | CRC-32C (Castagnoli) hash over caller-specified output region                 |
-| std/sha256/src/lib.rs                    | std extension | SHA256 hash over caller-specified output region                               |
+| File                                     | Stage         | Summary                                                                                 |
+| ---------------------------------------- | ------------- | --------------------------------------------------------------------------------------- |
+| ast/ast.rs                               | Stage 1       | Hand-rolled lexer -> token stream -> arena AST -> AstDb validation                      |
+| const_eval/const_eval.rs                 | Stage 2       | Lowers const and region AST statements to LinIR, returns SymbolTable and RegionBindings |
+| prune/prune.rs                           | Stage 3       | Eliminates if/else nodes from the AST; promotes sections from the taken branch          |
+| layoutdb/layoutdb.rs                     | Stage 4       | AST flattening into linear IR and operand vectors; values are still strings             |
+| irdb/irdb.rs                             | Stage 5       | String to typed value conversion, operand and file validation                           |
+| layout_phase/layout_phase.rs             | Stage 6       | Iterative address resolution and section footprint calculation                          |
+| validation_phase/validation_phase.rs     | Stage 7       | Evaluates all assert instructions after layout and before binary output                 |
+| exec_phase/exec_phase.rs                 | Stage 8       | Writes inline data, padding, file contents, and extension output to binary              |
+| symtable/symtable.rs                     | Shared types  | SymbolTable tracking every compile-time const from declaration through use              |
+| linearizer/linearizer.rs                 | Shared types  | LinIR and LinOperand types; shared lowering infrastructure for stages 2 and 4           |
+| ir/ir.rs                                 | Shared types  | IRKind, ParameterValue, IROperand, IR — the data flowing between stages 4–8             |
+| locationdb/locationdb.rs                 | Shared types  | LocationDb and Location produced by stage 6 and consumed by stages 7 and 8              |
+| map_phase/map_phase.rs                   | Map output    | Builds MapDb from LocationDb and IRDb; renders map to CSV, JSON, C99, and RS            |
+| process/process.rs                       | Orchestrator  | Orchestration of all stages, parses `-D` defines, opens the output file                 |
+| diags/diags.rs                           | Cross-cutting | Ariadne-backed diagnostic output channel used by every stage                            |
+| extensions/src/lib.rs                    | Extensions    | Single registration point for all extensions                                            |
+| brink_extension/lib.rs                   | Extensions    | Public API for extension authors                                                        |
+| extension_registry/extension_registry.rs | Extensions    | Runtime extension registry and dispatch wrapper                                         |
+| std/crc32c/src/lib.rs                    | std extension | CRC-32C (Castagnoli) hash over caller-specified output region                           |
+| std/sha256/src/lib.rs                    | std extension | SHA256 hash over caller-specified output region                                         |
 
 ## Rebuilding the vscode Syntax Highlighting Extension
 

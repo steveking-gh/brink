@@ -12,6 +12,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   statement.
 - FEATURE: Region support
 - FEATURE: added missing --list-extensions command line option which was already
+- FEATURE: support for K/M/G suffix on decimal number literals.
   documented in the README.md
 - README: Removed obsolete text on if/else statement restrictions
 - README: Documented region feature

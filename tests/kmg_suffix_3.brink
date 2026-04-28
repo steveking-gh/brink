@@ -1,0 +1,13 @@
+// K/M/G magnitude suffixes: negative I64 with K/M suffix.
+// -1K = -1024, -2M = -2097152.
+
+const A = -1Ki;
+const B = -2Mi;
+
+section foo {
+    assert A == -1024;
+    assert B == -2097152;
+    wr8 0;
+}
+
+output foo;

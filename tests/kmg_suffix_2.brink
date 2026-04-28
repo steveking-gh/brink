@@ -1,0 +1,15 @@
+// K/M/G magnitude suffixes: use in region addr/size and assert expressions.
+// 64K = 65536, so a region of size 64K should reject a 65537-byte section.
+// This test exercises the happy path: section fits exactly in the region.
+region ROM {
+    addr = 0x1000u;
+    size = 64K;
+}
+
+section data in ROM {
+    assert addr() == 0x1000u;
+    wr8 0xFF, 64;
+    assert sizeof(data) == 64;
+}
+
+output data;

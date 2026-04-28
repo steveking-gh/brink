@@ -22,7 +22,7 @@ use std::collections::HashMap;
 use tracing::{debug, trace};
 
 use ast::{Ast, AstDb, LexToken};
-use ir::{ConstBuiltins, IRKind, ParameterValue, RegionBinding};
+use ir::{ConstBuiltins, IRKind, ParameterValue, RegionBinding, strip_kmg};
 
 use linearizer::{LinIR, LinOperand, Linearizer, tok_to_irkind};
 use symtable::SymbolTable;
@@ -715,7 +715,8 @@ impl<'toks> ConstIR {
 
         match tok {
             ast::LexToken::Integer => {
-                let v: i64 = parse(&sval).ok().or_else(|| {
+                let (base, mult) = strip_kmg(&sval);
+                let v: i64 = parse::<i64>(base).ok().and_then(|v| v.checked_mul(mult as i64)).ok_or(()).ok().or_else(|| {
                     let m = format!("Malformed integer in const expression: {}", sval);
                     diags.err1("IRDB_22", &m, src_loc);
                     None
@@ -723,8 +724,9 @@ impl<'toks> ConstIR {
                 Some(ParameterValue::Integer(v))
             }
             ast::LexToken::U64 => {
-                let s = sval.strip_suffix('u').unwrap_or(&sval).to_string();
-                let v: u64 = parse(&s).ok().or_else(|| {
+                let no_u = sval.strip_suffix('u').unwrap_or(&sval);
+                let (base, mult) = strip_kmg(no_u);
+                let v: u64 = parse::<u64>(base).ok().and_then(|v| v.checked_mul(mult)).ok_or(()).ok().or_else(|| {
                     let m = format!("Malformed U64 in const expression: {}", sval);
                     diags.err1("IRDB_23", &m, src_loc);
                     None
@@ -732,8 +734,9 @@ impl<'toks> ConstIR {
                 Some(ParameterValue::U64(v))
             }
             ast::LexToken::I64 => {
-                let s = sval.strip_suffix('i').unwrap_or(&sval).to_string();
-                let v: i64 = parse(&s).ok().or_else(|| {
+                let no_i = sval.strip_suffix('i').unwrap_or(&sval);
+                let (base, mult) = strip_kmg(no_i);
+                let v: i64 = parse::<i64>(base).ok().and_then(|v| v.checked_mul(mult as i64)).ok_or(()).ok().or_else(|| {
                     let m = format!("Malformed I64 in const expression: {}", sval);
                     diags.err1("IRDB_24", &m, src_loc);
                     None

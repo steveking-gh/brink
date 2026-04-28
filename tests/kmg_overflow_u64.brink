@@ -1,0 +1,7 @@
+// K/M/G overflow: value * multiplier exceeds u64::MAX produces IR_1.
+// u64::MAX / 1G = 17179869183, so 17179869184G overflows.
+section foo {
+    wr8 17179869184Gu;
+}
+
+output foo;

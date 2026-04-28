@@ -461,3 +461,31 @@ EXEC_73: section size exceeds region size.
 EXEC_74: region addr + size overflows u64.
 
 342 tests pass.
+
+---
+
+## 2026-04-27 — K/M/G magnitude suffix for integer literals
+
+Decimal integer literals now accept an optional K/M/G magnitude suffix before
+the type suffix: `64K` = 65536, `1M` = 1048576, `2Gu` = U64(2147483648),
+`-1Ki` = I64(-1024).
+
+Full token forms: `<digits>[K|M|G][u|i]?` (decimal only; hex/binary unchanged).
+
+Changes:
+
+- `ast/lexer.rs`: `consume_decimal_suffix` checks for K/M/G before u/i.
+  `scan_negative_i64` checks for K/M/G before the optional `i` suffix.
+- `ir/ir.rs`: `strip_kmg(&str) -> (&str, u64)` added as a public free function.
+  All three numeric arms of `IROperand::convert_type` (U64, I64, Integer) call
+  `strip_kmg` after stripping the type suffix and apply `checked_mul` for
+  overflow detection.
+- `const_eval/const_eval.rs`: imports `strip_kmg` from `ir`. All three integer
+  arms of the inline literal evaluator (Integer/IRDB_22, U64/IRDB_23, I64/IRDB_24)
+  apply `strip_kmg` + `checked_mul`. Overflow is reported via the existing
+  IRDB_22/23/24 codes.
+- 5 new integration tests: `kmg_suffix_1`, `kmg_suffix_2`, `kmg_suffix_3`,
+  `kmg_overflow_u64`, `kmg_overflow_i64`.
+- `README.md`: region size example updated to use `64K` and `1M`.
+
+347 tests pass.

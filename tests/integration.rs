@@ -1537,6 +1537,36 @@ mod tests {
         assert_brink_failure("tests/integer_overflow_u64.brink", &["[IR_1]"]);
     }
 
+    /// K/M/G magnitude suffixes parse correctly in const expressions.
+    #[test]
+    fn kmg_suffix_1() {
+        assert_brink_success("tests/kmg_suffix_1.brink", None, None);
+    }
+
+    /// K/M/G magnitude suffix used in region size and section content.
+    #[test]
+    fn kmg_suffix_2() {
+        assert_brink_success("tests/kmg_suffix_2.brink", None, None);
+    }
+
+    /// Negative literals with K/M magnitude suffix produce correct I64 values.
+    #[test]
+    fn kmg_suffix_3() {
+        assert_brink_success("tests/kmg_suffix_3.brink", None, None);
+    }
+
+    /// K/M/G with u suffix: value * multiplier overflowing u64::MAX produces IR_1.
+    #[test]
+    fn kmg_overflow_u64() {
+        assert_brink_failure("tests/kmg_overflow_u64.brink", &["[IR_1]"]);
+    }
+
+    /// K/M/G on a const Integer: value * multiplier overflowing i64::MAX produces IRDB_22.
+    #[test]
+    fn kmg_overflow_i64() {
+        assert_brink_failure("tests/kmg_overflow_i64.brink", &["[IRDB_22]"]);
+    }
+
     // -------------------------------------------------------------------------
     // const tests
     // -------------------------------------------------------------------------
