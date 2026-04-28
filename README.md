@@ -595,7 +595,7 @@ retrieves that one value regardless of the scope of the caller.
 | ----------------------------- | ------------------------------------------------------- |
 | `addr()`                      | Scope of current section                                |
 | `addr(<section name>)`        | Scope of parent section that contains the child section |
-| `addr(<output section name)>` | Scope of the `output` section                           |
+| `addr(<output section name>)` | Scope of the `output` section                           |
 | `addr(<label name>)`          | Scope of the section that contains the label            |
 
 Example:
@@ -653,7 +653,7 @@ of the caller.
 | ------------------------------------ | ------------------------------------------------------- |
 | `addr_offset()`                      | Scope of current section                                |
 | `addr_offset(<section name>)`        | Scope of parent section that contains the child section |
-| `addr_offset(<output section name)>` | Scope of the `output` section                           |
+| `addr_offset(<output section name>)` | Scope of the `output` section                           |
 | `addr_offset(<label name>)`          | Scope of the section that contains the label            |
 
 Example:
@@ -999,11 +999,11 @@ section content being placed.  Unlike sections, regions are stateless and do
 not track dynamic information during layout.
 
 Users place *exactly one* section `in` a region.  We refer to this section as
-the *top-level section* of the region.  The top-level section is a normal
+the *bound section* of the region.  The bound section is a normal
 section with the following extra behaviors:
 
-* The region sets the starting address of the top-level section.
-* The region caps the size of the top-level section.
+* The region sets the starting address of the bound section.
+* The region caps the size of the bound section.
 
 For example:
 
@@ -1028,7 +1028,7 @@ For example:
     section eeprom_data1 { ... }
     section eeprom_data2 { ... }
 
-    // FLASH_TOP is the top-level section in the FLASH region
+    // FLASH_TOP is the bound section in the FLASH region
     section FLASH_TOP in FLASH {
         // Starts at address 0xF000_0000
         wr boot;
@@ -1037,13 +1037,13 @@ For example:
     }
 
     section EEPROM_TOP in EEPROM {
-        // Starts at address 0x0000_0000
+        assert addr() == 0xFF00_0000;
         wr runtime_code;
         wr runtime_data;
     }
 
     // The output file contains the image for FLASH and EEPROM regions.
-    // This section is not a top-level section of a region and behaves
+    // This section is not a bound section of a region and behaves
     // like any other section.
     section FIRMWARE_UPDATE_FILE {
         wr file_offset(FLASH_TOP);    // Offset to the new FLASH image
@@ -1064,13 +1064,13 @@ Regions support the following properties:
 ### Region Property `addr`
 
 The `addr` property defines the region's absolute starting address.  The
-region's top-level section starts at this address.  Users can query the `addr`
+region's bound section starts at this address.  Users can query the `addr`
 property of a region with `addr(<region name>)`.
 
 ### Region Property `size`
 
 Specifies the size of the region in bytes.  Brink reports an error if the
-size of the top-level section exceeds this value.
+size of the bound section exceeds this value.
 
 Users can query the `size` property of a region with `sizeof(<region name>)`.
 
@@ -1104,7 +1104,7 @@ byte, resulting in an error:
         wr32 0x87654321;  // ERROR!
     }
 
-Of course, region enforcement occurs not just in the region's top-level section,
+Of course, region enforcement occurs not just in the region's bound section,
 but in any reachable section.  For example:
 
     region LITTLE_ROM {
@@ -1133,14 +1133,85 @@ constrained to fit in the region.  For example:
         size = 1M;
     }
 
-    section foo {
-        set_addr 0xA000_0000;  // ERROR, address outside region
+    section foo in FLASH {
+        assert addr() == 0xF000_0000;  // Start of FLASH region
+        set_addr 0xF000_1000;          // OK, inside the region
+        wrs "Inside region!";
+        set_addr 0xA000_0000;          // ERROR, outside the region
         wrs "Outside region!";
     }
 
-    section flash_top_level in FLASH {
-        wr foo;
+    output foo;
+
+### Nested Regions
+
+Users can freely nest sections in different regions into each other.  However,
+Brink allows write operations only in the address range intersection permitted
+by *all* the parent regions.  For example:
+
+    region READ_ONLY {
+        addr = 0xF000_0000;
+        size = 0x1000_0000;
     }
+
+    region FLASH {
+        addr = 0xF100_0000;
+        size = 64K;
+    }
+
+    section flash_data in FLASH {
+        assert addr() == 0xF100_0000;
+        ...
+    }
+
+    section ro_data in READ_ONLY {
+        assert addr() == 0xF000_0000;
+        // OK, region FLASH is a subset of READ_ONLY.
+        // Note that the FLASH region anchors the starting address
+        // at 0xF100_0000.  This creates a logical (unpadded) address gap
+        // in the ro_data section between 0xF000_0000 and 0xF100_0000.
+        wr flash_data;
+    }
+
+    output ro_data;
+
+### Partially Overlapping Nested Regions
+
+For completeness, the region of a nested section need not be a proper subset of
+the parent region. However, any address written by the child section must lie in
+the intersection of *all* parent regions.  If the user requires partially
+overlapping regions, then explicit address manipulation with
+[set_addr](#set_addr) may be helpful.
+
+### Sections in Regions are Usually Single Use
+
+Placing a section in a region forces the starting address of the section to the
+region's `addr` value.  Writing this section more than once results in an
+address overwrite error if the section writes any data.  For example:
+
+    region PINNED_TABLE {
+        addr = 0xF100_0000;
+        size = 64K;
+    }
+
+    section loose_tables {
+        wrf "loose_tables.bin"
+    }
+
+    section pinned_tables in PINNED_TABLE {
+        assert addr() == 0xF100_0000;
+        wrf "pinned_tables.bin"
+    }
+
+    section top {
+        assert addr() == 0xF000_0000;
+        wr loose_tables; // OK
+        wr loose_tables; // duplicate OK, not in a region, no address overwrite
+        wr pinned_tables; // OK, pinned in a region
+        wr pinned_tables; // ERROR! Overwrites address 0xF100_0000
+    }
+
+    output top;
 
 ---
 
@@ -1233,7 +1304,7 @@ sections produce a warning.
 
 To help guide layout, users can place a exactly one section `in` a
 [region](#region) with `in <region name>` after the section name.  We call a
-section placed in a region as the *top-level section* of the region.
+section placed in a region as the *bound section* of the region.
 
 Example:
 
@@ -1284,16 +1355,16 @@ Example:
         wr8 5;
         set_addr 16;
         assert addr() == 16;
-        assert addr_offset() = 0;   // set_addr resets addr_offset
+        assert addr_offset() == 0;   // set_addr resets addr_offset
         assert file_offset() == 5;  // set_addr does not pad
         assert sec_offset() == 5;
         wr8 0xAA, 3;
-        assert addr_offset() = 3;
+        assert addr_offset() == 3;
         assert file_offset() == 8;
         assert sec_offset() == 8;
         set_sec_offset 24, 0xFF;     // Adds 24 - 8 = 16 pad bytes
         assert addr() == 35;         // 19 + 16 = 35
-        assert addr_offset() = 19;   // 3 + 16 = 19
+        assert addr_offset() == 19;  // 3 + 16 = 19
         assert file_offset() == 24;  // 8 + 16 = 24
         assert sec_offset() == 24;   // 8 + 16 = 24
     }
@@ -1356,31 +1427,39 @@ default value of 0.
 
 If the specified offset is less the current offset, Brink reports an error.
 
+`set_file_offset` is most useful when a section is written inside a parent
+section, because `sec_offset` resets to zero at the start of each child section
+while `file_offset` continues from the parent's position.  This lets a child
+section pad to an absolute file position regardless of where the parent places
+it.
+
 Example:
 
-    section foo {
-        wr8 1;
-        wr8 2;
-        wr8 3;
-        wr8 4;
-        wr8 5;
-        set_sec_offset 16;
-        assert addr() == 16;
-        assert file_offset() == 16;
-        assert sec_offset() == 16;
-        wr8 0xAA, 3;
-        set_sec_offset 24, 0xFF;
-        assert addr() == 24;
-        assert file_offset() == 24;
-        assert sec_offset() == 24;
-        set_sec_offset 24, 0xEE; // should do Nothing
-        wr8 0xAA, 3;
-        set_sec_offset 27, 0x33; // should do nothing
-        set_sec_offset 28, 0x77; // should pad to 28
-        assert sizeof(foo) == 28;
+    // A firmware container: an 8-byte header at file offset 0, followed by a
+    // payload that must start at file offset 512 for bootloader compatibility.
+
+    section header {
+        wrs "FIRM";       // 4-byte magic
+        wr32 0x00000001;  // version
     }
 
-    output foo;
+    section payload {
+        // firmware writes header first (8 bytes), so payload opens at
+        // file_offset 8.  Pad to the protocol-required file position 512.
+        set_file_offset 512, 0xFF;
+        assert file_offset() == 512; // absolute position in the output file
+        assert sec_offset() == 504;  // sec_offset starts from 0 inside payload
+        wrs "PAYLOAD";               // 7 bytes of payload data
+        assert file_offset() == 519;
+        assert sec_offset() == 511;
+    }
+
+    section firmware {
+        wr header;
+        wr payload;
+    }
+
+    output firmware;
 
 ---
 
@@ -1441,17 +1520,28 @@ Example:
     output foo;
 ---
 
-When called with an [extension](#extensions) identifier, `sizeof` returns the size of the
+When called with an [extension](#brink-extensions) identifier, `sizeof` returns the size of the
 extension's output.  For example:
 
     print "CRC size=", sizeof(std::crc32c);  // returns "CRC size=4"
 
-When called with a [region](#region) identifier, `sizeof` returns the fixed size of the region.
+When called with a [region](#region) identifier, `sizeof` returns the fixed size of the region regardless of whether the user's program writes any data in the region.
 
     region FLASH { ...; size = 8K; ... }
     ...
     print "FLASH size=", sizeof(FLASH);  // returns "FLASH size=8192"
 
+When called with a [section](#section) identifier, `sizeof` returns the size of the section *in the file*.  Therefore, this size does not take into account operations that do not write data nor pad bytes.  For example, address jumps, e.g. by using [set_addr](#set_addr) do not change the sizeof() result for a section.
+
+    section foo {
+        set_addr 0;
+        wrs "Hello\n";
+        // Address jumps by 0x1000, but no data nor pads written, so
+        // no effect on sizeof(foo).
+        set_addr 0x1000;
+        wrs "World\n";
+        assert sizeof(foo) == 12;
+    }
 ---
 
 ## to_i64
@@ -1943,7 +2033,7 @@ Brink relies on 100's of unit tests to catch bugs.  You can run these with:
 Brink supports fuzz tests for several of its internal libraries.  Fuzz testing
 starts from a corpus of random inputs and then further randomizes those inputs
 to try to cause crashes and hangs.  At the time of writing, fuzz testing
-**requires the nightly build**.  See `fuzz_help.txt` in the source repo for more
+**requires the nightly build**.  See `fuzz_help.md` in the source repo for more
 information.
 
 ## Checking Test Code Coverage
@@ -2018,13 +2108,13 @@ TOTAL                                          10878              1625    85.06%
 Rebuilding the extension require Node.js.  After you install Node.js, you may
 need to restart your command prompt.
 
-Building the extension requires Requires
+Building the extension requires
 [vsce](https://github.com/microsoft/vscode-vsce).  One time, you'll need to use
 `npm` to install `vsce`
 
     npm install -g @vscode/vsce
 
-No you're ready to rebuild the extension.
+Now you're ready to rebuild the extension.
 
     cd vscode-brink
     vsce package

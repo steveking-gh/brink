@@ -9,11 +9,16 @@ You will generally use the fuzz tests in process/fuzz since these exercise the
 entire Brink pipeline.
 
 Here's an example of running the fuzzer.  Note that we copy the tests into the
-seed directory to give the fuzzer better starting points.
+seed directory to give the fuzzer better starting points.  Also, deleting the
+existing fuzz/target directory is often needed since cargo gets confused between normal Rust and the nightly version.
 
-    cd process cp ../tests/* fuzz/seeds cargo +nightly fuzz run fuzz_target_1
-    fuzz/corpus/fuzz_target_1 ./fuzz/seeds -- -only_ascii=1
-    -dict=../tests/brink_fuzz.dict -timeout=5
+    cd process
+    cp ../tests/* fuzz/seeds
+    rm -rf fuzz/target
+    cargo +nightly fuzz build fuzz_target_1
+    ./fuzz/target/x86_64-unknown-linux-gnu/release/fuzz_target_1 \
+       ./fuzz/seeds -- -only_ascii=1 \
+       -dict=../tests/brink_fuzz.dict -timeout=5
 
 Cargo fuzz uses LLVM's libFuzzer internally, which provides a vast array of
 runtime options.  To see the options using the nightly compiler build:

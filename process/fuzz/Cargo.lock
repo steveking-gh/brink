@@ -15,6 +15,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "db55d72333851e17d572bec876e390cd3b11eb1ef53ae821dd9f3b653d2b4569"
 
 [[package]]
+name = "argvaldb"
+version = "6.1.1"
+dependencies = [
+ "ir",
+]
+
+[[package]]
 name = "ariadne"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -26,7 +33,7 @@ dependencies = [
 
 [[package]]
 name = "ast"
-version = "6.0.0"
+version = "6.1.1"
 dependencies = [
  "anyhow",
  "depth_guard",
@@ -43,7 +50,7 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
 name = "brink_extension"
-version = "6.0.0"
+version = "6.1.1"
 
 [[package]]
 name = "cc"
@@ -57,7 +64,7 @@ dependencies = [
 
 [[package]]
 name = "const_eval"
-version = "6.0.0"
+version = "6.1.1"
 dependencies = [
  "anyhow",
  "ast",
@@ -73,11 +80,11 @@ dependencies = [
 
 [[package]]
 name = "depth_guard"
-version = "6.0.0"
+version = "6.1.1"
 
 [[package]]
 name = "diags"
-version = "6.0.0"
+version = "6.1.1"
 dependencies = [
  "ariadne",
 ]
@@ -89,22 +96,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "48c757948c5ede0e46177b7add2e67155f70e33c07fea8284df6576da70b3719"
 
 [[package]]
-name = "engine"
-version = "6.0.0"
+name = "exec_phase"
+version = "6.1.1"
 dependencies = [
  "anyhow",
- "ast",
+ "argvaldb",
  "diags",
  "extension_registry",
  "ir",
  "irdb",
+ "locationdb",
+ "mapdb",
  "memmap2",
  "tracing",
 ]
 
 [[package]]
 name = "extension_registry"
-version = "6.0.0"
+version = "6.1.1"
 dependencies = [
  "brink_extension",
  "tracing",
@@ -112,7 +121,7 @@ dependencies = [
 
 [[package]]
 name = "extensions"
-version = "6.0.0"
+version = "6.1.1"
 dependencies = [
  "extension_registry",
 ]
@@ -155,7 +164,7 @@ dependencies = [
 
 [[package]]
 name = "ir"
-version = "6.0.0"
+version = "6.1.1"
 dependencies = [
  "diags",
  "parse_int",
@@ -164,7 +173,7 @@ dependencies = [
 
 [[package]]
 name = "irdb"
-version = "6.0.0"
+version = "6.1.1"
 dependencies = [
  "anyhow",
  "ast",
@@ -195,8 +204,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
+name = "layout_phase"
+version = "6.1.1"
+dependencies = [
+ "anyhow",
+ "argvaldb",
+ "ast",
+ "diags",
+ "extension_registry",
+ "ir",
+ "irdb",
+ "locationdb",
+ "memmap2",
+ "tracing",
+]
+
+[[package]]
 name = "layoutdb"
-version = "6.0.0"
+version = "6.1.1"
 dependencies = [
  "anyhow",
  "ast",
@@ -226,7 +251,7 @@ dependencies = [
 
 [[package]]
 name = "linearizer"
-version = "6.0.0"
+version = "6.1.1"
 dependencies = [
  "ast",
  "depth_guard",
@@ -237,14 +262,33 @@ dependencies = [
 ]
 
 [[package]]
-name = "map"
-version = "6.0.0"
+name = "locationdb"
+version = "6.1.1"
 dependencies = [
- "engine",
+ "diags",
+ "ir",
+]
+
+[[package]]
+name = "map_phase"
+version = "6.1.1"
+dependencies = [
+ "argvaldb",
+ "diags",
  "ir",
  "irdb",
+ "locationdb",
+ "mapdb",
  "serde_json",
  "tracing",
+]
+
+[[package]]
+name = "mapdb"
+version = "6.1.1"
+dependencies = [
+ "diags",
+ "ir",
 ]
 
 [[package]]
@@ -303,22 +347,27 @@ dependencies = [
 
 [[package]]
 name = "process"
-version = "6.0.0"
+version = "6.1.1"
 dependencies = [
  "anyhow",
+ "argvaldb",
  "ast",
  "const_eval",
  "diags",
- "engine",
+ "exec_phase",
  "extension_registry",
  "extensions",
  "ir",
  "irdb",
+ "layout_phase",
  "layoutdb",
- "map",
+ "locationdb",
+ "map_phase",
+ "mapdb",
  "parse_int",
  "prune",
  "tracing",
+ "validation_phase",
 ]
 
 [[package]]
@@ -331,7 +380,7 @@ dependencies = [
 
 [[package]]
 name = "prune"
-version = "6.0.0"
+version = "6.1.1"
 dependencies = [
  "anyhow",
  "ast",
@@ -422,7 +471,7 @@ dependencies = [
 
 [[package]]
 name = "symtable"
-version = "6.0.0"
+version = "6.1.1"
 dependencies = [
  "diags",
  "ir",
@@ -501,6 +550,18 @@ name = "unicode-width"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4ac048d71ede7ee76d585517add45da530660ef4390e49b098733c6e897f254"
+
+[[package]]
+name = "validation_phase"
+version = "6.1.1"
+dependencies = [
+ "anyhow",
+ "argvaldb",
+ "diags",
+ "ir",
+ "irdb",
+ "tracing",
+]
 
 [[package]]
 name = "yansi"
