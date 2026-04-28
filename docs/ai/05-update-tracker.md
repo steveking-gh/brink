@@ -489,3 +489,26 @@ Changes:
 - `README.md`: region size example updated to use `64K` and `1M`.
 
 347 tests pass.
+
+---
+
+## 2026-04-27 — RegionBinding diagnostic fields (name + src_loc)
+
+`RegionBinding` gained two new fields — `name: String` and `src_loc: SourceSpan`
+— so every region error site can name the region and point at its declaration
+without extra lookups.  `Copy` dropped (String prevents it); `Clone` retained.
+
+Changes:
+
+- `ir/ir.rs`: `RegionBinding` now carries `name` and `src_loc`.  `Copy` derive removed.
+- `const_eval/const_eval.rs`: binding constructor populates `name` and `src_loc`.
+  EXEC_75 message includes region name, points at declaration site.
+  EXEC_70 upgraded from `err1` to `err2`; both overlapping declarations highlighted.
+  Redundant `name_a`/`name_b` destructures in the overlap loop replaced with `_`.
+- `process/process.rs`: `*binding` (copy) changed to `binding.clone()`.
+- `layout_phase/layout_phase.rs`:
+  - EXEC_72 upgraded to `err2`; message includes region name; second label at declaration.
+  - EXEC_73 upgraded to `err2`; message includes region name; second label at declaration.
+  - EXEC_74 upgraded to `err2`; message includes region name; second label at declaration.
+
+347 tests pass.

@@ -172,7 +172,7 @@ pub fn process(
         if let Some(region_name) = &section.region
             && let Some(binding) = region_bindings.get(region_name)
         {
-            section_regions.insert(sec_name.to_string(), *binding);
+            section_regions.insert(sec_name.to_string(), binding.clone());
         }
     }
 

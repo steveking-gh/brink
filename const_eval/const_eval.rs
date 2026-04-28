@@ -1003,7 +1003,12 @@ pub fn evaluate_regions<'toks>(
 
     for (name, region) in &ast_db.regions {
         debug!("Evaluating properties of region {}", name);
-        let mut binding = RegionBinding { addr: 0, size: 0 };
+        let mut binding = RegionBinding {
+            addr: 0,
+            size: 0,
+            name: name.clone(),
+            src_loc: region.src_loc.clone(),
+        };
 
         for prop_nid in ast.children(region.nid) {
             let tinfo = ast.get_tinfo(prop_nid);
@@ -1077,10 +1082,10 @@ pub fn evaluate_regions<'toks>(
                 Some(end) => region_ends.push(Some(end)),
                 None => {
                     let msg = format!(
-                        "Region addr {:#X} + size {:#X} overflows u64.",
-                        binding.addr, binding.size
+                        "Region '{}' addr {:#X} + size {:#X} overflows u64.",
+                        name, binding.addr, binding.size
                     );
-                    diags.err1("EXEC_75", &msg, ast_db.regions[*name].src_loc.clone());
+                    diags.err1("EXEC_75", &msg, binding.src_loc.clone());
                     ok = false;
                     region_ends.push(None);
                 }
@@ -1091,14 +1096,19 @@ pub fn evaluate_regions<'toks>(
         let Some(end_a) = region_ends[i] else { continue; };
         for j in (i + 1)..region_list.len() {
             let Some(end_b) = region_ends[j] else { continue; };
-            let (name_a, binding_a) = region_list[i];
-            let (name_b, binding_b) = region_list[j];
+            let (_, binding_a) = region_list[i];
+            let (_, binding_b) = region_list[j];
             if binding_a.addr < end_b && binding_b.addr < end_a {
                 let msg = format!(
                     "Region '{}' [{:#X}, {:#X}) overlaps region '{}' [{:#X}, {:#X}).",
-                    name_a, binding_a.addr, end_a, name_b, binding_b.addr, end_b
+                    binding_a.name, binding_a.addr, end_a,
+                    binding_b.name, binding_b.addr, end_b
                 );
-                diags.err1("EXEC_70", &msg, ast_db.regions[name_a].src_loc.clone());
+                diags.err2(
+                    "EXEC_70", &msg,
+                    binding_a.src_loc.clone(),
+                    binding_b.src_loc.clone(),
+                );
                 ok = false;
             }
         }

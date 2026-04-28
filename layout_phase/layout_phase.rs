@@ -1038,17 +1038,21 @@ impl LayoutPhase {
         {
             let Some(region_end) = binding.addr.checked_add(binding.size) else {
                 if self.warned_lids.insert((lid, "EXEC_74")) {
-                    diags.err1("EXEC_74", "Region addr + size overflows u64.", ir.src_loc.clone());
+                    let msg = format!(
+                        "Region '{}' addr + size overflows u64.",
+                        binding.name
+                    );
+                    diags.err2("EXEC_74", &msg, ir.src_loc.clone(), binding.src_loc.clone());
                 }
                 return false;
             };
             if set_val < binding.addr || set_val >= region_end {
                 if self.warned_lids.insert((lid, "EXEC_72")) {
                     let msg = format!(
-                        "set_addr target {:#X} is outside region bounds [{:#X}, {:#X}).",
-                        set_val, binding.addr, region_end
+                        "set_addr target {:#X} is outside region '{}' bounds [{:#X}, {:#X}).",
+                        set_val, binding.name, binding.addr, region_end
                     );
-                    diags.err1("EXEC_72", &msg, ir.src_loc.clone());
+                    diags.err2("EXEC_72", &msg, ir.src_loc.clone(), binding.src_loc.clone());
                 }
                 return false;
             }
@@ -1286,10 +1290,15 @@ impl LayoutPhase {
             if sec_size > binding.size {
                 let excess = sec_size - binding.size;
                 let msg = format!(
-                    "Section '{}' size {} bytes exceeds region size {} bytes by {} bytes.",
-                    sec_name, sec_size, binding.size, excess
+                    "Section '{}' size {} bytes exceeds region '{}' size {} bytes by {} bytes.",
+                    sec_name, sec_size, binding.name, binding.size, excess
                 );
-                diags.err1("EXEC_73", &msg, irdb.ir_vec[ir_rng.start].src_loc.clone());
+                diags.err2(
+                    "EXEC_73",
+                    &msg,
+                    irdb.ir_vec[ir_rng.start].src_loc.clone(),
+                    binding.src_loc.clone(),
+                );
                 result = false;
             }
         }

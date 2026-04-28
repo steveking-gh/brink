@@ -19,10 +19,16 @@ use parse_int::parse;
 
 /// Region properties bound to a section via `section NAME in REGION`.
 /// Stored on IRDb; consumed by LayoutPhase and later execution phases.
-#[derive(Clone, Copy, Debug)]
+/// Carries the region name and declaration source location so that every
+/// error site can report which region was violated without extra lookups.
+#[derive(Clone, Debug)]
 pub struct RegionBinding {
     pub addr: u64,
     pub size: u64,
+    /// The region name as written in source, e.g. "FLASH".
+    pub name: String,
+    /// Source location of the region declaration for diagnostic labels.
+    pub src_loc: SourceSpan,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
