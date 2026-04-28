@@ -1,0 +1,21 @@
+// region_addr_sizeof.brink: addr(REGION) and sizeof(REGION) resolve to the
+// region's const-evaluated addr and size properties.
+region FLASH {
+    addr = 0x08000000;
+    size = 0x00100000;
+}
+region SRAM {
+    addr = 0x20000000;
+    size = 64K;
+}
+section top in FLASH {
+    wr32 addr(FLASH);
+    wr32 sizeof(FLASH);
+    wr32 addr(SRAM);
+    wr32 sizeof(SRAM);
+}
+assert addr(FLASH) == 0x08000000;
+assert sizeof(FLASH) == 0x00100000;
+assert addr(SRAM) == 0x20000000;
+assert sizeof(SRAM) == 64K;
+output top;

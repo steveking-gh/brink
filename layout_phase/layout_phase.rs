@@ -696,44 +696,46 @@ impl LayoutPhase {
         if in_parm.data_type() == DataType::Identifier {
             let sec_name = in_parm.identifier_to_str().to_string();
 
-            // We've already verified that the section identifier exists, but
-            // unless the section actually got used in the output, then we won't
-            // find location info for it.
-            let Some(ir_rng) = irdb.sized_locs.get(&sec_name) else {
-                let msg = format!(
-                    "Can't take sizeof() section '{}' not used in output.",
-                    sec_name
-                );
-                diags.err1("EXEC_5", &msg, ir.src_loc.clone());
-                return false;
-            };
-            assert!(ir_rng.start <= ir_rng.end);
-            let start_loc = &self.ir_locs[ir_rng.start];
-            let end_loc = &self.ir_locs[ir_rng.end];
+            // Section path: derive size from layout-phase ir_locs.
+            if let Some(ir_rng) = irdb.sized_locs.get(&sec_name) {
+                assert!(ir_rng.start <= ir_rng.end);
+                let start_loc = &self.ir_locs[ir_rng.start];
+                let end_loc = &self.ir_locs[ir_rng.end];
 
-            if start_loc.file_offset > end_loc.file_offset {
-                // This case can happen for sections on the first iteration of
-                // the layout pass, particularly for sections that contain a
-                // sizeof() of themselves. In that case, the section might have
-                // a starting location but no end location yet. So, we return 0
-                // size now, and will have a more accurate result on the next
-                // pass.
-                self.trace(format_args!(
-                    "Section {}: Starting file_pos {} > ending file_pos {}",
-                    sec_name, start_loc.file_offset, end_loc.file_offset
-                ));
-                *self.parms[out_parm_num].to_u64_mut() = 0;
-            } else {
-                let sz: u64 = end_loc.file_offset - start_loc.file_offset;
-                self.trace(format_args!("Sizeof {} is currently {}", sec_name, sz));
-                *self.parms[out_parm_num].to_u64_mut() = sz;
+                if start_loc.file_offset > end_loc.file_offset {
+                    // On the first iteration a section may not yet have a valid
+                    // end location (e.g. sizeof() of self).  Return 0 so the
+                    // loop converges on the next pass.
+                    self.trace(format_args!(
+                        "Section {}: Starting file_pos {} > ending file_pos {}",
+                        sec_name, start_loc.file_offset, end_loc.file_offset
+                    ));
+                    *self.parms[out_parm_num].to_u64_mut() = 0;
+                } else {
+                    let sz: u64 = end_loc.file_offset - start_loc.file_offset;
+                    self.trace(format_args!("Sizeof {} is currently {}", sec_name, sz));
+                    *self.parms[out_parm_num].to_u64_mut() = sz;
+                }
+                return true;
             }
-            return true;
+
+            // Region path: size is const-evaluated and stable across iterations.
+            if let Some(binding) = irdb.region_bindings.get(&sec_name) {
+                *self.parms[out_parm_num].to_u64_mut() = binding.size;
+                return true;
+            }
+
+            let msg = format!(
+                "sizeof() argument '{}' is not a section used in output or a declared region.",
+                sec_name
+            );
+            diags.err1("EXEC_5", &msg, ir.src_loc.clone());
+            return false;
         }
 
         diags.err1(
             "EXEC_52",
-            "sizeof() only accepts section names.",
+            "sizeof() only accepts section or region names.",
             ir.src_loc.clone(),
         );
         false
@@ -1097,52 +1099,76 @@ impl LayoutPhase {
 
         let name = self.parms[in_parm_num0].identifier_to_str().to_string();
 
-        let out_parm = &mut self.parms[out_parm_num];
-        let out = out_parm.to_u64_mut();
+        // Section / label path: look up the ir_locs entry for layout-time values.
+        if let Some(ir_num) = irdb.addressed_locs.get(&name) {
+            let start_loc = &self.ir_locs[*ir_num];
+            match ir.kind {
+                IRKind::Addr => {
+                    let Some(val) = start_loc
+                        .addr
+                        .addr_base
+                        .checked_add(start_loc.addr.addr_offset)
+                    else {
+                        diags.err1(
+                            "EXEC_44",
+                            "Absolute address (abs_base + off) overflow for identifier",
+                            ir.src_loc.clone(),
+                        );
+                        return false;
+                    };
+                    *self.parms[out_parm_num].to_u64_mut() = val;
+                }
+                IRKind::AddrOffset => {
+                    *self.parms[out_parm_num].to_u64_mut() = start_loc.addr.addr_offset;
+                }
+                IRKind::SecOffset => {
+                    *self.parms[out_parm_num].to_u64_mut() = start_loc.addr.sec_offset;
+                }
+                IRKind::FileOffset => {
+                    *self.parms[out_parm_num].to_u64_mut() = start_loc.file_offset;
+                }
+                bad => {
+                    panic!("Called iterate_identifier_address with bogus IR {:?}", bad);
+                }
+            }
+            return true;
+        }
 
-        // We've already verified that the section identifier exists,
-        // but unless the section actually got used in the output,
-        // then we won't find location info for it.
-        let Some(ir_num) = irdb.addressed_locs.get(&name) else {
-            let msg = format!(
-                "Address of section or label '{}' not reachable in output.",
-                name
-            );
-            diags.err1("EXEC_11", &msg, ir.src_loc.clone());
-            return false;
-        };
-        let start_loc = &self.ir_locs[*ir_num];
-        match ir.kind {
-            IRKind::Addr => {
-                let Some(val) = start_loc
-                    .addr
-                    .addr_base
-                    .checked_add(start_loc.addr.addr_offset)
-                else {
-                    diags.err1(
-                        "EXEC_44",
-                        "Absolute address (abs_base + off) overflow for identifier",
-                        ir.src_loc.clone(),
+        // Region path: addr and size are const-evaluated, not layout-dependent.
+        // Only addr(REGION) is valid; the offset variants have no meaning for a
+        // static region declaration.
+        if let Some(binding) = irdb.region_bindings.get(&name) {
+            match ir.kind {
+                IRKind::Addr => {
+                    *self.parms[out_parm_num].to_u64_mut() = binding.addr;
+                    return true;
+                }
+                IRKind::AddrOffset | IRKind::SecOffset | IRKind::FileOffset => {
+                    let kind_str = match ir.kind {
+                        IRKind::AddrOffset => "addr_offset",
+                        IRKind::SecOffset => "sec_offset",
+                        IRKind::FileOffset => "file_offset",
+                        _ => unreachable!(),
+                    };
+                    let msg = format!(
+                        "{}({}) is not valid for region '{}'; use addr({}) instead.",
+                        kind_str, name, name, name
                     );
+                    diags.err1("EXEC_76", &msg, ir.src_loc.clone());
                     return false;
-                };
-                *out = val;
-            }
-            IRKind::AddrOffset => {
-                *out = start_loc.addr.addr_offset;
-            }
-            IRKind::SecOffset => {
-                *out = start_loc.addr.sec_offset;
-            }
-            IRKind::FileOffset => {
-                *out = start_loc.file_offset;
-            }
-            bad => {
-                panic!("Called iterate_identifier_address with bogus IR {:?}", bad);
+                }
+                bad => {
+                    panic!("Called iterate_identifier_address with bogus IR {:?}", bad);
+                }
             }
         }
 
-        true
+        let msg = format!(
+            "Section, label, or region '{}' not found in output.",
+            name
+        );
+        diags.err1("EXEC_11", &msg, ir.src_loc.clone());
+        false
     }
 
     fn iterate_address(

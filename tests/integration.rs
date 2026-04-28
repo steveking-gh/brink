@@ -3154,4 +3154,9 @@ mod tests {
     fn region_nested_overflow() {
         assert_brink_failure("tests/region_nested_overflow.brink", &["[EXEC_73]"]);
     }
+
+    #[test]
+    fn region_addr_sizeof() {
+        assert_brink_success("tests/region_addr_sizeof.brink", None, None);
+    }
 } // mod tests

@@ -37,6 +37,11 @@ pub struct LayoutDb {
 
     /// Names of every section declared in the source (used by irdb).
     pub section_names: HashSet<String>,
+
+    /// Names of every region declared in the source.
+    /// Allows IdentDb to accept region names in addr() and sizeof() before
+    /// layout_phase resolves them from irdb.region_bindings.
+    pub region_names: HashSet<String>,
 }
 
 impl LayoutDb {
@@ -326,6 +331,8 @@ impl<'toks> LayoutDb {
 
         let section_names: HashSet<String> =
             ast_db.sections.keys().map(|s| s.to_string()).collect();
+        let region_names: HashSet<String> =
+            ast_db.regions.keys().map(|s| s.to_string()).collect();
 
         let mut layout_lz = Linearizer::new();
 
@@ -352,6 +359,7 @@ impl<'toks> LayoutDb {
             output_sec_str,
             output_sec_loc,
             section_names,
+            region_names,
         };
 
         layout_db.dump();
@@ -600,6 +608,9 @@ impl IdentDb {
                         diags.err1("LINEAR_9", &msg, src_loc.clone());
                         result = false;
                     }
+                    continue;
+                }
+                if lindb.region_names.contains(sval) {
                     continue;
                 }
                 let msg = format!("Unknown or unreachable identifier {}", sval);

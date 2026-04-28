@@ -192,6 +192,7 @@ pub fn process(
         &mut diags,
         &ext_registry,
         section_regions,
+        region_bindings,
     )
     .context("[PROC_5]: Error detected, halting.")?;
 

@@ -181,7 +181,6 @@ IR) but harmless.
 
 294 tests pass.
 
-
 ---
 
 ## 2026-04-17 — max-output-size flag (region plan step 1)
@@ -489,6 +488,43 @@ Changes:
 - `README.md`: region size example updated to use `64K` and `1M`.
 
 347 tests pass.
+
+---
+
+## 2026-04-28 — addr(REGION) and sizeof(REGION)
+
+`addr()` and `sizeof()` now accept region names in addition to section names.
+
+**Design**
+Same `IRKind::Addr` / `IRKind::Sizeof` and same identifier operand structure as
+sections.  Regions provide their values from `irdb.region_bindings` (const-
+evaluated, stable across layout iterations) rather than from `ir_locs[]`.
+
+Changes:
+
+- `layoutdb/layoutdb.rs`: `LayoutDb` gains `region_names: HashSet<String>`,
+  populated from `ast_db.regions` in `new()`.  `IdentDb::verify_operand_refs`
+  checks `lindb.region_names` before emitting LINEAR_6, so region names pass
+  the identifier validation gate.
+- `irdb/irdb.rs`: `IRDb` gains `region_bindings: HashMap<String, RegionBinding>`
+  (keyed by region name, parallel to `section_regions` which is keyed by section
+  name).  `IRDb::new` accepts and stores this map.
+- `process/process.rs`: passes `region_bindings` (returned by `evaluate_regions`,
+  not consumed when building `section_regions`) to `IRDb::new`.
+- `layout_phase/layout_phase.rs`:
+  - `iterate_sizeof`: falls back to `irdb.region_bindings` when the name is not
+    in `sized_locs`; returns `binding.size`.  EXEC_5 message updated to mention
+    regions.  EXEC_52 message updated to "section or region names".
+  - `iterate_identifier_address`: restructured into three paths — section/label,
+    region, not-found.  For regions: `addr(REGION)` returns `binding.addr`;
+    `addr_offset`/`sec_offset`/`file_offset` applied to a region emit EXEC_76.
+    EXEC_11 message updated to "section, label, or region".
+- New error code EXEC_76: offset-style address operation applied to a region name.
+- `tests/region_addr_sizeof.brink`: verifies `addr()` and `sizeof()` on two
+  regions with asserts and `wr32` output bytes.
+- 1 new integration test: `region_addr_sizeof`.
+
+348 tests pass.
 
 ---
 

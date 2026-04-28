@@ -60,6 +60,11 @@ pub struct IRDb {
     /// Region properties for sections declared `section NAME in REGION`.
     /// Keyed by section name; consumed by LayoutPhase and later execution phases.
     pub section_regions: HashMap<String, RegionBinding>,
+
+    /// All declared regions, keyed by region name.
+    /// Allows addr(REGION) and sizeof(REGION) to resolve directly to the
+    /// region's const-evaluated addr and size without a layout-time lookup.
+    pub region_bindings: HashMap<String, RegionBinding>,
 }
 
 impl IRDb {
@@ -765,6 +770,7 @@ impl IRDb {
         diags: &mut Diags,
         ext_registry: &ExtensionRegistry,
         section_regions: HashMap<String, RegionBinding>,
+        region_bindings: HashMap<String, RegionBinding>,
     ) -> anyhow::Result<Self> {
         let mut ir_db = IRDb {
             ir_vec: Vec::new(),
@@ -775,6 +781,7 @@ impl IRDb {
             symbol_table,
             output_sec_str: lin_db.output_sec_str.clone(),
             section_regions,
+            region_bindings,
         };
 
         if !ir_db.process_lin_operands(lin_db, diags) {
