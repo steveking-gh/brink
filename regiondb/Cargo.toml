@@ -1,0 +1,17 @@
+[package]
+name = "regiondb"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[lib]
+path = "regiondb.rs"
+
+[dependencies]
+anyhow = "1.0.34"
+tracing = "0.1.44"
+
+# local dependencies
+diags = { path = "../diags" }
+ir    = { path = "../ir" }
+irdb  = { path = "../irdb" }

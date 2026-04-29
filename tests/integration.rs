@@ -3204,4 +3204,12 @@ mod tests {
     fn region_exec78_bad_start() {
         assert_brink_failure("tests/region_exec78_bad_start.brink", &["[EXEC_78]"]);
     }
+
+    #[test]
+    /// Section 'pinned' is bound to a region and included twice via wr.
+    /// Region-bound sections anchor to a fixed address; re-use is disallowed.
+    /// EXEC_79 must fire.
+    fn region_exec79_reuse() {
+        assert_brink_failure("tests/region_exec79_reuse.brink", &["[EXEC_79]"]);
+    }
 } // mod tests

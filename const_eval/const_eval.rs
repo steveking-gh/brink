@@ -1071,15 +1071,13 @@ pub fn evaluate_regions<'toks>(
 
     // Validate each region's addr+size does not overflow u64.
     for (name, binding) in &bindings {
-        if binding.size > 0 {
-            if binding.addr.checked_add(binding.size).is_none() {
-                let msg = format!(
-                    "Region '{}' addr {:#X} + size {:#X} overflows u64.",
-                    name, binding.addr, binding.size
-                );
-                diags.err1("EXEC_75", &msg, binding.src_loc.clone());
-                ok = false;
-            }
+        if binding.size > 0 && binding.addr.checked_add(binding.size).is_none() {
+            let msg = format!(
+                "Region '{}' addr {:#X} + size {:#X} overflows u64.",
+                name, binding.addr, binding.size
+            );
+            diags.err1("EXEC_75", &msg, binding.src_loc.clone());
+            ok = false;
         }
     }
 

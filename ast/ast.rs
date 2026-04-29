@@ -24,7 +24,7 @@ use std::io::prelude::*;
 
 #[allow(unused_imports)]
 use depth_guard::{DepthGuard, MAX_RECURSION_DEPTH};
-use tracing::{enabled, Level, debug, trace};
+use tracing::{Level, debug, enabled, trace};
 
 /// All tokens in brink.
 /// Keep this simple and do not be tempted to attach
@@ -168,7 +168,6 @@ pub fn is_reserved_identifier(name: &str) -> bool {
     )
 }
 
-
 /// Returns true if the token is one that has a meaningful value
 /// to show in debug logs.
 pub const fn has_useful_debug_value(tok: LexToken) -> bool {
@@ -197,16 +196,15 @@ macro_rules! debug_peek {
     };
 }
 
-/// The basic token info structure used everywhere.
-/// The AST constructs a vector of TokenInfos.
+/// The basic token info structure used everywhere. The AST constructs a vector
+/// of TokenInfos.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TokenInfo<'toks> {
-    /// The token enum as identified by logos
+    /// The token as identified by the lexer.
     pub tok: LexToken,
 
-    /// The range of bytes in the source file occupied
-    /// by this token.  Diagnostics require this range
-    /// when producing errors.
+    /// The range of bytes in the source file occupied by this token.
+    /// Diagnostics require this range when producing errors.
     pub loc: SourceSpan,
 
     /// The value of the token trimmed of whitespace
@@ -230,7 +228,14 @@ pub struct TokenVector<'toks> {
 
 impl<'toks> TokenVector<'toks> {
     pub fn new(mut tv: Vec<TokenInfo<'toks>>) -> Self {
-        tv.push(TokenInfo { tok: LexToken::EOF, val: "", loc: SourceSpan { file_id: 0, range: 0..0 } });
+        tv.push(TokenInfo {
+            tok: LexToken::EOF,
+            val: "",
+            loc: SourceSpan {
+                file_id: 0,
+                range: 0..0,
+            },
+        });
         Self { tv, idx: 0 }
     }
 
@@ -244,8 +249,13 @@ impl<'toks> TokenVector<'toks> {
 
     /// Get needs access to all tokens.
     pub fn get(&self, idx: usize) -> &TokenInfo<'toks> {
-        self.tv.get(idx).unwrap_or_else(||
-            panic!("TokenVector::get: Index {} out of bounds, tv length={}", idx, self.tv.len()))
+        self.tv.get(idx).unwrap_or_else(|| {
+            panic!(
+                "TokenVector::get: Index {} out of bounds, tv length={}",
+                idx,
+                self.tv.len()
+            )
+        })
     }
 
     /// Return the next unread token, but do not advance.  The sequential parser
@@ -269,7 +279,9 @@ impl<'toks> TokenVector<'toks> {
     pub fn describe_token(&self, idx: usize) -> String {
         match self.tv.get(idx) {
             None => format!("token {} out of bounds, length={}", idx, self.tv.len()),
-            Some(tinfo) if has_useful_debug_value(tinfo.tok) => format!("token {}:{:?} is {:?}", idx, tinfo.tok, tinfo.val),
+            Some(tinfo) if has_useful_debug_value(tinfo.tok) => {
+                format!("token {}:{:?} is {:?}", idx, tinfo.tok, tinfo.val)
+            }
             Some(tinfo) => format!("token {}:{:?}", idx, tinfo.tok),
         }
     }
@@ -289,7 +301,11 @@ impl<'toks> TokenVector<'toks> {
     // Skip stops at the end of input.
     pub fn skip(&mut self) {
         if self.idx >= self.tv.len() {
-            panic!("TokenVector::skip: Index {} exceeded bounds, tv length={}", self.idx, self.tv.len())
+            panic!(
+                "TokenVector::skip: Index {} exceeded bounds, tv length={}",
+                self.idx,
+                self.tv.len()
+            )
         }
         if self.idx < self.tv.len() - 1 {
             self.idx += 1;
@@ -304,7 +320,6 @@ impl<'toks> TokenVector<'toks> {
         idx
     }
 }
-
 
 /**
  * Abstract Syntax Tree
@@ -518,7 +533,10 @@ impl<'toks> Ast<'toks> {
         let dummy_tinfo = TokenInfo {
             tok: LexToken::EOF,
             val: "",
-            loc: SourceSpan { file_id: 0, range: 0..0 },
+            loc: SourceSpan {
+                file_id: 0,
+                range: 0..0,
+            },
         };
         let root = arena.new_node(dummy_tinfo);
         let mut raw_tv = Vec::new();
@@ -561,7 +579,11 @@ impl<'toks> Ast<'toks> {
     // Boilerplate entry debug tracing for recursive descent parsing functions.
     fn dbg_enter(&self, func_name: &str) {
         if enabled!(Level::TRACE) {
-            trace!("Ast::{} ENTER, {}", func_name, self.tv.describe_token_at_offset(0));
+            trace!(
+                "Ast::{} ENTER, {}",
+                func_name,
+                self.tv.describe_token_at_offset(0)
+            );
         }
     }
 
@@ -617,10 +639,15 @@ impl<'toks> Ast<'toks> {
     /// between elements in the source file.  We check syntax and grammar during
     /// tree construction.
     fn parse(&mut self, diags: &mut Diags) -> bool {
-        debug!("Ast::parse: ENTER, Total of {} tokens",  self.tv.scannable_len());
+        debug!(
+            "Ast::parse: ENTER, Total of {} tokens",
+            self.tv.scannable_len()
+        );
 
         let mut result = true;
-        while let tinfo = self.tv.peek() && tinfo.tok != LexToken::EOF {
+        while let tinfo = self.tv.peek()
+            && tinfo.tok != LexToken::EOF
+        {
             debug_peek!("Ast::parse", self.tv);
             result &= match tinfo.tok {
                 LexToken::Section => self.parse_section(self.root, diags),
@@ -671,12 +698,7 @@ impl<'toks> Ast<'toks> {
         let tinfo_after = self.tv.get(idx);
         let tinfo_before = self.tv.get(idx - 1);
         let m = format!("{}, found {}", msg, self.tv.describe_token(idx));
-        diags.err2(
-            code,
-            &m,
-            tinfo_after.span(),
-            tinfo_before.span(),
-        );
+        diags.err2(code, &m, tinfo_after.span(), tinfo_before.span());
     }
 
     fn err_invalid_expression(&self, diags: &mut Diags, code: &str) {
@@ -704,11 +726,10 @@ impl<'toks> Ast<'toks> {
     fn advance_past_semicolon(&mut self) {
         self.dbg_enter("advance_past_semicolon");
         let prev_tinfo = self.tv.get(self.tv.get_index() - 1);
-        if prev_tinfo.tok != LexToken::Semicolon
-        {
+        if prev_tinfo.tok != LexToken::Semicolon {
             loop {
                 let tinfo = self.tv.take();
-                if tinfo.tok == LexToken::EOF || tinfo.tok == LexToken::Semicolon{
+                if tinfo.tok == LexToken::EOF || tinfo.tok == LexToken::Semicolon {
                     break;
                 }
             }
@@ -775,8 +796,7 @@ impl<'toks> Ast<'toks> {
     }
 
     /// Expect the specified token, add it to the parent and advance.
-    fn expect_token(&mut self, expected_tok: LexToken, diags: &mut Diags,
-                    parent: NodeId) -> bool {
+    fn expect_token(&mut self, expected_tok: LexToken, diags: &mut Diags, parent: NodeId) -> bool {
         let tinfo = self.tv.peek();
         if tinfo.tok == LexToken::EOF {
             self.err_no_input(diags);
@@ -996,11 +1016,19 @@ impl<'toks> Ast<'toks> {
         // Verify required properties are present.
         let reg_tinfo = self.get_tinfo(reg_nid);
         if !seen_addr {
-            diags.err1("AST_47", "Region is missing required property 'addr'", reg_tinfo.span());
+            diags.err1(
+                "AST_47",
+                "Region is missing required property 'addr'",
+                reg_tinfo.span(),
+            );
             result = false;
         }
         if !seen_size {
-            diags.err1("AST_64", "Region is missing required property 'size'", reg_tinfo.span());
+            diags.err1(
+                "AST_64",
+                "Region is missing required property 'size'",
+                reg_tinfo.span(),
+            );
             result = false;
         }
 
@@ -1034,7 +1062,11 @@ impl<'toks> Ast<'toks> {
         self.tv.skip(); // consume '='
 
         // Synthesize a RegionProp node.  Children: expression root, then ';'.
-        let prop_node = TokenInfo { tok: LexToken::RegionProp, loc: prop_loc, val: prop_val };
+        let prop_node = TokenInfo {
+            tok: LexToken::RegionProp,
+            loc: prop_loc,
+            val: prop_val,
+        };
         let prop_nid = self.arena.new_node(prop_node);
         reg_nid.append(prop_nid, &mut self.arena);
 
@@ -1434,12 +1466,7 @@ impl<'toks> Ast<'toks> {
     ///   abs
     ///   └── [<Identifier>] <- optional section or label name
     /// ```
-    fn parse_pratt(
-        &mut self,
-        min_bp: u8,
-        top: &mut Option<NodeId>,
-        diags: &mut Diags,
-    ) -> bool {
+    fn parse_pratt(&mut self, min_bp: u8, top: &mut Option<NodeId>, diags: &mut Diags) -> bool {
         debug!("Ast::parse_pratt: ENTER, Min BP = {}", min_bp);
         debug_peek!("Ast::parse_pratt", self.tv);
 
@@ -1833,7 +1860,10 @@ impl<'toks> Ast<'toks> {
             // Reject old syntax: output <name> <addr>;
             // The address argument was removed; use set_addr inside the section.
             let tinfo = self.tv.peek();
-            if matches!(tinfo.tok, LexToken::U64 | LexToken::Integer | LexToken::Identifier) {
+            if matches!(
+                tinfo.tok,
+                LexToken::U64 | LexToken::Integer | LexToken::Identifier
+            ) {
                 let msg = format!(
                     "output no longer accepts a starting address ('{}'); use set_addr inside the section instead",
                     tinfo.val
@@ -1923,12 +1953,7 @@ impl<'toks> Ast<'toks> {
     ///    ├── [else_stmts...]
     ///    └── }]
     /// ```
-    fn parse_if_r(
-        &mut self,
-        parent: NodeId,
-        diags: &mut Diags,
-        ctx: ParseIfContext,
-    ) -> bool {
+    fn parse_if_r(&mut self, parent: NodeId, diags: &mut Diags, ctx: ParseIfContext) -> bool {
         self.dbg_enter("parse_if");
 
         let Some(_guard) = DepthGuard::enter(MAX_RECURSION_DEPTH) else {
@@ -1983,11 +2008,7 @@ impl<'toks> Ast<'toks> {
                 self.err_no_input(diags);
                 false
             } else {
-                self.err_expected_after(
-                    diags,
-                    "AST_52",
-                    "Expected '{' or 'if' after 'else'",
-                );
+                self.err_expected_after(diags, "AST_52", "Expected '{' or 'if' after 'else'");
                 false
             }
         } else {
@@ -2084,7 +2105,11 @@ impl<'toks> Ast<'toks> {
         let idx = self.tv.get_index();
         let next_tinfo = self.tv.get(idx + 1);
         if next_tinfo.tok != LexToken::Eq {
-            let found = if next_tinfo.tok == LexToken::EOF { "<end of input>" } else { next_tinfo.val };
+            let found = if next_tinfo.tok == LexToken::EOF {
+                "<end of input>"
+            } else {
+                next_tinfo.val
+            };
             let msg = format!(
                 "Expected '=' after identifier in deferred const assignment, found '{}'",
                 found
@@ -2175,13 +2200,6 @@ impl<'toks> Ast<'toks> {
             .context("ast.dot write failed")?;
         let children = nid.children(&self.arena);
         for child_nid in children {
-            /*
-            let child_tinfo = self.get_tinfo(child_nid);
-            if child_tinfo.tok == LexToken::Semicolon {
-                continue;
-            }
-            */
-
             file.write(format!("{} -> {}\n", nid, child_nid).as_bytes())
                 .context("ast.dot write failed")?;
             self.dump_r(child_nid, depth + 1, file)?;
@@ -2189,12 +2207,11 @@ impl<'toks> Ast<'toks> {
         Ok(())
     }
 
-    /**
-     * Recursively dumps the AST to the console.
-     */
+    /// Recursively dumps the AST to file ast.dot in Graphviz dot format. View
+    /// the graph with `dot -Tpng ast.dot -o ast.png` or use an online Graphviz
+    /// viewer.
     pub fn dump(&self, fname: &str) -> anyhow::Result<()> {
         debug!("");
-
         let mut file = File::create(fname)
             .context(format!("Error attempting to create debug file '{}'", fname))?;
         file.write(b"digraph {\n").context("ast.dot write failed")?;
@@ -2317,7 +2334,7 @@ impl Region {
 
 /*****************************************************************************
  * AstDb
- * The AstDb contains a map of various items in the AST.
+ * The AstDb contains a info for various items in the AST.
  * After construction, we never mutate this database.
  * The key is the AST NodeID, the value is the TokenInfo object.
  *****************************************************************************/
@@ -2511,7 +2528,10 @@ impl<'toks> AstDb<'toks> {
         nested_sections: &mut HashSet<&'toks str>,
         diags: &mut Diags,
     ) -> bool {
-        debug!("AstDb::validate_nesting_r: ENTER for parent nid: {}", parent_nid);
+        debug!(
+            "AstDb::validate_nesting_r: ENTER for parent nid: {}",
+            parent_nid
+        );
 
         let Some(_guard) = DepthGuard::enter(MAX_RECURSION_DEPTH) else {
             let tinfo = ast.get_tinfo(parent_nid);
@@ -2572,7 +2592,10 @@ impl<'toks> AstDb<'toks> {
             }
         };
 
-        debug!("AstDb::validate_nesting_r: EXIT({}) for nid: {}", result, parent_nid);
+        debug!(
+            "AstDb::validate_nesting_r: EXIT({}) for nid: {}",
+            result, parent_nid
+        );
         result
     }
 
@@ -2666,7 +2689,12 @@ impl<'toks> AstDb<'toks> {
         for (reg_name, reg_entry) in &regions {
             if let Some(sec_item) = sections.get(reg_name.as_str()) {
                 let m = format!("Region name '{}' conflicts with a section name", reg_name);
-                diags.err2("AST_48", &m, reg_entry.src_loc.clone(), sec_item.tinfo.span());
+                diags.err2(
+                    "AST_48",
+                    &m,
+                    reg_entry.src_loc.clone(),
+                    sec_item.tinfo.span(),
+                );
                 result = false;
             }
             if let Some(const_span) = const_names.get(reg_name.as_str()) {

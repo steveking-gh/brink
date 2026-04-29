@@ -31,6 +31,18 @@ pub struct RegionBinding {
     pub src_loc: SourceSpan,
 }
 
+/// The effective region constraint for a section: the geometric intersection
+/// of all ancestor region bindings plus the section's own direct binding.
+/// contributors holds each RegionBinding that narrowed the intersection,
+/// outermost first, for use in EXEC_73 backtrace diagnostics.
+#[derive(Clone, Debug)]
+pub struct EffectiveRegion {
+    /// Geometric intersection of all applicable regions.
+    pub binding: RegionBinding,
+    /// All applicable regions, outermost first.
+    pub contributors: Vec<RegionBinding>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DataType {
     U64,

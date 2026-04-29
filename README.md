@@ -1194,38 +1194,14 @@ as follows:
 
 * Any address written by the child section must lie in the intersection of *all*
   parent regions.
-* The starting address of a nested section must fit the address allowed by all
+* The starting address of a nested section must fit the address range allowed by all
   parent regions.
 
-### Sections in Regions are Usually Single Use
+### Sections in Regions are Single Use
 
 Placing a section in a region forces the starting address of the section to the
 region's `addr` value.  Writing this section more than once results in an
-address overwrite error if the section writes any data.  For example:
-
-    region PINNED_TABLE {
-        addr = 0xF100_0000;
-        size = 64K;
-    }
-
-    section loose_tables {
-        wrf "loose_tables.bin"
-    }
-
-    section pinned_tables in PINNED_TABLE {
-        assert addr() == 0xF100_0000;
-        wrf "pinned_tables.bin"
-    }
-
-    section top {
-        assert addr() == 0xF000_0000;
-        wr loose_tables; // OK
-        wr loose_tables; // duplicate OK, not in a region, no address overwrite
-        wr pinned_tables; // OK, pinned in a region
-        wr pinned_tables; // ERROR! Overwrites address 0xF100_0000
-    }
-
-    output top;
+address address conflict with the previous instance of the section.
 
 ---
 

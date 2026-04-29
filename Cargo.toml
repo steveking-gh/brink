@@ -8,6 +8,7 @@ members = [
     "symtable",
     "linearizer",
     "layoutdb",
+    "regiondb",
     "layout_phase",
     "process",
     "irdb",

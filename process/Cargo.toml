@@ -25,6 +25,7 @@ layoutdb = { path = "../layoutdb" }
 const_eval = { path = "../const_eval" }
 prune = { path = "../prune" }
 irdb = { path = "../irdb" }
+regiondb = { path = "../regiondb" }
 layout_phase = { path = "../layout_phase" }
 map_phase = { path = "../map_phase" }
 exec_phase        = { path = "../exec_phase" }

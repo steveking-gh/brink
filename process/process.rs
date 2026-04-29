@@ -26,6 +26,7 @@ use irdb::IRDb;
 use layout_phase::LayoutPhase;
 use layoutdb::LayoutDb;
 use map_phase::{format_c99, format_csv, format_json, format_rs};
+use regiondb::RegionDb;
 use validation_phase::ValidationPhase;
 
 #[allow(unused_imports)]
@@ -98,6 +99,8 @@ pub fn list_extensions() -> Vec<String> {
 }
 
 /// Entry point for all processing on the input source file.
+/// This function drives the compilation pipeline.
+///
 /// `name`        — source file path
 /// `fstr`        — source file contents
 /// `output_file` — binary output path (default: "output.bin")
@@ -157,12 +160,9 @@ pub fn process(
     let pruned_ast_db =
         AstDb::new(&mut diags, &pruned_ast, true).context("[PROC_3]: Error detected, halting.")?;
 
-    let Some(region_bindings) = const_eval::evaluate_regions(
-        &mut diags,
-        &pruned_ast,
-        &pruned_ast_db,
-        &mut symbol_table,
-    ) else {
+    let Some(region_bindings) =
+        const_eval::evaluate_regions(&mut diags, &pruned_ast, &pruned_ast_db, &mut symbol_table)
+    else {
         return Err(anyhow!("[PROC_9]: Error detected, halting."));
     };
 
@@ -199,8 +199,12 @@ pub fn process(
         ir_db.dump();
     }
 
-    let (location_db, argval_db) = LayoutPhase::build(&ir_db, &ext_registry, &mut diags)
-        .context("[PROC_6]: Error detected, halting.")?;
+    let region_db = RegionDb::build(&ir_db, &mut diags)
+        .ok_or_else(|| anyhow!("[PROC_10]: Error detected, halting."))?;
+
+    let (location_db, argval_db) =
+        LayoutPhase::build(&ir_db, &region_db, &ext_registry, &mut diags)
+            .context("[PROC_6]: Error detected, halting.")?;
     if verbosity > 2 {
         // LayoutPhase debug dump removed
     }

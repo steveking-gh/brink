@@ -680,3 +680,54 @@ Tests:
   (0x1080); EXEC_78 fires.  Integration test `region_exec78_bad_start`.
 
 354 tests pass.
+
+---
+
+## 2026-04-28 — RegionDb crate; EXEC_79 region-bound section re-use
+
+**RegionDb crate**
+New first-class pipeline stage inserted between IRDb and LayoutPhase.
+
+`regiondb/regiondb.rs` walks `irdb.ir_vec` once, tracking section nesting via
+a scope stack, and computes `EffectiveRegion` for every section.  Because
+region `addr` and `size` are const-evaluated before IRDb exists, the resulting
+intersections are stable — they do not change across layout passes.
+
+`EffectiveRegion` moved from `layout_phase.rs` to `ir/ir.rs` so both `regiondb`
+and `layout_phase` can share the type without a circular dependency.
+
+`intersect_regions` helper moved from `LayoutPhase` (a private static method
+recomputed on every iterate pass) to `regiondb/regiondb.rs` (a module-level
+free function called exactly once during `RegionDb::build`).
+
+EXEC_77 and EXEC_78 detection moved from `layout_phase::iterate_section_start`
+(fired with `warned_lids` deduplication across every iterate pass) into
+`RegionDb::build` (fired once, naturally deduplicated).
+
+LayoutPhase simplification:
+
+- `EffectiveRegion` struct definition removed (now in `ir`).
+- `intersect_regions` static method removed (now in `regiondb`).
+- `section_effective_regions: HashMap<String, EffectiveRegion>` field removed.
+- `iterate_section_start`: reduced to a RegionDb lookup + scope push + anchor.
+  No intersection computation, no error emission, no `lid`/`diags` parameters.
+  Returns `()` instead of `bool`.
+- `validate_section_regions`: reads from `RegionDb` instead of the removed map.
+- `build` and `iterate` gain `region_db: &RegionDb` parameter.
+
+EXEC_79 — region-bound section used more than once: Region-bound sections
+anchor to a fixed address on every inclusion; a second `wr` is guaranteed to
+produce an address conflict.  `RegionDb::build` detects the second `SectionStart`
+for any region-bound section and emits EXEC_79.
+
+Pipeline ordering: `process.rs` builds `RegionDb` immediately after `IRDb`,
+before `LayoutPhase`.  Failure halts with PROC_10.
+
+New error codes: EXEC_79, PROC_10.
+
+Tests:
+
+- `region_exec79_reuse.brink`: `wr pinned` twice where `pinned in FLASH`;
+  EXEC_79 fires.  Integration test `region_exec79_reuse`.
+
+355 tests pass.
