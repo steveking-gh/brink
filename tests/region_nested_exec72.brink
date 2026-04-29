@@ -1,0 +1,15 @@
+// region_nested_exec72.brink: inner section has no direct region binding but
+// inherits the FLASH constraint from the outer section via the scope stack.
+// set_addr to an address outside FLASH triggers EXEC_72.
+region FLASH {
+    addr = 0x08000000;
+    size = 0x1000;
+}
+section outer in FLASH {
+    wr inner;
+}
+section inner {
+    set_addr(0x09000000);
+    wr8 0x00;
+}
+output outer;

@@ -150,6 +150,37 @@ impl Diags {
         self.print_report(report);
     }
 
+    /// Writes the diagnostic to the terminal with a primary location and N
+    /// secondary locations, each carrying an individual annotation message.
+    /// The primary label is red; each secondary label is yellow with its own
+    /// message text embedded inline at the source site.
+    pub fn err_with_locs(
+        &self,
+        code: &str,
+        msg: &str,
+        primary: SourceSpan,
+        secondaries: &[(SourceSpan, String)],
+    ) {
+        if self.verbosity == 0 {
+            return;
+        }
+
+        let pid = self.files[primary.file_id].0.clone();
+        let mut builder = Report::build(ReportKind::Error, (pid.clone(), primary.range.clone()))
+            .with_code(code)
+            .with_message(msg)
+            .with_label(Label::new((pid, primary.range)).with_color(Color::Red));
+        for (loc, text) in secondaries {
+            let sid = self.files[loc.file_id].0.clone();
+            builder = builder.with_label(
+                Label::new((sid, loc.range.clone()))
+                    .with_color(Color::Yellow)
+                    .with_message(text),
+            );
+        }
+        self.print_report(builder.finish());
+    }
+
     /// Writes the diagnostic to the terminal with primary
     /// and secondary code locations.
     pub fn err2(&self, code: &str, msg: &str, loc1: SourceSpan, loc2: SourceSpan) {

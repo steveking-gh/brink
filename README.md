@@ -1189,10 +1189,13 @@ by *all* the parent regions.  For example:
 ### Partially Overlapping Nested Regions
 
 For completeness, the region of a nested section need not be a proper subset of
-the parent region. However, any address written by the child section must lie in
-the intersection of *all* parent regions.  If the user requires partially
-overlapping regions, then explicit address manipulation with
-[set_addr](#set_addr) may be helpful.
+the parent region. Brink still enforces the constraints of *all* parent sections
+as follows:
+
+* Any address written by the child section must lie in the intersection of *all*
+  parent regions.
+* The starting address of a nested section must fit the address allowed by all
+  parent regions.
 
 ### Sections in Regions are Usually Single Use
 

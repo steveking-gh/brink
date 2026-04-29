@@ -1,0 +1,21 @@
+// region_nested_containment.brink: outer section in FLASH; inner section in CODE
+// where CODE is fully inside FLASH.  Containment is allowed -- no EXEC_70.
+// When inner is called from outer the effective region is FLASH & CODE = CODE.
+region FLASH {
+    addr = 0x08000000;
+    size = 256;
+}
+region CODE {
+    addr = 0x08000000;
+    size = 16;
+}
+section outer in FLASH {
+    wr inner;
+}
+section inner in CODE {
+    wr8 0xFF, 16;
+}
+assert sizeof(outer) == 16;
+assert sizeof(CODE) == 16;
+assert addr(CODE) == 0x08000000;
+output outer;

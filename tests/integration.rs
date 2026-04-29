@@ -3146,8 +3146,10 @@ mod tests {
         assert_brink_success("tests/region_nested.brink", None, None);
     }
     #[test]
+    /// Containment (FLASH1 fully inside FLASH) is allowed.  Previously expected
+    /// EXEC_70; now succeeds because containment is valid for nested sub-regions.
     fn region_nested_2() {
-        assert_brink_failure("tests/region_nested_2.brink", &["[EXEC_70]"]);
+        assert_brink_success("tests/region_nested_2.brink", None, None);
     }
 
     #[test]
@@ -3158,5 +3160,48 @@ mod tests {
     #[test]
     fn region_addr_sizeof() {
         assert_brink_success("tests/region_addr_sizeof.brink", None, None);
+    }
+
+    #[test]
+    /// Partial overlap between two regions is allowed.  Writes within the
+    /// intersection (A & B = [0x1080, 0x1100), 128 bytes) succeed.
+    fn region_exec70_partial() {
+        assert_brink_success("tests/region_exec70_partial.brink", None, None);
+    }
+
+    #[test]
+    /// Inner section in B called from outer in A (partial overlap).
+    /// Writing 192 bytes exceeds intersection size 128 -> EXEC_73.
+    fn region_exec73_partial_overlap() {
+        assert_brink_failure("tests/region_exec73_partial_overlap.brink", &["[EXEC_73]"]);
+    }
+
+    #[test]
+    /// Outer section in FLASH; inner section in CODE (CODE fully inside FLASH).
+    /// Containment is allowed; effective constraint for inner is FLASH & CODE = CODE.
+    fn region_nested_containment() {
+        assert_brink_success("tests/region_nested_containment.brink", None, None);
+    }
+
+    #[test]
+    /// Inner section (no direct binding) inherits FLASH from outer.
+    /// set_addr outside FLASH triggers EXEC_72 via inherited region constraint.
+    fn region_nested_exec72() {
+        assert_brink_failure("tests/region_nested_exec72.brink", &["[EXEC_72]"]);
+    }
+
+    #[test]
+    /// Inner section is bound to SRAM, which is disjoint from outer's FLASH.
+    /// Empty intersection triggers EXEC_77.
+    fn region_nested_exec77() {
+        assert_brink_failure("tests/region_nested_exec77.brink", &["[EXEC_77]"]);
+    }
+
+    #[test]
+    /// Inner section in B called from outer in A. B and A partially overlap but
+    /// B.addr (0x1000) is before A.addr (0x1080), so the section would anchor
+    /// outside the parent region. EXEC_78 must fire.
+    fn region_exec78_bad_start() {
+        assert_brink_failure("tests/region_exec78_bad_start.brink", &["[EXEC_78]"]);
     }
 } // mod tests

@@ -11,15 +11,25 @@ use locationdb::{AddressState, Location, LocationDb};
 // Order of operations: LayoutPhase executes after IRDb generation. LayoutPhase
 // outputs a LocationDb for consumption by MapPhase.
 
+use argvaldb::ParmValDb;
 use diags::Diags;
 use extension_registry::ExtensionRegistry;
-use ir::{ConstBuiltins, DataType, IR, IRKind, ParameterValue};
+use ir::{ConstBuiltins, DataType, IR, IRKind, ParameterValue, RegionBinding};
 use irdb::IRDb;
-use argvaldb::ParmValDb;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
+
+/// The effective region constraint for a section: the geometric intersection of
+/// all ancestor region bindings plus the section's own direct binding.
+/// contributors holds each RegionBinding that narrowed the intersection,
+/// outermost first, for use in EXEC_73 backtrace diagnostics.
+#[derive(Clone)]
+struct EffectiveRegion {
+    binding: RegionBinding,
+    contributors: Vec<RegionBinding>,
+}
 
 /// Tracks address ranges written during the execute phase.
 /// Maps `start_addr -> (end_addr_exclusive, src_loc)`.
@@ -28,6 +38,11 @@ struct ScopeFrame {
     parent_state: AddressState,
     sec_name: String,
     set_addr_seen: bool,
+    /// Effective region constraint for this scope and all descendants.
+    /// None when no region applies to this scope or any ancestor.
+    /// Carries both the geometric intersection (binding) and the list of
+    /// contributing regions (contributors) needed for EXEC_73 backtraces.
+    effective_region: Option<EffectiveRegion>,
 }
 
 pub struct LayoutPhase {
@@ -44,6 +59,15 @@ pub struct LayoutPhase {
     /// deduplicated independently.  Prevents duplicate diagnostics across
     /// iterate passes.
     warned_lids: HashSet<(usize, &'static str)>,
+
+    /// Effective region constraint per section name, populated by
+    /// iterate_section_start on each pass and used by validate_section_regions
+    /// after convergence.  Stores the intersection of all ancestor and direct
+    /// region bindings, which may be tighter than the direct binding alone
+    /// (e.g. when two regions partially overlap).  contributors lists every
+    /// RegionBinding that narrowed the intersection, enabling a backtrace in
+    /// EXEC_73 diagnostics.
+    section_effective_regions: HashMap<String, EffectiveRegion>,
 }
 
 fn get_wrx_byte_width(ir: &IR) -> usize {
@@ -1034,16 +1058,15 @@ impl LayoutPhase {
             ir.operands[2]
         };
 
-        // Check that the target address is within the enclosing region, if any.
+        // Check that the target address is within the effective region constraint,
+        // which is the intersection of all ancestor and direct region bindings.
         if let Some(frame) = self.scope_stack.last()
-            && let Some(binding) = irdb.region_for_section(&frame.sec_name)
+            && let Some(effective) = frame.effective_region.as_ref()
         {
+            let binding = &effective.binding;
             let Some(region_end) = binding.addr.checked_add(binding.size) else {
                 if self.warned_lids.insert((lid, "EXEC_74")) {
-                    let msg = format!(
-                        "Region '{}' addr + size overflows u64.",
-                        binding.name
-                    );
+                    let msg = format!("Region '{}' addr + size overflows u64.", binding.name);
                     diags.err2("EXEC_74", &msg, ir.src_loc.clone(), binding.src_loc.clone());
                 }
                 return false;
@@ -1163,10 +1186,7 @@ impl LayoutPhase {
             }
         }
 
-        let msg = format!(
-            "Section, label, or region '{}' not found in output.",
-            name
-        );
+        let msg = format!("Section, label, or region '{}' not found in output.", name);
         diags.err1("EXEC_11", &msg, ir.src_loc.clone());
         false
     }
@@ -1191,19 +1211,121 @@ impl LayoutPhase {
         }
     }
 
+    /// Compute the intersection of two region bindings.
+    /// Returns Some(intersection) when the regions overlap, None when disjoint.
+    /// The intersection name is "{parent} & {direct}" for diagnostics.
+    fn intersect_regions(parent: &RegionBinding, direct: &RegionBinding) -> Option<RegionBinding> {
+        let addr = parent.addr.max(direct.addr);
+        let end_p = parent.addr.saturating_add(parent.size);
+        let end_d = direct.addr.saturating_add(direct.size);
+        let end = end_p.min(end_d);
+        if end <= addr {
+            return None;
+        }
+        Some(RegionBinding {
+            addr,
+            size: end - addr,
+            name: format!("{} & {}", parent.name, direct.name),
+            src_loc: direct.src_loc.clone(),
+        })
+    }
+
     /// On section entry, save all parent cursor state that the child may modify.
+    /// Computes the effective region_intersection for this scope (EXEC_77 if empty).
+    /// Anchors the address base when the section has a direct region binding.
     fn iterate_section_start(
         &mut self,
         ir: &IR,
         irdb: &IRDb,
-        _diags: &mut Diags,
+        lid: usize,
+        diags: &mut Diags,
         current: &mut Location,
     ) -> bool {
         let sec_name = irdb.get_opnd_as_identifier(ir, 0);
+
+        let parent_effective = self.scope_stack.last().and_then(|f| f.effective_region.as_ref());
+        let direct_binding = irdb.region_for_section(sec_name);
+
+        // Build contributor list: inherit parent's, then append direct binding.
+        let mut contributors: Vec<RegionBinding> = parent_effective
+            .map(|e| e.contributors.clone())
+            .unwrap_or_default();
+        if let Some(d) = direct_binding {
+            contributors.push(d.clone());
+        }
+
+        let mut result = true;
+        let binding = match (parent_effective.map(|e| &e.binding), direct_binding) {
+            (None, None) => None,
+            (Some(p), None) => Some(p.clone()),
+            (None, Some(d)) => Some(d.clone()),
+            (Some(p), Some(d)) => {
+                match Self::intersect_regions(p, d) {
+                    Some(b) => {
+                        // The regions overlap, but the direct region's start may
+                        // still lie before the intersection.  The section must
+                        // anchor to d.addr, so d.addr must be reachable from the
+                        // parent — i.e. d.addr >= b.addr (the intersection start).
+                        if d.addr < b.addr {
+                            if self.warned_lids.insert((lid, "EXEC_78")) {
+                                let msg = format!(
+                                    "Section '{}': region '{}' starts at {:#X}, which is \
+                                     before the enclosing region '{}' start {:#X}. \
+                                     The starting address must lie within the intersection \
+                                     [{:#X}, {:#X}).",
+                                    sec_name,
+                                    d.name,
+                                    d.addr,
+                                    p.name,
+                                    p.addr,
+                                    b.addr,
+                                    b.addr.saturating_add(b.size),
+                                );
+                                diags.err2(
+                                    "EXEC_78",
+                                    &msg,
+                                    d.src_loc.clone(),
+                                    p.src_loc.clone(),
+                                );
+                            }
+                            result = false;
+                        }
+                        Some(b)
+                    }
+                    None => {
+                        if self.warned_lids.insert((lid, "EXEC_77")) {
+                            let msg = format!(
+                                "Section '{}': region '{}' [{:#X}, {:#X}) does not \
+                                 intersect with enclosing region '{}' [{:#X}, {:#X}).",
+                                sec_name,
+                                d.name,
+                                d.addr,
+                                d.addr.saturating_add(d.size),
+                                p.name,
+                                p.addr,
+                                p.addr.saturating_add(p.size),
+                            );
+                            diags.err2("EXEC_77", &msg, d.src_loc.clone(), p.src_loc.clone());
+                        }
+                        result = false;
+                        Some(d.clone()) // fallback keeps address stable across iterations
+                    }
+                }
+            }
+        };
+
+        let effective_region = binding.map(|b| EffectiveRegion { binding: b, contributors });
+
+        // Persist for validate_section_regions (called after iterate converges).
+        if let Some(ref e) = effective_region {
+            self.section_effective_regions.insert(sec_name.to_string(), e.clone());
+        }
+
         self.scope_stack.push(ScopeFrame {
             parent_state: current.addr.clone(),
             sec_name: sec_name.to_string(),
             set_addr_seen: false,
+            effective_region,
         });
         self.trace(format_args!(
             "LayoutPhase::iterate_section_start: section \"{}\", {}",
@@ -1211,14 +1333,15 @@ impl LayoutPhase {
         ));
         current.addr.sec_offset = 0;
 
-        // For region-bound sections, anchor the absolute base address to the
-        // region's starting address and reset the offset to zero.
-        if let Some(binding) = irdb.region_for_section(sec_name) {
-            current.addr.addr_base = binding.addr;
+        // Anchor to the direct region's addr (not the intersection's addr).
+        // Inner sections without a direct binding start wherever the cursor
+        // is inside the parent section.
+        if let Some(d) = direct_binding {
+            current.addr.addr_base = d.addr;
             current.addr.addr_offset = 0;
         }
 
-        true
+        result
     }
 
     /// On section exit, restore parent location state and advance the parent's
@@ -1271,6 +1394,7 @@ impl LayoutPhase {
             ir_locs,
             scope_stack: Vec::new(),
             warned_lids: HashSet::new(),
+            section_effective_regions: HashMap::new(),
         };
         layout_phase.trace(format_args!("LayoutPhase::new"));
 
@@ -1302,30 +1426,68 @@ impl LayoutPhase {
     }
 
     /// After iterate converges, verify each region-bound section fits within
-    /// its region.  Emits EXEC_73 for any section whose byte count exceeds
-    /// the region size.
+    /// its effective region.  Uses the intersection of all ancestor and direct
+    /// region bindings (section_effective_regions) so that writes never escape
+    /// the tighter bound imposed by partially overlapping parent regions.
     fn validate_section_regions(&self, irdb: &IRDb, diags: &mut Diags) -> bool {
         let mut result = true;
         for sec_name in irdb.section_region_names.keys() {
-            let Some(binding) = irdb.region_for_section(sec_name) else { continue; };
             let Some(ir_rng) = irdb.sized_locs.get(sec_name) else {
                 continue;
             };
             let start_loc = &self.ir_locs[ir_rng.start];
             let end_loc = &self.ir_locs[ir_rng.end];
             let sec_size = end_loc.file_offset.saturating_sub(start_loc.file_offset);
+
+            // Prefer the computed effective intersection (may be tighter than the
+            // direct binding when ancestor regions partially overlap).
+            let (binding, contributors): (&RegionBinding, &[RegionBinding]) =
+                if let Some(eff) = self.section_effective_regions.get(sec_name.as_str()) {
+                    (&eff.binding, &eff.contributors)
+                } else if let Some(b) = irdb.region_for_section(sec_name.as_str()) {
+                    (b, std::slice::from_ref(b))
+                } else {
+                    continue;
+                };
+
             if sec_size > binding.size {
                 let excess = sec_size - binding.size;
                 let msg = format!(
-                    "Section '{}' size {} bytes exceeds region '{}' size {} bytes by {} bytes.",
+                    "Section '{}' size {} bytes exceeds region '{}' effective size {} by {} bytes.",
                     sec_name, sec_size, binding.name, binding.size, excess
                 );
-                diags.err2(
-                    "EXEC_73",
-                    &msg,
-                    irdb.ir_vec[ir_rng.start].src_loc.clone(),
-                    binding.src_loc.clone(),
-                );
+                if !contributors.is_empty() {
+                    // Emit one yellow label per contributing region so the user
+                    // sees exactly which regions combined to produce the tighter
+                    // bound.  Each label includes addr and size because ariadne
+                    // points to the 'region NAME {' declaration line, not the
+                    // property values.
+                    let secondaries: Vec<(diags::SourceSpan, String)> = contributors
+                        .iter()
+                        .map(|c| {
+                            (
+                                c.src_loc.clone(),
+                                format!(
+                                    "region '{}': addr={:#X}, size={}",
+                                    c.name, c.addr, c.size
+                                ),
+                            )
+                        })
+                        .collect();
+                    diags.err_with_locs(
+                        "EXEC_73",
+                        &msg,
+                        irdb.ir_vec[ir_rng.start].src_loc.clone(),
+                        &secondaries,
+                    );
+                } else {
+                    diags.err2(
+                        "EXEC_73",
+                        &msg,
+                        irdb.ir_vec[ir_rng.start].src_loc.clone(),
+                        binding.src_loc.clone(),
+                    );
+                }
                 result = false;
             }
         }
@@ -1422,7 +1584,7 @@ impl LayoutPhase {
                     }
                     IRKind::Wrs => self.iterate_wrs(ir, irdb, diags, &mut current),
                     IRKind::SectionStart => {
-                        let ok = self.iterate_section_start(ir, irdb, diags, &mut current);
+                        let ok = self.iterate_section_start(ir, irdb, lid, diags, &mut current);
                         // Re-record after iterate_section_start so that addr(section_name)
                         // reflects the anchored address, not the pre-entry address.
                         self.ir_locs[lid] = current.clone();

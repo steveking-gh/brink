@@ -1,0 +1,21 @@
+// region_exec70_partial.brink: partial overlap between two regions is allowed.
+// When inner (in B) is called from outer (in A), the effective region is the
+// intersection A & B ([0x1080, 0x1100), size = 128).  Writes within the
+// intersection succeed.
+region A {
+    addr = 0x1000;
+    size = 0x100;
+}
+region B {
+    addr = 0x1080;
+    size = 0x100;
+}
+section outer in A {
+    wr inner;
+}
+section inner in B {
+    wr8 0, 128;
+}
+assert addr(inner) == 0x1080;
+assert sizeof(inner) == 128;
+output outer;

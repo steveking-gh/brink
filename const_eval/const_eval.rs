@@ -1069,46 +1069,15 @@ pub fn evaluate_regions<'toks>(
         bindings.insert(name.clone(), binding);
     }
 
-    // Detect overlapping regions (EXEC_70).  Skip zero-size regions.
-    // Pre-compute exclusive end addresses; EXEC_75 if addr+size overflows u64.
-    let region_list: Vec<(&str, &RegionBinding)> =
-        bindings.iter().map(|(n, b)| (n.as_str(), b)).collect();
-    let mut region_ends: Vec<Option<u64>> = Vec::with_capacity(region_list.len());
-    for (name, binding) in &region_list {
-        if binding.size == 0 {
-            region_ends.push(None);
-        } else {
-            match binding.addr.checked_add(binding.size) {
-                Some(end) => region_ends.push(Some(end)),
-                None => {
-                    let msg = format!(
-                        "Region '{}' addr {:#X} + size {:#X} overflows u64.",
-                        name, binding.addr, binding.size
-                    );
-                    diags.err1("EXEC_75", &msg, binding.src_loc.clone());
-                    ok = false;
-                    region_ends.push(None);
-                }
-            }
-        }
-    }
-    for i in 0..region_list.len() {
-        let Some(end_a) = region_ends[i] else { continue; };
-        for j in (i + 1)..region_list.len() {
-            let Some(end_b) = region_ends[j] else { continue; };
-            let (_, binding_a) = region_list[i];
-            let (_, binding_b) = region_list[j];
-            if binding_a.addr < end_b && binding_b.addr < end_a {
+    // Validate each region's addr+size does not overflow u64.
+    for (name, binding) in &bindings {
+        if binding.size > 0 {
+            if binding.addr.checked_add(binding.size).is_none() {
                 let msg = format!(
-                    "Region '{}' [{:#X}, {:#X}) overlaps region '{}' [{:#X}, {:#X}).",
-                    binding_a.name, binding_a.addr, end_a,
-                    binding_b.name, binding_b.addr, end_b
+                    "Region '{}' addr {:#X} + size {:#X} overflows u64.",
+                    name, binding.addr, binding.size
                 );
-                diags.err2(
-                    "EXEC_70", &msg,
-                    binding_a.src_loc.clone(),
-                    binding_b.src_loc.clone(),
-                );
+                diags.err1("EXEC_75", &msg, binding.src_loc.clone());
                 ok = false;
             }
         }

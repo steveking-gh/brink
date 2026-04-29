@@ -1,0 +1,18 @@
+// region_nested_exec77.brink: inner section is bound to SRAM, which is disjoint
+// from the outer section's FLASH region.  When inner is called from outer the
+// effective region intersection is empty -> EXEC_77.
+region FLASH {
+    addr = 0x08000000;
+    size = 0x10000;
+}
+region SRAM {
+    addr = 0x20000000;
+    size = 0x10000;
+}
+section outer in FLASH {
+    wr inner;
+}
+section inner in SRAM {
+    wr8 0x00;
+}
+output outer;

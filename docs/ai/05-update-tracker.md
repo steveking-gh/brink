@@ -548,3 +548,135 @@ Changes:
   - EXEC_74 upgraded to `err2`; message includes region name; second label at declaration.
 
 347 tests pass.
+
+---
+
+## 2026-04-28 — Nested region support (region_intersection + EXEC_77)
+
+**EXEC_70 relaxed for containment**
+`evaluate_regions` in `const_eval.rs` previously rejected any two regions that
+shared any address range, including containment (A fully inside B).  The check
+now detects only *partial* overlap (ranges overlap but neither contains the other).
+Containment is allowed so that inner sections can bind to sub-regions of an outer
+region without triggering EXEC_70.
+
+**region_intersection on ScopeFrame**
+`layout_phase.rs` gains `region_intersection: Option<RegionBinding>` on `ScopeFrame`.
+At each `SectionStart`, the effective constraint is computed as the intersection
+of the parent frame's `region_intersection` and the current section's direct
+region binding (from `irdb.region_for_section`):
+
+- No constraints: `None` (no enforcement).
+- Parent only or direct only: inherit as-is.
+- Both: compute geometric intersection -- `addr = max`, `end = min(ends)`.
+  - Non-empty: `Some(intersection)` with name `"{parent} & {direct}"`.
+  - Empty (disjoint): emit EXEC_77, fall back to direct binding.
+
+`iterate_set_addr` now reads `frame.region_intersection` instead of calling
+`irdb.region_for_section`.  This means inner sections without a direct binding
+still get EXEC_72 enforcement from the inherited parent region.
+
+`intersect_regions` static helper added to `LayoutPhase`.
+
+**New error code EXEC_77**
+EXEC_77: section's direct region binding does not intersect the enclosing
+region inherited from the parent scope (mutually exclusive regions in nested
+sections).  Emitted in `iterate_section_start` via `warned_lids` deduplication.
+
+Tests:
+
+- `region_exec70_partial.brink`: two partially-overlapping regions (A straddles B)
+  still trigger EXEC_70. Integration test `region_exec70_partial`.
+- `region_nested_2.brink`: comment updated; test changed from failure (EXEC_70) to
+  success -- FLASH1 fully inside FLASH is valid containment.
+- `region_nested_containment.brink`: outer in FLASH, inner (called via `wr`) in CODE
+  where CODE is a subset of FLASH; both fit; no errors. Integration test
+  `region_nested_containment`.
+- `region_nested_exec72.brink`: inner section (no direct binding) inherits FLASH
+  from outer; `set_addr` outside FLASH triggers EXEC_72. Integration test
+  `region_nested_exec72`.
+- `region_nested_exec77.brink`: inner bound to SRAM (disjoint from outer's FLASH);
+  EXEC_77 fires. Integration test `region_nested_exec77`.
+
+352 tests pass.
+
+---
+
+## 2026-04-28 — Allow partial region overlap; intersection-based EXEC_73
+
+**EXEC_70 retired**
+The compile-time region overlap check (EXEC_70) is removed entirely.  Any two
+regions may share address space -- containment, partial overlap, or identical
+ranges are all valid.  Enforcement that writes stay within the effective
+intersection is handled at layout time by the `section_effective_regions` map
+and `validate_section_regions`.
+
+**section_effective_regions on LayoutPhase**
+`LayoutPhase` gains `section_effective_regions: HashMap<String, RegionBinding>`.
+`iterate_section_start` writes the converged `region_intersection` into this map
+on every iterate pass; the final pass holds the post-convergence value.
+
+`validate_section_regions` now prefers `section_effective_regions[sec]` over the
+raw `irdb.region_for_section()` lookup.  When two regions partially overlap, the
+stored intersection is tighter than the direct binding, so EXEC_73 fires if the
+section's byte count exceeds the intersection size rather than the (wider) direct
+binding size.
+
+Tests:
+
+- `region_exec70_partial.brink` repurposed: outer in A, inner in B (partial
+  overlap A & B = 128 bytes); inner writes exactly 128 bytes -- succeeds.
+  Integration test `region_exec70_partial` changed from failure to success.
+- `region_exec73_partial_overlap.brink`: same regions, inner writes 192 bytes;
+  exceeds intersection 128 -> EXEC_73.  Integration test `region_exec73_partial_overlap`.
+
+353 tests pass.
+
+---
+
+## 2026-04-28 — EffectiveRegion backtrace + EXEC_78 starting-address check
+
+**EffectiveRegion struct**
+Replaced the ad-hoc `region_intersection: Option<RegionBinding>` + separate
+`region_contributors: Vec<RegionBinding>` fields on `ScopeFrame` with a single
+`effective_region: Option<EffectiveRegion>` field.  `EffectiveRegion` carries:
+
+- `binding: RegionBinding` — the geometric intersection (used for EXEC_72/73/74
+  enforcement, unchanged).
+- `contributors: Vec<RegionBinding>` — every region that narrowed the bound,
+  outermost first, for use in EXEC_73 backtrace diagnostics.
+
+`section_effective_regions: HashMap<String, EffectiveRegion>` (was
+`HashMap<String, RegionBinding>`) persists the converged value for
+`validate_section_regions`.
+
+**EXEC_73 backtrace via err_with_locs**
+`diags::Diags` gains `err_with_locs(code, msg, primary, &[(SourceSpan, String)])`:
+builds an ariadne report with one red primary label and N yellow secondary labels,
+each carrying its own `.with_message(text)`.  When EXEC_73 fires and
+`contributors.len() > 0`, one yellow label per contributing region is emitted,
+each annotated with `"region 'X': addr=0x…, size=…"`.  The addr/size text is
+necessary because ariadne shows only the `region NAME {` declaration line, not
+the property values.
+
+**Anchor fix (README consistency)**
+`iterate_section_start` previously anchored `addr_base` to `intersection.addr`
+(the effective intersection start).  The README states that a section `in R`
+always starts at `R.addr`.  Anchor changed to `d.addr` (direct region's addr).
+
+**EXEC_78 — starting address outside parent intersection**
+When a section has both a parent inherited region and a direct binding, and the
+intersection is non-empty but `d.addr < intersection.addr` (the direct region
+starts before the parent region), EXEC_78 fires.  This covers the case where
+the anchor `d.addr` would lie outside the effective parent constraint.  Emitted
+via `err2` with both region declaration sites highlighted.
+
+New error code: EXEC_78.
+
+Tests:
+
+- `region_exec78_bad_start.brink`: A=[0x1080,0x100), B=[0x1000,0x200); B starts
+  before A; intersection non-empty but B.addr (0x1000) < intersection start
+  (0x1080); EXEC_78 fires.  Integration test `region_exec78_bad_start`.
+
+354 tests pass.
