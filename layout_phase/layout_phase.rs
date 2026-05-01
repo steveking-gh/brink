@@ -1042,18 +1042,17 @@ impl LayoutPhase {
         // which is the intersection of all ancestor and direct region bindings.
         if let Some(frame) = self.scope_stack.last()
             && let Some(effective) = frame.effective_region.as_ref()
+            && !effective.contains_addr(set_val)
         {
-            if !effective.contains_addr(set_val) {
-                if self.warned_lids.insert((lid, "EXEC_72")) {
-                    let b = &effective.effective_region;
-                    let msg = format!(
-                        "set_addr target {:#X} is outside region '{}' bounds [{:#X}, {:#X}).",
-                        set_val, b.name, b.addr, b.addr + b.size
-                    );
-                    diags.err2("EXEC_72", &msg, ir.src_loc.clone(), b.src_loc.clone());
-                }
-                return false;
+            if self.warned_lids.insert((lid, "EXEC_72")) {
+                let b = &effective.effective_region;
+                let msg = format!(
+                    "set_addr target {:#X} is outside region '{}' bounds [{:#X}, {:#X}).",
+                    set_val, b.name, b.addr, b.addr + b.size
+                );
+                diags.err2("EXEC_72", &msg, ir.src_loc.clone(), b.src_loc.clone());
             }
+            return false;
         }
 
         // Record that set_addr was called mid-section if sec_offset is non-zero.
