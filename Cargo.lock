@@ -111,6 +111,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "astdb"
+version = "6.1.1"
+dependencies = [
+ "anyhow",
+ "ast",
+ "depth_guard",
+ "diags",
+ "indextree",
+ "tracing",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -226,6 +238,7 @@ version = "6.1.1"
 dependencies = [
  "anyhow",
  "ast",
+ "astdb",
  "depth_guard",
  "diags",
  "indextree",
@@ -485,6 +498,7 @@ version = "6.1.1"
 dependencies = [
  "anyhow",
  "ast",
+ "astdb",
  "depth_guard",
  "diags",
  "indextree",
@@ -707,6 +721,7 @@ dependencies = [
  "anyhow",
  "argvaldb",
  "ast",
+ "astdb",
  "const_eval",
  "diags",
  "exec_phase",

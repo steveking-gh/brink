@@ -31,16 +31,84 @@ pub struct RegionBinding {
     pub src_loc: SourceSpan,
 }
 
-/// The effective region constraint for a section: the geometric intersection
-/// of all ancestor region bindings plus the section's own direct binding.
-/// contributors holds each RegionBinding that narrowed the intersection,
+impl RegionBinding {
+    /// Returns the intersection of self and other, or None when disjoint.
+    /// The intersection name is "{self} & {other}" for diagnostics.
+    pub fn intersect(&self, other: &RegionBinding) -> Option<RegionBinding> {
+        let addr = self.addr.max(other.addr);
+        // No overflow, bare addition is safe.
+        let end = (self.addr + self.size).min(other.addr + other.size);
+        if end <= addr {
+            return None;
+        }
+        Some(RegionBinding {
+            addr,
+            size: end - addr,
+            name: format!("{} & {}", self.name, other.name),
+            src_loc: other.src_loc.clone(),
+        })
+    }
+}
+
+/// The effective region constraint for a section: the geometric intersection of
+/// all ancestor region bindings plus the section's own direct binding.
+/// region_stack holds each RegionBinding that narrowed the intersection,
 /// outermost first, for use in EXEC_73 backtrace diagnostics.
 #[derive(Clone, Debug)]
 pub struct EffectiveRegion {
-    /// Geometric intersection of all applicable regions.
-    pub binding: RegionBinding,
+    /// Intersection of all regions in the region stack..
+    pub effective_region: RegionBinding,
     /// All applicable regions, outermost first.
-    pub contributors: Vec<RegionBinding>,
+    pub region_stack: Vec<RegionBinding>,
+}
+
+impl EffectiveRegion {
+    /// Returns true when addr falls within [effective_region.addr,
+    /// effective_region.addr + size). No overflow: RegionDb validates addr +
+    /// size before constructing EffectiveRegion.
+    pub fn contains_addr(&self, addr: u64) -> bool {
+        let b = &self.effective_region;
+        addr >= b.addr && addr < b.addr + b.size
+    }
+
+    /// Returns true when sec_size fits within the effective region. On failure,
+    /// emits an error with per-contributor labels when region_stack is
+    /// non-empty, or a two-location error otherwise.
+    pub fn check_section_fits(
+        &self,
+        sec_name: &str,
+        sec_size: u64,
+        use_src_loc: SourceSpan,
+        diags: &mut Diags,
+    ) -> bool {
+        let b = &self.effective_region;
+        if sec_size <= b.size {
+            return true;
+        }
+        let excess = sec_size - b.size;
+        let msg = format!(
+            "Section '{}' size {} bytes exceeds region '{}' effective size {} by {} bytes.",
+            sec_name, sec_size, b.name, b.size, excess
+        );
+        let secondaries: Vec<(SourceSpan, String)> = if !self.region_stack.is_empty() {
+            self.region_stack
+                .iter()
+                .map(|c| {
+                    (
+                        c.src_loc.clone(),
+                        format!("region '{}': addr={:#X}, size={}", c.name, c.addr, c.size),
+                    )
+                })
+                .collect()
+        } else {
+            vec![(
+                b.src_loc.clone(),
+                format!("region '{}': addr={:#X}, size={}", b.name, b.addr, b.size),
+            )]
+        };
+        diags.err_with_locs("EXEC_73", &msg, use_src_loc, &secondaries);
+        false
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

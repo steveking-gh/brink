@@ -22,7 +22,9 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   exec phases.
 - INTERNAL: Refactor parameter values into their own module.
 - INTERNAL: Refactor validation as a dedicated phase.
+- INTERNAL: Refactor region info into a RegionDb library
 - BUG FIX: Fixed bad string conversion assert in verbose output
+- BUG FIX: Fixed check for duplicate error codes and eliminated a few duplicates
 
 ## [6.1.1] - 2026-04-20
 

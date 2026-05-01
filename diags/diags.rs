@@ -69,6 +69,14 @@ impl Diags {
         self.print_report(report);
     }
 
+    /// Writes a warning, with a source location when one is available.
+    pub fn warn_opt(&self, code: &str, msg: &str, loc: Option<SourceSpan>) {
+        match loc {
+            Some(l) => self.warn1(code, msg, l),
+            None => self.warn(code, msg),
+        }
+    }
+
     /// Writes a warning to the terminal with a primary source location.
     pub fn warn1(&self, code: &str, msg: &str, loc: SourceSpan) {
         if self.verbosity == 0 {

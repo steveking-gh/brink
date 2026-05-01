@@ -1,24 +1,21 @@
 // Lexer, parser and abstract syntax tree (AST) for brink.
 //
-// This is the first stage of the compiler pipeline.  The logos-generated
-// lexer converts the raw source text into a flat token stream (LexToken).
-// The recursive-descent / Pratt-expression parser then consumes that stream
-// and builds an indextree arena-based AST, where each node holds a TokenInfo
-// that records the token kind, its string value, and its byte-offset span in
-// the source file.  A second pass, AstDb, validates global constraints such as
-// unique section names and resolves cross-section references.
+// This is the first stage of the compiler pipeline.  The lexer converts the raw
+// source text into a flat token stream (LexToken). The recursive-descent /
+// Pratt-expression parser then consumes that stream and builds an arena-based
+// AST.  In the AST, each node holds a TokenInfo that records the token kind,
+// its string value, and its byte-offset span in the source file.
 //
-// Order of operations: ast runs immediately after the source file is read.
-// Its output — an Ast and an AstDb — is consumed by lineardb in the next
-// stage.
+// The astdb crate consumes the AST output and builds required lookup structures
+// for later compiler phases.
 
 mod lexer;
 use lexer::Lexer;
 
-use anyhow::{Context, bail};
+use anyhow::Context;
 use diags::{Diags, SourceSpan};
 use indextree::{Arena, NodeId};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
 
@@ -129,17 +126,23 @@ pub enum LexToken {
 ///
 /// Reserved prefixes:
 ///   - "wr" + digit  — write instructions (wr8, wr16, wr32, etc)
-///   - "set_"        — configuration directives (set_sec_offset, set_addr, etc)
-///   - "__"          — leading double underscore names refer to builtin identifiers
+///   - "set_"        — configuration directives (set_addr, set_sec_offset, etc)
+///   - "__"          — builtin identifiers (__output_size, __output_addr, etc)
 ///
 /// Reserved exact keywords:
-///   - "wrs" / "wrf"              — write-string and write-file commands
-///   - "include" / "import"       — file or module inclusion
-///   - "if" / "else"              — conditional section inclusion
+///   - "wr" / "wrs" / "wrf"       — write commands
+///   - "section" / "output"       — structural declarations
+///   - "const" / "region" / "in"  — structural declarations
+///   - "align"                    — alignment directive
+///   - "assert"                   — assertion
+///   - "sizeof" / "addr"          — address and size expressions
+///   - "addr_offset" / "sec_offset" / "file_offset" — offset expressions
+///   - "print"                    — debug output
+///   - "to_u64" / "to_i64"        — type conversion
+///   - "include" / "import"       — file inclusion
+///   - "if" / "else"              — conditional inclusion
 ///   - "true" / "false"           — boolean literals
-///   - "extern"                   — external section references
-///   - "let"                      — future variable declarations
-///   - "fill"                     — fill/pad byte ranges
+///   - "extern" / "let" / "fill"  — reserved for future use
 pub fn is_reserved_identifier(name: &str) -> bool {
     // "wr" followed by at least one digit reserves the numeric write variants.
     if let Some(rest) = name.strip_prefix("wr")
@@ -152,10 +155,26 @@ pub fn is_reserved_identifier(name: &str) -> bool {
     }
     matches!(
         name,
-        "wrs"
+        "wr"
+            | "wrs"
             | "wrf"
-            | "import"
+            | "section"
+            | "output"
+            | "const"
+            | "region"
+            | "in"
+            | "align"
+            | "assert"
+            | "sizeof"
+            | "addr"
+            | "addr_offset"
+            | "sec_offset"
+            | "file_offset"
+            | "print"
+            | "to_u64"
+            | "to_i64"
             | "include"
+            | "import"
             | "if"
             | "else"
             | "true"
@@ -163,8 +182,6 @@ pub fn is_reserved_identifier(name: &str) -> bool {
             | "extern"
             | "let"
             | "fill"
-            | "region"
-            | "in"
     )
 }
 
@@ -2242,542 +2259,3 @@ impl<'toks> Ast<'toks> {
     }
 }
 
-/*******************************
- * Section
- ******************************/
-#[derive(Debug)]
-pub struct Section<'toks> {
-    pub tinfo: &'toks TokenInfo<'toks>,
-    pub nid: NodeId,
-    /// Region name from an `in REGION` binding, if present.
-    pub region: Option<String>,
-}
-
-impl<'toks> Section<'toks> {
-    pub fn new(ast: &'toks Ast, nid: NodeId) -> Section<'toks> {
-        // Second child is RegionRef when `section NAME in REGION` was parsed.
-        let region = {
-            let mut children = nid.children(&ast.arena);
-            let _name = children.next(); // skip section name (first child)
-            children.next().and_then(|child_nid| {
-                let ti = ast.get_tinfo(child_nid);
-                if ti.tok == LexToken::RegionRef {
-                    Some(ti.val.to_string())
-                } else {
-                    None
-                }
-            })
-        };
-        Section {
-            tinfo: ast.get_tinfo(nid),
-            nid,
-            region,
-        }
-    }
-}
-
-/*******************************
- * Label
- ******************************/
-#[derive(Debug)]
-pub struct Label {
-    pub nid: NodeId,
-
-    /// Location in source code of the label
-    pub loc: SourceSpan,
-}
-
-/*******************************
- * Output
- ******************************/
-#[derive(Clone, Debug)]
-pub struct Output<'toks> {
-    pub tinfo: &'toks TokenInfo<'toks>,
-    pub nid: NodeId,
-    pub sec_nid: NodeId,
-}
-
-impl<'toks> Output<'toks> {
-    /// Create an new output object
-    pub fn new(ast: &'toks Ast, nid: NodeId) -> Output<'toks> {
-        let mut children = nid.children(&ast.arena);
-        // the section name is the first child of the output
-        // AST processing guarantees this exists.
-        let sec_nid = children.next().unwrap();
-        Output {
-            tinfo: ast.get_tinfo(nid),
-            nid,
-            sec_nid,
-        }
-    }
-}
-
-/*******************************
- * Region
- ******************************/
-/// AST-phase record of a region declaration.
-/// Holds the parse-tree position and source location; evaluated properties
-/// (addr, size) are produced by const_eval::evaluate_regions.
-#[derive(Clone, Debug)]
-pub struct Region {
-    /// AST node ID of the region root; used by const_eval to find properties.
-    pub nid: NodeId,
-    /// Source location of the region keyword, for diagnostics.
-    pub src_loc: SourceSpan,
-}
-
-impl Region {
-    pub fn new(nid: NodeId, src_loc: SourceSpan) -> Self {
-        Region { nid, src_loc }
-    }
-}
-
-/*****************************************************************************
- * AstDb
- * The AstDb contains a info for various items in the AST.
- * After construction, we never mutate this database.
- * The key is the AST NodeID, the value is the TokenInfo object.
- *****************************************************************************/
-pub struct AstDb<'toks> {
-    pub sections: HashMap<&'toks str, Section<'toks>>,
-    pub labels: HashMap<&'toks str, Label>,
-    pub output: Output<'toks>,
-    pub global_asserts: Vec<NodeId>,
-    /// All top-level const definitions, const declarations, and if/else blocks
-    /// in their original source token order.
-    pub const_statements: Vec<NodeId>,
-    /// Set of all const names for collision detection.
-    pub const_names: HashMap<&'toks str, SourceSpan>,
-    /// All region declarations, keyed by name, in encounter order.
-    pub regions: HashMap<String, Region>,
-}
-
-impl<'toks> AstDb<'toks> {
-    /// Records a region declaration into the regions map.
-    /// Checks for reserved identifier use (AST_61) and duplicate names (AST_60).
-    fn record_region(
-        diags: &mut Diags,
-        reg_nid: NodeId,
-        ast: &'toks Ast,
-        regions: &mut HashMap<String, Region>,
-    ) -> bool {
-        debug!("AstDb::record_region: NodeId {}", reg_nid);
-
-        let mut children = reg_nid.children(&ast.arena);
-        let name_nid = children.next().unwrap();
-        let name_tinfo = ast.get_tinfo(name_nid);
-        let name_str = name_tinfo.val;
-
-        if is_reserved_identifier(name_str) {
-            let m = format!(
-                "'{}' is a reserved identifier and cannot be used as a region name",
-                name_str
-            );
-            diags.err1("AST_61", &m, name_tinfo.span());
-            return false;
-        }
-        if let Some(existing) = regions.get(name_str) {
-            let m = format!("Duplicate region name '{}'", name_str);
-            diags.err2("AST_60", &m, name_tinfo.span(), existing.src_loc.clone());
-            return false;
-        }
-
-        let entry = Region::new(reg_nid, name_tinfo.span());
-        regions.insert(name_str.to_string(), entry);
-        true
-    }
-
-    /// Processes a section in the AST
-    /// All section names are also label names
-    fn record_section(
-        diags: &mut Diags,
-        sec_nid: NodeId,
-        ast: &'toks Ast,
-        sections: &mut HashMap<&'toks str, Section<'toks>>,
-    ) -> bool {
-        debug!("AstDb::record_section: NodeId {}", sec_nid);
-
-        let mut children = sec_nid.children(&ast.arena);
-        let sec_name_nid = children.next().unwrap();
-        let sec_tinfo = ast.get_tinfo(sec_name_nid);
-        let sec_str = sec_tinfo.val;
-        if is_reserved_identifier(sec_str) {
-            let m = format!(
-                "'{}' is a reserved identifier and cannot be used as a section name",
-                sec_str
-            );
-            diags.err1("AST_32", &m, sec_tinfo.span());
-            return false;
-        }
-        if sections.contains_key(sec_str) {
-            // error, duplicate section names
-            // We know the section exists, so unwrap is fine.
-            let orig_section = sections.get(sec_str).unwrap();
-            let orig_tinfo = orig_section.tinfo;
-            let m = format!("Duplicate section name '{}'", sec_str);
-            diags.err2("AST_29", &m, sec_tinfo.span(), orig_tinfo.span());
-            return false;
-        }
-        sections.insert(sec_str, Section::new(ast, sec_nid));
-        true
-    }
-
-    /// Records a const identifier in the AST.
-    /// Checks for duplicate names and reserved words.
-    fn record_const(
-        diags: &mut Diags,
-        const_nid: NodeId,
-        ast: &'toks Ast,
-        consts: &mut HashMap<&'toks str, SourceSpan>,
-    ) -> bool {
-        debug!("AstDb::record_const: NodeId {}", const_nid);
-
-        let mut children = const_nid.children(&ast.arena);
-        let const_name_nid = children.next().unwrap();
-        let const_tinfo = ast.get_tinfo(const_name_nid);
-        let const_str = const_tinfo.val;
-        if is_reserved_identifier(const_str) {
-            let m = format!(
-                "'{}' is a reserved identifier and cannot be used as a const name",
-                const_str
-            );
-            diags.err1("AST_33", &m, const_tinfo.span());
-            return false;
-        }
-        if let Some(orig_span) = consts.get(const_str) {
-            let m = format!("Duplicate const name '{}'", const_str);
-            diags.err2("AST_30", &m, const_tinfo.span(), orig_span.clone());
-            return false;
-        }
-        consts.insert(const_str, const_tinfo.span());
-        true
-    }
-
-    /// Returns true if the specified child of the specified node is a section
-    /// name that exists.  Otherwise, prints a diagnostic and returns false.
-    fn validate_section_name(
-        &self,
-        child_num: usize,
-        parent_nid: NodeId,
-        ast: &'toks Ast,
-        diags: &mut Diags,
-    ) -> bool {
-        debug!(
-            "AstDb::validate_section_name: NodeId {} for child {}",
-            parent_nid, child_num
-        );
-
-        let mut children = parent_nid.children(&ast.arena);
-
-        // First, advance to the specified child number
-        let mut num = 0;
-        while num < child_num {
-            let sec_name_nid_opt = children.next();
-            if sec_name_nid_opt.is_none() {
-                // error, not enough children to reach section name
-                let m = "Missing section name".to_string();
-                let section_tinfo = ast.get_tinfo(parent_nid);
-                diags.err1("AST_23", &m, section_tinfo.span());
-                return false;
-            }
-            num += 1;
-        }
-        let Some(sec_name_nid) = children.next() else {
-            // error, specified section does not exist
-            let m = "Missing section name".to_string();
-            let section_tinfo = ast.get_tinfo(parent_nid);
-            diags.err1("AST_11", &m, section_tinfo.span());
-            return false;
-        };
-        let sec_tinfo = ast.get_tinfo(sec_name_nid);
-        let sec_str = sec_tinfo.val;
-        if !self.sections.contains_key(sec_str) {
-            // error, specified section does not exist
-            let m = format!("Unknown or unreachable section name '{}'", sec_str);
-            diags.err1("AST_16", &m, sec_tinfo.span());
-            return false;
-        }
-        true
-    }
-
-    pub fn record_output(
-        diags: &mut Diags,
-        nid: NodeId,
-        ast: &'toks Ast,
-        output: &mut Option<Output<'toks>>,
-    ) -> bool {
-        let tinfo = ast.get_tinfo(nid);
-        if output.is_some() {
-            let m = "Multiple output statements are not allowed.";
-            let orig_tinfo = output.as_ref().unwrap().tinfo;
-            diags.err2("AST_10", m, orig_tinfo.span(), tinfo.span());
-            return false;
-        }
-
-        *output = Some(Output::new(ast, nid));
-        true // succeed
-    }
-
-    /// Recursively validate the basic hierarchy of the AST object.
-    /// Nested sections tracks the current hierarchy of section writes so we
-    /// catch cycles.
-    fn validate_nesting_r(
-        &mut self,
-        parent_nid: NodeId,
-        ast: &'toks Ast,
-        nested_sections: &mut HashSet<&'toks str>,
-        diags: &mut Diags,
-    ) -> bool {
-        debug!(
-            "AstDb::validate_nesting_r: ENTER for parent nid: {}",
-            parent_nid
-        );
-
-        let Some(_guard) = DepthGuard::enter(MAX_RECURSION_DEPTH) else {
-            let tinfo = ast.get_tinfo(parent_nid);
-            let m = format!(
-                "Maximum recursion depth ({MAX_RECURSION_DEPTH}) exceeded when processing '{}'.",
-                tinfo.val
-            );
-            diags.err1("AST_5", &m, tinfo.span());
-            return false;
-        };
-
-        let mut result = true;
-        let tinfo = ast.get_tinfo(parent_nid);
-        result &= match tinfo.tok {
-            // Wr statement must specify a valid section name
-            LexToken::Wr => {
-                let mut children = parent_nid.children(&ast.arena);
-                // the section name is the first child of the output
-                // AST processing guarantees this exists.
-                let sec_nid = children.next().unwrap();
-                let sec_tinfo = ast.get_tinfo(sec_nid);
-
-                if sec_tinfo.tok == LexToken::Identifier && !ast.has_children(sec_nid) {
-                    if !self.validate_section_name(0, parent_nid, ast, diags) {
-                        return false;
-                    }
-
-                    let sec_str = sec_tinfo.val;
-
-                    // Make sure we haven't already recursed through this section.
-                    if nested_sections.contains(sec_str) {
-                        let m = "Writing section creates a cycle.";
-                        diags.err1("AST_6", m, sec_tinfo.span());
-                        false
-                    } else {
-                        // add this section to our nested sections tracker
-                        nested_sections.insert(sec_str);
-                        let section = self.sections.get(sec_str).unwrap();
-                        let children = section.nid.children(&ast.arena);
-                        for nid in children {
-                            result &= self.validate_nesting_r(nid, ast, nested_sections, diags);
-                        }
-                        // We're done with the section, so remove it from the nesting hash.
-                        nested_sections.remove(sec_str);
-                        result
-                    }
-                } else {
-                    true
-                }
-            }
-            _ => {
-                // When no children exist, this case terminates recursion.
-                let children = parent_nid.children(&ast.arena);
-                for nid in children {
-                    result &= self.validate_nesting_r(nid, ast, nested_sections, diags);
-                }
-                result
-            }
-        };
-
-        debug!(
-            "AstDb::validate_nesting_r: EXIT({}) for nid: {}",
-            result, parent_nid
-        );
-        result
-    }
-
-    /// Build an `AstDb` from `ast`.
-    ///
-    /// When `validate` is `true` (the normal post-prune call), the output section's
-    /// full nesting tree is walked to catch circular references and unknown `wr`
-    /// targets.  When `false` (the pre-prune call used only for `const_eval`), that
-    /// walk is skipped so that `wr` references to sections defined inside top-level
-    /// `if` blocks do not produce false-positive errors before those blocks are pruned.
-    pub fn new(diags: &mut Diags, ast: &'toks Ast, validate: bool) -> anyhow::Result<AstDb<'toks>> {
-        debug!("AstDb::new");
-
-        // Populate the AST database of critical structures.
-        let mut result = true;
-
-        // All sections, mapping section name to AST node.
-        let mut sections: HashMap<&'toks str, Section<'toks>> = HashMap::new();
-        // The single required output statement.
-        let mut output: Option<Output<'toks>> = None;
-        // All top-level assert statements.
-        let mut global_asserts: Vec<NodeId> = Vec::new();
-        // All const declarations and conditional blocks in source code order.
-        let mut const_statements: Vec<NodeId> = Vec::new();
-        // All declared const names and their locations for duplicate detection.
-        let mut const_names: HashMap<&'toks str, SourceSpan> = HashMap::new();
-        // All region declarations, keyed by name.
-        let mut regions: HashMap<String, Region> = HashMap::new();
-
-        // First phase, record all sections, files, and the output.
-        // These are defined only at top level so no need for recursion.
-        for nid in ast.root.children(&ast.arena) {
-            let tinfo = ast.get_tinfo(nid);
-            result = result
-                && match tinfo.tok {
-                    LexToken::Section => Self::record_section(diags, nid, ast, &mut sections),
-                    LexToken::Region => Self::record_region(diags, nid, ast, &mut regions),
-                    LexToken::Output => Self::record_output(diags, nid, ast, &mut output),
-                    LexToken::Const => {
-                        const_statements.push(nid);
-                        Self::record_const(diags, nid, ast, &mut const_names)
-                    }
-                    LexToken::If => {
-                        // We evaluate if statements a const-time, so expect
-                        // only const-compatible statements inside.
-                        const_statements.push(nid);
-                        true
-                    }
-                    LexToken::Eq => {
-                        const_statements.push(nid);
-                        true
-                    }
-                    // Global asserts are collected here and linearized later.
-                    // They have no name to record in any map.
-                    LexToken::Assert => {
-                        global_asserts.push(nid);
-                        true
-                    }
-                    _ => {
-                        let msg = format!("Invalid top-level expression {}", tinfo.val);
-                        diags.err1("AST_24", &msg, tinfo.span().clone());
-                        diags.note0(
-                            "AST_25",
-                            "At top-level, allowed expressions are 'section' and 'output'",
-                        );
-                        false
-                    }
-                };
-        }
-
-        if !result {
-            bail!("AST construction failed");
-        }
-
-        // Make sure we found an output!
-        let Some(output) = output else {
-            diags.err0("AST_8", "Missing output statement");
-            bail!("AST construction failed");
-        };
-
-        // Check for const names that conflict with section names.
-        for (const_name, const_span) in &const_names {
-            if let Some(sec_item) = sections.get(const_name) {
-                let m = format!("Const name '{}' conflicts with a section name", const_name);
-                diags.err2("AST_31", &m, const_span.clone(), sec_item.tinfo.span());
-                result = false;
-            }
-        }
-
-        // Check for region names that conflict with section or const names.
-        for (reg_name, reg_entry) in &regions {
-            if let Some(sec_item) = sections.get(reg_name.as_str()) {
-                let m = format!("Region name '{}' conflicts with a section name", reg_name);
-                diags.err2(
-                    "AST_48",
-                    &m,
-                    reg_entry.src_loc.clone(),
-                    sec_item.tinfo.span(),
-                );
-                result = false;
-            }
-            if let Some(const_span) = const_names.get(reg_name.as_str()) {
-                let m = format!("Region name '{}' conflicts with a const name", reg_name);
-                diags.err2("AST_63", &m, reg_entry.src_loc.clone(), const_span.clone());
-                result = false;
-            }
-        }
-
-        // Validate section region references.
-        // Track which regions are already bound to detect duplicate bindings.
-        let mut bound_regions: HashMap<&str, SourceSpan> = HashMap::new();
-        for (sec_name, sec_entry) in &sections {
-            let Some(ref reg_name) = sec_entry.region else {
-                continue;
-            };
-            if let Some(reg_entry) = regions.get(reg_name) {
-                // Region exists — check for a second binding to the same region.
-                if let Some(prev_span) = bound_regions.get(reg_name.as_str()) {
-                    let m = format!(
-                        "Section '{}' binds to region '{}' which is already bound to another section",
-                        sec_name, reg_name
-                    );
-                    diags.err2("AST_57", &m, sec_entry.tinfo.span(), prev_span.clone());
-                    result = false;
-                } else {
-                    bound_regions.insert(reg_name.as_str(), sec_entry.tinfo.span());
-                }
-                let _ = reg_entry; // suppress unused warning; accessed by get() above
-            } else {
-                let m = format!(
-                    "Section '{}' references undeclared region '{}'",
-                    sec_name, reg_name
-                );
-                diags.err1("AST_56", &m, sec_entry.tinfo.span());
-                result = false;
-            }
-        }
-
-        if !result {
-            bail!("AST construction failed");
-        }
-
-        let output_nid = output.nid;
-        let mut ast_db = AstDb {
-            sections,
-            labels: HashMap::new(),
-            output,
-            global_asserts,
-            const_statements,
-            const_names,
-            regions,
-        };
-
-        if !ast_db.validate_section_name(0, output_nid, ast, diags) {
-            bail!("AST construction failed");
-        }
-
-        if validate {
-            let mut children = output_nid.children(&ast.arena);
-            // the section name is the first child of the output
-            // AST processing guarantees this exists.
-            let sec_nid = children.next().unwrap();
-            let sec_tinfo = ast.get_tinfo(sec_nid);
-            let sec_str = sec_tinfo.val;
-
-            // add the output section to our nested sections tracker
-            let mut nested_sections = HashSet::new();
-            nested_sections.insert(sec_str);
-            let section = ast_db.sections.get(sec_str).unwrap();
-
-            // We're going to need this iterator more than once
-            let children = section.nid.children(&ast.arena);
-
-            for nid in children {
-                result &= ast_db.validate_nesting_r(nid, ast, &mut nested_sections, diags);
-            }
-
-            if !result {
-                bail!("AST construction failed");
-            }
-        }
-
-        Ok(ast_db)
-    }
-}

@@ -802,7 +802,7 @@ mod tests {
     #[test]
 
     fn const_ext_call_const() {
-        assert_brink_failure("tests/const_ext_call_const.brink", &["[IRDB_21]"]);
+        assert_brink_failure("tests/const_ext_call_const.brink", &["[IRDB_60]"]);
     }
 
     #[test]
@@ -1460,21 +1460,41 @@ mod tests {
     /// is unique across the entire source base.  A duplicated code would mean
     /// that `grep "SOME_CODE"` hits two unrelated call sites, defeating the
     /// searchability goal.
+    /// Recursively collects all .rs files under `dir`, skipping `target/` and
+    /// hidden directories.
+    fn collect_rs_files(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+        let Ok(entries) = fs::read_dir(dir) else {
+            return;
+        };
+        let mut entries: Vec<_> = entries.flatten().collect();
+        entries.sort_by_key(|e| e.path());
+        for entry in entries {
+            let path = entry.path();
+            if path.is_dir() {
+                let skip = path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .map(|n| n == "target" || n.starts_with('.'))
+                    .unwrap_or(false);
+                if !skip {
+                    collect_rs_files(&path, out);
+                }
+            } else if path.extension().and_then(|e| e.to_str()) == Some("rs") {
+                out.push(path);
+            }
+        }
+    }
+
     #[test]
     fn error_codes_are_unique() {
         use std::collections::HashMap;
 
-        let source_files = &[
-            "ast/ast.rs",
-            "ir/ir.rs",
-            "layoutdb/layoutdb.rs",
-            "irdb/irdb.rs",
-            "layout_phase/layout_phase.rs",
-            "map_phase/map_phase.rs",
-            "exec_phase/exec_phase.rs",
-            "process/process.rs",
-            "src/main.rs",
-        ];
+        let mut source_files: Vec<std::path::PathBuf> = Vec::new();
+        collect_rs_files(std::path::Path::new("."), &mut source_files);
+        assert!(
+            !source_files.is_empty(),
+            "No .rs files found -- wrong working directory?"
+        );
 
         // Maps error code -> list of "file:line" locations where it appears.
         let mut code_locations: HashMap<String, Vec<String>> = HashMap::new();
@@ -1483,22 +1503,24 @@ mod tests {
             "diags.err0(\"",
             "diags.err1(\"",
             "diags.err2(\"",
+            "diags.err_with_locs(\"",
             "diags.warn(\"",
             "diags.warn1(\"",
             "diags.note0(\"",
             "diags.note1(\"",
         ];
 
-        for path in source_files {
+        for path in &source_files {
             let contents = fs::read_to_string(path)
-                .unwrap_or_else(|e| panic!("Failed to read {}: {}", path, e));
+                .unwrap_or_else(|e| panic!("Failed to read {}: {}", path.display(), e));
             for (line_num, line) in contents.lines().enumerate() {
                 for prefix in &prefixes {
                     if let Some(offset) = line.find(prefix) {
                         let after = &line[offset + prefix.len()..];
                         if let Some(end) = after.find('"') {
                             let code = after[..end].to_string();
-                            let location = format!("{}:{}", path, line_num + 1);
+                            let location =
+                                format!("{}:{}", path.display(), line_num + 1);
                             code_locations.entry(code).or_default().push(location);
                         }
                     }

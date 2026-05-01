@@ -17,7 +17,8 @@ use indextree::NodeId;
 #[allow(unused_imports)]
 use tracing::{debug, trace};
 
-use ast::{Ast, AstDb, LexToken, is_reserved_identifier};
+use ast::{Ast, LexToken, is_reserved_identifier};
+use astdb::AstDb;
 use ir::IRKind;
 use std::collections::{HashMap, HashSet};
 
@@ -117,7 +118,7 @@ impl<'toks> LayoutDb {
                 "Maximum recursion depth ({MAX_RECURSION_DEPTH}) exceeded when processing '{}'.",
                 tinfo.val
             );
-            diags.err1("LINEAR_1", &m, tinfo.span());
+            diags.err1("LINEAR_18", &m, tinfo.span());
             return false;
         };
 
@@ -320,7 +321,7 @@ impl<'toks> LayoutDb {
 
     // ── Constructor ───────────────────────────────────────────────────────────
 
-    pub fn new(diags: &mut Diags, ast: &'toks Ast, ast_db: &'toks AstDb) -> anyhow::Result<Self> {
+    pub fn new(diags: &mut Diags, ast: &'toks Ast, ast_db: &AstDb) -> anyhow::Result<Self> {
         debug!("LayoutDb::new: ENTER");
 
         let output_nid = ast_db.output.nid;

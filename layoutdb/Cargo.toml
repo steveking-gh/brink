@@ -14,7 +14,8 @@ anyhow = "1.0.34"
 
 depth_guard = { path = "../depth_guard" }
 diags = { path = "../diags" }
-ast = { path = "../ast" }
+ast   = { path = "../ast" }
+astdb = { path = "../astdb" }
 ir = { path = "../ir" }
 linearizer = { path = "../linearizer" }
 tracing = "0.1.44"

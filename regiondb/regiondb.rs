@@ -6,14 +6,6 @@
 // const_eval evaluates region addr and size before IRDb exists, the resulting
 // intersections are stable and do not change across layout passes.
 //
-// Placing this computation before layout (rather than recomputing on every pass)
-// correctly signals that region geometry resolves fully before layout begins
-// and prevents the layout iterate loop from implying that region data might
-// converge over iterations.
-//
-// Order of operations: build RegionDb after IRDb and before LayoutPhase.
-// process.rs calls RegionDb::build, then passes the result to LayoutPhase::build.
-//
 
 use diags::Diags;
 use ir::{EffectiveRegion, IRKind, RegionBinding};
@@ -22,25 +14,6 @@ use std::collections::{HashMap, HashSet};
 
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
-
-/// Computes the intersection of two region bindings. Returns Some(intersection)
-/// when the regions overlap, None when disjoint. The intersection name is
-/// "{parent} & {direct}" for diagnostics.
-fn intersect_regions(parent: &RegionBinding, direct: &RegionBinding) -> Option<RegionBinding> {
-    let addr = parent.addr.max(direct.addr);
-    let end_p = parent.addr + parent.size;
-    let end_d = direct.addr + direct.size;
-    let end = end_p.min(end_d);
-    if end <= addr {
-        return None;
-    }
-    Some(RegionBinding {
-        addr,
-        size: end - addr,
-        name: format!("{} & {}", parent.name, direct.name),
-        src_loc: direct.src_loc.clone(),
-    })
-}
 
 /// Pre-computed region intersection data, keyed by section name.
 /// RegionDb::build produces this once after IRDb; LayoutPhase reads the map for
@@ -57,7 +30,7 @@ impl RegionDb {
         let mut effective_regions: HashMap<String, EffectiveRegion> = HashMap::new();
         // Scope stack: one entry per active section, innermost last.
         // None means the section has no region constraint.
-        let mut scope_stack: Vec<Option<EffectiveRegion>> = Vec::new();
+        let mut effective_region_stack: Vec<Option<EffectiveRegion>> = Vec::new();
         // Tracks region-bound sections already entered -- detects re-use.
         let mut seen_region_sections: HashSet<String> = HashSet::new();
         let mut ok = true;
@@ -68,69 +41,121 @@ impl RegionDb {
             match ir.kind {
                 IRKind::SectionStart => {
                     let sec_name = irdb.get_opnd_as_identifier(ir, 0);
-                    let parent_effective = scope_stack.last().and_then(|e| e.as_ref());
-                    let direct = irdb.region_for_section(sec_name);
+                    trace!("RegionDb::build: Processing section '{}'", sec_name);
+                    let parent_effective = effective_region_stack.last().and_then(|e| e.as_ref());
+                    let direct_binding = irdb.region_for_section(sec_name);
 
                     // Region-bound sections anchor to a fixed address; re-inclusion conflicts.
-                    if direct.is_some() && !seen_region_sections.insert(sec_name.to_string()) {
+                    if direct_binding.is_some()
+                        && !seen_region_sections.insert(sec_name.to_string())
+                    {
                         let msg = format!(
-                            "Section '{}' is bound to a region and cannot be included more \
-                             than once.  Region-bound sections anchor to a fixed address; \
-                             a second inclusion always produces an address conflict.",
+                            "Section '{}' is bound to a region and cannot be written more \
+                             than once, since doing so produces an address conflict.",
                             sec_name
                         );
                         diags.err1("EXEC_79", &msg, ir.src_loc.clone());
                         ok = false;
                     }
 
-                    // Build contributor list: inherit parent's, then append direct.
-                    let mut contributors: Vec<RegionBinding> = parent_effective
-                        .map(|e| e.contributors.clone())
+                    // Build region stack: inherit parent's, then append local region binding, if any.
+                    let mut region_stack: Vec<RegionBinding> = parent_effective
+                        .map(|e| e.region_stack.clone())
                         .unwrap_or_default();
-                    if let Some(d) = direct {
-                        contributors.push(d.clone());
+                    if let Some(direct) = direct_binding {
+                        region_stack.push(direct.clone());
                     }
 
-                    let effective = match (parent_effective.map(|e| &e.binding), direct) {
+                    // The effective regions depends on possible presence of both direct and inherited regions.
+                    //
+                    // * No direct nor inherited region: no effective region.
+                    // * Inherited but no direct region: effective region is the inherited region.
+                    // * Direct but no inherited region: effective region is the direct region.
+                    // * Both direct and inherited region: effective region is the intersection.
+                    //
+                    let effective = match (
+                        parent_effective.map(|e| &e.effective_region),
+                        direct_binding,
+                    ) {
                         (None, None) => None,
-                        (Some(p), None) => Some(EffectiveRegion {
-                            binding: p.clone(),
-                            contributors,
-                        }),
-                        (None, Some(d)) => Some(EffectiveRegion {
-                            binding: d.clone(),
-                            contributors,
-                        }),
-                        (Some(p), Some(d)) => {
-                            match intersect_regions(p, d) {
-                                Some(b) => {
+                        (Some(parent), None) => {
+                            debug!(
+                                "RegionDb::build: Section '{}' no direct region \
+                                binding, inherits effective region '{}' [{:#X}, {:#X})",
+                                sec_name,
+                                parent.name,
+                                parent.addr,
+                                parent.addr + parent.size
+                            );
+                            Some(EffectiveRegion {
+                                effective_region: parent.clone(),
+                                region_stack,
+                            })
+                        }
+                        (None, Some(direct)) => {
+                            debug!(
+                                "RegionDb::build: Section '{}' has direct region \
+                                binding '{}' [{:#X}, {:#X}), inherits no effective region",
+                                sec_name,
+                                direct.name,
+                                direct.addr,
+                                direct.addr + direct.size
+                            );
+
+                            Some(EffectiveRegion {
+                                effective_region: direct.clone(),
+                                region_stack,
+                            })
+                        }
+                        (Some(parent), Some(direct)) => {
+                            debug!(
+                                "RegionDb::build: Section '{}' has direct region \
+                                binding '{}' [{:#X}, {:#X}), and also inherits effective region '{}' [{:#X}, {:#X})",
+                                sec_name,
+                                direct.name,
+                                direct.addr,
+                                direct.addr + direct.size,
+                                parent.name,
+                                parent.addr,
+                                parent.addr + parent.size
+                            );
+                            match parent.intersect(direct) {
+                                Some(intersection) => {
                                     // The section anchors to d.addr; d.addr must fall
                                     // within the parent constraint.
-                                    if d.addr < b.addr {
+                                    if direct.addr < intersection.addr {
                                         let msg = format!(
                                             "Section '{}': region '{}' starts at {:#X}, which \
                                              is before the enclosing region '{}' start {:#X}. \
-                                             The starting address must lie within the \
-                                             intersection [{:#X}, {:#X}).",
+                                             The starting address of the directly bound region must lie within \
+                                             the intersection with parent region(s) [{:#X}, {:#X}).",
                                             sec_name,
-                                            d.name,
-                                            d.addr,
-                                            p.name,
-                                            p.addr,
-                                            b.addr,
-                                            b.addr + b.size, // No overflow, bare addition is safe.
+                                            direct.name,
+                                            direct.addr,
+                                            parent.name,
+                                            parent.addr,
+                                            intersection.addr,
+                                            intersection.addr + intersection.size, // No overflow, bare addition is safe.
                                         );
                                         diags.err2(
                                             "EXEC_78",
                                             &msg,
-                                            d.src_loc.clone(),
-                                            p.src_loc.clone(),
+                                            direct.src_loc.clone(),
+                                            parent.src_loc.clone(),
                                         );
                                         ok = false;
                                     }
+                                    debug!(
+                                        "RegionDb::build: Section '{}' effective region intersection \
+                                            is '{}' [{:#X}, {:#X})",
+                                        sec_name,
+                                        intersection.name,
+                                        intersection.addr,
+                                        intersection.addr + intersection.size
+                                    );
                                     Some(EffectiveRegion {
-                                        binding: b,
-                                        contributors,
+                                        effective_region: intersection,
+                                        region_stack,
                                     })
                                 }
                                 None => {
@@ -139,25 +164,25 @@ impl RegionDb {
                                         "Section '{}': region '{}' [{:#X}, {:#X}) does not \
                                          intersect with enclosing region '{}' [{:#X}, {:#X}).",
                                         sec_name,
-                                        d.name,
-                                        d.addr,
-                                        d.addr + d.size, // No overflow, bare addition is safe.
-                                        p.name,
-                                        p.addr,
-                                        p.addr + p.size, // No overflow, bare addition is safe.
+                                        direct.name,
+                                        direct.addr,
+                                        direct.addr + direct.size, // No overflow, bare addition is safe.
+                                        parent.name,
+                                        parent.addr,
+                                        parent.addr + parent.size, // No overflow, bare addition is safe.
                                     );
                                     diags.err2(
                                         "EXEC_77",
                                         &msg,
-                                        d.src_loc.clone(),
-                                        p.src_loc.clone(),
+                                        direct.src_loc.clone(),
+                                        parent.src_loc.clone(),
                                     );
                                     ok = false;
                                     // Fallback: push direct binding to keep the scope stack
                                     // structurally consistent for child sections.
                                     Some(EffectiveRegion {
-                                        binding: d.clone(),
-                                        contributors,
+                                        effective_region: direct.clone(),
+                                        region_stack,
                                     })
                                 }
                             }
@@ -167,11 +192,11 @@ impl RegionDb {
                     if let Some(ref e) = effective {
                         effective_regions.insert(sec_name.to_string(), e.clone());
                     }
-                    scope_stack.push(effective);
+                    effective_region_stack.push(effective);
                 }
 
                 IRKind::SectionEnd => {
-                    scope_stack.pop();
+                    effective_region_stack.pop();
                 }
 
                 _ => {}

@@ -1,10 +1,6 @@
 // Lexer for brink source files.
 //
-// This create replaces our previous use of the Logos lexer.  Switching
-// to a hand-rolled lexer reduced many dependencies, some which had
-// known security vulnerabilities.
-//
-// Provides the same three-method interface that the logos crate did:
+// Provides the same three-method interface as the old logos version:
 //   Lexer::new(src)  — construct from source string
 //   .next()          — advance and return the next LexToken (or None at EOF)
 //   .slice()         — the source text of the most-recently returned token

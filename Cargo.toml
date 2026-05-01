@@ -4,6 +4,7 @@ members = [
     "mapdb",
     "depth_guard",
     "ast",
+    "astdb",
     "ir",
     "symtable",
     "linearizer",

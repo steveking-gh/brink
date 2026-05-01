@@ -143,10 +143,7 @@ impl SymbolTable {
         for (name, entry) in &self.entries {
             if entry.value.is_some() && !entry.used {
                 let m = format!("Const '{}' is defined but never used.", name);
-                match &entry.decl_loc {
-                    Some(loc) => diags.warn1("SYMTAB_1", &m, loc.clone()),
-                    None => diags.warn("SYMTAB_1", &m),
-                }
+                diags.warn_opt("SYMTAB_1", &m, entry.decl_loc.clone());
             }
         }
     }

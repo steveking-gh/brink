@@ -1,0 +1,17 @@
+[package]
+name = "astdb"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[lib]
+path = "astdb.rs"
+
+[dependencies]
+anyhow = "1.0.34"
+indextree = "4.3.1"
+
+depth_guard = { path = "../depth_guard" }
+diags      = { path = "../diags" }
+ast        = { path = "../ast" }
+tracing    = "0.1.44"

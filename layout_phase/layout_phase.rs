@@ -18,7 +18,7 @@ use locationdb::{AddressState, Location, LocationDb};
 use argvaldb::ParmValDb;
 use diags::Diags;
 use extension_registry::ExtensionRegistry;
-use ir::{ConstBuiltins, DataType, EffectiveRegion, IR, IRKind, ParameterValue, RegionBinding};
+use ir::{ConstBuiltins, DataType, EffectiveRegion, IR, IRKind, ParameterValue};
 use irdb::IRDb;
 use regiondb::RegionDb;
 use std::collections::HashSet;
@@ -1043,21 +1043,14 @@ impl LayoutPhase {
         if let Some(frame) = self.scope_stack.last()
             && let Some(effective) = frame.effective_region.as_ref()
         {
-            let binding = &effective.binding;
-            let Some(region_end) = binding.addr.checked_add(binding.size) else {
-                if self.warned_lids.insert((lid, "EXEC_74")) {
-                    let msg = format!("Region '{}' addr + size overflows u64.", binding.name);
-                    diags.err2("EXEC_74", &msg, ir.src_loc.clone(), binding.src_loc.clone());
-                }
-                return false;
-            };
-            if set_val < binding.addr || set_val >= region_end {
+            if !effective.contains_addr(set_val) {
                 if self.warned_lids.insert((lid, "EXEC_72")) {
+                    let b = &effective.effective_region;
                     let msg = format!(
                         "set_addr target {:#X} is outside region '{}' bounds [{:#X}, {:#X}).",
-                        set_val, binding.name, binding.addr, region_end
+                        set_val, b.name, b.addr, b.addr + b.size
                     );
-                    diags.err2("EXEC_72", &msg, ir.src_loc.clone(), binding.src_loc.clone());
+                    diags.err2("EXEC_72", &msg, ir.src_loc.clone(), b.src_loc.clone());
                 }
                 return false;
             }
@@ -1308,9 +1301,7 @@ impl LayoutPhase {
     }
 
     /// After iterate converges, verify each region-bound section fits within
-    /// its effective region.  Uses the intersection of all ancestor and direct
-    /// region bindings (section_effective_regions) so that writes never escape
-    /// the tighter bound imposed by partially overlapping parent regions.
+    /// its effective region.
     fn validate_section_regions(&self, irdb: &IRDb, region_db: &RegionDb, diags: &mut Diags) -> bool {
         let mut result = true;
         for sec_name in irdb.section_region_names.keys() {
@@ -1321,54 +1312,16 @@ impl LayoutPhase {
             let end_loc = &self.ir_locs[ir_rng.end];
             let sec_size = end_loc.file_offset.saturating_sub(start_loc.file_offset);
 
-            // Use the pre-computed effective intersection from RegionDb.
-            let (binding, contributors): (&RegionBinding, &[RegionBinding]) =
-                if let Some(eff) = region_db.effective_regions.get(sec_name.as_str()) {
-                    (&eff.binding, &eff.contributors)
-                } else if let Some(b) = irdb.region_for_section(sec_name.as_str()) {
-                    (b, std::slice::from_ref(b))
-                } else {
-                    continue;
-                };
+            let Some(eff) = region_db.effective_regions.get(sec_name.as_str()) else {
+                continue;
+            };
 
-            if sec_size > binding.size {
-                let excess = sec_size - binding.size;
-                let msg = format!(
-                    "Section '{}' size {} bytes exceeds region '{}' effective size {} by {} bytes.",
-                    sec_name, sec_size, binding.name, binding.size, excess
-                );
-                if !contributors.is_empty() {
-                    // Emit one yellow label per contributing region so the user
-                    // sees exactly which regions combined to produce the tighter
-                    // bound.  Each label includes addr and size because ariadne
-                    // points to the 'region NAME {' declaration line, not the
-                    // property values.
-                    let secondaries: Vec<(diags::SourceSpan, String)> = contributors
-                        .iter()
-                        .map(|c| {
-                            (
-                                c.src_loc.clone(),
-                                format!(
-                                    "region '{}': addr={:#X}, size={}",
-                                    c.name, c.addr, c.size
-                                ),
-                            )
-                        })
-                        .collect();
-                    diags.err_with_locs(
-                        "EXEC_73",
-                        &msg,
-                        irdb.ir_vec[ir_rng.start].src_loc.clone(),
-                        &secondaries,
-                    );
-                } else {
-                    diags.err2(
-                        "EXEC_73",
-                        &msg,
-                        irdb.ir_vec[ir_rng.start].src_loc.clone(),
-                        binding.src_loc.clone(),
-                    );
-                }
+            if !eff.check_section_fits(
+                sec_name,
+                sec_size,
+                irdb.ir_vec[ir_rng.start].src_loc.clone(),
+                diags,
+            ) {
                 result = false;
             }
         }
@@ -1385,7 +1338,7 @@ impl LayoutPhase {
     /// (addresses, alignments, section sizes) stabilize.  Each pass walks the
     /// full `irdb.ir_vec` in order, updating `self.ir_locs` with the image and
     /// section offset recorded after each instruction.  Because an alignment or
-    /// `sizeof` expression may change the size of an earlier region on a later
+    /// `sizeof` expression may change the size of an earlier section on a later
     /// pass, iteration continues until two consecutive passes produce identical
     /// location vectors.  Returns `false` and emits diagnostics if any instruction
     /// fails validation or execution during the loop.

@@ -18,7 +18,8 @@ anyhow = "1.0.34"
 parse_int = "0.9.0"
 
 # local dependencies
-ast = { path = "../ast" }
+ast   = { path = "../ast" }
+astdb = { path = "../astdb" }
 diags = { path = "../diags" }
 ir = { path = "../ir" }
 layoutdb = { path = "../layoutdb" }

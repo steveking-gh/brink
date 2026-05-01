@@ -21,7 +21,8 @@ use std::collections::HashMap;
 #[allow(unused_imports)]
 use tracing::{debug, trace};
 
-use ast::{Ast, AstDb, LexToken};
+use ast::{Ast, LexToken};
+use astdb::AstDb;
 use ir::{ConstBuiltins, IRKind, ParameterValue, RegionBinding, strip_kmg};
 
 use linearizer::{LinIR, LinOperand, Linearizer, tok_to_irkind};
@@ -677,7 +678,7 @@ impl<'toks> ConstIR {
                         "Operation '{:?}' is not supported in a const expression.",
                         op
                     );
-                    diags.err1("IRDB_21", &m, err_loc.clone());
+                    diags.err1("IRDB_60", &m, err_loc.clone());
                     None
                 }
             };
@@ -992,10 +993,10 @@ impl<'toks> ConstIR {
 ///
 /// Called after const_eval::evaluate and prune, using the fully resolved symbol
 /// table.  Returns Some(map) on success, None on failure (errors in diags).
-pub fn evaluate_regions<'toks>(
+pub fn evaluate_regions(
     diags: &mut Diags,
-    ast: &'toks Ast,
-    ast_db: &AstDb<'toks>,
+    ast: &Ast,
+    ast_db: &AstDb,
     symbol_table: &mut SymbolTable,
 ) -> Option<HashMap<String, RegionBinding>> {
     let mut bindings: HashMap<String, RegionBinding> = HashMap::new();
