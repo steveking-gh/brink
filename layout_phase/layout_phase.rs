@@ -726,15 +726,15 @@ impl LayoutPhase {
             // Region path: size is const-evaluated and stable across iterations.
             if let Some(binding) = irdb.region_bindings.get(&sec_name) {
                 *self.parms[out_parm_num].to_u64_mut() = binding.size;
-                return true;
+            } else {
+                unreachable!(
+                    "sizeof() argument '{}' is not a section used in output or \
+                     a declared region.  layoutdb::verify_operand_refs should have \
+                     caught this.",
+                    sec_name
+                );
             }
-
-            let msg = format!(
-                "sizeof() argument '{}' is not a section used in output or a declared region.",
-                sec_name
-            );
-            diags.err1("EXEC_5", &msg, ir.src_loc.clone());
-            return false;
+            return true;
         }
 
         diags.err1(
@@ -1048,7 +1048,10 @@ impl LayoutPhase {
                 let b = &effective.effective_region;
                 let msg = format!(
                     "set_addr target {:#X} is outside region '{}' bounds [{:#X}, {:#X}).",
-                    set_val, b.name, b.addr, b.addr + b.size
+                    set_val,
+                    b.name,
+                    b.addr,
+                    b.addr + b.size
                 );
                 diags.err2("EXEC_72", &msg, ir.src_loc.clone(), b.src_loc.clone());
             }
@@ -1301,7 +1304,12 @@ impl LayoutPhase {
 
     /// After iterate converges, verify each region-bound section fits within
     /// its effective region.
-    fn validate_section_regions(&self, irdb: &IRDb, region_db: &RegionDb, diags: &mut Diags) -> bool {
+    fn validate_section_regions(
+        &self,
+        irdb: &IRDb,
+        region_db: &RegionDb,
+        diags: &mut Diags,
+    ) -> bool {
         let mut result = true;
         for sec_name in irdb.section_region_names.keys() {
             let Some(ir_rng) = irdb.sized_locs.get(sec_name) else {

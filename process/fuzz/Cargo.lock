@@ -43,6 +43,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "astdb"
+version = "6.1.1"
+dependencies = [
+ "anyhow",
+ "ast",
+ "depth_guard",
+ "diags",
+ "indextree",
+ "tracing",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -68,6 +80,7 @@ version = "6.1.1"
 dependencies = [
  "anyhow",
  "ast",
+ "astdb",
  "depth_guard",
  "diags",
  "indextree",
@@ -216,6 +229,7 @@ dependencies = [
  "irdb",
  "locationdb",
  "memmap2",
+ "regiondb",
  "tracing",
 ]
 
@@ -225,6 +239,7 @@ version = "6.1.1"
 dependencies = [
  "anyhow",
  "ast",
+ "astdb",
  "depth_guard",
  "diags",
  "indextree",
@@ -352,6 +367,7 @@ dependencies = [
  "anyhow",
  "argvaldb",
  "ast",
+ "astdb",
  "const_eval",
  "diags",
  "exec_phase",
@@ -366,6 +382,7 @@ dependencies = [
  "mapdb",
  "parse_int",
  "prune",
+ "regiondb",
  "tracing",
  "validation_phase",
 ]
@@ -398,6 +415,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "41f2619966050689382d2b44f664f4bc593e129785a36d6ee376ddf37259b924"
 dependencies = [
  "proc-macro2",
+]
+
+[[package]]
+name = "regiondb"
+version = "6.1.1"
+dependencies = [
+ "anyhow",
+ "diags",
+ "ir",
+ "irdb",
+ "tracing",
 ]
 
 [[package]]

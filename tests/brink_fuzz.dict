@@ -6,6 +6,8 @@
 "include"
 "wr8" "wr16" "wr32" "wr64" "wrs" "wrf" "wr"
 "if" "else"
+"region"
+"in"
 "set_addr" "set_addr_offset" "align"
 "addr" "addr_offset" "sec_offset" "file_offset"
 "print" "to_u64" "to_i64"

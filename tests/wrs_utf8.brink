@@ -1,0 +1,5 @@
+section foo {
+    wrs "日本語 emoji: 🎉 café";
+}
+
+output foo;

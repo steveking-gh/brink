@@ -102,6 +102,15 @@ impl<'src> Lexer<'src> {
         let bytes = &self.src.as_bytes()[self.pos..];
         let b = bytes[0];
 
+        // Non-ASCII bytes are not valid outside quoted strings.  Advance past
+        // the full codepoint so tok_end lands on a UTF-8 boundary and slice()
+        // does not panic.  The parser rejects the resulting Unknown token.
+        if b >= 0x80 {
+            let c = self.src[self.pos..].chars().next().unwrap();
+            self.pos += c.len_utf8();
+            return LexToken::Unknown;
+        }
+
         if b == b'"' {
             return self.scan_string();
         }

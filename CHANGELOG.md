@@ -8,7 +8,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [7.x.x] - 2026-04-20
 
-- DEFEATURE: With `region` incoming, remove starting address from `output`
+- DEFEATURE: With `region`, remove obsolete starting address from `output`
   statement.
 - FEATURE: Region support
 - FEATURE: added missing --list-extensions command line option which was already
@@ -25,6 +25,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - INTERNAL: Refactor region info into a RegionDb library
 - BUG FIX: Fixed bad string conversion assert in verbose output
 - BUG FIX: Fixed check for duplicate error codes and eliminated a few duplicates
+- BUF FIX: Panic on incomplete UTF-8 character in position of an operator.
 
 ## [6.1.1] - 2026-04-20
 

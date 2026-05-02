@@ -410,6 +410,11 @@ mod tests {
         assert_brink_failure("tests/fuzz_found_26.brink", &["[EXEC_62]"]);
     }
 
+    #[test]
+    fn fuzz_found_27() {
+        assert_brink_failure("tests/fuzz_found_27.brink", &["[AST_18]"]);
+    }
+
     /// assert inside a top-level if body with a string condition panics -- latent bug.
     #[test]
     fn const_bool_string_assert() {
@@ -823,6 +828,15 @@ mod tests {
             "tests/wrs_1.brink",
             Some("wrs_1.bin"),
             Some("123\x00456 Wow! 18 2\n"),
+        );
+    }
+
+    #[test]
+    fn wrs_utf8() {
+        assert_brink_success(
+            "tests/wrs_utf8.brink",
+            Some("wrs_utf8.bin"),
+            Some("日本語 emoji: 🎉 café"),
         );
     }
 
