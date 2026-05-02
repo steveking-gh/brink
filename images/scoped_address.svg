@@ -26,7 +26,7 @@
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#d1d1d1"
      inkscape:zoom="0.90509668"
-     inkscape:cx="1176.1175"
+     inkscape:cx="1175.565"
      inkscape:cy="534.7495"
      inkscape:window-width="3840"
      inkscape:window-height="2054"
@@ -168,7 +168,7 @@
        x="281.37259"
        y="97.423889"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:26.6667px;font-family:'Roboto Mono';-inkscape-font-specification:'Roboto Mono';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000;fill-opacity:1"
-       id="tspan4"></tspan><tspan
+       id="tspan4" /><tspan
        sodipodi:role="line"
        x="281.37259"
        y="130.75726"
@@ -178,7 +178,7 @@
    id="tspan53">// Fill with 0xAA</tspan></tspan><tspan
        sodipodi:role="line"
        x="281.37259"
-       y="164.09065"
+       y="164.09064"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:26.6667px;font-family:'Roboto Mono';-inkscape-font-specification:'Roboto Mono';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000;fill-opacity:1"
        id="tspan14">section B { wr8 0xBB, 1024; } <tspan
    style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:26.6667px;font-family:'Roboto Mono';-inkscape-font-specification:'Roboto Mono, @wght=700';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;font-variation-settings:'wght' 700;fill:#00d455"
@@ -197,35 +197,35 @@
        id="tspan50">section D in FLASH { assert sizeof(D) == 4096;</tspan><tspan
        sodipodi:role="line"
        x="281.37259"
-       y="264.09079"
+       y="264.09076"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:26.6667px;font-family:'Roboto Mono';-inkscape-font-specification:'Roboto Mono';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000;fill-opacity:1"
        id="tspan38">    wr64 addr(C);        <tspan
    style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:26.6667px;font-family:'Roboto Mono';-inkscape-font-specification:'Roboto Mono, @wght=700';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;font-variation-settings:'wght' 700;fill:#00d455"
    id="tspan61">// Pointer to relocatable section C</tspan></tspan><tspan
        sodipodi:role="line"
        x="281.37259"
-       y="297.42416"
+       y="297.42413"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:26.6667px;font-family:'Roboto Mono';-inkscape-font-specification:'Roboto Mono';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000;fill-opacity:1"
        id="tspan62">    wr64 sizeof(C);      <tspan
    style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:26.6667px;font-family:'Roboto Mono';-inkscape-font-specification:'Roboto Mono, @wght=700';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;font-variation-settings:'wght' 700;fill:#00d455"
    id="tspan63">// Size of relocatable section C</tspan></tspan><tspan
        sodipodi:role="line"
        x="281.37259"
-       y="330.75754"
+       y="330.75751"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:26.6667px;font-family:'Roboto Mono';-inkscape-font-specification:'Roboto Mono';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000;fill-opacity:1"
-       id="tspan16">    set_sec_offset 512;  <tspan
+       id="tspan16">    pad_sec_offset 512;  <tspan
    style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:26.6667px;font-family:'Roboto Mono';-inkscape-font-specification:'Roboto Mono, @wght=700';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;font-variation-settings:'wght' 700;fill:#00d455"
    id="tspan56">// Add padding to offset 512</tspan></tspan><tspan
        sodipodi:role="line"
        x="281.37259"
-       y="364.09091"
+       y="364.09088"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:26.6667px;font-family:'Roboto Mono';-inkscape-font-specification:'Roboto Mono';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000;fill-opacity:1"
        id="tspan17">    wr A;                <tspan
    style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:26.6667px;font-family:'Roboto Mono';-inkscape-font-specification:'Roboto Mono, @wght=700';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;font-variation-settings:'wght' 700;fill:#00d455"
    id="tspan59">// Write section A</tspan></tspan><tspan
        sodipodi:role="line"
        x="281.37259"
-       y="397.42429"
+       y="397.42426"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:26.6667px;font-family:'Roboto Mono';-inkscape-font-specification:'Roboto Mono';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000;fill-opacity:1"
        id="tspan19">    wr B;                <tspan
    style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:26.6667px;font-family:'Roboto Mono';-inkscape-font-specification:'Roboto Mono, @wght=700';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;font-variation-settings:'wght' 700;fill:#00d455"
@@ -234,7 +234,7 @@
        x="281.37259"
        y="430.75766"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:26.6667px;font-family:'Roboto Mono';-inkscape-font-specification:'Roboto Mono';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#000000;fill-opacity:1"
-       id="tspan52">    set_sec_offset 3072; <tspan
+       id="tspan52">    pad_sec_offset 3072; <tspan
    style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:26.6667px;font-family:'Roboto Mono';-inkscape-font-specification:'Roboto Mono, @wght=700';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;font-variation-settings:'wght' 700;fill:#00d455"
    id="tspan57">// Add padding to offset 3072</tspan></tspan><tspan
        sodipodi:role="line"
