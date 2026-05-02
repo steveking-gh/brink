@@ -29,14 +29,14 @@ members = [
 ]
 
 [workspace.package]
-version = "6.1.1"
+version = "7.0.2"
 authors = ["Steve King <sk@metrokings.com>"]
 edition = "2024"
 
 [package]
 name = "brink"
 description = "Ergonomic firmware and binary file creation tool."
-version = "6.1.1"
+version = "7.0.2"
 build = "build.rs"
 license-file = "LICENSE.txt"
 readme = "README.md"

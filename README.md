@@ -15,13 +15,13 @@ when creating FLASH, ROM or other non-volatile memory images.
 
 ## Install Prebuilt Binaries for Linux
 
-    curl --proto '=https' --tlsv1.2 -LsSf https://github.com/steveking-gh/brink/releases/download/6.1.0/brink-installer.sh | sh
+    curl --proto '=https' --tlsv1.2 -LsSf https://github.com/steveking-gh/brink/releases/download/7.0.2/brink-installer.sh | sh
 
 ## Install Prebuilt Binaries for Windows
 
 Start a command prompt and execute the following:
 
-    powershell -ExecutionPolicy Bypass -c "irm https://github.com/steveking-gh/brink/releases/download/6.1.0/brink-installer.ps1 | iex"
+    powershell -ExecutionPolicy Bypass -c "irm https://github.com/steveking-gh/brink/releases/download/7.0.2/brink-installer.ps1 | iex"
 
 ## Build From Source
 
@@ -2045,36 +2045,29 @@ To update the coverage table in this README from Windows, run
 ```text
 Filename                                     Regions    Missed Regions     Cover   Functions  Missed Functions  Executed       Lines      Missed Lines     Cover    Branches   Missed Branches     Cover
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-argvaldb/argvaldb.rs                               3                 0   100.00%           1                 0   100.00%           3                 0   100.00%           0                 0         -
-ast/ast.rs                                      2180               416    80.92%          65                 8    87.69%        1233               201    83.70%           0                 0         -
-ast/lexer.rs                                     413                13    96.85%          16                 0   100.00%         255                10    96.08%           0                 0         -
-astdb/astdb.rs                                   634                61    90.38%          11                 0   100.00%         312                22    92.95%           0                 0         -
-brink_extension/lib.rs                             3                 0   100.00%           1                 0   100.00%           3                 0   100.00%           0                 0         -
-const_eval/const_eval.rs                        1259               207    83.56%          32                 5    84.38%         800               174    78.25%           0                 0         -
-depth_guard/depth_guard.rs                       146                 0   100.00%          17                 0   100.00%          77                 0   100.00%           0                 0         -
-diags/diags.rs                                   256                26    89.84%          12                 1    91.67%         134                20    85.07%           0                 0         -
-exec_phase/exec_phase.rs                         711               192    73.00%          19                 5    73.68%         483               119    75.36%           0                 0         -
-extension_registry/extension_registry.rs         258                 9    96.51%          18                 3    83.33%         126                 9    92.86%           0                 0         -
-extension_registry/test_mocks.rs                 259                34    86.87%          38                 6    84.21%         204                33    83.82%           0                 0         -
-extensions/src/lib.rs                              8                 0   100.00%           1                 0   100.00%           5                 0   100.00%           0                 0         -
-ir/ir.rs                                         309                30    90.29%          30                 1    96.67%         230                21    90.87%           0                 0         -
-irdb/irdb.rs                                     833                94    88.72%          19                 1    94.74%         491                60    87.78%           0                 0         -
-layout_phase/layout_phase.rs                    1548               319    79.39%          44                 2    95.45%         974               170    82.55%           0                 0         -
-layoutdb/layoutdb.rs                             765               164    78.56%          19                 0   100.00%         408                65    84.07%           0                 0         -
-linearizer/linearizer.rs                         571                29    94.92%          21                 1    95.24%         326                19    94.17%           0                 0         -
-locationdb/locationdb.rs                          39                 4    89.74%           3                 1    66.67%          28                 4    85.71%           0                 0         -
-map_phase/map_phase.rs                           892                13    98.54%          57                 0   100.00%         613                 9    98.53%           0                 0         -
-process/process.rs                               425                25    94.12%          26                 5    80.77%         240                 9    96.25%           0                 0         -
-prune/prune.rs                                   150                 9    94.00%          12                 2    83.33%          95                 7    92.63%           0                 0         -
-regiondb/regiondb.rs                             127                 5    96.06%           3                 0   100.00%         107                 5    95.33%           0                 0         -
-src/main.rs                                      164                14    91.46%          11                 3    72.73%         108                10    90.74%           0                 0         -
-std/crc32c/src/crc32c.rs                          31                 2    93.55%           5                 0   100.00%          26                 3    88.46%           0                 0         -
-std/md5/src/md5.rs                                31                 2    93.55%           5                 0   100.00%          26                 3    88.46%           0                 0         -
-std/sha256/src/sha256.rs                          31                 2    93.55%           5                 0   100.00%          26                 3    88.46%           0                 0         -
-symtable/symtable.rs                             107                 5    95.33%          14                 2    85.71%          78                 5    93.59%           0                 0         -
-validation_phase/validation_phase.rs              98                 3    96.94%           4                 0   100.00%          68                 2    97.06%           0                 0         -
+ast\ast.rs                                      2318               452    80.50%          70                 8    88.57%        1265               208    83.56%           0                 0         -
+ast\lexer.rs                                     376                12    96.81%          16                 0   100.00%         234                 9    96.15%           0                 0         -
+brink_extension\lib.rs                             3                 0   100.00%           1                 0   100.00%           3                 0   100.00%           0                 0         -
+const_eval\const_eval.rs                        1081               174    83.90%          26                 5    80.77%         701               150    78.60%           0                 0         -
+diags\diags.rs                                   209                25    88.04%          10                 1    90.00%         106                19    82.08%           0                 0         -
+engine\engine.rs                                2292               483    78.93%          66                 6    90.91%        1480               271    81.69%           0                 0         -
+extension_registry\extension_registry.rs         248                 9    96.37%          17                 3    82.35%         121                 9    92.56%           0                 0         -
+extension_registry\test_mocks.rs                 259                34    86.87%          38                 6    84.21%         204                33    83.82%           0                 0         -
+extensions\src\lib.rs                              8                 0   100.00%           1                 0   100.00%           5                 0   100.00%           0                 0         -
+ir\ir.rs                                         226                28    87.61%          22                 1    95.45%         172                18    89.53%           0                 0         -
+irdb\irdb.rs                                     818                97    88.14%          17                 1    94.12%         482                60    87.55%           0                 0         -
+layoutdb\layoutdb.rs                             772               160    79.27%          18                 0   100.00%         434                72    83.41%           0                 0         -
+linearizer\linearizer.rs                         568                87    84.68%          19                 1    94.74%         332                38    88.55%           0                 0         -
+map\map.rs                                       860                13    98.49%          58                 0   100.00%         579                 9    98.45%           0                 0         -
+process\process.rs                               360                25    93.06%          22                 5    77.27%         195                 9    95.38%           0                 0         -
+prune\prune.rs                                   150                 9    94.00%          12                 2    83.33%          95                 7    92.63%           0                 0         -
+src\main.rs                                      123                 6    95.12%           8                 1    87.50%          84                 5    94.05%           0                 0         -
+std\crc32c\src\crc32c.rs                          31                 2    93.55%           5                 0   100.00%          26                 3    88.46%           0                 0         -
+std\md5\src\md5.rs                                31                 2    93.55%           5                 0   100.00%          26                 3    88.46%           0                 0         -
+std\sha256\src\sha256.rs                          31                 2    93.55%           5                 0   100.00%          26                 3    88.46%           0                 0         -
+symtable\symtable.rs                             114                 5    95.61%          14                 2    85.71%          80                 5    93.75%           0                 0         -
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-TOTAL                                          12251              1678    86.30%         509                46    90.96%        7479               983    86.86%           0                 0         -
+TOTAL                                          10878              1625    85.06%         450                42    90.67%        6650               931    86.00%           0                 0         -
 ```
 <!-- COVERAGE_END -->
 
