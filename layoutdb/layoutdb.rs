@@ -202,10 +202,10 @@ impl<'toks> LayoutDb {
             }
 
             // ── Alignment and address directives ──────────────────────────
-            LexToken::SetSecOffset
-            | LexToken::SetAddrOffset
+            LexToken::PadSecOffset
+            | LexToken::PadAddrOffset
             | LexToken::SetAddr
-            | LexToken::SetFileOffset
+            | LexToken::PadFileOffset
             | LexToken::Align => {
                 let mut lops = Vec::new();
                 let ir_lid = lz.new_ir(parent_nid, ast, tok_to_irkind(tok));

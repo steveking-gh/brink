@@ -4,19 +4,19 @@ section foo {
     wr8 3;
     wr8 4;
     wr8 5;
-    set_sec_offset 16;
+    pad_sec_offset 16;
     assert addr() == 16;
     assert addr_offset() == 16;
     assert sec_offset() == 16;
     wr8 0xAA, 3;
-    set_sec_offset 24, 0xFF;
+    pad_sec_offset 24, 0xFF;
     assert addr() == 24;
     assert addr_offset() == 24;
     assert sec_offset() == 24;
-    set_sec_offset 24, 0xEE; // should do Nothing
+    pad_sec_offset 24, 0xEE; // should do Nothing
     wr8 0xAA, 3;
-    set_sec_offset 27, 0x33; // should do nothing
-    set_sec_offset 28, 0x77; // should pad to 28
+    pad_sec_offset 27, 0x33; // should do nothing
+    pad_sec_offset 28, 0x77; // should pad to 28
     assert sizeof(foo) == 28;
 }
 

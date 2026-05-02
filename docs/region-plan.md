@@ -5,7 +5,7 @@
 This plan adds three related features to brink:
 
 1. **`--max-output-size` flag** (Step 1) — immediate fix for the fuzz-found
-   infinite-loop bug caused by pathological `set_addr_offset` values.
+   infinite-loop bug caused by pathological `pad_addr_offset` values.
 2. **Remove `output` address argument** (Step 2) — simplification that
    eliminates a redundant and conflict-prone feature before the region system
    lands.

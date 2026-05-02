@@ -1,6 +1,0 @@
-section foo {
-    wrs "Hello";
-    set_addr_offset 0x4; // move backward, should fail
-}
-
-output foo;

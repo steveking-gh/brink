@@ -1,6 +1,0 @@
-section foo {
-    wrs "Hello";
-    set_sec_offset 0x1; // moves backward, should fail
-}
-
-output foo;

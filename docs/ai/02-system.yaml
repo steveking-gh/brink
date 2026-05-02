@@ -157,7 +157,7 @@ language_features:
   wrs: write a string literal
   wrf: write a binary file
   align: pad to alignment boundary
-  set_addr / set_addr_offset / set_sec_offset / set_file_offset: address control
+  set_addr / pad_addr_offset / pad_sec_offset / pad_file_offset: address control
   --max-output-size: CLI flag (default 256M); rejects images exceeding the limit before execute (PROC_7)
   label: named location for map output
   assert: compile-time or layout-time assertion

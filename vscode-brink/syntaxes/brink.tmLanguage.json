@@ -107,9 +107,9 @@
     "keywords": {
       "patterns": [
         {
-          "comment": "Layout/section directives — set_addr_offset before set_addr, set_sec_offset before sec_offset",
+          "comment": "Layout/section directives",
           "name": "keyword.other.layout.brink",
-          "match": "\\b(section|align|set_addr_offset|set_sec_offset|set_file_offset|set_addr)\\b"
+          "match": "\\b(region|section|align|pad_addr_offset|pad_sec_offset|pad_file_offset|set_addr)\\b"
         },
         {
           "comment": "Write/emit instructions — sized variants listed before bare wr",

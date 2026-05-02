@@ -952,7 +952,7 @@ impl LayoutPhase {
     /// Compute the required number of bytes to pad the current section to the specified size.
     /// We don't actually pad anything yet, since that happens in a subsequent
     /// wr8 instruction.
-    /// This function covers set_sec_offset and set_addr_offset.
+    /// This function covers pad_sec_offset and pad_addr_offset.
     fn iterate_set(
         &mut self,
         ir: &IR,
@@ -1059,7 +1059,7 @@ impl LayoutPhase {
         }
 
         // Record that set_addr was called mid-section if sec_offset is non-zero.
-        // This arms the warning for any subsequent set_sec_offset in this scope.
+        // This arms the warning for any subsequent pad_sec_offset in this scope.
         if current.addr.sec_offset != 0
             && let Some(frame) = self.scope_stack.last_mut()
         {
@@ -1444,14 +1444,14 @@ impl LayoutPhase {
                             && let Some(true) = self.scope_stack.last().map(|f| &f.set_addr_seen)
                                 && self.warned_lids.insert((lid, "EXEC_54")) {
                                     let cmd = if ir.kind == IRKind::SetSecOffset {
-                                        "set_sec_offset"
+                                        "pad_sec_offset"
                                     } else {
-                                        "set_addr_offset"
+                                        "pad_addr_offset"
                                     };
                                     let msg = format!(
                                         "[EXEC_54] Warning: '{}' follows 'set_addr' in the same \
                                          section scope.  '{}' pads to a sec/addr_offset value, \
-                                         not to an address.  Consider 'set_addr_offset' after \
+                                         not to an address.  Consider 'pad_addr_offset' after \
                                          'set_addr' to pad relative to the address anchor.",
                                         cmd, cmd
                                     );

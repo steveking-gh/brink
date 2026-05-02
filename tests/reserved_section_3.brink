@@ -1,6 +1,6 @@
 // Identifiers starting with 'set_' are reserved and may not be used as section names.
 // Expected: AST_32.
-section set_custom {
+section pad_addr_offset {
     wr8 1;
 }
-output set_custom;
+output pad_addr_offset;

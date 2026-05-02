@@ -1066,24 +1066,24 @@ mod tests {
 
     #[test]
 
-    fn set_sec_offset_1() {
-        assert_brink_success("tests/set_sec_offset_1.brink", None, None);
+    fn pad_sec_offset_1() {
+        assert_brink_success("tests/pad_sec_offset_1.brink", None, None);
     }
 
     #[test]
-    fn set_sec_offset_2() {
-        assert_brink_failure("tests/set_sec_offset_2.brink", &["[EXEC_22]"]);
+    fn pad_sec_offset_2() {
+        assert_brink_failure("tests/pad_sec_offset_2.brink", &["[EXEC_22]"]);
     }
 
     #[test]
 
-    fn set_addr_offset_1() {
-        assert_brink_success("tests/set_addr_offset_1.brink", None, None);
+    fn pad_addr_offset_1() {
+        assert_brink_success("tests/pad_addr_offset_1.brink", None, None);
     }
 
     #[test]
-    fn set_addr_offset_2() {
-        assert_brink_failure("tests/set_addr_offset_2.brink", &["[EXEC_22]"]);
+    fn pad_addr_offset_2() {
+        assert_brink_failure("tests/pad_addr_offset_2.brink", &["[EXEC_22]"]);
     }
 
     #[test]
@@ -1098,8 +1098,8 @@ mod tests {
     }
 
     #[test]
-    fn set_sec_offset_after_set_addr() {
-        assert_brink_warning("tests/set_sec_offset_after_set_addr.brink", &["[EXEC_54]"]);
+    fn pad_sec_offset_after_set_addr() {
+        assert_brink_warning("tests/pad_sec_offset_after_set_addr.brink", &["[EXEC_54]"]);
     }
 
     #[test]
@@ -1167,42 +1167,42 @@ mod tests {
     }
 
     #[test]
-    fn set_sec_offset_after_set_addr_no_warn() {
+    fn pad_sec_offset_after_set_addr_no_warn() {
         // set_addr as the first statement keeps addr_offset and sec_offset in
         // sync, so EXEC_54 must not fire.
         assert_brink_no_warning(
-            "tests/set_sec_offset_after_set_addr_no_warn.brink",
+            "tests/pad_sec_offset_after_set_addr_no_warn.brink",
             &["[EXEC_54]"],
         );
     }
 
     #[test]
 
-    fn set_sec_offset_3() {
+    fn pad_sec_offset_3() {
         let _cmd = Command::cargo_bin("brink")
             .unwrap()
-            .arg("tests/set_sec_offset_3.brink")
-            .arg("-o set_sec_offset_3.bin")
+            .arg("tests/pad_sec_offset_3.brink")
+            .arg("-o pad_sec_offset_3.bin")
             .assert()
             .success();
 
         // Verify output file is correct.  If so, then clean up.
-        let bytevec = fs::read("set_sec_offset_3.bin").unwrap();
+        let bytevec = fs::read("pad_sec_offset_3.bin").unwrap();
         let temp: Vec<u8> = vec![
-            1, 2, 3, 4, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // set_sec_offset 16;
-            0xAA, 0xAA, 0xAA, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // set_sec_offset 24, 0xFF;
-            0xAA, 0xAA, 0xAA, 0x77, // set_sec_offset 28, 0x77;
+            1, 2, 3, 4, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // pad_sec_offset 16;
+            0xAA, 0xAA, 0xAA, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // pad_sec_offset 24, 0xFF;
+            0xAA, 0xAA, 0xAA, 0x77, // pad_sec_offset 28, 0x77;
         ];
         println!("Bytevec length = {}", bytevec.len());
         assert!(bytevec.len() == 28);
         assert!(bytevec == temp);
-        fs::remove_file("set_sec_offset_3.bin").unwrap();
+        fs::remove_file("pad_sec_offset_3.bin").unwrap();
     }
 
     #[test]
     fn file_offset_1() {
         // Success: assert()-heavy test inside the .brink file verifies
-        // monotonic file_offset, set_addr independence, set_file_offset
+        // monotonic file_offset, set_addr independence, pad_file_offset
         // padding, and the identifier form file_offset(name).
         let _cmd = Command::cargo_bin("brink")
             .unwrap()
@@ -1214,7 +1214,7 @@ mod tests {
         // Verify the binary layout matches the expected pad bytes.
         //   file[0..4]   "head"
         //   file[4..7]   "inn"
-        //   file[7..16]  0xBB x9  (set_file_offset 16, 0xBB)
+        //   file[7..16]  0xBB x9  (pad_file_offset 16, 0xBB)
         //   file[16..20] "tail"
         let bytevec = fs::read("file_offset_1.bin").unwrap();
         let expected: Vec<u8> = vec![
@@ -1230,7 +1230,7 @@ mod tests {
 
     #[test]
     fn file_offset_overflow() {
-        // set_file_offset backwards (target < current) must produce EXEC_22.
+        // pad_file_offset backwards (target < current) must produce EXEC_22.
         assert_brink_failure("tests/file_offset_overflow.brink", &["[EXEC_22]"]);
     }
 

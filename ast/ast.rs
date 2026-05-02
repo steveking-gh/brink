@@ -42,10 +42,10 @@ pub enum LexToken {
     Region,
     Section,
     Align,
-    SetSecOffset,
-    SetAddrOffset,
+    PadSecOffset,
+    PadAddrOffset,
     SetAddr,
-    SetFileOffset,
+    PadFileOffset,
     Assert,
     Sizeof,
     Print,
@@ -126,7 +126,6 @@ pub enum LexToken {
 ///
 /// Reserved prefixes:
 ///   - "wr" + digit  — write instructions (wr8, wr16, wr32, etc)
-///   - "set_"        — configuration directives (set_addr, set_sec_offset, etc)
 ///   - "__"          — builtin identifiers (__output_size, __output_addr, etc)
 ///
 /// Reserved exact keywords:
@@ -150,7 +149,7 @@ pub fn is_reserved_identifier(name: &str) -> bool {
     {
         return true;
     }
-    if name.starts_with("set_") || name.starts_with("__") {
+    if name.starts_with("__") {
         return true;
     }
     matches!(
@@ -170,6 +169,10 @@ pub fn is_reserved_identifier(name: &str) -> bool {
             | "addr_offset"
             | "sec_offset"
             | "file_offset"
+            | "pad_addr_offset"
+            | "pad_sec_offset"
+            | "pad_file_offset"
+            | "set_addr"
             | "print"
             | "to_u64"
             | "to_i64"
@@ -1191,10 +1194,10 @@ impl<'toks> Ast<'toks> {
                 | LexToken::Wrs
                 | LexToken::Assert
                 | LexToken::Align
-                | LexToken::SetSecOffset
-                | LexToken::SetAddrOffset
+                | LexToken::PadSecOffset
+                | LexToken::PadAddrOffset
                 | LexToken::SetAddr
-                | LexToken::SetFileOffset
+                | LexToken::PadFileOffset
                 | LexToken::Print
         )
     }

@@ -10,6 +10,9 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 - DEFEATURE: With `region`, remove obsolete starting address from `output`
   statement.
+- SYNTAX CHANGE: Rename set_sec_offset to pad_sec_offset
+- SYNTAX CHANGE: Rename set_addr_offset to pad_addr_offset
+- SYNTAX CHANGE: Rename set_file_offset to pad_file_offset
 - FEATURE: Region support
 - FEATURE: added missing --list-extensions command line option which was already
 - FEATURE: support for K/M/G suffix on decimal number literals.

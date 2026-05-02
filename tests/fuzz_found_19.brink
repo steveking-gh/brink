@@ -1,5 +1,5 @@
 section main {
-    set_addr_offset 0xFFFFFFFFFFFFF;
+    pad_addr_offset 0xFFFFFFFFFFFFF;
     wrs "123";
 }
 output main;

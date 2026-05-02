@@ -1,7 +1,7 @@
 section foo {
     set_addr 0x1000;
     wrs "Hello";
-    set_sec_offset 0x20;
+    pad_sec_offset 0x20;
     assert sizeof(foo) == 0x20;
     assert addr() == 0x1020;
     assert addr_offset() == 0x20;

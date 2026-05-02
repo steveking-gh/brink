@@ -1,0 +1,6 @@
+section foo {
+    wrs "Hello";
+    pad_sec_offset 0x1; // moves backward, should fail
+}
+
+output foo;

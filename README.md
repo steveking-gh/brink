@@ -260,7 +260,7 @@ value monotonically increases to the end of the output file.
 The following table provides a summary of the addresses and offsets used in
 Brink.
 
-| Variable       | Section Entry | Section Exit     | [`set_addr`](#set_addr) | [`set_sec_offset`](#set_sec_offset) | [`set_addr_offset`](#set_addr_offset) | [`set_file_offset`](#set_file_offset) |
+| Variable       | Section Entry | Section Exit     | [`set_addr`](#set_addr) | [`pad_sec_offset`](#pad_sec_offset) | [`pad_addr_offset`](#pad_addr_offset) | [`pad_file_offset`](#pad_file_offset) |
 | -------------- | ------------- | ---------------- | ----------------------- | ----------------------------------- | ------------------------------------- | ------------------------------------- |
 | Address        | No Change     | Restore & Update | Set                     | Pad Forward                         | Pad Forward                           | Pad Forward                           |
 | Address Offset | No Change     | Restore & Update | Set to 0                | Pad Forward                         | Pad Forward                           | Pad Forward                           |
@@ -455,7 +455,6 @@ beginning with a reserved prefix triggers an error.
 | Reserved Prefix | Reason                                                                                          |
 | --------------- | ----------------------------------------------------------------------------------------------- |
 | `wr` + digit    | Numeric write instructions (`wr8`, `wr16`, `wr32`, and future width variants)                   |
-| `set_`          | Configuration directives (`set_sec_offset`, `set_addr`, `set_file_offset`, and future variants) |
 | `__`            | Leading double underscore names refer to builtin identifiers.                                   |
 
 Brink also reserves the following *exact* keywords:
@@ -1124,7 +1123,7 @@ but in any reachable section.  For example:
     }
 
     section nested_stuff {
-        set_sec_offset 6;  // pad to last byte of region
+        pad_sec_offset 6;  // pad to last byte of region
         wr more_nested;
     }
 
@@ -1282,7 +1281,7 @@ unique, and must not conflict with const names, label names, region name, or
 Sections have their own section-relative location counter which resets to zero
 at the start of each section.  Sections can read and advance the section
 location counter with [`sec_offset()`](#sec_offset) and
-[`set_sec_offset()`](#set_sec_offset) statements
+[`pad_sec_offset()`](#pad_sec_offset) statements
 respectively.
 
 The root section named in the [`output`](#output) statement is the only section
@@ -1352,7 +1351,7 @@ Example:
         assert addr_offset() == 3;
         assert file_offset() == 8;
         assert sec_offset() == 8;
-        set_sec_offset 24, 0xFF;     // Adds 24 - 8 = 16 pad bytes
+        pad_sec_offset 24, 0xFF;     // Adds 24 - 8 = 16 pad bytes
         assert addr() == 35;         // 19 + 16 = 35
         assert addr_offset() == 19;  // 3 + 16 = 19
         assert file_offset() == 24;  // 8 + 16 = 24
@@ -1365,9 +1364,9 @@ When used in a section in a [region](#region), Brink reports an error if the `se
 
 ---
 
-## set_addr_offset
+## pad_addr_offset
 
-`set_addr_offset <expression> [, <pad byte value>];`
+`pad_addr_offset <expression> [, <pad byte value>];`
 
 Pads the output until `addr_offset` reaches the specified value.  Users may
 specify an optional pad byte value or use the default value of 0.
@@ -1375,7 +1374,7 @@ specify an optional pad byte value or use the default value of 0.
 If the specified value is less than the current `addr_offset`, Brink reports an
 error.
 
-`set_addr_offset` is most useful after a `set_addr` call, because `set_addr`
+`pad_addr_offset` is most useful after a `set_addr` call, because `set_addr`
 resets `addr_offset` to zero.  This lets users pad to a size relative to their
 chosen address anchor without knowing what the surrounding section's
 `sec_offset` happens to be.
@@ -1397,7 +1396,7 @@ Example:
         set_addr 0xF000;
         wr8 0xAA, 3;          // 3 bytes of payload
         // Pad to 0x20 bytes from the 0xF000 anchor.
-        set_addr_offset 0x20;
+        pad_addr_offset 0x20;
         assert addr() == 0xF020;
         assert addr_offset() == 0x20;
         assert sec_offset() == 0x25;  // 5 (header) + 3 (payload) + 29 (pad) = 0x25
@@ -1407,17 +1406,17 @@ Example:
 
 ---
 
-## set_file_offset
+## pad_file_offset
 
-`set_file_offset <expression> [, <pad byte value>];`
+`pad_file_offset <expression> [, <pad byte value>];`
 
-The set_file_offset command pads the output file until the *file offset* reaches
+The pad_file_offset command pads the output file until the *file offset* reaches
 the specified value.  Users may specify an optional pad byte value or use the
 default value of 0.
 
 If the specified offset is less the current offset, Brink reports an error.
 
-`set_file_offset` is most useful when a section is written inside a parent
+`pad_file_offset` is most useful when a section is written inside a parent
 section, because `sec_offset` resets to zero at the start of each child section
 while `file_offset` continues from the parent's position.  This lets a child
 section pad to an absolute file position regardless of where the parent places
@@ -1436,7 +1435,7 @@ Example:
     section payload {
         // firmware writes header first (8 bytes), so payload opens at
         // file_offset 8.  Pad to the protocol-required file position 512.
-        set_file_offset 512, 0xFF;
+        pad_file_offset 512, 0xFF;
         assert file_offset() == 512; // absolute position in the output file
         assert sec_offset() == 504;  // sec_offset starts from 0 inside payload
         wrs "PAYLOAD";               // 7 bytes of payload data
@@ -1453,11 +1452,11 @@ Example:
 
 ---
 
-## set_sec_offset
+## pad_sec_offset
 
-`set_sec_offset <expression> [, <pad byte value>];`
+`pad_sec_offset <expression> [, <pad byte value>];`
 
-The set_sec_offset command pads the current section until the *section offset*
+The pad_sec_offset command pads the current section until the *section offset*
 reaches the specified value.  Users may specify an optional pad byte value or
 use the default value of 0.
 
@@ -1471,19 +1470,19 @@ Example:
         wr8 3;
         wr8 4;
         wr8 5;
-        set_sec_offset 16;
+        pad_sec_offset 16;
         assert addr() == 16;
         assert file_offset() == 16;
         assert sec_offset() == 16;
         wr8 0xAA, 3;
-        set_sec_offset 24, 0xFF;
+        pad_sec_offset 24, 0xFF;
         assert addr() == 24;
         assert file_offset() == 24;
         assert sec_offset() == 24;
-        set_sec_offset 24, 0xEE; // should do Nothing
+        pad_sec_offset 24, 0xEE; // should do Nothing
         wr8 0xAA, 3;
-        set_sec_offset 27, 0x33; // should do nothing
-        set_sec_offset 28, 0x77; // should pad to 28
+        pad_sec_offset 27, 0x33; // should do nothing
+        pad_sec_offset 28, 0x77; // should pad to 28
         assert sizeof(foo) == 28;
     }
 
@@ -1872,7 +1871,7 @@ Users invoke extensions using function-style syntax.  Users creating their own e
 
 Fixed-size write commands like `wr32` are invalid for extensions. If the
 designer needs to pad the extension's output to a specific size, they must
-follow the `wr` command with a `set_sec_offset` or `align` statement.
+follow the `wr` command with a `pad_sec_offset` or `align` statement.
 
 ### Passing Section Data to Extensions
 

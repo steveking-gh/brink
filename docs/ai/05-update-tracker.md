@@ -186,7 +186,7 @@ IR) but harmless.
 ## 2026-04-17 — max-output-size flag (region plan step 1)
 
 **Fuzz bug fix**
-`set_addr_offset 0xFFFFFFFFFFFFF; wrs "123";` caused a hang in `execute_wrx`
+`pad_addr_offset 0xFFFFFFFFFFFFF; wrs "123";` caused a hang in `execute_wrx`
 (petabyte-range pad count).  Fix: pre-execute size check in `process.rs` using
 `engine.wr_dispatches.last().map_or(0, |d| d.file_offset + d.size)`.
 
@@ -729,5 +729,32 @@ Tests:
 
 - `region_exec79_reuse.brink`: `wr pinned` twice where `pinned in FLASH`;
   EXEC_79 fires.  Integration test `region_exec79_reuse`.
+
+355 tests pass.
+
+---
+
+## 2026-05-02 — Rename pad_* offset commands
+
+**Syntax rename**
+Three layout-time padding commands renamed for clarity:
+
+- `set_addr_offset` → `pad_addr_offset`
+- `set_sec_offset`  → `pad_sec_offset`
+- `set_file_offset` → `pad_file_offset`
+
+The `pad_` prefix makes intent explicit: these commands pad forward to a target
+offset; they do not set an absolute address.
+
+Changes:
+
+- `ast/lexer.rs`: keyword table entries renamed.
+- `ir/ir.rs`: `IRKind` variants renamed (`PadAddrOffset`, `PadSecOffset`, `PadFileOffset`).
+- `layout_phase/layout_phase.rs`: match arms updated to new variant names.
+- `tests/brink_fuzz.dict`: new names added; old names removed.
+- All test fixtures in `tests/*.brink` updated.
+- `process/fuzz/seeds/*.brink` and `process/fuzz/seeds/brink_fuzz.dict` updated.
+- `docs/`: `02-system.yaml`, `region-plan.md`, and this file updated.
+- `vscode-brink/CHANGELOG.md`: keyword list updated.
 
 355 tests pass.

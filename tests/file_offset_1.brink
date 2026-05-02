@@ -4,7 +4,7 @@
 //   1) file_offset() increments monotonically across all section boundaries.
 //      Unlike sec_offset(), it never resets on section entry.
 //      Unlike addr_offset(), it is unaffected by set_addr.
-//   2) set_file_offset pads the output until file_offset() reaches the
+//   2) pad_file_offset pads the output until file_offset() reaches the
 //      specified value, writing a caller-supplied pad byte.
 //
 // Also verifies file_offset(<identifier>) for both section names and labels,
@@ -17,7 +17,7 @@
 //  file[4..7]   "inn"    (inner)                     lab_inner_start @ 4
 //                                                    lab_inner_exit @ 7
 //                                                    lab_before_pad @ 7  (same pos, top scope)
-//  file[7..16]  0xBB x9  (set_file_offset 16 pad)
+//  file[7..16]  0xBB x9  (pad_file_offset 16 pad)
 //  file[16..20] "tail"   (top, after pad)            lab_after_pad @ 16
 //
 // Total: 20 bytes.
@@ -64,14 +64,14 @@ section top {
     lab_before_pad:
 
     // Pad from file offset 7 to 16 with 0xBB (9 bytes).
-    set_file_offset 16, 0xBB;             // file[7..16]
+    pad_file_offset 16, 0xBB;             // file[7..16]
     assert file_offset() == 16;
     assert sec_offset() == 16;
     assert addr_offset() == 12;            // 3 (inner) + 9 (pad)
     assert addr() == 0x800C;
 
-    // set_file_offset to the current value: must be a no-op.
-    set_file_offset 16, 0xCC;
+    // pad_file_offset to the current value: must be a no-op.
+    pad_file_offset 16, 0xCC;
     assert file_offset() == 16;
     assert sec_offset() == 16;
 
