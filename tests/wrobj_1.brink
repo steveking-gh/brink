@@ -1,0 +1,9 @@
+obj rodata {
+    section = ".rodata";
+    file    = "tests/obj_test.elf";
+}
+section out {
+    wr rodata;
+    assert sizeof(rodata) == 23;
+}
+output out;

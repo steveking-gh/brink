@@ -1,0 +1,8 @@
+obj rodata {
+    section = ".nonexistent";
+    file    = "tests/obj_test.elf";
+}
+section out {
+    wr rodata;
+}
+output out;

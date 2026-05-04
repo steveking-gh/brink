@@ -43,6 +43,9 @@ pub struct LayoutDb {
     /// Allows IdentDb to accept region names in addr() and sizeof() before
     /// layout_phase resolves them from irdb.region_bindings.
     pub region_names: HashSet<String>,
+
+    /// Obj declarations from the source: declared name -> (section_name, file_path).
+    pub obj_decls: HashMap<String, (String, String)>,
 }
 
 impl LayoutDb {
@@ -135,7 +138,7 @@ impl<'toks> LayoutDb {
                 returned_operands.push(idx);
             }
 
-            // ── Generic wr: section write or extension write ───────────────
+            // ── Generic wr: obj write, section write, or extension write ─────
             LexToken::Wr => {
                 let mut lops = Vec::new();
                 let child_nid = ast.children(parent_nid).next().unwrap();
@@ -143,11 +146,16 @@ impl<'toks> LayoutDb {
 
                 if child_tinfo.tok == LexToken::Identifier && !ast.has_children(child_nid) {
                     let sec_name_str = child_tinfo.val;
-                    let section = ast_db.sections.get(sec_name_str).unwrap();
-                    let sec_nid = section.nid;
-                    result &=
-                        Self::record_r(lz, sec_nid, &mut lops, diags, ast, ast_db);
-                    result &= lz.operand_count_is_valid(0, &lops, diags, tinfo);
+                    if ast_db.obj_decls.contains_key(sec_name_str) {
+                        // wr obj_name — emit Wrobj with single Name operand.
+                        let ir_lid = lz.new_ir(parent_nid, ast, IRKind::Wrobj);
+                        lz.add_new_operand_to_ir(ir_lid, LinOperand::new_name(child_tinfo));
+                    } else {
+                        let section = ast_db.sections.get(sec_name_str).unwrap();
+                        let sec_nid = section.nid;
+                        result &= Self::record_r(lz, sec_nid, &mut lops, diags, ast, ast_db);
+                        result &= lz.operand_count_is_valid(0, &lops, diags, tinfo);
+                    }
                 } else {
                     // record_expr_r (called via record_children_r) creates the
                     // extension call LinIR as the write statement directly.
@@ -334,7 +342,11 @@ impl<'toks> LayoutDb {
             ast_db.sections.keys().map(|s| s.to_string()).collect();
         let region_names: HashSet<String> =
             ast_db.regions.keys().map(|s| s.to_string()).collect();
-
+        let obj_decls: HashMap<String, (String, String)> = ast_db
+            .obj_decls
+            .iter()
+            .map(|(k, v)| (k.clone(), (v.section_name.clone(), v.file_path.clone())))
+            .collect();
         let mut layout_lz = Linearizer::new();
 
         // Linearize the output section body (layout-time IR).
@@ -361,6 +373,7 @@ impl<'toks> LayoutDb {
             output_sec_loc,
             section_names,
             region_names,
+            obj_decls,
         };
 
         layout_db.dump();
@@ -612,6 +625,9 @@ impl IdentDb {
                     continue;
                 }
                 if lindb.region_names.contains(sval) {
+                    continue;
+                }
+                if lindb.obj_decls.contains_key(sval) {
                     continue;
                 }
                 let msg = format!("Unknown or unreachable identifier {}", sval);

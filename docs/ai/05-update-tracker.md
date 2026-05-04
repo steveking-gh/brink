@@ -758,3 +758,51 @@ Changes:
 - `vscode-brink/CHANGELOG.md`: keyword list updated.
 
 355 tests pass.
+
+---
+
+## 2026-05-03 -- obj declaration and wr obj redesign
+
+**Design**
+Replaced the point-solution `wrobj "section", "file"` command with a holistic
+`obj` declaration that binds a name to a section in an external object file.
+The name is then used with `wr` and `sizeof` exactly like a section name.
+
+```brink
+obj rodata = ".rodata" in "tests/obj_test.elf";
+section firmware {
+    wr rodata;
+    assert sizeof(rodata) == 23;
+}
+output firmware;
+```
+
+Key design decisions:
+- `obj` is a top-level declaration (parallel to `region`).
+- `wr obj_name` dispatches to `IRKind::Wrobj` at layoutdb time (like `wrf`).
+- `sizeof(obj_name)` resolves via `irdb.obj_sections` in `iterate_sizeof`.
+- Section/const/region name conflict checks added (AST_69, AST_70, AST_71).
+- `obj_sections` keyed by declared name (was `(section_name, file_path)` tuple).
+- `wrobj` keyword and `LexToken::Wrobj` removed; `LexToken::Obj` added.
+
+Changes:
+
+- `ast/lexer.rs`: removed `wrobj` keyword, added `obj`.
+- `ast/ast.rs`: added `parse_obj`, `LexToken::Obj` top-level dispatch.
+- `astdb/astdb.rs`: `ObjDecl` struct, `obj_decls` map, `record_obj`,
+  conflict checks (AST_67..71), `validate_nesting_r` obj bypass.
+- `layoutdb/layoutdb.rs`: `obj_decls`/`obj_names` fields, `wr obj_name`
+  path emits `IRKind::Wrobj`, removed `LexToken::Wrobj` arm,
+  `verify_operand_refs` accepts obj names.
+- `linearizer/linearizer.rs`: removed `LexToken::Wrobj` from `tok_to_irkind`.
+- `irdb/irdb.rs`: `obj_decls` field, `obj_sections` rekeyed by declared name,
+  `validate_wrobj_operands` rewritten for single Name operand,
+  `resolve_obj_section` takes declared name.
+- `layout_phase/layout_phase.rs`: `iterate_wrobj` uses single Name operand,
+  `iterate_sizeof` gains obj path.
+- `exec_phase/exec_phase.rs`: `execute_wrobj` uses single Name operand.
+- `docs/error_codes.md`: AST_67..71 added; next available updated to AST_72.
+- Test fixtures `wrobj_*.brink` rewritten for new syntax.
+- `tests/integration.rs`: `wrobj_wrong_args` now checks AST_66.
+
+361 tests pass.

@@ -152,10 +152,12 @@ language_features:
     section_body: conditions are const; body may contain layout-time statements (wr8, wr, etc.)
   section: named block of layout-time statements
   output: single required directive naming the root section to emit
-  wr: write a named section into the current section
+  wr: write a named section or obj into the current section
   wr8/wr16/.../wr64: write integer literals
   wrs: write a string literal
   wrf: write a binary file
+  obj: top-level declaration binding a name to a section in an object file; syntax: obj name { section = "..."; file = "..."; }
+  sizeof(obj_name): returns the byte size of the named obj section (resolved at IRDb validation time)
   align: pad to alignment boundary
   set_addr / pad_addr_offset / pad_sec_offset / pad_file_offset: address control
   --max-output-size: CLI flag (default 256M); rejects images exceeding the limit before execute (PROC_7)

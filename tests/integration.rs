@@ -1522,6 +1522,10 @@ mod tests {
             "diags.warn1(\"",
             "diags.note0(\"",
             "diags.note1(\"",
+            // AST parser wrapper methods that forward the code string as a parameter.
+            // The code must appear as a string literal on the same line as the call.
+            "err_expected_after(diags, \"",
+            "err_invalid_expression(diags, \"",
         ];
 
         for path in &source_files {
@@ -3247,5 +3251,49 @@ mod tests {
     /// EXEC_79 must fire.
     fn region_exec79_reuse() {
         assert_brink_failure("tests/region_exec79_reuse.brink", &["[EXEC_79]"]);
+    }
+
+    // ── obj / wr obj ──────────────────────────────────────────────────────────
+
+    #[test]
+    /// obj declaration + wr extracts the named ELF section and writes the exact bytes.
+    fn wrobj_1() {
+        let out = "tests_wrobj_1.brink.bin";
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/wrobj_1.brink")
+            .arg("-o")
+            .arg(out)
+            .assert()
+            .success()
+            .stderr(predicates::str::is_empty());
+
+        let bytes = fs::read(out).unwrap();
+        assert_eq!(
+            bytes,
+            &[
+                0x01, 0x00, 0x02, 0x00, 0x49, 0x20, 0x67, 0x6f, 0x74, 0x20, 0x25, 0x64,
+                0x20, 0x61, 0x72, 0x67, 0x75, 0x6d, 0x65, 0x6e, 0x74, 0x73, 0x00,
+            ]
+        );
+        fs::remove_file(out).unwrap();
+    }
+
+    #[test]
+    /// obj with a section name not present in the ELF fails with IRDB_63.
+    fn wrobj_bad_section() {
+        assert_brink_failure("tests/wrobj_bad_section.brink", &["[IRDB_63]"]);
+    }
+
+    #[test]
+    /// obj with a non-existent file path fails with IRDB_62.
+    fn wrobj_bad_file() {
+        assert_brink_failure("tests/wrobj_bad_file.brink", &["[IRDB_62]"]);
+    }
+
+    #[test]
+    /// obj block missing the required 'file' property fails with AST_76.
+    fn wrobj_wrong_args() {
+        assert_brink_failure("tests/wrobj_wrong_args.brink", &["[AST_76]"]);
     }
 } // mod tests

@@ -37,6 +37,7 @@
         "Pretoken",
         "Pretokenizer",
         "rdepth",
+        "rodata",
         "signedness",
         "stringifying",
         "strout",
@@ -52,6 +53,7 @@
         "tokvec",
         "vec",
         "Wrf",
+        "wrobj",
         "Wrs",
         "wrsa",
         "xstr"

@@ -20,6 +20,7 @@ use tracing::{debug, error, info, trace, warn};
 
 use extension_registry::{ExtensionRegistry, ParamKind};
 use ir::{DataType, IR, IRKind, IROperand, ParameterValue, RegionBinding};
+use object::{Object, ObjectSection};
 use std::{
     collections::{HashMap, HashSet},
     fs,
@@ -31,6 +32,14 @@ use symtable::SymbolTable;
 
 pub struct FileInfo {
     pub path: String,
+    pub size: u64,
+    pub src_loc: SourceSpan,
+}
+
+pub struct ObjSectionInfo {
+    pub path: String,
+    pub section_name: String,
+    pub file_offset: u64,
     pub size: u64,
     pub src_loc: SourceSpan,
 }
@@ -64,6 +73,17 @@ pub struct IRDb {
     /// All declared regions, keyed by region name.  Single source of truth for
     /// region addr/size; use region_for_section() to look up a section's binding.
     pub region_bindings: HashMap<String, RegionBinding>,
+
+    /// Obj declarations from layoutdb: declared name -> (section_name, file_path).
+    pub obj_decls: HashMap<String, (String, String)>,
+
+    /// Resolved object-file sections: key = declared obj name.
+    /// Populated during validation; consumed by layout_phase and exec_phase.
+    pub obj_sections: HashMap<String, ObjSectionInfo>,
+
+    /// Per-file parse cache: file_path -> section_name -> (file_offset, size).
+    /// Ensures each object file is opened and parsed at most once.
+    parsed_obj_files: HashMap<String, HashMap<String, (u64, u64)>>,
 }
 
 impl IRDb {
@@ -361,6 +381,99 @@ impl IRDb {
         true
     }
 
+    // Parse the object file at file_path and populate parsed_obj_files with a
+    // section_name -> (file_offset, size) map.  Returns false and emits IRDB_62
+    // on any open or parse failure.  Does nothing if already cached.
+    fn load_obj_file_sections(
+        &mut self,
+        file_path: &str,
+        src_loc: &SourceSpan,
+        diags: &mut Diags,
+    ) -> bool {
+        if self.parsed_obj_files.contains_key(file_path) {
+            return true;
+        }
+        let bytes = match fs::read(file_path) {
+            Ok(b) => b,
+            Err(e) => {
+                let m = format!(
+                    "Cannot read object file '{}': {}",
+                    file_path, e
+                );
+                diags.err1("IRDB_62", &m, src_loc.clone());
+                return false;
+            }
+        };
+        let obj = match object::File::parse(bytes.as_slice()) {
+            Ok(o) => o,
+            Err(e) => {
+                let m = format!(
+                    "'{}' is not a recognized object file format: {}",
+                    file_path, e
+                );
+                diags.err1("IRDB_64", &m, src_loc.clone());
+                return false;
+            }
+        };
+        let mut section_map: HashMap<String, (u64, u64)> = HashMap::new();
+        for section in obj.sections() {
+            if let Ok(name) = section.name() && let Some((offset, size)) = section.file_range() {
+                section_map.insert(name.to_string(), (offset, size));
+            }
+        }
+        self.parsed_obj_files.insert(file_path.to_string(), section_map);
+        true
+    }
+
+    // Resolve and cache an obj section by its declared name.
+    // Looks up (section_name, file_path) from self.obj_decls, parses the object
+    // file if not yet cached, and inserts an ObjSectionInfo keyed by declared name.
+    fn resolve_obj_section(
+        &mut self,
+        obj_name: &str,
+        src_loc: &SourceSpan,
+        diags: &mut Diags,
+    ) -> bool {
+        if self.obj_sections.contains_key(obj_name) {
+            return true;
+        }
+        let (section_name, file_path) = match self.obj_decls.get(obj_name) {
+            Some(pair) => (pair.0.clone(), pair.1.clone()),
+            None => {
+                let m = format!("Unknown obj name '{}'", obj_name);
+                diags.err1("IRDB_61", &m, src_loc.clone());
+                return false;
+            }
+        };
+        if !self.load_obj_file_sections(&file_path, src_loc, diags) {
+            return false;
+        }
+        let section_map = self.parsed_obj_files.get(&file_path).unwrap();
+        let Some(&(file_offset, size)) = section_map.get(&section_name) else {
+            let m = format!(
+                "Section '{}' not found in '{}', or section has no file data (e.g. zero-initialized sections cannot be copied).",
+                section_name, file_path
+            );
+            diags.err1("IRDB_63", &m, src_loc.clone());
+            return false;
+        };
+        self.obj_sections.insert(obj_name.to_string(), ObjSectionInfo {
+            path: file_path,
+            section_name,
+            file_offset,
+            size,
+            src_loc: src_loc.clone(),
+        });
+        true
+    }
+
+    fn validate_wrobj_operands(&mut self, ir: &IR, diags: &mut Diags) -> bool {
+        assert!(ir.operands.len() == 1, "wr obj_name must have exactly 1 operand");
+        let obj_name = self.parms[ir.operands[0]].val.identifier_to_str().to_string();
+        let src_loc = ir.src_loc.clone();
+        self.resolve_obj_section(&obj_name, &src_loc, diags)
+    }
+
     // Expect 1 operand which is an integer of some sort or bool
     fn validate_numeric_1(&self, ir: &IR, diags: &mut Diags) -> bool {
         let len = ir.operands.len();
@@ -474,6 +587,7 @@ impl IRDb {
             }
             IRKind::Assert => self.validate_numeric_1(ir, diags),
             IRKind::Wrf => self.validate_wrf_operands(ir, diags),
+            IRKind::Wrobj => self.validate_wrobj_operands(ir, diags),
             IRKind::Wrs | IRKind::Print => self.validate_string_expr_operands(ir, diags),
             IRKind::ExtensionCall => {
                 let name = self.get_opnd_as_identifier(ir, 0);
@@ -789,6 +903,9 @@ impl IRDb {
             output_sec_str: lin_db.output_sec_str.clone(),
             section_region_names,
             region_bindings,
+            obj_decls: lin_db.obj_decls.clone(),
+            obj_sections: HashMap::new(),
+            parsed_obj_files: HashMap::new(),
         };
 
         if !ir_db.process_lin_operands(lin_db, diags) {

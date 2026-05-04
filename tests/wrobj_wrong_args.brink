@@ -1,0 +1,7 @@
+obj rodata {
+    section = ".rodata";
+}
+section out {
+    wr rodata;
+}
+output out;

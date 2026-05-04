@@ -85,6 +85,20 @@ impl Output {
     }
 }
 
+// -- ObjDecl ------------------------------------------------------------------
+
+/// AST-phase record of an `obj` declaration.
+/// Section name and file path are literal strings resolved at parse time.
+#[derive(Clone, Debug)]
+pub struct ObjDecl {
+    /// ELF/Mach-O/PE section name (e.g. ".rodata").
+    pub section_name: String,
+    /// Path to the object file.
+    pub file_path: String,
+    /// Source location of the `obj` keyword, for diagnostics.
+    pub src_loc: SourceSpan,
+}
+
 // -- Region --------------------------------------------------------------------
 
 /// AST-phase record of a region declaration.
@@ -118,9 +132,59 @@ pub struct AstDb {
     pub const_names: HashMap<String, SourceSpan>,
     /// All region declarations, keyed by name, in encounter order.
     pub regions: HashMap<String, Region>,
+    /// All obj declarations, keyed by declared name, in encounter order.
+    pub obj_decls: HashMap<String, ObjDecl>,
 }
 
 impl AstDb {
+    fn record_obj(
+        diags: &mut Diags,
+        obj_nid: NodeId,
+        ast: &Ast,
+        obj_decls: &mut HashMap<String, ObjDecl>,
+    ) -> bool {
+        let mut children = ast.children(obj_nid);
+        let name_nid = children.next().unwrap();
+        let name_tinfo = ast.get_tinfo(name_nid);
+        let name_str = name_tinfo.val;
+
+        if is_reserved_identifier(name_str) {
+            let m = format!("'{}' is a reserved identifier and cannot be used as an obj name", name_str);
+            diags.err1("AST_67", &m, name_tinfo.span());
+            return false;
+        }
+        if let Some(existing) = obj_decls.get(name_str) {
+            let m = format!("Duplicate obj name '{}'", name_str);
+            diags.err2("AST_68", &m, name_tinfo.span(), existing.src_loc.clone());
+            return false;
+        }
+
+        // Children after the name are ObjProp nodes; find section and file by val.
+        let mut section_name = String::new();
+        let mut file_path    = String::new();
+        for prop_nid in children {
+            let prop_tinfo = ast.get_tinfo(prop_nid);
+            if prop_tinfo.tok != LexToken::ObjProp { continue; }
+            // The ObjProp's single child is the QuotedString value.
+            let val_nid  = ast.children(prop_nid).next().unwrap();
+            let raw      = ast.get_tinfo(val_nid).val;
+            // Strip surrounding double-quotes that the lexer includes in val.
+            let stripped = raw.strip_prefix('"').unwrap_or("").strip_suffix('"').unwrap_or("").to_string();
+            match prop_tinfo.val {
+                "section" => section_name = stripped,
+                "file"    => file_path    = stripped,
+                _         => {}
+            }
+        }
+
+        obj_decls.insert(name_str.to_string(), ObjDecl {
+            section_name,
+            file_path,
+            src_loc: name_tinfo.span(),
+        });
+        true
+    }
+
     fn record_region(
         diags: &mut Diags,
         reg_nid: NodeId,
@@ -300,11 +364,16 @@ impl AstDb {
                 let sec_tinfo = ast.get_tinfo(sec_nid);
 
                 if sec_tinfo.tok == LexToken::Identifier && !ast.has_children(sec_nid) {
+                    let sec_str = sec_tinfo.val;
+
+                    // `wr obj_name` — obj is a leaf, no section recursion needed.
+                    if self.obj_decls.contains_key(sec_str) {
+                        return true;
+                    }
+
                     if !self.validate_section_name(0, parent_nid, ast, diags) {
                         return false;
                     }
-
-                    let sec_str = sec_tinfo.val;
 
                     if nested_sections.contains(sec_str) {
                         let m = "Writing section creates a cycle.";
@@ -357,6 +426,7 @@ impl AstDb {
         let mut const_statements: Vec<NodeId> = Vec::new();
         let mut const_names: HashMap<String, SourceSpan> = HashMap::new();
         let mut regions: HashMap<String, Region> = HashMap::new();
+        let mut obj_decls: HashMap<String, ObjDecl> = HashMap::new();
 
         for nid in ast.children(ast.root()) {
             let tinfo = ast.get_tinfo(nid);
@@ -364,6 +434,7 @@ impl AstDb {
                 && match tinfo.tok {
                     LexToken::Section => Self::record_section(diags, nid, ast, &mut sections),
                     LexToken::Region => Self::record_region(diags, nid, ast, &mut regions),
+                    LexToken::Obj => Self::record_obj(diags, nid, ast, &mut obj_decls),
                     LexToken::Output => Self::record_output(diags, nid, ast, &mut output),
                     LexToken::Const => {
                         const_statements.push(nid);
@@ -463,6 +534,25 @@ impl AstDb {
             bail!("AST construction failed");
         }
 
+        // Check for obj names that conflict with section, const, or region names.
+        for (obj_name, obj_entry) in &obj_decls {
+            if let Some(sec_item) = sections.get(obj_name.as_str()) {
+                let m = format!("Obj name '{}' conflicts with a section name", obj_name);
+                diags.err2("AST_69", &m, obj_entry.src_loc.clone(), sec_item.src_loc.clone());
+                result = false;
+            }
+            if let Some(const_span) = const_names.get(obj_name.as_str()) {
+                let m = format!("Obj name '{}' conflicts with a const name", obj_name);
+                diags.err2("AST_70", &m, obj_entry.src_loc.clone(), const_span.clone());
+                result = false;
+            }
+            if let Some(reg_entry) = regions.get(obj_name.as_str()) {
+                let m = format!("Obj name '{}' conflicts with a region name", obj_name);
+                diags.err2("AST_71", &m, obj_entry.src_loc.clone(), reg_entry.src_loc.clone());
+                result = false;
+            }
+        }
+
         let output_nid = output.nid;
         let mut ast_db = AstDb {
             sections,
@@ -472,6 +562,7 @@ impl AstDb {
             const_statements,
             const_names,
             regions,
+            obj_decls,
         };
 
         if !ast_db.validate_section_name(0, output_nid, ast, diags) {

@@ -192,6 +192,7 @@ pub enum IRKind {
     /// Write N bytes (little-endian). N is the byte width: 1..=8.
     Wr(u8),
     Wrf,
+    Wrobj,
     Wrs,
 }
 

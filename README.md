@@ -942,6 +942,144 @@ For example:
     output foo;
 ---
 
+## obj
+
+`obj <obj name> { ... }`
+
+An `obj` statement assigns a name to a specific section in an external object or
+executable file.  The *section* in this case is not a Brink `section`, but a
+linker section such as ".text" or ".rodata" created by an external compiler
+toolchain, e.g. [gcc](https://en.wikipedia.org/wiki/GNU_toolchain).
+
+By default, Brink supports only the
+[ELF](https://en.wikipedia.org/wiki/Executable_and_Linkable_Format) format.
+However, using compile-time feature flags, users can enable support for any
+object file format supported by the Rust
+[object](https://crates.io/crates/object) crate and rebuild Brink from source.
+
+> [!NOTE]
+> On Linux systems, the `objdump -h <filename>` command lists all the
+> sections in a compatible binary file.
+
+For example:
+
+    obj runtime_code {
+        file = "/path/to/exe";
+        section = ".text";
+    }
+
+    obj runtime_rodata {
+        file = "/path/to/exe";
+        section = ".rodata";
+    }
+
+    section main {
+        wr runtime_code;
+        wr runtime_rodata;
+    }
+
+    output main;
+
+### Obj Properties
+
+Obj definitions support the following properties:
+
+* `file` Path to the object or executable file (required)
+* `section` Name of the section in the object file (required)
+
+#### Obj Property `file`
+
+Path to the object or executable file.  Brink uses the same path resolution as
+the [wrf](#wrf-quoted-file-path) command.  Namely, paths can relative to the
+current directory or absolute.
+
+#### Obj Property `section`
+
+Name of the linker section in the object file.  The name must include the full
+string value recorded in the object or executable file, including any leading
+characters such as the "." in ".text".
+
+### Obj Size
+
+The external object file sets size of an `obj`.  Users can query the size with
+`sizeof`.  For example:
+
+    obj runtime_rodata {
+        file = "/path/to/exe";
+        section = ".rodata";
+    }
+
+    section foo {
+        print "The size of read-only data is ", sizeof(runtime_rodata), " bytes\n";
+        wr64 sizeof(runtime_rodata);
+        wr runtime_rodata;
+    }
+
+### Obj LMA and VMA
+
+Some file formats, notably ELF, define a *load memory address* (LMA) for a
+section.  The LMA specifies where a system stores a section *at rest*, as
+possibly distinct from the runtime address, known as the *virtual memory address*
+(VMA).  These addresses differ when a system copies the section before use,
+e.g. copies program code from slow FLASH memory (at the *LMA*) to fast SRAM (at the
+*VMA*) before execution.
+
+Users can query the ELF LMA and VMA of an `obj` using the [obj_lma](#obj_lma) and
+[obj_vma](#obj_vma) commands.
+
+### Brink `addr` vs LMA and VMA
+
+Users fully control their output files and can use Brink's address support
+([addr](#addr), [set_addr](#set_addr), [region](#region), etc) as they see fit.
+For most systems however, Brink's `addr` plays the same role as the ELF LMA. The
+Brink `addr` value is usually the section's *storage* address as might be used
+by a FLASH update utility.  Any subsequent copy at runtime is typically outside
+the scope of Brink.
+
+---
+
+## obj_lma
+
+`obj_lma(<obj>) -> U64`
+
+Returns the *load memory address* (LMA) of the specified [obj](#obj) as a U64.  The external object file defines this value as set by a compiler toolchain.  See [LMA and VMA](#obj-lma-and-vma) for more information.
+
+For example:
+
+    obj runtime_rodata {
+        file = "/path/to/exe";
+        section = ".rodata";
+    }
+
+    section foo {
+        print "The load address is ", obj_lma(runtime_rodata), "\n";
+        // Keep the object file load address as-is.
+        set_addr(obj_lma(runtime_rodata));
+        wr runtime_rodata;
+    }
+
+---
+
+## obj_vma
+
+`obj_vma(<obj>) -> U64`
+
+Returns the *virtual memory address* (VMA) of the specified [obj](#obj) as a U64.  The external object file defines this value as set by a compiler toolchain.  See [LMA and VMA](#obj-lma-and-vma) for more information.
+
+For example:
+
+    obj runtime_rodata {
+        file = "/path/to/exe";
+        section = ".rodata";
+    }
+
+    section foo {
+        set_addr(obj_lma(runtime_rodata));
+        // Our runtime doesn't support relocation.
+        assert obj_vma(runtime_rodata) == obj_lma(runtime_rodata);
+        wr runtime_rodata;
+    }
+
 ## output
 
 `output <section identifier>;`
@@ -1005,10 +1143,10 @@ Will result in the following console output:
 
 `region <identifier> { ... }`
 
-A region defines the name and *static* properties of an address range. Regions
-provide a way to decouple memory placement and top-down layout control from the
-section content being placed.  Unlike sections, regions are stateless and do
-not track dynamic information during layout.
+A `region` declares the name and *static* properties of an address range.
+Regions provide a way to decouple memory placement and top-down layout control
+from the section content being placed.  Unlike sections, regions are stateless
+and do not track dynamic information during layout.
 
 Users place *exactly one* section `in` a region.  We refer to this section as
 the *bound section* of the region.  The bound section is a normal
@@ -1073,13 +1211,13 @@ Regions support the following properties:
 * `addr` Starting address (required)
 * `size` Size in bytes (required)
 
-### Region Property `addr`
+#### Region Property `addr`
 
 The `addr` property defines the region's absolute starting address.  The
 region's bound section starts at this address.  Users can query the `addr`
 property of a region with `addr(<region name>)`.
 
-### Region Property `size`
+#### Region Property `size`
 
 Specifies the size of the region in bytes.  Brink reports an error if the
 size of the bound section exceeds this value.

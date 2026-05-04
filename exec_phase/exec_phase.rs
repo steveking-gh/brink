@@ -18,7 +18,7 @@ use mapdb::MapDb;
 use argvaldb::ParmValDb;
 use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
-use std::io::{Read, Write};
+use std::io::{Read, Seek, SeekFrom, Write};
 
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
@@ -202,6 +202,79 @@ impl ExecPhase {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
+    fn execute_wrobj(
+        location_db: &LocationDb,
+        argvaldb: &ParmValDb,
+        written_ranges: &mut WrittenRanges,
+        lid: usize,
+        ir: &IR,
+        irdb: &IRDb,
+        diags: &mut Diags,
+        file: &mut File,
+    ) -> Result<()> {
+        trace!("Engine::execute_wrobj:");
+
+        let obj_name = argvaldb.parms[ir.operands[0]].identifier_to_str().to_owned();
+
+        // IRDb pre-validated this entry; unwrap is safe.
+        let info = irdb.obj_sections.get(&obj_name).unwrap();
+        let file_path = info.path.clone();
+
+        let loc = &location_db.ir_locs[lid];
+        let addr = loc.addr.addr_base + loc.addr.addr_offset;
+        if !Self::check_and_record_range(written_ranges, addr, info.size, ir.src_loc.clone(), diags)
+        {
+            return Err(anyhow!("Address overwrite detected"));
+        }
+
+        let mut source_file = match File::open(file_path.as_str()) {
+            Ok(f) => f,
+            Err(err) => {
+                let msg = format!(
+                    "Opening object file '{file_path}' failed with OS error '{:?}'.",
+                    err.raw_os_error()
+                );
+                diags.err1("EXEC_80", &msg, ir.src_loc.clone());
+                return Err(anyhow!(err));
+            }
+        };
+
+        if let Err(err) = source_file.seek(SeekFrom::Start(info.file_offset)) {
+            let msg = format!(
+                "Seeking in object file '{file_path}' failed with OS error '{:?}'.",
+                err.raw_os_error()
+            );
+            diags.err1("EXEC_81", &msg, ir.src_loc.clone());
+            return Err(anyhow!(err));
+        }
+
+        let mut remaining = info.size;
+        let mut buf = [0u8; 0x10000];
+        while remaining > 0 {
+            let to_read = remaining.min(buf.len() as u64) as usize;
+            let bytes_read = match source_file.read(&mut buf[..to_read]) {
+                Ok(n) => n,
+                Err(err) => {
+                    let msg = format!(
+                        "Reading object file '{file_path}' failed with OS error '{:?}'.",
+                        err.raw_os_error()
+                    );
+                    diags.err1("EXEC_82", &msg, ir.src_loc.clone());
+                    return Err(anyhow!(err));
+                }
+            };
+            if let Err(err) = file.write_all(&buf[..bytes_read]) {
+                let msg = "Writing object section bytes failed.".to_string();
+                diags.err1("EXEC_83", &msg, ir.src_loc.clone());
+                return Err(anyhow!(err));
+            }
+            remaining -= bytes_read as u64;
+        }
+
+        Ok(())
+    }
+
     fn execute_wrx(
         location_db: &LocationDb,
         argvaldb: &ParmValDb,
@@ -295,6 +368,7 @@ impl ExecPhase {
                 IRKind::Print => Self::execute_print(argvaldb, ir, irdb, diags, file),
                 IRKind::Wrs => Self::execute_wrs(location_db, argvaldb, written_ranges, lid, ir, irdb, diags, file),
                 IRKind::Wrf => Self::execute_wrf(location_db, argvaldb, written_ranges, lid, ir, irdb, diags, file),
+                IRKind::Wrobj => Self::execute_wrobj(location_db, argvaldb, written_ranges, lid, ir, irdb, diags, file),
                 // Assert evaluates in the validation phase, before byte generation.
                 IRKind::Assert => Ok(()),
                 // the rest of these operations are computed during iteration

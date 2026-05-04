@@ -66,6 +66,7 @@ pub enum LexToken {
     Wr64,
     Wrf,
     Wr,
+    Obj,
     Output,
     DoubleEq,
     NEq,
@@ -117,6 +118,11 @@ pub enum LexToken {
     /// Synthesized when `section NAME in REGION` is parsed; tok = RegionRef,
     /// val = region name.  No children.
     RegionRef,
+    /// A property inside an obj block.
+    /// Synthesized by parse_obj; tok = ObjProp, val = property name
+    /// ("section" or "file").
+    /// The single child is the QuotedString value.
+    ObjProp,
     /// Catch-all for unrecognized input.
     Unknown,
 }
@@ -185,6 +191,7 @@ pub fn is_reserved_identifier(name: &str) -> bool {
             | "extern"
             | "let"
             | "fill"
+            | "obj"
     )
 }
 
@@ -202,6 +209,7 @@ pub const fn has_useful_debug_value(tok: LexToken) -> bool {
             | LexToken::NamedArg
             | LexToken::RegionProp
             | LexToken::RegionRef
+            | LexToken::ObjProp
     )
 }
 
@@ -672,6 +680,7 @@ impl<'toks> Ast<'toks> {
             result &= match tinfo.tok {
                 LexToken::Section => self.parse_section(self.root, diags),
                 LexToken::Region => self.parse_region(self.root, diags),
+                LexToken::Obj => self.parse_obj(self.root, diags),
                 LexToken::Output => self.parse_output(self.root, diags),
                 LexToken::Const => self.parse_const(self.root, diags),
                 LexToken::If => self.parse_if_r(self.root, diags, ParseIfContext::TopLevel),
@@ -963,6 +972,111 @@ impl<'toks> Ast<'toks> {
         self.dbg_exit("parse_region", result)
     }
 
+    /// Parses an `obj` declaration at the top level.
+    ///
+    /// ```text
+    /// obj <name> {
+    ///     section = "<elf-section>";
+    ///     file    = "<file-path>";
+    /// }
+    ///
+    ///   obj                    <- root node
+    ///   ├── <Identifier>        <- declared name
+    ///   ├── ObjProp("section")  <- section property node
+    ///   │   └── <QuotedString>  <- ELF section name
+    ///   └── ObjProp("file")     <- file property node
+    ///       └── <QuotedString>  <- file path
+    /// ```
+    /// Properties may appear in any order; both are required.
+    fn parse_obj(&mut self, parent: NodeId, diags: &mut Diags) -> bool {
+        self.dbg_enter("parse_obj");
+        let obj_nid = self.add_to_parent_and_advance(parent);
+
+        if !self.expect_name_leaf(diags, obj_nid, "AST_66", "Expected an identifier after 'obj'") {
+            return self.dbg_exit("parse_obj", false);
+        }
+
+        if self.tv.peek().tok != LexToken::OpenBrace {
+            self.err_expected_after(diags, "AST_66", "'obj <name>': expected '{'");
+            return self.dbg_exit("parse_obj", false);
+        }
+        let brace_tok_num = self.tv.get_index();
+        self.tv.skip(); // consume '{'
+
+        let mut section_seen = false;
+        let mut file_seen    = false;
+
+        loop {
+            let tinfo = self.tv.peek();
+            if tinfo.tok == LexToken::CloseBrace {
+                self.tv.skip();
+                break;
+            }
+            if tinfo.tok == LexToken::EOF {
+                self.err_no_close_brace(diags, brace_tok_num);
+                return self.dbg_exit("parse_obj", false);
+            }
+
+            let prop_name = tinfo.val;
+            let prop_loc  = tinfo.span();
+
+            let is_section = match prop_name {
+                "section" => true,
+                "file"    => false,
+                _ => {
+                    let m = format!("Unknown obj property '{}'. Expected 'section' or 'file'.", prop_name);
+                    diags.err1("AST_75", &m, prop_loc);
+                    return self.dbg_exit("parse_obj", false);
+                }
+            };
+
+            if (is_section && section_seen) || (!is_section && file_seen) {
+                let m = format!("Duplicate '{}' property in obj block.", prop_name);
+                diags.err1("AST_74", &m, prop_loc);
+                return self.dbg_exit("parse_obj", false);
+            }
+
+            self.tv.skip(); // consume property name
+
+            if self.tv.peek().tok != LexToken::Eq {
+                self.err_expected_after(diags, "AST_72", &format!("'{}': expected '='", prop_name));
+                return self.dbg_exit("parse_obj", false);
+            }
+            self.tv.skip(); // consume '='
+
+            if self.tv.peek().tok != LexToken::QuotedString {
+                self.err_expected_after(diags, "AST_73", &format!("'{} =': expected a quoted string value", prop_name));
+                return self.dbg_exit("parse_obj", false);
+            }
+
+            // Synthesize an ObjProp node whose val is the property name,
+            // then attach the QuotedString value as its child.
+            let prop_node = TokenInfo { tok: LexToken::ObjProp, loc: prop_loc, val: prop_name };
+            let prop_nid  = self.arena.new_node(prop_node);
+            obj_nid.append(prop_nid, &mut self.arena);
+            self.parse_leaf(prop_nid); // attaches QuotedString child and advances
+
+            if self.tv.peek().tok != LexToken::Semicolon {
+                self.err_expected_after(diags, "AST_77", "Expected ';' after obj property value");
+                return self.dbg_exit("parse_obj", false);
+            }
+            self.tv.skip(); // consume ';'
+
+            if is_section { section_seen = true; } else { file_seen = true; }
+        }
+
+        if !section_seen || !file_seen {
+            let missing = if !section_seen { "section" } else { "file" };
+            let m = format!("obj block is missing required property '{}'.", missing);
+            let name_nid = obj_nid.children(&self.arena).next().unwrap();
+            let name_loc = self.arena[name_nid].get().loc.clone();
+            diags.err1("AST_76", &m, name_loc);
+            return self.dbg_exit("parse_obj", false);
+        }
+
+        self.dbg_exit("parse_obj", true)
+    }
+
     /// Parses the body of a `region` block: `name = expr ;` assignments until `}`.
     fn parse_region_contents(
         &mut self,
@@ -1141,11 +1255,7 @@ impl<'toks> Ast<'toks> {
                     matches!(chars.next(), Some(c) if c.is_ascii_alphabetic() || c == '_')
                 };
                 if !val_is_name {
-                    self.err_expected_after(
-                        diags,
-                        "AST_49",
-                        "'in': expected region name after 'in'",
-                    );
+                    self.err_expected_after(diags, "AST_49", "'in': expected region name after 'in'");
                     return self.dbg_exit("parse_section", false);
                 }
                 // Synthesize a RegionRef node to record the binding.
@@ -1948,11 +2058,7 @@ impl<'toks> Ast<'toks> {
                 // Declare-only: const NAME;  (value assigned later in an if/else body)
                 result = self.expect_semi(diags, const_nid);
             } else {
-                self.err_expected_after(
-                    diags,
-                    "AST_50",
-                    "Expected '=' or ';' after const identifier",
-                );
+                self.err_expected_after(diags, "AST_50", "Expected '=' or ';' after const identifier");
             }
         }
         self.dbg_exit("parse_const", result)

@@ -235,6 +235,18 @@ impl LayoutPhase {
         current.advance(byte_size, &ir.src_loc, diags)
     }
 
+    fn iterate_wrobj(
+        &mut self,
+        ir: &IR,
+        irdb: &IRDb,
+        diags: &mut Diags,
+        current: &mut Location,
+    ) -> bool {
+        let obj_name = self.parms[ir.operands[0]].identifier_to_str().to_string();
+        let info = irdb.obj_sections.get(&obj_name).unwrap();
+        current.advance(info.size, &ir.src_loc, diags)
+    }
+
     /// Compute the string representation of the expression.
     /// Returns the resulting string in xstr.
     /// If the diags noprint option is true, suppress printing.
@@ -723,13 +735,19 @@ impl LayoutPhase {
                 return true;
             }
 
+            // Obj path: size is fixed from the object file section.
+            if let Some(info) = irdb.obj_sections.get(&sec_name) {
+                *self.parms[out_parm_num].to_u64_mut() = info.size;
+                return true;
+            }
+
             // Region path: size is const-evaluated and stable across iterations.
             if let Some(binding) = irdb.region_bindings.get(&sec_name) {
                 *self.parms[out_parm_num].to_u64_mut() = binding.size;
             } else {
                 unreachable!(
                     "sizeof() argument '{}' is not a section used in output or \
-                     a declared region.  layoutdb::verify_operand_refs should have \
+                     a declared obj or region.  layoutdb::verify_operand_refs should have \
                      caught this.",
                     sec_name
                 );
@@ -1462,6 +1480,7 @@ impl LayoutPhase {
                     IRKind::SetAddr => self.iterate_set_addr(ir, irdb, lid, diags, &mut current),
 
                     IRKind::Wrf => self.iterate_wrf(ir, irdb, diags, &mut current),
+                    IRKind::Wrobj => self.iterate_wrobj(ir, irdb, diags, &mut current),
 
                     // The following IR types are evaluated only at execute time.
                     // Nothing to do during iteration.
