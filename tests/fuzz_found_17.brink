@@ -1,4 +1,5 @@
-section foo {// 3;
+// EXPECT-FAIL: LINEAR_5
+section foo {
     assert 0 >> 1490u == 42i; // = 0
 }
 

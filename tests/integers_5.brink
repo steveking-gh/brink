@@ -1,5 +1,5 @@
 section foo {
-    assert 42u == 42i; // Fails, type mismatch
+    assert 42u == 42i; // EXPECT-FAIL: LINEAR_5
 }
 
 output foo;

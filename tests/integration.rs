@@ -362,12 +362,12 @@ mod tests {
 
     #[test]
     fn fuzz_found_17() {
-        assert_brink_failure("tests/fuzz_found_17.brink", &["[EXEC_13]"]);
+        assert_brink_failure("tests/fuzz_found_17.brink", &["[LINEAR_5]"]);
     }
 
     #[test]
     fn fuzz_found_18() {
-        assert_brink_failure("tests/fuzz_found_18.brink", &["[IRDB_2]"]);
+        assert_brink_failure("tests/fuzz_found_18.brink", &["[LINEAR_3]"]);
     }
 
     #[test]
@@ -397,7 +397,7 @@ mod tests {
 
     #[test]
     fn fuzz_found_24() {
-        assert_brink_failure("tests/fuzz_found_24.brink", &["[LINEAR_1]"]);
+        assert_brink_failure("tests/fuzz_found_24.brink", &["[IRDB_59]"]);
     }
 
     #[test]
@@ -572,7 +572,7 @@ mod tests {
     #[test]
 
     fn integers_5() {
-        assert_brink_failure("tests/integers_5.brink", &["[EXEC_13]"]);
+        assert_brink_failure("tests/integers_5.brink", &["[LINEAR_5]"]);
     }
 
     #[test]
@@ -2694,7 +2694,7 @@ mod tests {
     /// get_operand_data_type_r cannot reconcile them.
     #[test]
     fn irdb_1_type_mismatch() {
-        assert_brink_failure("tests/irdb_1_type_mismatch.brink", &["[IRDB_1]"]);
+        assert_brink_failure("tests/irdb_1_type_mismatch.brink", &["[LINEAR_4]"]);
     }
 
     /// IRDB_9: wr8 operand is a quoted string rather than a numeric value.

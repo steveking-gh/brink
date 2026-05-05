@@ -32,24 +32,18 @@ crates:
 
   const_eval:
     path: const_eval/const_eval.rs
-    role: Const expression evaluation; produces SymbolTable
+    role: Const expression evaluation and AST pruning
     key_types: [ConstIR, LinIR, LinOperand]
-    key_fns: [evaluate, eval_ast_condition]
+    key_fns: [evaluate, evaluate_and_prune]
     notes: >
-      eval_ast_condition linearizes the condition sub-tree via
-      Linearizer::record_expr_r, then evaluates with eval_const_expr_r.
-      No separate eval_ast_expr — eliminated by Strategy B refactor.
+      Acts as an AST walker. Evaluates constants and prunes dead if/else branches
+      simultaneously, returning a cloned working AST. Eliminates the need for a separate prune crate.
 
   prune:
-    path: prune/prune.rs
-    role: Remove if/else nodes from pruned AST clone
-    key_fns: [prune, prune_body, prune_if_node]
+    path: (removed)
+    role: (removed)
     notes: >
-      prune() takes no AstDb — walks root directly.
-      keep filter (fn(LexToken)->bool) controls which nodes promote.
-      Root step: keep Section|If only. Section-body step: keep all.
-      root_nid must be captured before &mut pruned borrow (NodeId is Copy
-      but borrow checker requires sequential borrows in separate statements).
+      The prune crate has been completely eliminated and merged into const_eval.
 
   layoutdb:
     path: layoutdb/layoutdb.rs
@@ -133,7 +127,7 @@ crates:
     path: process/process.rs
     role: Pipeline orchestrator; single entry point for the binary
     notes: >
-      Calls stages in order: Ast → AstDb(false) → const_eval → prune →
+      Calls stages in order: Ast → AstDb(false) → const_eval(evaluate_and_prune) →
       AstDb(true) → LayoutDb → IRDb → LayoutPhase → ValidationPhase →
       ExecPhase → map output.
 

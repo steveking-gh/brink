@@ -150,11 +150,8 @@ pub fn process(
     // sections promoted from top-level if/else blocks are visible.
     let ast_db = AstDb::new(&mut diags, &ast, false)?;
 
-    let mut symbol_table = const_eval::evaluate(&mut diags, &ast, &ast_db, &const_defines)
+    let (mut symbol_table, pruned_ast) = const_eval::evaluate_and_prune(&mut diags, &ast, &ast_db, &const_defines)
         .context("[PROC_2]: Error detected, halting.")?;
-
-    let pruned_ast = prune::prune(&ast, &mut symbol_table, &mut diags)
-        .context("[PROC_3]: Error detected, halting.")?;
 
     // Second AstDb: built from the pruned AST with full nesting validation.
     // Sections promoted from top-level if/else blocks are now at root level.
@@ -175,7 +172,7 @@ pub fn process(
         }
     }
 
-    let layout_db = LayoutDb::new(&mut diags, &pruned_ast, &pruned_ast_db)
+    let layout_db = LayoutDb::new(&mut diags, &pruned_ast, &pruned_ast_db, &symbol_table)
         .context("[PROC_4]: Error detected, halting.")?;
     if verbosity > 2 {
         layout_db.dump();

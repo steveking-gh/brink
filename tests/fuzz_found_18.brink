@@ -1,2 +1,3 @@
+// EXPECT-FAIL: LINEAR_4
 section foo{ print"f "+"\n";}
 output foo;

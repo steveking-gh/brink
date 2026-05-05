@@ -105,8 +105,10 @@ pub struct IRDb {
 // Scan PT_LOAD program headers and assign each section its LMA.
 // Sections not covered by any PT_LOAD segment default to VMA.
 // Called only for ELF files; non-ELF files leave lma = None.
-fn fill_lma<Elf>(elf: &object::read::elf::ElfFile<'_, Elf>, section_map: &mut HashMap<String, SectionProps>)
-where
+fn fill_lma<Elf>(
+    elf: &object::read::elf::ElfFile<'_, Elf>,
+    section_map: &mut HashMap<String, SectionProps>,
+) where
     Elf: object::read::elf::FileHeader,
     Elf::Word: Into<u64>,
 {
@@ -138,7 +140,10 @@ where
 // Scan PT_LOAD program headers and assign each section its LMA.
 // Sections not covered by any PT_LOAD segment default to VMA.
 // Called only for ELF files; non-ELF files leave lma = None.
-fn compute_lma_from_segments(obj: &object::File<'_>, section_map: &mut HashMap<String, SectionProps>) {
+fn compute_lma_from_segments(
+    obj: &object::File<'_>,
+    section_map: &mut HashMap<String, SectionProps>,
+) {
     match obj {
         object::File::Elf32(elf) => fill_lma(elf, section_map),
         object::File::Elf64(elf) => fill_lma(elf, section_map),
@@ -150,10 +155,10 @@ impl IRDb {
     /// Return the RegionBinding for a section, or None if the section is not
     /// bound to a region.
     pub fn region_for_section(&self, sec_name: &str) -> Option<&RegionBinding> {
-        self.section_region_names.get(sec_name)
+        self.section_region_names
+            .get(sec_name)
             .and_then(|rname| self.region_bindings.get(rname))
     }
-
 
     /// Returns the value of the specified operand for the specified IR.
     /// The operand number is for the *IR*, not the absolute operand
@@ -168,153 +173,20 @@ impl IRDb {
         self.parms.get(opnd_num).unwrap().ir_lid
     }
 
-    /// Get the datatype of the referenced operand by recursively inspecting
-    /// the input operands.
-    /// Returns None on error
-    fn get_operand_data_type_r(
-        depth: usize,
-        lop_num: usize,
-        lin_db: &LayoutDb,
-        symbol_table: &SymbolTable,
-        diags: &mut Diags,
-    ) -> Option<DataType> {
-        trace!(
-            "IRDb::get_operand_data_type_r: Enter at depth {} for lop number {}",
-            depth, lop_num
-        );
-        let lop = &lin_db.operand_vec[lop_num];
-        let mut data_type = None;
-
-        match lop {
-            linearizer::LinOperand::Output { ir_lid, .. } => {
-                let lin_ir = &lin_db.ir_vec[*ir_lid];
-                match lin_ir.op {
-                    // Extension call output: rejects use in arithmetic, wr8..64, wrs, const.
-                    IRKind::ExtensionCall => return Some(DataType::Extension),
-
-                    // Arithmetic and bitwise ops: output type matches input types.
-                    IRKind::Add
-                    | IRKind::Subtract
-                    | IRKind::Multiply
-                    | IRKind::Divide
-                    | IRKind::Modulo
-                    | IRKind::BitOr
-                    | IRKind::BitAnd
-                    | IRKind::LeftShift
-                    | IRKind::RightShift => {
-                        // Expect 2 input operands and 1 output operand.
-                        assert!(lin_ir.operand_vec.len() == 3);
-                        assert!(lin_ir.operand_vec[2] == lop_num);
-                        let lhs_num = lin_ir.operand_vec[0];
-                        let rhs_num = lin_ir.operand_vec[1];
-
-                        let lhs_opt = Self::get_operand_data_type_r(
-                            depth + 1,
-                            lhs_num,
-                            lin_db,
-                            symbol_table,
-                            diags,
-                        );
-                        if let Some(lhs_dt) = lhs_opt {
-                            let rhs_opt = Self::get_operand_data_type_r(
-                                depth + 1,
-                                rhs_num,
-                                lin_db,
-                                symbol_table,
-                                diags,
-                            );
-                            if let Some(rhs_dt) = rhs_opt {
-                                if lhs_dt == rhs_dt {
-                                    let allowed = [DataType::I64, DataType::U64, DataType::Integer];
-                                    if !allowed.contains(&lhs_dt) {
-                                        let msg = format!(
-                                            "Error, found data type '{:?}', but operation '{:?}' requires one of {:?}.",
-                                            lhs_dt, lin_ir.op, allowed
-                                        );
-                                        diags.err1("IRDB_2", &msg, lin_ir.src_loc.clone());
-                                    } else {
-                                        data_type = Some(lhs_dt);
-                                    }
-                                } else {
-                                    let mut dt_ok = false;
-                                    // Attempt to reconcile Integer with a typed value.
-                                    if rhs_dt == DataType::Integer {
-                                        if [DataType::I64, DataType::U64, DataType::Integer]
-                                            .contains(&lhs_dt)
-                                        {
-                                            dt_ok = true;
-                                            data_type = Some(lhs_dt);
-                                        }
-                                    } else if lhs_dt == DataType::Integer
-                                        && [DataType::I64, DataType::U64].contains(&rhs_dt)
-                                    {
-                                        dt_ok = true;
-                                        data_type = Some(rhs_dt);
-                                    }
-                                    if !dt_ok {
-                                        let msg = format!(
-                                            "Error, data type mismatch in input operands.  Left is {:?}, right is {:?}.",
-                                            lhs_dt, rhs_dt
-                                        );
-                                        diags.err1("IRDB_1", &msg, lin_ir.src_loc.clone());
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    IRKind::ToI64 => return Some(DataType::I64),
-                    IRKind::BuiltinVersionString => return Some(DataType::QuotedString),
-                    // All other output-producing ops yield U64.
-                    _ => return Some(DataType::U64),
-                }
-            }
-
-            linearizer::LinOperand::Literal { tok, .. } => {
-                match tok {
-                    ast::LexToken::U64 => data_type = Some(DataType::U64),
-                    ast::LexToken::I64 => data_type = Some(DataType::I64),
-                    ast::LexToken::Integer => data_type = Some(DataType::Integer),
-                    ast::LexToken::QuotedString => data_type = Some(DataType::QuotedString),
-                    ast::LexToken::Namespace => data_type = Some(DataType::Identifier),
-                    ast::LexToken::BuiltinVersionString => data_type = Some(DataType::QuotedString),
-                    _ => {
-                        panic!("Literal operand with unexpected token {:?}", tok);
-                    }
-                }
-            }
-
-            // Identifier reference: type is the const's type if found, else Identifier.
-            linearizer::LinOperand::Ref { sval, .. } => {
-                if let Some(cv) = symbol_table.get(sval.as_str()) {
-                    data_type = Some(cv.data_type());
-                } else {
-                    data_type = Some(DataType::Identifier);
-                }
-            }
-
-            // NameDef: always resolves to Identifier.
-            linearizer::LinOperand::NameDef { .. } => {
-                data_type = Some(DataType::Identifier);
-            }
-        };
-
-        trace!(
-            "IRDb::get_operand_data_type_r: Exit from depth {}, lop {} is {:?}",
-            depth, lop_num, data_type
-        );
-        data_type
-    }
-
     /// Process untyped linear operands into real IR operands
     fn process_lin_operands(&mut self, lin_db: &LayoutDb, diags: &mut Diags) -> bool {
         trace!("IRDb::process_lin_operands: Enter");
 
         let mut result = true;
-        for (lop_num, lop) in lin_db.operand_vec.iter().enumerate() {
+        for lop in lin_db.operand_vec.iter() {
             // Const substitution: replace Ref operands that name a resolved const
             // with the const's typed value.
-            if let linearizer::LinOperand::Ref { sval, src_loc, param_name } = lop
+            if let linearizer::LinOperand::Ref {
+                sval,
+                src_loc,
+                param_name,
+                ..
+            } = lop
                 && let Some(const_val) = self.symbol_table.get(sval.as_str()).cloned()
             {
                 self.symbol_table.mark_used(sval.as_str());
@@ -328,27 +200,32 @@ impl IRDb {
                 continue;
             }
 
-            let dt_opt =
-                Self::get_operand_data_type_r(0, lop_num, lin_db, &self.symbol_table, diags);
-            let Some(data_type) = dt_opt else {
-                return false; // error case, just give up
-            };
+            let data_type = lop.data_type();
 
             // Destructure fields needed by IROperand::new.  Output operands carry no
             // sval (the engine initializes their value at execution time), so pass "".
             let (ir_lid, sval, src_loc, is_immediate, param_name) = match lop {
-                linearizer::LinOperand::Literal { sval, src_loc, param_name, .. } => {
-                    (None, sval.as_str(), src_loc, true, param_name.clone())
-                }
-                linearizer::LinOperand::Ref { sval, src_loc, param_name } => {
-                    (None, sval.as_str(), src_loc, true, param_name.clone())
-                }
-                linearizer::LinOperand::NameDef { sval, src_loc } => {
+                linearizer::LinOperand::Literal {
+                    sval,
+                    src_loc,
+                    param_name,
+                    ..
+                } => (None, sval.as_str(), src_loc, true, param_name.clone()),
+                linearizer::LinOperand::Ref {
+                    sval,
+                    src_loc,
+                    param_name,
+                    ..
+                } => (None, sval.as_str(), src_loc, true, param_name.clone()),
+                linearizer::LinOperand::NameDef { sval, src_loc, .. } => {
                     (None, sval.as_str(), src_loc, true, None)
                 }
-                linearizer::LinOperand::Output { ir_lid, src_loc, param_name } => {
-                    (Some(*ir_lid), "", src_loc, false, param_name.clone())
-                }
+                linearizer::LinOperand::Output {
+                    ir_lid,
+                    src_loc,
+                    param_name,
+                    ..
+                } => (Some(*ir_lid), "", src_loc, false, param_name.clone()),
             };
 
             // Convert the string literal to a typed value; fails on malformed input.
@@ -456,10 +333,7 @@ impl IRDb {
         let bytes = match fs::read(file_path) {
             Ok(b) => b,
             Err(e) => {
-                let m = format!(
-                    "Cannot read object file '{}': {}",
-                    file_path, e
-                );
+                let m = format!("Cannot read object file '{}': {}", file_path, e);
                 diags.err1("IRDB_62", &m, src_loc.clone());
                 return false;
             }
@@ -477,20 +351,24 @@ impl IRDb {
         };
         let mut section_map: HashMap<String, SectionProps> = HashMap::new();
         for section in obj.sections() {
-            if let Ok(name) = section.name() {
-                if let Some((file_offset, size)) = section.file_range() {
-                    section_map.insert(name.to_string(), SectionProps {
+            if let Ok(name) = section.name()
+                && let Some((file_offset, size)) = section.file_range()
+            {
+                section_map.insert(
+                    name.to_string(),
+                    SectionProps {
                         file_offset,
                         size,
                         align: section.align(),
                         vma: section.address(),
                         lma: None,
-                    });
-                }
+                    },
+                );
             }
         }
         compute_lma_from_segments(&obj, &mut section_map);
-        self.parsed_obj_files.insert(file_path.to_string(), section_map);
+        self.parsed_obj_files
+            .insert(file_path.to_string(), section_map);
         true
     }
 
@@ -526,22 +404,31 @@ impl IRDb {
             diags.err1("IRDB_63", &m, src_loc.clone());
             return false;
         };
-        self.obj_sections.insert(obj_name.to_string(), ObjSectionInfo {
-            path: file_path,
-            section_name,
-            file_offset: props.file_offset,
-            size: props.size,
-            align: props.align,
-            vma: props.vma,
-            lma: props.lma.unwrap(),
-            src_loc: src_loc.clone(),
-        });
+        self.obj_sections.insert(
+            obj_name.to_string(),
+            ObjSectionInfo {
+                path: file_path,
+                section_name,
+                file_offset: props.file_offset,
+                size: props.size,
+                align: props.align,
+                vma: props.vma,
+                lma: props.lma.unwrap(),
+                src_loc: src_loc.clone(),
+            },
+        );
         true
     }
 
     fn validate_wrobj_operands(&mut self, ir: &IR, diags: &mut Diags) -> bool {
-        assert!(ir.operands.len() == 1, "wr obj_name must have exactly 1 operand");
-        let obj_name = self.parms[ir.operands[0]].val.identifier_to_str().to_string();
+        assert!(
+            ir.operands.len() == 1,
+            "wr obj_name must have exactly 1 operand"
+        );
+        let obj_name = self.parms[ir.operands[0]]
+            .val
+            .identifier_to_str()
+            .to_string();
         let src_loc = ir.src_loc.clone();
         self.resolve_obj_section(&obj_name, &src_loc, diags)
     }
@@ -549,11 +436,13 @@ impl IRDb {
     // obj_align/obj_lma/obj_vma: [identifier, output]; resolve the obj section.
     fn validate_obj_query_operands(&mut self, ir: &IR, diags: &mut Diags) -> bool {
         assert!(ir.operands.len() == 2);
-        let obj_name = self.parms[ir.operands[0]].val.identifier_to_str().to_string();
+        let obj_name = self.parms[ir.operands[0]]
+            .val
+            .identifier_to_str()
+            .to_string();
         let src_loc = ir.src_loc.clone();
         self.resolve_obj_section(&obj_name, &src_loc, diags)
     }
-
 
     // Expect 1 operand which is an integer of some sort or bool
     fn validate_numeric_1(&self, ir: &IR, diags: &mut Diags) -> bool {
@@ -583,10 +472,7 @@ impl IRDb {
     fn validate_numeric_1_or_2(&self, ir: &IR, diags: &mut Diags) -> bool {
         let len = ir.operands.len();
         if !(1..=2).contains(&len) {
-            let m = format!(
-                "'{:?}' takes 1 or 2 arguments, found {}.",
-                ir.kind, len
-            );
+            let m = format!("'{:?}' takes 1 or 2 arguments, found {}.", ir.kind, len);
             diags.err1("IRDB_55", &m, ir.src_loc.clone());
             return false;
         }
@@ -663,13 +549,18 @@ impl IRDb {
         _section_names: &HashSet<String>,
     ) -> bool {
         match ir.kind {
-            IRKind::Align | IRKind::SetSecOffset | IRKind::SetAddrOffset | IRKind::SetAddr | IRKind::SetFileOffset | IRKind::Wr(_) => {
-                self.validate_numeric_1_or_2(ir, diags)
-            }
+            IRKind::Align
+            | IRKind::SetSecOffset
+            | IRKind::SetAddrOffset
+            | IRKind::SetAddr
+            | IRKind::SetFileOffset
+            | IRKind::Wr(_) => self.validate_numeric_1_or_2(ir, diags),
             IRKind::Assert => self.validate_numeric_1(ir, diags),
             IRKind::Wrf => self.validate_wrf_operands(ir, diags),
             IRKind::Wrobj => self.validate_wrobj_operands(ir, diags),
-            IRKind::ObjAlign | IRKind::ObjVma | IRKind::ObjLma => self.validate_obj_query_operands(ir, diags),
+            IRKind::ObjAlign | IRKind::ObjVma | IRKind::ObjLma => {
+                self.validate_obj_query_operands(ir, diags)
+            }
             IRKind::Wrs | IRKind::Print => self.validate_string_expr_operands(ir, diags),
             IRKind::ExtensionCall => {
                 let name = self.get_opnd_as_identifier(ir, 0);
@@ -886,7 +777,9 @@ impl IRDb {
                         return false;
                     }
                     // IRDB_54: the identifier does not name a known section.
-                    let ParameterValue::Identifier(ref sec_name) = opnd.val else { unreachable!() };
+                    let ParameterValue::Identifier(ref sec_name) = opnd.val else {
+                        unreachable!()
+                    };
                     if !section_names.contains(sec_name.as_str()) {
                         let m = format!(
                             "Extension '{}': parameter '{}' names an unknown section '{}'",
@@ -1045,7 +938,11 @@ impl IRDb {
                             op.push_str(&format!(" ({:?}){}", operand.val.data_type(), v));
                         }
                         DataType::Extension => {
-                            op.push_str(&format!("({:?}){}", operand.val.data_type(), operand.val.to_str()));
+                            op.push_str(&format!(
+                                "({:?}){}",
+                                operand.val.data_type(),
+                                operand.val.to_str()
+                            ));
                         }
                         DataType::Unknown => {
                             println!("Dump: Found unknown Data Type operand {:?}", operand);

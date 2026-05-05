@@ -1,4 +1,4 @@
-// IRDB_1: binary operator applied to two typed but incompatible operands.
+// EXPECT-FAIL: LINEAR_4: binary operator applied to two typed but incompatible operands.
 // U64 (1u) and I64 (1i) are both typed and neither is the untyped Integer class,
 // so the type reconciler cannot promote either side — IRDB_1 must fire.
 

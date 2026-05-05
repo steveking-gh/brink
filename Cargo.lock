@@ -505,6 +505,7 @@ dependencies = [
  "indextree",
  "ir",
  "linearizer",
+ "symtable",
  "tracing",
 ]
 
@@ -529,6 +530,7 @@ dependencies = [
  "diags",
  "indextree",
  "ir",
+ "symtable",
  "tracing",
 ]
 
@@ -745,23 +747,9 @@ dependencies = [
  "map_phase",
  "mapdb",
  "parse_int",
- "prune",
  "regiondb",
  "tracing",
  "validation_phase",
-]
-
-[[package]]
-name = "prune"
-version = "7.0.2"
-dependencies = [
- "anyhow",
- "ast",
- "const_eval",
- "diags",
- "indextree",
- "symtable",
- "tracing",
 ]
 
 [[package]]

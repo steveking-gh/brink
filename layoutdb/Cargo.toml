@@ -18,4 +18,5 @@ ast   = { path = "../ast" }
 astdb = { path = "../astdb" }
 ir = { path = "../ir" }
 linearizer = { path = "../linearizer" }
+symtable = { path = "../symtable" }
 tracing = "0.1.44"

@@ -14,4 +14,5 @@ depth_guard = { path = "../depth_guard" }
 diags = { path = "../diags" }
 ast = { path = "../ast" }
 ir = { path = "../ir" }
+symtable = { path = "../symtable" }
 tracing = "0.1.44"

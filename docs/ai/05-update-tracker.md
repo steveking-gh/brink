@@ -854,3 +854,20 @@ Changed files: `ir/ir.rs`, `ast/lexer.rs`, `ast/ast.rs`,
 `tests/obj_lma_1.brink`, `tests/obj_lma_non_elf.brink`, `tests/integration.rs`.
 
 365 tests pass.
+
+---
+
+## 2026-05-05 — Typed-lowering architecture integration
+
+**Const Evaluation as AST Walker**
+`const_eval` transitioned into a pure AST walker, evaluating and pruning in one pass. It clones the input AST into a "working" pruned AST. `LexToken::Const` evaluation correctly differentiates between declarations (`const X;`) and assignments (`const X = 1;`) by inspecting the node structure dynamically.
+
+**Typed Lowering in Linearizer**
+Type deduction pushed out of `IRDb` and into the shared `Linearizer::record_expr_r`. `LinOperand` now carries a `DataType`. Arithmetic and comparison expressions fail early during linearization with robust type-mismatch diagnostic codes (e.g. `LINEAR_3`, `LINEAR_4`, `LINEAR_5`).
+
+**IRDb Simplification**
+`get_operand_data_type_r` entirely eliminated from `IRDb`. The `IRDb` now reads guaranteed correct types from `LinOperand::data_type()` rather than inferring them through recursive lookups, greatly improving stability and separation of concerns.
+
+**Diagnostic Code Resolution & Test Alignment**
+Cleaned up duplicate diagnostic codes across `const_eval.rs`, `linearizer.rs`, and `layoutdb.rs` after the architectural shift merged their diagnostic paths. The test harness (`tests/integration.rs`) was strictly realigned to expect typed-lowering's `[LINEAR_*]` codes instead of deferred execution `[EXEC_*]` or legacy `[IRDB_*]` codes.
+

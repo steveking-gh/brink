@@ -24,7 +24,6 @@ diags = { path = "../diags" }
 ir = { path = "../ir" }
 layoutdb = { path = "../layoutdb" }
 const_eval = { path = "../const_eval" }
-prune = { path = "../prune" }
 irdb = { path = "../irdb" }
 regiondb = { path = "../regiondb" }
 layout_phase = { path = "../layout_phase" }

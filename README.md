@@ -11,6 +11,49 @@ Brink simplifies construction of complex files by managing sizes, offsets and
 ordering in a readable declarative style.  Brink tries to be especially useful
 when creating FLASH, ROM or other non-volatile memory images.
 
+# Features
+
+## Support For All Common Firmware Image Structures
+
+- Define, compose and nest content sections to create your output
+- Define platform specific memory regions to set address and size boundaries
+- Write raw data, strings, and repeated values
+- Write hashes and checksums
+- Write offsets, addresses and sizes
+- Extract and write sections from ELF and other other object file formats
+- Copy external files into your output
+- Align and pad content
+- Output detailed map files in various formats: Rust, C99 header, JSON and CSV
+
+## Brink Language Features
+
+- Thorough human-written reference documentation
+- Comfortable curly-brace and semicolon syntax
+- Declarative style so your Brink source resembles your output file
+- Include other `.brink` files for modularity
+- Robust address and offset management with full section scope support
+- Full support for arithmetic expressions
+- Conditional expressions with if/else
+- Compile-time interface for user-defined extensions
+- Handy shorthand for numeric values, e.g. 4M is 4 x 1024 x 1024.
+- Label any content for easy reference and debugging
+- Support for "-D" command-line definitions visible to your program, e.g. "-DMEM_SIZE=1M"
+
+## Debug And Diagnostic Features
+
+- Use [`assert`](#assert) statements to provide inline validation of your program
+- Use [`print`](#print) statements for debug and or any other console messages
+- Brink provides clear error messages with source code context
+- Optional verbose debug output levels
+- Brink has hundreds of integration tests exercising features and edge cases
+- Brink is actively fuzz tested against panics
+
+## Cross-Platform Support
+
+- Implemented in Rust with support for any Rust language host platform
+- Fully open source with MIT license
+
+
 # Quick Start
 
 ## Install Prebuilt Binaries for Linux
@@ -63,7 +106,7 @@ Brink can assemble any number of input files into a unified output.
 
 ---
 
-Brink can calculate relative or absolute offsets, allowing the output to contain pointer tables, cross-references and so on.
+Brink can calculate relative or absolute offsets, allowing your output to contain pointer tables, cross-references and so on.
 
 <img src="./images/offsets.svg" width="400">
 
@@ -452,10 +495,10 @@ names, or label names at compile time.
 Brink also reserves two identifier *prefixes*.  Any user defined identifier
 beginning with a reserved prefix triggers an error.
 
-| Reserved Prefix | Reason                                                                                          |
-| --------------- | ----------------------------------------------------------------------------------------------- |
-| `wr` + digit    | Numeric write instructions (`wr8`, `wr16`, `wr32`, and future width variants)                   |
-| `__`            | Leading double underscore names refer to builtin identifiers.                                   |
+| Reserved Prefix | Reason                                                                        |
+| --------------- | ----------------------------------------------------------------------------- |
+| `wr` + digit    | Numeric write instructions (`wr8`, `wr16`, `wr32`, and future width variants) |
+| `__`            | Leading double underscore names refer to builtin identifiers.                 |
 
 Brink also reserves the following *exact* keywords:
 

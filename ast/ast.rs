@@ -166,8 +166,7 @@ pub fn is_reserved_identifier(name: &str) -> bool {
     }
     matches!(
         name,
-        "wr"
-            | "wrs"
+        "wr" | "wrs"
             | "wrf"
             | "section"
             | "output"
@@ -998,7 +997,12 @@ impl<'toks> Ast<'toks> {
         self.dbg_enter("parse_obj");
         let obj_nid = self.add_to_parent_and_advance(parent);
 
-        if !self.expect_name_leaf(diags, obj_nid, "AST_66", "Expected an identifier after 'obj'") {
+        if !self.expect_name_leaf(
+            diags,
+            obj_nid,
+            "AST_66",
+            "Expected an identifier after 'obj'",
+        ) {
             return self.dbg_exit("parse_obj", false);
         }
 
@@ -1010,7 +1014,7 @@ impl<'toks> Ast<'toks> {
         self.tv.skip(); // consume '{'
 
         let mut section_seen = false;
-        let mut file_seen    = false;
+        let mut file_seen = false;
 
         loop {
             let tinfo = self.tv.peek();
@@ -1024,13 +1028,16 @@ impl<'toks> Ast<'toks> {
             }
 
             let prop_name = tinfo.val;
-            let prop_loc  = tinfo.span();
+            let prop_loc = tinfo.span();
 
             let is_section = match prop_name {
                 "section" => true,
-                "file"    => false,
+                "file" => false,
                 _ => {
-                    let m = format!("Unknown obj property '{}'. Expected 'section' or 'file'.", prop_name);
+                    let m = format!(
+                        "Unknown obj property '{}'. Expected 'section' or 'file'.",
+                        prop_name
+                    );
                     diags.err1("AST_75", &m, prop_loc);
                     return self.dbg_exit("parse_obj", false);
                 }
@@ -1051,14 +1058,22 @@ impl<'toks> Ast<'toks> {
             self.tv.skip(); // consume '='
 
             if self.tv.peek().tok != LexToken::QuotedString {
-                self.err_expected_after(diags, "AST_73", &format!("'{} =': expected a quoted string value", prop_name));
+                self.err_expected_after(
+                    diags,
+                    "AST_73",
+                    &format!("'{} =': expected a quoted string value", prop_name),
+                );
                 return self.dbg_exit("parse_obj", false);
             }
 
             // Synthesize an ObjProp node whose val is the property name,
             // then attach the QuotedString value as its child.
-            let prop_node = TokenInfo { tok: LexToken::ObjProp, loc: prop_loc, val: prop_name };
-            let prop_nid  = self.arena.new_node(prop_node);
+            let prop_node = TokenInfo {
+                tok: LexToken::ObjProp,
+                loc: prop_loc,
+                val: prop_name,
+            };
+            let prop_nid = self.arena.new_node(prop_node);
             obj_nid.append(prop_nid, &mut self.arena);
             self.parse_leaf(prop_nid); // attaches QuotedString child and advances
 
@@ -1068,7 +1083,11 @@ impl<'toks> Ast<'toks> {
             }
             self.tv.skip(); // consume ';'
 
-            if is_section { section_seen = true; } else { file_seen = true; }
+            if is_section {
+                section_seen = true;
+            } else {
+                file_seen = true;
+            }
         }
 
         if !section_seen || !file_seen {
@@ -1261,7 +1280,11 @@ impl<'toks> Ast<'toks> {
                     matches!(chars.next(), Some(c) if c.is_ascii_alphabetic() || c == '_')
                 };
                 if !val_is_name {
-                    self.err_expected_after(diags, "AST_49", "'in': expected region name after 'in'");
+                    self.err_expected_after(
+                        diags,
+                        "AST_49",
+                        "'in': expected region name after 'in'",
+                    );
                     return self.dbg_exit("parse_section", false);
                 }
                 // Synthesize a RegionRef node to record the binding.
@@ -1791,16 +1814,19 @@ impl<'toks> Ast<'toks> {
                 if !self.parse_pratt(0, &mut arg_opt, diags) {
                     return self.dbg_exit_pratt("parse_pratt", &None, false);
                 }
-                let valid = arg_opt.map_or(false, |nid| {
+                let valid = arg_opt.is_some_and(|nid| {
                     let t = self.get_tinfo(nid);
                     t.tok == LexToken::Identifier && !self.has_children(nid)
                 });
                 if !valid {
-                    let err_span = arg_opt.map_or(
-                        self.get_tinfo(top.unwrap()).span(),
-                        |nid| self.get_tinfo(nid).span(),
+                    let err_span = arg_opt.map_or(self.get_tinfo(top.unwrap()).span(), |nid| {
+                        self.get_tinfo(nid).span()
+                    });
+                    diags.err1(
+                        "AST_78",
+                        "obj_align/obj_lma/obj_vma requires exactly one obj name",
+                        err_span,
                     );
-                    diags.err1("AST_78", "obj_align/obj_lma/obj_vma requires exactly one obj name", err_span);
                     return self.dbg_exit_pratt("parse_pratt", &None, false);
                 }
                 top.unwrap().append(arg_opt.unwrap(), &mut self.arena);
@@ -2093,7 +2119,11 @@ impl<'toks> Ast<'toks> {
                 // Declare-only: const NAME;  (value assigned later in an if/else body)
                 result = self.expect_semi(diags, const_nid);
             } else {
-                self.err_expected_after(diags, "AST_50", "Expected '=' or ';' after const identifier");
+                self.err_expected_after(
+                    diags,
+                    "AST_50",
+                    "Expected '=' or ';' after const identifier",
+                );
             }
         }
         self.dbg_exit("parse_const", result)
@@ -2402,4 +2432,3 @@ impl<'toks> Ast<'toks> {
         Ok(())
     }
 }
-

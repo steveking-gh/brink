@@ -18,14 +18,9 @@ pipeline:
     - name: const_eval
       crate: const_eval
       input: Ast, AstDb.const_statements, -D defines
-      output: SymbolTable (fully resolved const values)
-      notes: Two-pass — lowering (AST → LinIR via Linearizer) then evaluation.
-             Handles top-level if/else for const-only statements.
-
-    - name: prune
-      crate: prune
-      input: Ast, SymbolTable
-      output: pruned Ast (clone with if/else nodes replaced by taken branch)
+      output: SymbolTable (fully resolved const values) and pruned Ast
+      notes: Evaluates constants and prunes if/else branches simultaneously as an AST walker.
+             Handles top-level if/else for const-only statements. Replaces the old separate 'prune' crate.
       notes: Two steps.
              Step 1 — prune root-level if/else, promote only Section+If nodes.
              Step 2 — prune section-body if/else for all sections now at root.
@@ -49,6 +44,8 @@ pipeline:
       input: LayoutDb, SymbolTable
       output: typed IR (Vec<IRItem>)
       notes: Validates types, resolves extensions, handles sizeof/addr builtins.
+             Type deduction logic (e.g. get_operand_data_type_r) has been removed;
+             relies entirely on Linearizer's typed lowering.
 
     - name: LayoutPhase + ValidationPhase + ExecPhase
       crates: [layout_phase, validation_phase, exec_phase]

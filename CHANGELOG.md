@@ -6,10 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic
 Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [7.1.0] - 2026-05-04
+## [7.x.x] - 2026-05-05
 
 - FEATURE: Support for `obj` external ELF format file sections.
 - FEATURE: Support for `obj_lma`, `obj_vma`, `obj_align`
+- INTERNAL: Enormous simplification of const eval to just use the exist AST
+- INTERNAL: Type deduction moves from IRDB to the Linearizer
+- README: Added Brink features overview to the introducdtion
 
 ## [7.0.0] - 2026-05-02
 

@@ -14,7 +14,8 @@ use indextree::NodeId;
 use tracing::debug;
 
 use ast::{Ast, LexToken, TokenInfo};
-use ir::IRKind;
+use ir::{DataType, IRKind};
+use symtable::SymbolTable;
 
 /// An operand in the linearized IR. Two design choices greatly simplify lifetime
 /// management:
@@ -43,6 +44,8 @@ pub enum LinOperand {
         sval: String,
         /// Named-argument parameter name, if the call site used `name=value` syntax.
         param_name: Option<String>,
+        /// Data type established during lowering (or explicitly provided)
+        data_type: DataType,
     },
     /// Identifier value reference; const-substitution applies if the identifier names a const.
     Ref {
@@ -52,6 +55,8 @@ pub enum LinOperand {
         sval: String,
         /// Named-argument parameter name, if the call site used `name=value` syntax.
         param_name: Option<String>,
+        /// Data type established during lowering (or explicitly provided)
+        data_type: DataType,
     },
     /// Identifier at a definition site: the string is the value, not a lookup key.
     /// Covers extension call names, label declarations, const LHS names, and assign LHS names.
@@ -72,26 +77,30 @@ pub enum LinOperand {
         /// Named-argument parameter name, if the call site used `name=value` syntax.
         /// None for positional arguments and for non-named-arg output placeholders.
         param_name: Option<String>,
+        /// Data type of the output computed by the instruction
+        data_type: DataType,
     },
 }
 
 impl LinOperand {
     /// Construct a direct-value literal operand from a token.
-    pub fn new_literal(tinfo: &TokenInfo<'_>) -> Self {
+    pub fn new_literal(tinfo: &TokenInfo<'_>, data_type: DataType) -> Self {
         LinOperand::Literal {
             src_loc: tinfo.loc.clone(),
             sval: tinfo.val.to_string(),
             tok: tinfo.tok,
             param_name: None,
+            data_type,
         }
     }
 
     /// Construct a value-reference operand for an identifier that may name a const.
-    pub fn new_ref(tinfo: &TokenInfo<'_>) -> Self {
+    pub fn new_ref(tinfo: &TokenInfo<'_>, data_type: DataType) -> Self {
         LinOperand::Ref {
             src_loc: tinfo.loc.clone(),
             sval: tinfo.val.to_string(),
             param_name: None,
+            data_type,
         }
     }
 
@@ -109,11 +118,12 @@ impl LinOperand {
     }
 
     /// Construct an output-slot operand for a computed IR result.
-    pub fn new_output(ir_lid: usize, src_loc: SourceSpan) -> Self {
+    pub fn new_output(ir_lid: usize, src_loc: SourceSpan, data_type: DataType) -> Self {
         LinOperand::Output {
             src_loc,
             ir_lid,
             param_name: None,
+            data_type,
         }
     }
 
@@ -124,9 +134,9 @@ impl LinOperand {
             LinOperand::Literal { param_name, .. } => *param_name = Some(name),
             LinOperand::Ref { param_name, .. } => *param_name = Some(name),
             LinOperand::Output { param_name, .. } => *param_name = Some(name),
-            LinOperand::NameDef { .. } => {
-                panic!("set_param_name called on a NameDef operand — NameDef operands are not named-arg values");
-            }
+            LinOperand::NameDef { .. } => panic!(
+                "set_param_name called on a NameDef operand — NameDef operands are not named-arg values"
+            ),
         }
     }
 
@@ -137,6 +147,16 @@ impl LinOperand {
             LinOperand::Ref { param_name, .. } => param_name.as_deref(),
             LinOperand::Output { param_name, .. } => param_name.as_deref(),
             LinOperand::NameDef { .. } => None,
+        }
+    }
+
+    /// Return the DataType established for this operand.
+    pub fn data_type(&self) -> DataType {
+        match self {
+            LinOperand::Literal { data_type, .. } => *data_type,
+            LinOperand::Ref { data_type, .. } => *data_type,
+            LinOperand::Output { data_type, .. } => *data_type,
+            LinOperand::NameDef { .. } => DataType::Identifier,
         }
     }
 }
@@ -219,8 +239,8 @@ pub fn tok_to_irkind(tok: LexToken) -> IRKind {
         LexToken::Wr56 => IRKind::Wr(7),
         LexToken::Wr64 => IRKind::Wr(8),
         LexToken::ObjAlign => IRKind::ObjAlign,
-        LexToken::ObjLma   => IRKind::ObjLma,
-        LexToken::ObjVma   => IRKind::ObjVma,
+        LexToken::ObjLma => IRKind::ObjLma,
+        LexToken::ObjVma => IRKind::ObjVma,
         LexToken::Wrf => IRKind::Wrf,
         LexToken::Wrs => IRKind::Wrs,
         LexToken::BuiltinOutputSize => IRKind::BuiltinOutputSize,
@@ -229,13 +249,7 @@ pub fn tok_to_irkind(tok: LexToken) -> IRKind {
         LexToken::BuiltinVersionMajor => IRKind::BuiltinVersionMajor,
         LexToken::BuiltinVersionMinor => IRKind::BuiltinVersionMinor,
         LexToken::BuiltinVersionPatch => IRKind::BuiltinVersionPatch,
-        bug => {
-            panic!(
-                "Failed to convert LexToken to IRKind for {:?} — \
-                 this token should not reach tok_to_irkind",
-                bug
-            );
-        }
+        bug => panic!("Failed to convert LexToken to IRKind for {:?}", bug),
     }
 }
 
@@ -296,11 +310,14 @@ impl Linearizer {
     ) -> bool {
         let found = lops.len();
         if found != expected {
-            let m = format!(
-                "Expected {} operand(s), but found {} for '{}' expression",
-                expected, found, tinfo.val
+            diags.err1(
+                "LINEAR_2",
+                &format!(
+                    "Expected {} operand(s), but found {} for '{}' expression",
+                    expected, found, tinfo.val
+                ),
+                tinfo.span(),
             );
-            diags.err1("LINEAR_2", &m, tinfo.span());
             return false;
         }
         true
@@ -349,12 +366,13 @@ impl Linearizer {
         &mut self,
         parent_nid: NodeId,
         lops: &mut Vec<usize>,
+        symbol_table: &SymbolTable,
         diags: &mut Diags,
         ast: &Ast<'_>,
     ) -> bool {
         let mut result = true;
         for nid in ast.children(parent_nid) {
-            result &= self.record_expr_r(nid, lops, diags, ast);
+            result &= self.record_expr_r(nid, lops, symbol_table, diags, ast);
         }
         result
     }
@@ -371,18 +389,21 @@ impl Linearizer {
         &mut self,
         parent_nid: NodeId,
         returned_operands: &mut Vec<usize>,
+        symbol_table: &SymbolTable,
         diags: &mut Diags,
         ast: &Ast<'_>,
     ) -> bool {
         debug!("Linearizer::record_expr_r: ENTER for nid: {}", parent_nid);
-
         let Some(_guard) = DepthGuard::enter(MAX_RECURSION_DEPTH) else {
             let tinfo = ast.get_tinfo(parent_nid);
-            let m = format!(
-                "Maximum recursion depth ({MAX_RECURSION_DEPTH}) exceeded when processing '{}'.",
-                tinfo.val
+            diags.err1(
+                "LINEAR_1",
+                &format!(
+                    "Maximum recursion depth ({MAX_RECURSION_DEPTH}) exceeded when processing '{}'.",
+                    tinfo.val
+                ),
+                tinfo.span(),
             );
-            diags.err1("LINEAR_1", &m, tinfo.span());
             return false;
         };
 
@@ -392,9 +413,15 @@ impl Linearizer {
 
         match tok {
             LexToken::U64 | LexToken::I64 | LexToken::Integer | LexToken::QuotedString => {
-                // parent_nid is a literal.  Recursion bottom.
+                let dt = match tok {
+                    LexToken::U64 => DataType::U64,
+                    LexToken::I64 => DataType::I64,
+                    LexToken::Integer => DataType::Integer,
+                    LexToken::QuotedString => DataType::QuotedString,
+                    _ => unreachable!(),
+                };
                 let idx = self.operand_vec.len();
-                self.operand_vec.push(LinOperand::new_literal(tinfo));
+                self.operand_vec.push(LinOperand::new_literal(tinfo, dt));
                 returned_operands.push(idx);
             }
 
@@ -403,14 +430,15 @@ impl Linearizer {
                 if ast.has_children(parent_nid) {
                     // An identifier with children means this is an extension call.
                     let ir_lid = self.new_ir(parent_nid, ast, IRKind::ExtensionCall);
-                    // Add the extension's name as the first operand so the backend
-                    // can look up the extension.  Name variant: the linearizer never const-substitutes the name.
+                    // Add the extension's name as the first operand so the
+                    // backend can look up the extension.  Name variant: the
+                    // linearizer never const-substitutes the name.
                     self.add_new_operand_to_ir(ir_lid, LinOperand::new_name(tinfo));
 
                     // Now recursively add operands for the extension call arguments.
                     let mut lops = Vec::new();
                     for child in ast.children(parent_nid) {
-                        result &= self.record_expr_r(child, &mut lops, diags, ast);
+                        result &= self.record_expr_r(child, &mut lops, symbol_table, diags, ast);
                     }
                     for idx in lops {
                         self.add_existing_operand_to_ir(ir_lid, idx);
@@ -421,14 +449,18 @@ impl Linearizer {
                     // wrs, or const expressions.
                     let out_idx = self.add_new_operand_to_ir(
                         ir_lid,
-                        LinOperand::new_output(ir_lid, tinfo.loc.clone()),
+                        LinOperand::new_output(ir_lid, tinfo.loc.clone(), DataType::Extension),
                     );
                     returned_operands.push(out_idx);
                 } else {
                     // Leaf identifier — const ref or section/label name used as value.
                     // process_lin_operands substitutes the operand if the identifier names a const.
+                    let dt = symbol_table
+                        .get_value(tinfo.val)
+                        .map(|v| v.data_type())
+                        .unwrap_or(DataType::Identifier);
                     let idx = self.operand_vec.len();
-                    self.operand_vec.push(LinOperand::new_ref(tinfo));
+                    self.operand_vec.push(LinOperand::new_ref(tinfo, dt));
                     returned_operands.push(idx);
                 }
             }
@@ -439,52 +471,75 @@ impl Linearizer {
                 let id_child = children.next().unwrap();
                 let id_tinfo = ast.get_tinfo(id_child);
                 let extension_name = format!("{}{}", tinfo.val, id_tinfo.val);
-
                 let ir_lid = self.new_ir(parent_nid, ast, IRKind::ExtensionCall);
                 // Store the full qualified name (e.g. "custom::foo") as a Name
                 // operand so the backend can look it up without const substitution.
-                self.add_new_operand_to_ir(ir_lid, LinOperand::new_name_str(extension_name, tinfo.loc.clone()));
-
+                self.add_new_operand_to_ir(
+                    ir_lid,
+                    LinOperand::new_name_str(extension_name, tinfo.loc.clone()),
+                );
                 let mut lops = Vec::new();
                 for child in children {
-                    result &= self.record_expr_r(child, &mut lops, diags, ast);
+                    result &= self.record_expr_r(child, &mut lops, symbol_table, diags, ast);
                 }
                 for idx in lops {
                     self.add_existing_operand_to_ir(ir_lid, idx);
                 }
-
                 // Output operand: same role as in the Identifier arm above.
                 let out_idx = self.add_new_operand_to_ir(
                     ir_lid,
-                    LinOperand::new_output(ir_lid, tinfo.loc.clone()),
+                    LinOperand::new_output(ir_lid, tinfo.loc.clone(), DataType::Extension),
                 );
                 returned_operands.push(out_idx);
             }
 
-            // ── Builtin variable atoms ─────────────────────────────────────
+            // Built-in values have exactly one output operand.
             LexToken::BuiltinOutputSize
             | LexToken::BuiltinOutputAddr
-            | LexToken::BuiltinVersionString
             | LexToken::BuiltinVersionMajor
             | LexToken::BuiltinVersionMinor
             | LexToken::BuiltinVersionPatch => {
                 let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tok));
-                let idx = self.add_new_operand_to_ir(ir_lid, LinOperand::new_output(ir_lid, tinfo.loc.clone()));
+                let idx = self.add_new_operand_to_ir(
+                    ir_lid,
+                    LinOperand::new_output(ir_lid, tinfo.loc.clone(), DataType::U64),
+                );
+                returned_operands.push(idx);
+            }
+            LexToken::BuiltinVersionString => {
+                let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tok));
+                let idx = self.add_new_operand_to_ir(
+                    ir_lid,
+                    LinOperand::new_output(ir_lid, tinfo.loc.clone(), DataType::QuotedString),
+                );
                 returned_operands.push(idx);
             }
 
-            // ── Type conversions ───────────────────────────────────────────
-            LexToken::ToI64 | LexToken::ToU64 => {
+            LexToken::ToI64 => {
                 let mut lops = Vec::new();
                 result &=
-                    self.record_expr_children_r(parent_nid, &mut lops, diags, ast);
+                    self.record_expr_children_r(parent_nid, &mut lops, symbol_table, diags, ast);
                 let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tok));
                 result &= self.process_operands(1, &mut lops, ir_lid, diags, tinfo);
-                let idx = self.add_new_operand_to_ir(ir_lid, LinOperand::new_output(ir_lid, tinfo.loc.clone()));
+                let idx = self.add_new_operand_to_ir(
+                    ir_lid,
+                    LinOperand::new_output(ir_lid, tinfo.loc.clone(), DataType::I64),
+                );
+                returned_operands.push(idx);
+            }
+            LexToken::ToU64 => {
+                let mut lops = Vec::new();
+                result &=
+                    self.record_expr_children_r(parent_nid, &mut lops, symbol_table, diags, ast);
+                let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tok));
+                result &= self.process_operands(1, &mut lops, ir_lid, diags, tinfo);
+                let idx = self.add_new_operand_to_ir(
+                    ir_lid,
+                    LinOperand::new_output(ir_lid, tinfo.loc.clone(), DataType::U64),
+                );
                 returned_operands.push(idx);
             }
 
-            // ── Binary and comparison operators ────────────────────────────
             LexToken::Eq
             | LexToken::NEq
             | LexToken::LEq
@@ -492,23 +547,125 @@ impl Linearizer {
             | LexToken::Lt
             | LexToken::Gt
             | LexToken::DoubleEq
-            | LexToken::DoubleGreater
+            | LexToken::DoublePipe
+            | LexToken::DoubleAmpersand => {
+                let mut lops = Vec::new();
+                result &=
+                    self.record_expr_children_r(parent_nid, &mut lops, symbol_table, diags, ast);
+                let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tok));
+                result &= self.process_operands(2, &mut lops, ir_lid, diags, tinfo);
+
+                if lops.len() == 2 {
+                    let lhs_dt = self.operand_vec[lops[0]].data_type();
+                    let rhs_dt = self.operand_vec[lops[1]].data_type();
+                    let mut ok = false;
+                    if lhs_dt == rhs_dt {
+                        if [
+                            DataType::I64,
+                            DataType::U64,
+                            DataType::Integer,
+                            DataType::QuotedString,
+                            DataType::Identifier,
+                        ]
+                        .contains(&lhs_dt)
+                        {
+                            ok = true;
+                        }
+                    } else if rhs_dt == DataType::Integer
+                        && [DataType::I64, DataType::U64].contains(&lhs_dt)
+                    {
+                        ok = true;
+                    } else if lhs_dt == DataType::Integer
+                        && [DataType::I64, DataType::U64].contains(&rhs_dt)
+                    {
+                        ok = true;
+                    } else if lhs_dt == DataType::Identifier || rhs_dt == DataType::Identifier {
+                        ok = true; // Resolve at layout time
+                    }
+                    if !ok {
+                        let msg = format!(
+                            "Type mismatch in comparison: '{:?}' and '{:?}'.",
+                            lhs_dt, rhs_dt
+                        );
+                        diags.err1("LINEAR_5", &msg, tinfo.loc.clone());
+                        result = false;
+                    }
+                }
+
+                let idx = self.add_new_operand_to_ir(
+                    ir_lid,
+                    LinOperand::new_output(ir_lid, tinfo.loc.clone(), DataType::U64),
+                );
+                returned_operands.push(idx);
+            }
+
+            LexToken::DoubleGreater
             | LexToken::DoubleLess
             | LexToken::Asterisk
             | LexToken::Ampersand
-            | LexToken::DoubleAmpersand
             | LexToken::Pipe
-            | LexToken::DoublePipe
             | LexToken::FSlash
             | LexToken::Percent
             | LexToken::Minus
             | LexToken::Plus => {
                 let mut lops = Vec::new();
                 result &=
-                    self.record_expr_children_r(parent_nid, &mut lops, diags, ast);
+                    self.record_expr_children_r(parent_nid, &mut lops, symbol_table, diags, ast);
                 let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tok));
                 result &= self.process_operands(2, &mut lops, ir_lid, diags, tinfo);
-                let idx = self.add_new_operand_to_ir(ir_lid, LinOperand::new_output(ir_lid, tinfo.loc.clone()));
+
+                let mut out_dt = DataType::Unknown;
+                if lops.len() == 2 {
+                    let lhs_dt = self.operand_vec[lops[0]].data_type();
+                    let rhs_dt = self.operand_vec[lops[1]].data_type();
+
+                    if lhs_dt == rhs_dt {
+                        if [DataType::I64, DataType::U64, DataType::Integer].contains(&lhs_dt) {
+                            out_dt = lhs_dt;
+                        } else if lhs_dt == DataType::Identifier {
+                            out_dt = DataType::Identifier; // Deferred resolution
+                        } else {
+                            let msg = format!(
+                                "Invalid operand types for arithmetic: '{:?}' and '{:?}'.",
+                                lhs_dt, rhs_dt
+                            );
+                            diags.err1("LINEAR_3", &msg, tinfo.loc.clone());
+                            result = false;
+                        }
+                    } else if rhs_dt == DataType::Integer
+                        && [DataType::I64, DataType::U64].contains(&lhs_dt)
+                    {
+                        out_dt = lhs_dt;
+                    } else if lhs_dt == DataType::Integer
+                        && [DataType::I64, DataType::U64].contains(&rhs_dt)
+                    {
+                        out_dt = rhs_dt;
+                    } else if lhs_dt == DataType::Identifier || rhs_dt == DataType::Identifier {
+                        // Identifier will become U64 for labels, but wait...
+                        // Just use the non-identifier type or keep Identifier.
+                        if [DataType::I64, DataType::U64, DataType::Integer].contains(&lhs_dt) {
+                            out_dt = lhs_dt;
+                        } else if [DataType::I64, DataType::U64, DataType::Integer]
+                            .contains(&rhs_dt)
+                        {
+                            out_dt = rhs_dt;
+                        } else {
+                            out_dt = DataType::Identifier;
+                        }
+                    } else {
+                        let msg = format!(
+                            "Type mismatch in arithmetic: '{:?}' and '{:?}'.",
+                            lhs_dt, rhs_dt
+                        );
+                        diags.err1("LINEAR_4", &msg, tinfo.loc.clone());
+                        result = false;
+                    }
+                }
+
+                let idx = self.add_new_operand_to_ir(
+                    ir_lid,
+                    LinOperand::new_output(ir_lid, tinfo.loc.clone(), out_dt),
+                );
                 returned_operands.push(idx);
             }
 
@@ -522,18 +679,30 @@ impl Linearizer {
                     let ext_id_tinfo = ast.get_tinfo(ns_children[0]);
                     let full_name = format!("{}{}", first_child_tinfo.val, ext_id_tinfo.val);
                     let ir_lid = self.new_ir(parent_nid, ast, IRKind::SizeofExt);
-                    self.add_new_operand_to_ir(ir_lid, LinOperand::new_name_str(full_name, first_child_tinfo.loc.clone()));
-                    let idx =
-                        self.add_new_operand_to_ir(ir_lid, LinOperand::new_output(ir_lid, tinfo.loc.clone()));
+                    self.add_new_operand_to_ir(
+                        ir_lid,
+                        LinOperand::new_name_str(full_name, first_child_tinfo.loc.clone()),
+                    );
+                    let idx = self.add_new_operand_to_ir(
+                        ir_lid,
+                        LinOperand::new_output(ir_lid, tinfo.loc.clone(), DataType::U64),
+                    );
                     returned_operands.push(idx);
                 } else {
                     let mut lops = Vec::new();
                     let ir_lid = self.new_ir(parent_nid, ast, IRKind::Sizeof);
-                    result &=
-                        self.record_expr_children_r(parent_nid, &mut lops, diags, ast);
+                    result &= self.record_expr_children_r(
+                        parent_nid,
+                        &mut lops,
+                        symbol_table,
+                        diags,
+                        ast,
+                    );
                     result &= self.process_operands(1, &mut lops, ir_lid, diags, tinfo);
-                    let idx =
-                        self.add_new_operand_to_ir(ir_lid, LinOperand::new_output(ir_lid, tinfo.loc.clone()));
+                    let idx = self.add_new_operand_to_ir(
+                        ir_lid,
+                        LinOperand::new_output(ir_lid, tinfo.loc.clone(), DataType::U64),
+                    );
                     returned_operands.push(idx);
                 }
             }
@@ -542,9 +711,13 @@ impl Linearizer {
             LexToken::ObjAlign | LexToken::ObjLma | LexToken::ObjVma => {
                 let mut lops = Vec::new();
                 let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tok));
-                result &= self.record_expr_children_r(parent_nid, &mut lops, diags, ast);
+                result &=
+                    self.record_expr_children_r(parent_nid, &mut lops, symbol_table, diags, ast);
                 result &= self.process_operands(1, &mut lops, ir_lid, diags, tinfo);
-                let idx = self.add_new_operand_to_ir(ir_lid, LinOperand::new_output(ir_lid, tinfo.loc.clone()));
+                let idx = self.add_new_operand_to_ir(
+                    ir_lid,
+                    LinOperand::new_output(ir_lid, tinfo.loc.clone(), DataType::U64),
+                );
                 returned_operands.push(idx);
             }
 
@@ -553,13 +726,16 @@ impl Linearizer {
                 let mut lops = Vec::new();
                 let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tok));
                 result &=
-                    self.record_expr_children_r(parent_nid, &mut lops, diags, ast);
+                    self.record_expr_children_r(parent_nid, &mut lops, symbol_table, diags, ast);
                 result &= self.process_optional_operands(1, &mut lops, ir_lid, diags, tinfo);
-                let idx = self.add_new_operand_to_ir(ir_lid, LinOperand::new_output(ir_lid, tinfo.loc.clone()));
+                let idx = self.add_new_operand_to_ir(
+                    ir_lid,
+                    LinOperand::new_output(ir_lid, tinfo.loc.clone(), DataType::U64),
+                );
                 returned_operands.push(idx);
             }
 
-            // ── Syntactic noise — no IR emitted ───────────────────────────
+            // Syntactic stuff, no IR emitted.
             LexToken::Semicolon
             | LexToken::Comma
             | LexToken::OpenParen
@@ -570,7 +746,7 @@ impl Linearizer {
             // layout statement and never reaches expression evaluation.
             | LexToken::RegionRef => {}
 
-            // ── Named argument: name=expr ─────────────────────────────────
+            // Named argument: name=expr -------------------------------------
             // A NamedArg node (synthesized by the parser) wraps one RHS expression
             // child.  Lower the child normally, then tag the resulting operand(s)
             // with the parameter name so IRDb can reorder to declaration order.
@@ -578,7 +754,7 @@ impl Linearizer {
                 let param_name = tinfo.val.to_string();
                 let before = returned_operands.len();
                 let child = ast.children(parent_nid).next().unwrap();
-                result &= self.record_expr_r(child, returned_operands, diags, ast);
+                result &= self.record_expr_r(child, returned_operands, symbol_table, diags, ast);
                 // Tag every operand added for this arg with the parameter name.
                 for idx in &returned_operands[before..] {
                     self.operand_vec[*idx].set_param_name(param_name.clone());
@@ -593,7 +769,10 @@ impl Linearizer {
             }
         }
 
-        debug!("Linearizer::record_expr_r: EXIT({}) for nid: {}", result, parent_nid);
+        debug!(
+            "Linearizer::record_expr_r: EXIT({}) for nid: {}",
+            result, parent_nid
+        );
         result
     }
 }
