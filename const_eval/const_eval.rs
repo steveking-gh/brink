@@ -520,7 +520,10 @@ impl<'toks> ConstIR {
                 | IRKind::Addr
                 | IRKind::AddrOffset
                 | IRKind::SecOffset
-                | IRKind::FileOffset => {
+                | IRKind::FileOffset
+                | IRKind::ObjAlign
+                | IRKind::ObjLma
+                | IRKind::ObjVma => {
                     let m = format!(
                         "Operation '{:?}' cannot be used in a const expression \
                          because it requires engine-time layout or addressing.",

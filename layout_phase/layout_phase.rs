@@ -786,6 +786,30 @@ impl LayoutPhase {
         }
     }
 
+    fn iterate_obj_align(&mut self, ir: &IR, irdb: &IRDb) -> bool {
+        assert!(ir.operands.len() == 2);
+        let obj_name = self.parms[ir.operands[0]].identifier_to_str().to_string();
+        let info = irdb.obj_sections.get(&obj_name).unwrap();
+        *self.parms[ir.operands[1]].to_u64_mut() = info.align;
+        true
+    }
+
+    fn iterate_obj_vma(&mut self, ir: &IR, irdb: &IRDb) -> bool {
+        assert!(ir.operands.len() == 2);
+        let obj_name = self.parms[ir.operands[0]].identifier_to_str().to_string();
+        let info = irdb.obj_sections.get(&obj_name).unwrap();
+        *self.parms[ir.operands[1]].to_u64_mut() = info.vma;
+        true
+    }
+
+    fn iterate_obj_lma(&mut self, ir: &IR, irdb: &IRDb) -> bool {
+        assert!(ir.operands.len() == 2);
+        let obj_name = self.parms[ir.operands[0]].identifier_to_str().to_string();
+        let info = irdb.obj_sections.get(&obj_name).unwrap();
+        *self.parms[ir.operands[1]].to_u64_mut() = info.lma;
+        true
+    }
+
     fn iterate_output_size(&mut self, ir: &IR, irdb: &IRDb, diags: &mut Diags) -> bool {
         // __OUTPUT_SIZE has no input operands, only a single output operand.
         assert!(ir.operands.len() == 1);
@@ -1430,6 +1454,9 @@ impl LayoutPhase {
                     }
                     IRKind::Sizeof => self.iterate_sizeof(ir, irdb, diags, &current),
                     IRKind::SizeofExt => self.iterate_sizeof_ext(ir, diags, ext_registry),
+                    IRKind::ObjAlign => self.iterate_obj_align(ir, irdb),
+                    IRKind::ObjLma   => self.iterate_obj_lma(ir, irdb),
+                    IRKind::ObjVma   => self.iterate_obj_vma(ir, irdb),
                     IRKind::BuiltinOutputSize => self.iterate_output_size(ir, irdb, diags),
                     IRKind::BuiltinOutputAddr => self.iterate_output_addr(ir, irdb, diags),
                     IRKind::BuiltinVersionString => self.iterate_builtin_version_string(ir),

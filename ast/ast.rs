@@ -123,6 +123,12 @@ pub enum LexToken {
     /// ("section" or "file").
     /// The single child is the QuotedString value.
     ObjProp,
+    /// obj_align(<obj>) -- returns section alignment as U64.
+    ObjAlign,
+    /// obj_lma(<obj>) -- returns section LMA as U64 (ELF only).
+    ObjLma,
+    /// obj_vma(<obj>) -- returns section VMA as U64.
+    ObjVma,
     /// Catch-all for unrecognized input.
     Unknown,
 }
@@ -1768,6 +1774,35 @@ impl<'toks> Ast<'toks> {
                     return self.dbg_exit_pratt("parse_pratt", &None, false);
                 }
 
+                top.unwrap().append(arg_opt.unwrap(), &mut self.arena);
+                if !self.expect_token_no_add(LexToken::CloseParen, diags) {
+                    return self.dbg_exit_pratt("parse_pratt", &None, false);
+                }
+            }
+
+            // obj_align/obj_lma/obj_vma: mandatory single obj identifier in parens
+            LexToken::ObjAlign | LexToken::ObjLma | LexToken::ObjVma => {
+                *top = Some(self.arena.new_node(self.tv.peek().clone()));
+                self.tv.skip();
+                if !self.expect_token_no_add(LexToken::OpenParen, diags) {
+                    return self.dbg_exit_pratt("parse_pratt", &None, false);
+                }
+                let mut arg_opt = None;
+                if !self.parse_pratt(0, &mut arg_opt, diags) {
+                    return self.dbg_exit_pratt("parse_pratt", &None, false);
+                }
+                let valid = arg_opt.map_or(false, |nid| {
+                    let t = self.get_tinfo(nid);
+                    t.tok == LexToken::Identifier && !self.has_children(nid)
+                });
+                if !valid {
+                    let err_span = arg_opt.map_or(
+                        self.get_tinfo(top.unwrap()).span(),
+                        |nid| self.get_tinfo(nid).span(),
+                    );
+                    diags.err1("AST_78", "obj_align/obj_lma/obj_vma requires exactly one obj name", err_span);
+                    return self.dbg_exit_pratt("parse_pratt", &None, false);
+                }
                 top.unwrap().append(arg_opt.unwrap(), &mut self.arena);
                 if !self.expect_token_no_add(LexToken::CloseParen, diags) {
                     return self.dbg_exit_pratt("parse_pratt", &None, false);

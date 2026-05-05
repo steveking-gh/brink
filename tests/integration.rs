@@ -3296,4 +3296,56 @@ mod tests {
     fn wrobj_wrong_args() {
         assert_brink_failure("tests/wrobj_wrong_args.brink", &["[AST_76]"]);
     }
+
+    #[test]
+    /// obj_align() returns the alignment declared in the ELF section header.
+    fn obj_align_1() {
+        let out = "tests_obj_align_1.brink.bin";
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/obj_align_1.brink")
+            .arg("-o")
+            .arg(out)
+            .assert()
+            .success()
+            .stderr(predicates::str::is_empty());
+        fs::remove_file(out).unwrap();
+    }
+
+    #[test]
+    /// obj_vma() returns the virtual address of the ELF section.
+    fn obj_vma_1() {
+        let out = "tests_obj_vma_1.brink.bin";
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/obj_vma_1.brink")
+            .arg("-o")
+            .arg(out)
+            .assert()
+            .success()
+            .stderr(predicates::str::is_empty());
+        fs::remove_file(out).unwrap();
+    }
+
+    #[test]
+    /// obj_lma() returns the load address of the ELF section.
+    fn obj_lma_1() {
+        let out = "tests_obj_lma_1.brink.bin";
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/obj_lma_1.brink")
+            .arg("-o")
+            .arg(out)
+            .assert()
+            .success()
+            .stderr(predicates::str::is_empty());
+        fs::remove_file(out).unwrap();
+    }
+
+    #[test]
+    /// obj_lma() referencing a file that is not a recognized object format fails with IRDB_64.
+    /// Recognized non-ELF formats return VMA as the LMA by convention.
+    fn obj_lma_non_elf() {
+        assert_brink_failure("tests/obj_lma_non_elf.brink", &["[IRDB_64]"]);
+    }
 } // mod tests

@@ -383,6 +383,9 @@ impl ExecPhase {
                 | IRKind::SecOffset
                 | IRKind::FileOffset
                 | IRKind::Label
+                | IRKind::ObjAlign
+                | IRKind::ObjLma
+                | IRKind::ObjVma
                 | IRKind::Sizeof
                 | IRKind::SizeofExt
                 | IRKind::BuiltinOutputSize

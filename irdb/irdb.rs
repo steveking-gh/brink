@@ -41,7 +41,23 @@ pub struct ObjSectionInfo {
     pub section_name: String,
     pub file_offset: u64,
     pub size: u64,
+    /// Required alignment of the section as declared in the object file.
+    pub align: u64,
+    /// Virtual memory address of the section.
+    pub vma: u64,
+    /// Load memory address of the section.  Equals VMA for non-ELF formats.
+    pub lma: u64,
     pub src_loc: SourceSpan,
+}
+
+// Per-section metadata extracted from one pass over an object file.
+// Keyed by section name inside parsed_obj_files.
+struct SectionProps {
+    file_offset: u64,
+    size: u64,
+    align: u64,
+    vma: u64,
+    lma: Option<u64>,
 }
 
 pub struct IRDb {
@@ -81,9 +97,53 @@ pub struct IRDb {
     /// Populated during validation; consumed by layout_phase and exec_phase.
     pub obj_sections: HashMap<String, ObjSectionInfo>,
 
-    /// Per-file parse cache: file_path -> section_name -> (file_offset, size).
+    /// Per-file parse cache: file_path -> section_name -> SectionProps.
     /// Ensures each object file is opened and parsed at most once.
-    parsed_obj_files: HashMap<String, HashMap<String, (u64, u64)>>,
+    parsed_obj_files: HashMap<String, HashMap<String, SectionProps>>,
+}
+
+// Scan PT_LOAD program headers and assign each section its LMA.
+// Sections not covered by any PT_LOAD segment default to VMA.
+// Called only for ELF files; non-ELF files leave lma = None.
+fn fill_lma<Elf>(elf: &object::read::elf::ElfFile<'_, Elf>, section_map: &mut HashMap<String, SectionProps>)
+where
+    Elf: object::read::elf::FileHeader,
+    Elf::Word: Into<u64>,
+{
+    use object::read::elf::ProgramHeader as _;
+    let endian = elf.endian();
+    for phdr in elf.elf_program_headers() {
+        if phdr.p_type(endian) != object::elf::PT_LOAD {
+            continue;
+        }
+        let seg_vma: u64 = phdr.p_vaddr(endian).into();
+        let seg_pma: u64 = phdr.p_paddr(endian).into();
+        let seg_end: u64 = seg_vma + Into::<u64>::into(phdr.p_memsz(endian));
+        for props in section_map.values_mut() {
+            if props.lma.is_some() {
+                continue;
+            }
+            if props.vma >= seg_vma && props.vma < seg_end {
+                props.lma = Some(seg_pma + (props.vma - seg_vma));
+            }
+        }
+    }
+    for props in section_map.values_mut() {
+        if props.lma.is_none() {
+            props.lma = Some(props.vma);
+        }
+    }
+}
+
+// Scan PT_LOAD program headers and assign each section its LMA.
+// Sections not covered by any PT_LOAD segment default to VMA.
+// Called only for ELF files; non-ELF files leave lma = None.
+fn compute_lma_from_segments(obj: &object::File<'_>, section_map: &mut HashMap<String, SectionProps>) {
+    match obj {
+        object::File::Elf32(elf) => fill_lma(elf, section_map),
+        object::File::Elf64(elf) => fill_lma(elf, section_map),
+        _ => {}
+    }
 }
 
 impl IRDb {
@@ -415,12 +475,21 @@ impl IRDb {
                 return false;
             }
         };
-        let mut section_map: HashMap<String, (u64, u64)> = HashMap::new();
+        let mut section_map: HashMap<String, SectionProps> = HashMap::new();
         for section in obj.sections() {
-            if let Ok(name) = section.name() && let Some((offset, size)) = section.file_range() {
-                section_map.insert(name.to_string(), (offset, size));
+            if let Ok(name) = section.name() {
+                if let Some((file_offset, size)) = section.file_range() {
+                    section_map.insert(name.to_string(), SectionProps {
+                        file_offset,
+                        size,
+                        align: section.align(),
+                        vma: section.address(),
+                        lma: None,
+                    });
+                }
             }
         }
+        compute_lma_from_segments(&obj, &mut section_map);
         self.parsed_obj_files.insert(file_path.to_string(), section_map);
         true
     }
@@ -449,7 +518,7 @@ impl IRDb {
             return false;
         }
         let section_map = self.parsed_obj_files.get(&file_path).unwrap();
-        let Some(&(file_offset, size)) = section_map.get(&section_name) else {
+        let Some(props) = section_map.get(&section_name) else {
             let m = format!(
                 "Section '{}' not found in '{}', or section has no file data (e.g. zero-initialized sections cannot be copied).",
                 section_name, file_path
@@ -460,8 +529,11 @@ impl IRDb {
         self.obj_sections.insert(obj_name.to_string(), ObjSectionInfo {
             path: file_path,
             section_name,
-            file_offset,
-            size,
+            file_offset: props.file_offset,
+            size: props.size,
+            align: props.align,
+            vma: props.vma,
+            lma: props.lma.unwrap(),
             src_loc: src_loc.clone(),
         });
         true
@@ -473,6 +545,15 @@ impl IRDb {
         let src_loc = ir.src_loc.clone();
         self.resolve_obj_section(&obj_name, &src_loc, diags)
     }
+
+    // obj_align/obj_lma/obj_vma: [identifier, output]; resolve the obj section.
+    fn validate_obj_query_operands(&mut self, ir: &IR, diags: &mut Diags) -> bool {
+        assert!(ir.operands.len() == 2);
+        let obj_name = self.parms[ir.operands[0]].val.identifier_to_str().to_string();
+        let src_loc = ir.src_loc.clone();
+        self.resolve_obj_section(&obj_name, &src_loc, diags)
+    }
+
 
     // Expect 1 operand which is an integer of some sort or bool
     fn validate_numeric_1(&self, ir: &IR, diags: &mut Diags) -> bool {
@@ -588,6 +669,7 @@ impl IRDb {
             IRKind::Assert => self.validate_numeric_1(ir, diags),
             IRKind::Wrf => self.validate_wrf_operands(ir, diags),
             IRKind::Wrobj => self.validate_wrobj_operands(ir, diags),
+            IRKind::ObjAlign | IRKind::ObjVma | IRKind::ObjLma => self.validate_obj_query_operands(ir, diags),
             IRKind::Wrs | IRKind::Print => self.validate_string_expr_operands(ir, diags),
             IRKind::ExtensionCall => {
                 let name = self.get_opnd_as_identifier(ir, 0);

@@ -165,6 +165,9 @@ language_features:
   assert: compile-time or layout-time assertion
   print: compile-time diagnostic output
   sizeof / addr / addr_offset / sec_offset / file_offset: layout-time builtins
+  obj_align(obj_name): returns section alignment from the object file (layout-time, ELF unified API)
+  obj_vma(obj_name): returns section virtual memory address (layout-time, ELF unified API)
+  obj_lma(obj_name): returns section load memory address (layout-time, ELF only; IRDB_66 for non-ELF when additional format features enabled)
   include: include another .brink file
 
 diagnostics:

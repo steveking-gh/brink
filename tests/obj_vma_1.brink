@@ -1,0 +1,9 @@
+obj rodata {
+    section = ".rodata";
+    file    = "tests/obj_test.elf";
+}
+section out {
+    assert obj_vma(rodata) == 0x2000;
+    wr rodata;
+}
+output out;

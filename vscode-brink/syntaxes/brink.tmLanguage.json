@@ -109,7 +109,7 @@
         {
           "comment": "Layout/section directives",
           "name": "keyword.other.layout.brink",
-          "match": "\\b(region|section|align|pad_addr_offset|pad_sec_offset|pad_file_offset|set_addr)\\b"
+          "match": "\\b(obj|region|section|align|pad_addr_offset|pad_sec_offset|pad_file_offset|set_addr)\\b"
         },
         {
           "comment": "Write/emit instructions — sized variants listed before bare wr",
@@ -129,7 +129,7 @@
         {
           "comment": "Address/offset query functions — addr_offset before addr",
           "name": "support.function.builtin.brink",
-          "match": "\\b(addr_offset|addr|sec_offset|file_offset)\\b"
+          "match": "\\b(obj_align|obj_lma|obj_vma|addr_offset|addr|sec_offset|file_offset)\\b"
         },
         {
           "comment": "Diagnostic keywords",

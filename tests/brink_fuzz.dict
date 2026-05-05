@@ -4,6 +4,7 @@
 "assert"
 "sizeof"
 "include"
+"obj" "obj_lma" "obj_vma" "obj_align"
 "wr8" "wr16" "wr32" "wr64" "wrs" "wrf" "wr"
 "if" "else"
 "region"

@@ -8,7 +8,8 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [7.1.0] - 2026-05-04
 
-- FEATURE: Support for external ELF format file sections.
+- FEATURE: Support for `obj` external ELF format file sections.
+- FEATURE: Support for `obj_lma`, `obj_vma`, `obj_align`
 
 ## [7.0.0] - 2026-05-02
 

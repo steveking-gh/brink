@@ -806,3 +806,51 @@ Changes:
 - `tests/integration.rs`: `wrobj_wrong_args` now checks AST_66.
 
 361 tests pass.
+
+---
+
+## 2026-05-04 — obj brace-block syntax + obj_align/obj_lma/obj_vma
+
+**Two changes shipped in one session.**
+
+### obj brace-block syntax
+
+Converted `obj` declaration from inline `= "section" in "file"` style to
+brace-block style: `obj name { section = "..."; file = "..."; }`.  Properties
+may appear in any order.  The synthesized `ObjProp` AST node carries the
+property name in `val` (matched by string, not by token type, to avoid the
+`LexToken::Section` collision).  Error codes AST_66..77 were assigned and
+individualized; AST_76 fires when a required property is missing.  The
+`error_codes_are_unique` test was extended to scan `err_expected_after` and
+`err_invalid_expression` wrapper calls.  `obj_names: HashSet` removed from
+`LayoutDb`; replaced by `obj_decls.contains_key`.
+
+Changed files: `ast/lexer.rs`, `ast/ast.rs`, `astdb/astdb.rs`,
+`layoutdb/layoutdb.rs`, `tests/wrobj_*.brink`, `tests/integration.rs`,
+`docs/error_codes.md` (AST_67..77, next AST_78).
+
+### obj_align / obj_lma / obj_vma
+
+Three new layout-time expression builtins returning U64.  All follow the
+`sizeof(name)` pattern: one mandatory identifier in parens, one output operand.
+
+- `obj_align(obj)` -- section alignment (unified `object` API).
+- `obj_vma(obj)` -- section virtual address (unified `object` API).
+- `obj_lma(obj)` -- section load address (ELF program-header scan).
+  Non-ELF recognized formats: IRDB_66.  Unrecognized formats: IRDB_64.
+  With current features `["read","elf"]`, only ELF is parseable; IRDB_66
+  is reserved for future COFF/Mach-O feature additions.
+
+`ObjSectionInfo` gained `align`, `vma`, `lma` fields.  `parsed_obj_files`
+cache updated to `HashMap<String, SectionProps>` (adds align/vma/lma).
+`compute_lma_from_segments` free function scans PT_LOAD program headers via
+`object::File::Elf32/Elf64` match + `ProgramHeader` trait.
+
+Changed files: `ir/ir.rs`, `ast/lexer.rs`, `ast/ast.rs`,
+`linearizer/linearizer.rs`, `irdb/irdb.rs`, `layout_phase/layout_phase.rs`,
+`exec_phase/exec_phase.rs`, `const_eval/const_eval.rs`,
+`docs/error_codes.md` (AST_78, IRDB_66, next AST_79/IRDB_67),
+`docs/ai/02-system.yaml`, `tests/obj_align_1.brink`, `tests/obj_vma_1.brink`,
+`tests/obj_lma_1.brink`, `tests/obj_lma_non_elf.brink`, `tests/integration.rs`.
+
+365 tests pass.

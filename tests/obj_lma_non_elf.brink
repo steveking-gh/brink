@@ -1,0 +1,13 @@
+obj rodata {
+    section = ".rodata";
+    file    = "tests/obj_test.elf";
+}
+obj notelf {
+    section = ".rodata";
+    file    = "tests/wrobj_1.brink";
+}
+section out {
+    assert obj_lma(notelf) == 0;
+    wr rodata;
+}
+output out;

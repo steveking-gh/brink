@@ -327,6 +327,9 @@ impl<'src> Lexer<'src> {
             "wrf"                    => LexToken::Wrf,
             "wr"                     => LexToken::Wr,
             "obj"                    => LexToken::Obj,
+            "obj_align"              => LexToken::ObjAlign,
+            "obj_lma"                => LexToken::ObjLma,
+            "obj_vma"                => LexToken::ObjVma,
             "output"                 => LexToken::Output,
             _                        => LexToken::Identifier,
         }

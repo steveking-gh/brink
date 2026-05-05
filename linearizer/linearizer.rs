@@ -218,6 +218,9 @@ pub fn tok_to_irkind(tok: LexToken) -> IRKind {
         LexToken::Wr48 => IRKind::Wr(6),
         LexToken::Wr56 => IRKind::Wr(7),
         LexToken::Wr64 => IRKind::Wr(8),
+        LexToken::ObjAlign => IRKind::ObjAlign,
+        LexToken::ObjLma   => IRKind::ObjLma,
+        LexToken::ObjVma   => IRKind::ObjVma,
         LexToken::Wrf => IRKind::Wrf,
         LexToken::Wrs => IRKind::Wrs,
         LexToken::BuiltinOutputSize => IRKind::BuiltinOutputSize,
@@ -533,6 +536,16 @@ impl Linearizer {
                         self.add_new_operand_to_ir(ir_lid, LinOperand::new_output(ir_lid, tinfo.loc.clone()));
                     returned_operands.push(idx);
                 }
+            }
+
+            // ── obj_align/obj_lma/obj_vma: one required identifier, one output ─
+            LexToken::ObjAlign | LexToken::ObjLma | LexToken::ObjVma => {
+                let mut lops = Vec::new();
+                let ir_lid = self.new_ir(parent_nid, ast, tok_to_irkind(tok));
+                result &= self.record_expr_children_r(parent_nid, &mut lops, diags, ast);
+                result &= self.process_operands(1, &mut lops, ir_lid, diags, tinfo);
+                let idx = self.add_new_operand_to_ir(ir_lid, LinOperand::new_output(ir_lid, tinfo.loc.clone()));
+                returned_operands.push(idx);
             }
 
             // ── Address queries: addr([label]), addr_offset([label]), etc. ──
