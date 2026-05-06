@@ -228,6 +228,21 @@ impl IRDb {
                 } => (Some(*ir_lid), "", src_loc, false, param_name.clone()),
             };
 
+            // Output operands from a failed arithmetic IR carry
+            // DataType::Unknown. The linearizer already emitted the primary
+            // error (LINEAR_3/4/5). Push a placeholder directly to avoid a
+            // spurious diagnostic error later.
+            if data_type == DataType::Unknown {
+                self.parms.push(IROperand {
+                    ir_lid,
+                    src_loc: src_loc.clone(),
+                    is_immediate: false,
+                    val: ParameterValue::Unknown,
+                    param_name,
+                });
+                continue;
+            }
+
             // Convert the string literal to a typed value; fails on malformed input.
             let opnd = IROperand::new(ir_lid, sval, src_loc, data_type, is_immediate, diags);
             if let Some(mut opnd) = opnd {
