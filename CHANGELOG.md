@@ -2,28 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic
 Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [7.x.x] - 2026-05-05
+## [8.x.x] - 2026-05-05
 
-- FEATURE: Support for `obj` external ELF format file sections.
-- FEATURE: Support for `obj_lma`, `obj_vma`, `obj_align`
-- INTERNAL: Enormous simplification of const eval to just use the exist AST
+- REMOVED: Removed support for old style extension args
+- ADDED: Support for `obj` external ELF format file sections.
+- ADDED: Support for `obj_lma`, `obj_vma`, `obj_align`
+- README: Added Brink features overview to the introduction
+- INTERNAL: Enormous simplification of const eval to just use the AST
 - INTERNAL: Type deduction moves from IRDB to the Linearizer
-- README: Added Brink features overview to the introducdtion
 
 ## [7.0.0] - 2026-05-02
 
-- DEFEATURE: With `region`, remove obsolete starting address from `output`
+- REMOVED: With `region`, remove obsolete starting address from `output`
   statement.
 - SYNTAX CHANGE: Rename set_sec_offset to pad_sec_offset
 - SYNTAX CHANGE: Rename set_addr_offset to pad_addr_offset
 - SYNTAX CHANGE: Rename set_file_offset to pad_file_offset
-- FEATURE: Region support
-- FEATURE: added missing --list-extensions command line option which was already
-- FEATURE: support for K/M/G suffix on decimal number literals.
+- ADDED: Region support
+- ADDED: added missing --list-extensions command line option which was already
+- ADDED: support for K/M/G suffix on decimal number literals.
   documented in the README.md
 - README: Removed obsolete text on if/else statement restrictions
 - README: Documented region feature
@@ -34,24 +35,24 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - INTERNAL: Refactor parameter values into their own module.
 - INTERNAL: Refactor validation as a dedicated phase.
 - INTERNAL: Refactor region info into a RegionDb library
-- BUG FIX: Fixed bad string conversion assert in verbose output
-- BUG FIX: Fixed check for duplicate error codes and eliminated a few duplicates
-- BUF FIX: Panic on incomplete UTF-8 character in position of an operator.
+- FIXED: Fixed bad string conversion assert in verbose output
+- FIXED: Fixed check for duplicate error codes and eliminated a few duplicates
+- FIXED: Panic on incomplete UTF-8 character in position of an operator.
 
 ## [6.1.1] - 2026-04-20
 
-- BUG FIX: Fixed version to 6.1.1 in Cargo.toml
+- FIXED: Fixed version to 6.1.1 in Cargo.toml
 
 ## [6.1.0] - 2026-04-17
 
-- FEATURE: added --max-output-size CLI option.
-- BUG FIX: Fixed assert when wrf had too man args
-- BUG FIX: Fixed assert when wr8..wr64 had too man args
-- BUG FIX: Fixed bad bool conversion assert
-- BUG FIX: Fixed various unlimited recursion bugs
-- BUG FIX: Fixed incorrect const substitution
-- BUG FIX: Support 8MB stack depth on Windows, which matches Linux default.
-- BUG FIX: Prevent infinite iteration in circular layout dependencies.
+- ADDED: added --max-output-size CLI option.
+- FIXED: Fixed assert when wrf had too man args
+- FIXED: Fixed assert when wr8..wr64 had too man args
+- FIXED: Fixed bad bool conversion assert
+- FIXED: Fixed various unlimited recursion bugs
+- FIXED: Fixed incorrect const substitution
+- FIXED: Support 8MB stack depth on Windows, which matches Linux default.
+- FIXED: Prevent infinite iteration in circular layout dependencies.
 - INTERNAL: Added DepthGuard library for recursion limits
 - INTERNAL: Better linear operand enumeration
 - INTERNAL: Upgrade to latest md-5 crate.
@@ -67,9 +68,9 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 ## [6.0.0] - 2026-04-16
 
 - EXTENSION API BREAKING CHANGE: Generalized and unified extension parameter passing.
-- FEATURE: Extensions support named arguments, as in foo:bar(stuff=42);
-- BUG FIX: Fixed to_i64() and to_u64() in const expressions
-- BUG FIX: Use checked arithmetic for extension size.
+- ADDED: Extensions support named arguments, as in foo:bar(stuff=42);
+- FIXED: Fixed to_i64() and to_u64() in const expressions
+- FIXED: Use checked arithmetic for extension size.
 - INTERNAL: Fixed unused import clippy warning
 - INTERNAL: Cleaned up dead code in const evaluation.
 - INTERNAL: Refactored common code into coerce_numeric_pair
