@@ -196,6 +196,9 @@ pub fn is_reserved_identifier(name: &str) -> bool {
             | "extern"
             | "let"
             | "fill"
+            | "obj_align"
+            | "obj_lma"
+            | "obj_vma"
             | "obj"
     )
 }
