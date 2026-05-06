@@ -3,6 +3,9 @@ name = "argvaldb"
 version = "6.1.1"
 edition = "2021"
 
+[lints]
+workspace = true
+
 [lib]
 path = "argvaldb.rs"
 

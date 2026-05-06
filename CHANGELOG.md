@@ -16,6 +16,8 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - INTERNAL: Enormous simplification of const eval to just use the AST
 - INTERNAL: Type deduction moves from IRDB to the Linearizer
 - INTERNAL: Replace `unsafe` mmap with OutputBuffer wrapper for vec<>
+- INTERNAL: Forbid unsafe rust code
+
 
 ## [7.0.0] - 2026-05-02
 

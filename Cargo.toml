@@ -1,3 +1,6 @@
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
 [workspace]
 members = [
     "locationdb",
@@ -50,8 +53,8 @@ categories = ["development-tools::build-utils"]
 authors = ["Steve King <sk@metrokings.com>"]
 edition = "2024"
 
-# See more keys and their definitions at
-# https://doc.rust-lang.org/cargo/reference/manifest.html
+[lints]
+workspace = true
 
 [profile.release]
 opt-level = 3

@@ -6,6 +6,9 @@ edition = "2021"
 [lib]
 path = "mapdb.rs"
 
+[lints]
+workspace = true
+
 [dependencies]
 ir = { path = "../ir" }
 diags = { path = "../diags" }
