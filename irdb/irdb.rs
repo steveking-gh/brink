@@ -682,9 +682,6 @@ impl IRDb {
     /// When the extension declares params() and the call site uses positional args:
     ///   - Validates argument count matches params() length (IRDB_53).
     ///
-    /// When the extension returns an empty params() slice (legacy opt-out):
-    ///   - No validation beyond what validate_operands already performs.
-    ///   - The engine applies the first-Identifier-is-section heuristic.
     fn resolve_named_ext_args(
         &self,
         ir: &mut IR,
@@ -702,11 +699,6 @@ impl IRDb {
         // last = index of the trailing output operand
         let last = ir.operands.len() - 1;
         let user_count = last - 1; // operands[1..last]
-
-        if params.is_empty() {
-            // Legacy path: no named-arg enforcement.  Engine heuristic applies.
-            return true;
-        }
 
         // Detect whether any user arg carries a param_name (named-args mode).
         let any_named = (1..last).any(|i| self.parms[ir.operands[i]].param_name.is_some());

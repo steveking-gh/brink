@@ -1,0 +1,8 @@
+// Writes the 4-byte output of brink::no_args, which takes no arguments
+// and returns the constant 0x12345678 (big-endian).
+section top {
+    wr brink::no_args();
+    assert sizeof(top) == 4;
+}
+
+output top;

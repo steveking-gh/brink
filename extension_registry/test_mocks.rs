@@ -295,6 +295,24 @@ impl BrinkExtension for MockSum8 {
     }
 }
 
+/// Writes the constant value 0x12345678 (big-endian) with no call-site args.
+pub struct MockNoArgs;
+
+impl BrinkExtension for MockNoArgs {
+    fn name(&self) -> &str {
+        "brink::no_args"
+    }
+
+    fn size(&self) -> usize {
+        4
+    }
+
+    fn execute<'a>(&self, _args: &[ParamArg<'a>], out: &mut [u8]) -> Result<(), String> {
+        out.copy_from_slice(&0x12345678u32.to_be_bytes());
+        Ok(())
+    }
+}
+
 /// Returns `usize::MAX` from `size()` to force a u64 overflow in the iterate
 /// location counter when written after any prior byte. Used to test EXEC_60.
 pub struct MockHugeExt;
@@ -317,6 +335,7 @@ pub fn register_test_extensions(reg: &mut ExtensionRegistry) {
     reg.register(Box::new(MockCrc::new()));
     reg.register(Box::new(MockLogger::new()));
     reg.register(Box::new(MockHugeExt));
+    reg.register(Box::new(MockNoArgs));
     reg.register(Box::new(MockSum8));
     reg.register(Box::new(MockIncrement::new()));
     reg.register(Box::new(MockRangedSum::new()));

@@ -1392,6 +1392,24 @@ mod tests {
         fs::remove_file("execute_extension_increment.bin").ok();
     }
 
+    #[test]
+    fn execute_extension_no_args() {
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/extension_no_args.brink")
+            .arg("-o")
+            .arg("execute_extension_no_args.bin")
+            .assert()
+            .success();
+
+        let produced = fs::read("execute_extension_no_args.bin")
+            .expect("execute_extension_no_args.bin not found");
+
+        assert_eq!(produced, [0x12u8, 0x34, 0x56, 0x78]);
+
+        fs::remove_file("execute_extension_no_args.bin").ok();
+    }
+
     // Form 3 (section-name): brink::ranged_sum receives the entire `out`
     // section (4 data bytes + 8-byte extension slot) as its image slice.
     // Sum of 0x01+0x02+0x03+0x04 = 10; extension slot bytes are zero.

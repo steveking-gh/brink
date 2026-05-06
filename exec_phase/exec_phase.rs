@@ -527,119 +527,67 @@ impl ExecPhase {
             // The trailing output operand is a type-checking placeholder and
             // must not be passed to the extension.  last = len-1 excludes it.
             //
-            // When the extension declares params() (cached_params non-empty), the
-            // engine resolves Slice-kinded params to ParamArg::Slice and passes
+            // The engine resolves Slice params to ParamArg::Slice and passes
             // remaining params as ParamArg::Int or ParamArg::Str.  Operands arrive in
             // declaration order (irdb canonicalized them).
             //
-            // When cached_params is empty (legacy opt-out), the engine applies the
-            // old heuristic: if the first user arg is an Identifier that names a
-            // known section, resolve it to ParamArg::Slice.
-            //
             // ParamArg::Slice holds &mmap[..], an immutable borrow.  Pre-resolve
             // all section lookups before that scope so error handling can use `continue`.
-            let last = ir.operands.len() - 1;
             let cached_params = &entry.cached_params;
 
             // Per-param section resolutions, indexed parallel to cached_params.
             // Each entry is Some((file_offset, size, slice_start, slice_end)) for
             // Slice params, or None for Int/Str params.
-            // For the legacy path a single entry covers user arg 0.
             let mut resolved_sections: Vec<Option<(u64, u64, usize, usize)>> = Vec::new();
             let mut section_resolve_failed = false;
 
-            if cached_params.is_empty() {
-                // Legacy heuristic: if user arg 0 is a DeferredRef matching a section,
-                // resolve it to ParamArg::Slice.
-                if last > 1 {
-                    if let ParameterValue::DeferredRef(ref sec_name) =
-                        argvaldb.parms[ir.operands[1]]
-                    {
-                        let indices = sec_dispatch_map
-                            .get(sec_name.as_str())
-                            .map(Vec::as_slice)
-                            .unwrap_or(&[]);
-                        if indices.len() > 1 {
-                            diags.err1(
-                                "EXEC_56",
-                                &format!(
-                                    "Section '{}' appears {} times in the output; \
-                                     section-name form is ambiguous. Wrap with a unique \
-                                     section name or use `wr {}(section_name)` on a single \
-                                     occurrence.",
-                                    sec_name,
-                                    indices.len(),
-                                    name,
-                                ),
-                                ir.src_loc.clone(),
-                            );
-                            error_count += 1;
-                            section_resolve_failed = true;
-                        } else if let Some(&di) = indices.first() {
-                            let d = &map_db.sections[di];
-                            let start = d.file_offset as usize;
-                            resolved_sections.push(Some((
-                                d.file_offset,
-                                d.size,
-                                start,
-                                start + d.size as usize,
-                            )));
-                        } else {
-                            resolved_sections.push(None);
-                        }
-                    } else {
-                        resolved_sections.push(None);
-                    }
-                }
-            } else {
-                // Named-arg/positional path: resolve each Slice param.
-                // Operands arrive in declaration order after irdb canonicalization.
-                for (i, p) in cached_params.iter().enumerate() {
-                    if p.kind == ParamKind::Slice {
-                        let sec_name = argvaldb.parms[ir.operands[1 + i]]
-                            .identifier_to_str()
-                            .to_string();
-                        let indices = sec_dispatch_map
-                            .get(sec_name.as_str())
-                            .map(Vec::as_slice)
-                            .unwrap_or(&[]);
-                        if indices.len() > 1 {
-                            diags.err1(
-                                "EXEC_56",
-                                &format!(
-                                    "Extension '{}': section '{}' for parameter '{}' appears {} \
-                                     times in the output and is ambiguous.",
-                                    name,
-                                    sec_name,
-                                    p.name,
-                                    indices.len(),
-                                ),
-                                ir.src_loc.clone(),
-                            );
-                            error_count += 1;
-                            section_resolve_failed = true;
-                            break;
-                        }
-                        let Some(&di) = indices.first() else {
-                            return Err(anyhow!(
-                                "Extension '{}': section '{}' for parameter '{}' not found \
-                                 in dispatch table. This is a compiler bug.",
+            // Resolve each Slice param.
+            // Operands arrive in declaration order after irdb canonicalization.
+            for (i, p) in cached_params.iter().enumerate() {
+                if p.kind == ParamKind::Slice {
+                    let sec_name = argvaldb.parms[ir.operands[1 + i]]
+                        .identifier_to_str()
+                        .to_string();
+                    let indices = sec_dispatch_map
+                        .get(sec_name.as_str())
+                        .map(Vec::as_slice)
+                        .unwrap_or(&[]);
+                    if indices.len() > 1 {
+                        diags.err1(
+                            "EXEC_56",
+                            &format!(
+                                "Extension '{}': section '{}' for parameter '{}' appears {} \
+                                 times in the output and is ambiguous.",
                                 name,
                                 sec_name,
-                                p.name
-                            ));
-                        };
-                        let d = &map_db.sections[di];
-                        let start = d.file_offset as usize;
-                        resolved_sections.push(Some((
-                            d.file_offset,
-                            d.size,
-                            start,
-                            start + d.size as usize,
-                        )));
-                    } else {
-                        resolved_sections.push(None);
+                                p.name,
+                                indices.len(),
+                            ),
+                            ir.src_loc.clone(),
+                        );
+                        error_count += 1;
+                        section_resolve_failed = true;
+                        break;
                     }
+                    let Some(&di) = indices.first() else {
+                        return Err(anyhow!(
+                            "Extension '{}': section '{}' for parameter '{}' not found \
+                             in dispatch table. This is a compiler bug.",
+                            name,
+                            sec_name,
+                            p.name
+                        ));
+                    };
+                    let d = &map_db.sections[di];
+                    let start = d.file_offset as usize;
+                    resolved_sections.push(Some((
+                        d.file_offset,
+                        d.size,
+                        start,
+                        start + d.size as usize,
+                    )));
+                } else {
+                    resolved_sections.push(None);
                 }
             }
 
@@ -653,56 +601,27 @@ impl ExecPhase {
             let exec_result: Result<Vec<u8>, String> = {
                 let mut ext_args: Vec<ParamArg<'_>> = Vec::new();
 
-                if cached_params.is_empty() {
-                    // Legacy path: section at user arg 0 (if any), then remaining args.
-                    let user_arg_start = if let Some(Some((_file_offset, _len, start, end))) =
-                        resolved_sections.first().copied()
-                    {
-                        ext_args.push(ParamArg::Slice {
-                            data: &mmap[start..end],
-                        });
-                        2
+                for (i, p) in cached_params.iter().enumerate() {
+                    if p.kind == ParamKind::Slice {
+                        if let Some((_file_offset, _len, start, end)) = resolved_sections[i] {
+                            ext_args.push(ParamArg::Slice {
+                                data: &mmap[start..end],
+                            });
+                        }
                     } else {
-                        1
-                    };
-                    for &op in &ir.operands[user_arg_start..last] {
-                        let parm = &argvaldb.parms[op];
+                        let parm = &argvaldb.parms[ir.operands[1 + i]];
                         let arg = match parm {
                             ParameterValue::U64(v) => ParamArg::Int(*v),
                             ParameterValue::I64(v) | ParameterValue::Integer(v) => {
                                 ParamArg::Int(*v as u64)
                             }
                             ParameterValue::QuotedString(s) => ParamArg::Str(s.as_str()),
-                            _ => {
-                                unreachable!("unexpected extension arg type {:?}", parm.data_type())
-                            }
+                            _ => unreachable!(
+                                "unexpected extension arg type {:?}",
+                                parm.data_type()
+                            ),
                         };
                         ext_args.push(arg);
-                    }
-                } else {
-                    // Named-arg/positional path: build args from declared params in order.
-                    for (i, p) in cached_params.iter().enumerate() {
-                        if p.kind == ParamKind::Slice {
-                            if let Some((_file_offset, _len, start, end)) = resolved_sections[i] {
-                                ext_args.push(ParamArg::Slice {
-                                    data: &mmap[start..end],
-                                });
-                            }
-                        } else {
-                            let parm = &argvaldb.parms[ir.operands[1 + i]];
-                            let arg = match parm {
-                                ParameterValue::U64(v) => ParamArg::Int(*v),
-                                ParameterValue::I64(v) | ParameterValue::Integer(v) => {
-                                    ParamArg::Int(*v as u64)
-                                }
-                                ParameterValue::QuotedString(s) => ParamArg::Str(s.as_str()),
-                                _ => unreachable!(
-                                    "unexpected extension arg type {:?}",
-                                    parm.data_type()
-                                ),
-                            };
-                            ext_args.push(arg);
-                        }
                     }
                 }
 

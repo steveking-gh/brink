@@ -135,13 +135,11 @@ pub trait BrinkExtension {
     /// Returns the declared parameters for this extension.
     ///
     /// Each entry in the slice declares one parameter: its name and kind.
-    /// Return a non-empty slice to enable named-argument call sites
-    /// (`foo::bar(data=my_section, seed=42)`).  Brink validates argument names
-    /// against this slice and reorders call-site args to declaration order
-    /// before passing them to [`execute`](Self::execute).
+    /// Returns the declared parameters for this extension.
     ///
-    /// Return an empty slice (the default) to opt out.  Positional-only rules
-    /// apply and legacy section-detection heuristics remain active.
+    /// Each entry declares one parameter: its name and kind.  Brink validates
+    /// argument names against this slice and reorders call-site args to
+    /// declaration order before passing them to [`execute`](Self::execute).
     fn params(&self) -> &[ParamDesc] {
         &[]
     }
