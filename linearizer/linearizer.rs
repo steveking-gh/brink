@@ -641,8 +641,9 @@ impl Linearizer {
                     {
                         out_dt = rhs_dt;
                     } else if lhs_dt == DataType::Identifier || rhs_dt == DataType::Identifier {
-                        // Identifier will become U64 for labels, but wait...
-                        // Just use the non-identifier type or keep Identifier.
+                        // When one operand is an Identifier and the other is a
+                        // numeric type, propagate the numeric type.  If both are
+                        // Identifiers, keep Identifier for deferred resolution
                         if [DataType::I64, DataType::U64, DataType::Integer].contains(&lhs_dt) {
                             out_dt = lhs_dt;
                         } else if [DataType::I64, DataType::U64, DataType::Integer]

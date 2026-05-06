@@ -23,11 +23,11 @@ when creating FLASH, ROM or other non-volatile memory images.
 - Extract and write sections from ELF and other other object file formats
 - Copy external files into your output
 - Align and pad content
-- Output detailed map files in various formats: Rust, C99 header, JSON and CSV
+- Output detailed map files in various formats: Rust, C header, JSON and CSV
 
 ## Brink Language Features
 
-- Thorough human-written reference documentation
+- Thorough reference documentation
 - Comfortable curly-brace and semicolon syntax
 - Declarative style so your Brink source resembles your output file
 - Include other `.brink` files for modularity
@@ -52,7 +52,6 @@ when creating FLASH, ROM or other non-volatile memory images.
 
 - Implemented in Rust with support for any Rust language host platform
 - Fully open source with MIT license
-
 
 # Quick Start
 

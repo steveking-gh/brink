@@ -212,6 +212,14 @@ pub enum ParameterValue {
 }
 
 impl ParameterValue {
+    // Some operations require numeric operands, so provide a concise check.
+    pub fn is_numeric(&self) -> bool {
+        matches!(
+            self,
+            ParameterValue::U64(_) | ParameterValue::I64(_) | ParameterValue::Integer(_)
+        )
+    }
+
     pub fn data_type(&self) -> DataType {
         match self {
             ParameterValue::U64(_) => DataType::U64,

@@ -509,7 +509,7 @@ pub fn evaluate_regions(
                     ok = false;
                 }
                 Some(val) => {
-                    if val.to_bool().is_none() {
+                    if !val.is_numeric() {
                         diags.err1(
                             "EXEC_66",
                             &format!(
@@ -705,6 +705,9 @@ fn evaluate_stmt(
             }
         }
         LexToken::If => walk_if_statement(ast, nid, symbol_table, diags),
+
+        // All other statements are ignored by the const evaluator.
+        // These include section, region, output and more.
         _ => true,
     }
 }

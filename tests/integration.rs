@@ -2690,8 +2690,6 @@ mod tests {
     // ── IRDB error path coverage ──────────────────────────────────────────────
 
     /// IRDB_1: binary operator applied to two typed but incompatible operands
-    /// (U64 and I64) in the layout IR; neither is the untyped Integer class so
-    /// get_operand_data_type_r cannot reconcile them.
     #[test]
     fn irdb_1_type_mismatch() {
         assert_brink_failure("tests/irdb_1_type_mismatch.brink", &["[LINEAR_4]"]);
