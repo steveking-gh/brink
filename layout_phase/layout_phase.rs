@@ -709,7 +709,7 @@ impl LayoutPhase {
 
         let in_parm = &self.parms[in_parm_num0];
 
-        if in_parm.data_type() == DataType::Identifier {
+        if in_parm.data_type() == DataType::DeferredRef {
             let sec_name = in_parm.identifier_to_str().to_string();
 
             // Section path: derive size from layout-phase ir_locs.

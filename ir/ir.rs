@@ -117,7 +117,12 @@ pub enum DataType {
     I64,
     Integer, // ambiguously U64 or I64
     QuotedString,
+    /// A structural name whose string is the final value: extension call names,
+    /// label declarations, const LHS, section start/end markers.  Never substituted.
     Identifier,
+    /// An identifier reference whose concrete type is not yet known at linearization
+    /// time.  The layout engine resolves it to an address, size, or section bytes.
+    DeferredRef,
     /// Output type of an extension call.  All type checks reject Extension
     /// except for the ExtensionCall/ExtensionCallSection IR output slot.
     Extension,
@@ -206,6 +211,9 @@ pub enum ParameterValue {
     Integer(i64), // ambiguously U64 or I64, physically backed by i64
     QuotedString(String),
     Identifier(String),
+    /// An identifier reference whose concrete type is not yet known at linearization
+    /// time.  The layout engine resolves it to an address, size, or section bytes.
+    DeferredRef(String),
     /// Placeholder value for the output slot of an extension call.
     Extension,
     Unknown,
@@ -227,6 +235,7 @@ impl ParameterValue {
             ParameterValue::Integer(_) => DataType::Integer,
             ParameterValue::QuotedString(_) => DataType::QuotedString,
             ParameterValue::Identifier(_) => DataType::Identifier,
+            ParameterValue::DeferredRef(_) => DataType::DeferredRef,
             ParameterValue::Extension => DataType::Extension,
             ParameterValue::Unknown => DataType::Unknown,
         }
@@ -288,7 +297,7 @@ impl ParameterValue {
 
     pub fn identifier_to_str(&self) -> &str {
         match self {
-            ParameterValue::Identifier(s) => s,
+            ParameterValue::Identifier(s) | ParameterValue::DeferredRef(s) => s,
             _ => {
                 panic!("Internal error: Invalid type conversion from {:?} to identifier", self);
             }
@@ -442,6 +451,9 @@ impl IROperand {
 
             DataType::Identifier => {
                 return Some(ParameterValue::Identifier(sval.to_string()));
+            }
+            DataType::DeferredRef => {
+                return Some(ParameterValue::DeferredRef(sval.to_string()));
             }
             DataType::Unknown => {
                 let m = format!("Conversion failed for unknown type {}.", sval);

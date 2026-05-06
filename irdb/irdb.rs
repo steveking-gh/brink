@@ -542,8 +542,8 @@ impl IRDb {
                 | DataType::I64
                 | DataType::Integer
                 | DataType::QuotedString
-                // Identifier section names resolve to ParamArg::Slice at engine time.
-                | DataType::Identifier
+                // DeferredRef section names resolve to ParamArg::Slice at engine time.
+                | DataType::DeferredRef
             ) {
                 let m = format!(
                     "Extension '{}': argument {} must be a numeric, string, or section-name expression, got {:?}",
@@ -754,12 +754,12 @@ impl IRDb {
                 }
             }
 
-            // IRDB_52: Slice params must receive an Identifier (section name).
+            // IRDB_52: Slice params must receive a section name (DeferredRef).
             for p in params.iter() {
                 if p.kind == ParamKind::Slice {
                     let opnd_idx = name_to_opnd_idx[p.name];
                     let opnd = &self.parms[opnd_idx];
-                    if !matches!(opnd.val, ParameterValue::Identifier(_)) {
+                    if !matches!(opnd.val, ParameterValue::DeferredRef(_)) {
                         Self::err_bytearray_needs_section(ir, p.name, opnd, name, diags);
                         return false;
                     }
@@ -782,17 +782,17 @@ impl IRDb {
                 diags.err1("IRDB_53", &m, ir.src_loc.clone());
                 return false;
             }
-            // Validate Slice positional params received an Identifier (section name).
+            // Validate Slice positional params received a section name (DeferredRef).
             for (i, p) in params.iter().enumerate() {
                 if p.kind == ParamKind::Slice {
                     let opnd = &self.parms[ir.operands[1 + i]];
-                    if !matches!(opnd.val, ParameterValue::Identifier(_)) {
+                    if !matches!(opnd.val, ParameterValue::DeferredRef(_)) {
                         // IRDB_52: value expression where a section name is required.
                         Self::err_bytearray_needs_section(ir, p.name, opnd, name, diags);
                         return false;
                     }
                     // IRDB_54: the identifier does not name a known section.
-                    let ParameterValue::Identifier(ref sec_name) = opnd.val else {
+                    let ParameterValue::DeferredRef(ref sec_name) = opnd.val else {
                         unreachable!()
                     };
                     if !section_names.contains(sec_name.as_str()) {
@@ -948,7 +948,7 @@ impl IRDb {
                             let v = operand.val.to_str();
                             op.push_str(&format!(" ({:?}){}", operand.val.data_type(), v));
                         }
-                        DataType::Identifier => {
+                        DataType::Identifier | DataType::DeferredRef => {
                             let v = operand.val.identifier_to_str();
                             op.push_str(&format!(" ({:?}){}", operand.val.data_type(), v));
                         }

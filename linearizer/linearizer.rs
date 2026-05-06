@@ -29,7 +29,7 @@ use symtable::SymbolTable;
 ///   * Ref: an identifier value reference (e.g. a const name).
 ///     process_lin_operands replaces the operand with the const's typed value
 ///     if found in the symbol table; otherwise the operand becomes
-///     ParameterValue::Identifier.
+///     ParameterValue::DeferredRef.
 ///   * NameDef: a structural identifier whose string IS the final value (extension
 ///     names, label names, const LHS, assign LHS).  Never substituted.
 ///   * Output: the result slot of a prior IR instruction.
@@ -458,7 +458,7 @@ impl Linearizer {
                     let dt = symbol_table
                         .get_value(tinfo.val)
                         .map(|v| v.data_type())
-                        .unwrap_or(DataType::Identifier);
+                        .unwrap_or(DataType::DeferredRef);
                     let idx = self.operand_vec.len();
                     self.operand_vec.push(LinOperand::new_ref(tinfo, dt));
                     returned_operands.push(idx);
@@ -566,6 +566,7 @@ impl Linearizer {
                             DataType::Integer,
                             DataType::QuotedString,
                             DataType::Identifier,
+                            DataType::DeferredRef,
                         ]
                         .contains(&lhs_dt)
                         {
@@ -579,7 +580,7 @@ impl Linearizer {
                         && [DataType::I64, DataType::U64].contains(&rhs_dt)
                     {
                         ok = true;
-                    } else if lhs_dt == DataType::Identifier || rhs_dt == DataType::Identifier {
+                    } else if lhs_dt == DataType::DeferredRef || rhs_dt == DataType::DeferredRef {
                         ok = true; // Resolve at layout time
                     }
                     if !ok {
@@ -622,8 +623,8 @@ impl Linearizer {
                     if lhs_dt == rhs_dt {
                         if [DataType::I64, DataType::U64, DataType::Integer].contains(&lhs_dt) {
                             out_dt = lhs_dt;
-                        } else if lhs_dt == DataType::Identifier {
-                            out_dt = DataType::Identifier; // Deferred resolution
+                        } else if lhs_dt == DataType::DeferredRef {
+                            out_dt = DataType::DeferredRef; // Resolve at layout time
                         } else {
                             let msg = format!(
                                 "Invalid operand types for arithmetic: '{:?}' and '{:?}'.",
@@ -640,10 +641,10 @@ impl Linearizer {
                         && [DataType::I64, DataType::U64].contains(&rhs_dt)
                     {
                         out_dt = rhs_dt;
-                    } else if lhs_dt == DataType::Identifier || rhs_dt == DataType::Identifier {
-                        // When one operand is an Identifier and the other is a
+                    } else if lhs_dt == DataType::DeferredRef || rhs_dt == DataType::DeferredRef {
+                        // When one operand is a DeferredRef and the other is a
                         // numeric type, propagate the numeric type.  If both are
-                        // Identifiers, keep Identifier for deferred resolution
+                        // DeferredRefs, keep DeferredRef for layout-time resolution.
                         if [DataType::I64, DataType::U64, DataType::Integer].contains(&lhs_dt) {
                             out_dt = lhs_dt;
                         } else if [DataType::I64, DataType::U64, DataType::Integer]
@@ -651,7 +652,7 @@ impl Linearizer {
                         {
                             out_dt = rhs_dt;
                         } else {
-                            out_dt = DataType::Identifier;
+                            out_dt = DataType::DeferredRef;
                         }
                     } else {
                         let msg = format!(

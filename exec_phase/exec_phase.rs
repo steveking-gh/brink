@@ -549,10 +549,10 @@ impl ExecPhase {
             let mut section_resolve_failed = false;
 
             if cached_params.is_empty() {
-                // Legacy heuristic: if user arg 0 is an Identifier matching a section,
+                // Legacy heuristic: if user arg 0 is a DeferredRef matching a section,
                 // resolve it to ParamArg::Slice.
                 if last > 1 {
-                    if let ParameterValue::Identifier(ref sec_name) =
+                    if let ParameterValue::DeferredRef(ref sec_name) =
                         argvaldb.parms[ir.operands[1]]
                     {
                         let indices = sec_dispatch_map

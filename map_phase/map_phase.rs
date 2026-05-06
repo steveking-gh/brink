@@ -33,7 +33,7 @@ pub fn fmt_const_value(pv: &ParameterValue) -> String {
         ParameterValue::I64(v) => format!("{v}"),
         ParameterValue::Integer(v) => format!("{v}"),
         ParameterValue::QuotedString(s) => format!("\"{s}\""),
-        ParameterValue::Identifier(s) => s.clone(),
+        ParameterValue::Identifier(s) | ParameterValue::DeferredRef(s) => s.clone(),
         ParameterValue::Extension => "(extension)".to_string(),
         ParameterValue::Unknown => "(unknown)".to_string(),
     }
