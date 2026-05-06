@@ -1,5 +1,5 @@
 // Region name conflicts with an existing section name.
-// AST_48: "FLASH" is already declared as a section.
+// ERR_43: "FLASH" is already declared as a section.
 section FLASH {
     wr8 0x01;
 }

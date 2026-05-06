@@ -1,5 +1,5 @@
 // Named argument 'value' supplied twice in one extension call.
-// IRDb rejects the duplicate with IRDB_49.
+// IRDb rejects the duplicate with ERR_105.
 section top {
     wr brink::test_crc(value=1, value=2);
 }

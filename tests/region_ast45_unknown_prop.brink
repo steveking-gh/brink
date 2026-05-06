@@ -1,5 +1,5 @@
 // Unknown property name inside a region block.
-// AST_45: "bogus" is not a recognized region property.
+// ERR_40: "bogus" is not a recognized region property.
 region FLASH {
     addr = 0x1000;
     size = 0x100;

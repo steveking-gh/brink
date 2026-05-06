@@ -1,4 +1,4 @@
-// An integer literal that exceeds i64::MAX triggers IR_4.
+// An integer literal that exceeds i64::MAX triggers ERR_201.
 // 99999999999999999999 > 9223372036854775807 (i64::MAX)
 section foo {
     wr8 99999999999999999999;

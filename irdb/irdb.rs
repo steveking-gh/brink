@@ -230,7 +230,7 @@ impl IRDb {
 
             // Output operands from a failed arithmetic IR carry
             // DataType::Unknown. The linearizer already emitted the primary
-            // error (LINEAR_3/4/5). Push a placeholder directly to avoid a
+            // error (ERR_205/4/5). Push a placeholder directly to avoid a
             // spurious diagnostic error later.
             if data_type == DataType::Unknown {
                 self.parms.push(IROperand {
@@ -278,7 +278,7 @@ impl IRDb {
                 ir.kind,
                 path_opnd.val.data_type()
             );
-            diags.err2("IRDB_11", &m, ir.src_loc.clone(), path_opnd.src_loc.clone());
+            diags.err2("ERR_80", &m, ir.src_loc.clone(), path_opnd.src_loc.clone());
             return false;
         }
 
@@ -309,7 +309,7 @@ impl IRDb {
                     Looking in directory '{}'",
                 path_str, os_err, full_path
             );
-            diags.err1("IRDB_13", &m, path_opnd.src_loc.clone());
+            diags.err1("ERR_81", &m, path_opnd.src_loc.clone());
             return false;
         }
 
@@ -317,7 +317,7 @@ impl IRDb {
 
         if !fm.is_file() {
             let m = format!("'{}' must be a regular file.", path_str);
-            diags.err1("IRDB_14", &m, path_opnd.src_loc.clone());
+            diags.err1("ERR_82", &m, path_opnd.src_loc.clone());
             return false;
         }
 
@@ -334,7 +334,7 @@ impl IRDb {
     }
 
     // Parse the object file at file_path and populate parsed_obj_files with a
-    // section_name -> (file_offset, size) map.  Returns false and emits IRDB_62
+    // section_name -> (file_offset, size) map.  Returns false and emits ERR_118
     // on any open or parse failure.  Does nothing if already cached.
     fn load_obj_file_sections(
         &mut self,
@@ -349,7 +349,7 @@ impl IRDb {
             Ok(b) => b,
             Err(e) => {
                 let m = format!("Cannot read object file '{}': {}", file_path, e);
-                diags.err1("IRDB_62", &m, src_loc.clone());
+                diags.err1("ERR_118", &m, src_loc.clone());
                 return false;
             }
         };
@@ -360,7 +360,7 @@ impl IRDb {
                     "'{}' is not a recognized object file format: {}",
                     file_path, e
                 );
-                diags.err1("IRDB_64", &m, src_loc.clone());
+                diags.err1("ERR_120", &m, src_loc.clone());
                 return false;
             }
         };
@@ -403,7 +403,7 @@ impl IRDb {
             Some(pair) => (pair.0.clone(), pair.1.clone()),
             None => {
                 let m = format!("Unknown obj name '{}'", obj_name);
-                diags.err1("IRDB_61", &m, src_loc.clone());
+                diags.err1("ERR_117", &m, src_loc.clone());
                 return false;
             }
         };
@@ -416,7 +416,7 @@ impl IRDb {
                 "Section '{}' not found in '{}', or section has no file data (e.g. zero-initialized sections cannot be copied).",
                 section_name, file_path
             );
-            diags.err1("IRDB_63", &m, src_loc.clone());
+            diags.err1("ERR_119", &m, src_loc.clone());
             return false;
         };
         self.obj_sections.insert(
@@ -467,7 +467,7 @@ impl IRDb {
                 "'{:?}' expressions must evaluate to one operand, but found {}.",
                 ir.kind, len
             );
-            diags.err1("IRDB_4", &m, ir.src_loc.clone());
+            diags.err1("ERR_77", &m, ir.src_loc.clone());
             return false;
         }
         let opnd = &self.parms[ir.operands[0]];
@@ -477,7 +477,7 @@ impl IRDb {
                 ir.kind,
                 opnd.val.data_type()
             );
-            diags.err2("IRDB_5", &m, ir.src_loc.clone(), opnd.src_loc.clone());
+            diags.err2("ERR_78", &m, ir.src_loc.clone(), opnd.src_loc.clone());
             return false;
         }
         true
@@ -488,7 +488,7 @@ impl IRDb {
         let len = ir.operands.len();
         if !(1..=2).contains(&len) {
             let m = format!("'{:?}' takes 1 or 2 arguments, found {}.", ir.kind, len);
-            diags.err1("IRDB_55", &m, ir.src_loc.clone());
+            diags.err1("ERR_111", &m, ir.src_loc.clone());
             return false;
         }
 
@@ -501,7 +501,7 @@ impl IRDb {
                 ir.kind,
                 opnd.val.data_type()
             );
-            diags.err2("IRDB_9", &m, ir.src_loc.clone(), opnd.src_loc.clone());
+            diags.err2("ERR_79", &m, ir.src_loc.clone(), opnd.src_loc.clone());
             return false;
         }
 
@@ -515,7 +515,7 @@ impl IRDb {
                     ir.kind,
                     opnd.val.data_type()
                 );
-                diags.err2("IRDB_15", &m, ir.src_loc.clone(), opnd.src_loc.clone());
+                diags.err2("ERR_83", &m, ir.src_loc.clone(), opnd.src_loc.clone());
                 return false;
             }
         }
@@ -524,7 +524,7 @@ impl IRDb {
 
     /// Validates that every extension user argument in the given operand
     /// index range is a value type (numeric, string, or section-name identifier).
-    /// Extension outputs and unknown types are rejected with IRDB_47 because
+    /// Extension outputs and unknown types are rejected with ERR_103 because
     /// the engine cannot convert them to ParamArg.
     fn validate_ext_user_args(
         &self,
@@ -549,7 +549,7 @@ impl IRDb {
                     "Extension '{}': argument {} must be a numeric, string, or section-name expression, got {:?}",
                     ext_name, opnd_pos, dt
                 );
-                diags.err2("IRDB_47", &m, ir.src_loc.clone(), opnd.src_loc.clone());
+                diags.err2("ERR_103", &m, ir.src_loc.clone(), opnd.src_loc.clone());
                 return false;
             }
         }
@@ -585,7 +585,7 @@ impl IRDb {
                     } else {
                         format!("Unknown function '{}'", name)
                     };
-                    diags.err1("IRDB_40", &m, ir.src_loc.clone());
+                    diags.err1("ERR_99", &m, ir.src_loc.clone());
                     return false;
                 }
                 // User args: operands[1..last] (operands[0]=name, operands[last]=output).
@@ -600,7 +600,7 @@ impl IRDb {
                     } else {
                         format!("Unknown extension '{}'", name)
                     };
-                    diags.err1("IRDB_44", &m, ir.src_loc.clone());
+                    diags.err1("ERR_100", &m, ir.src_loc.clone());
                     return false;
                 }
                 true
@@ -653,7 +653,7 @@ impl IRDb {
         }
     }
 
-    /// Emits IRDB_52: a Slice parameter received a value expression instead of a section name.
+    /// Emits ERR_108: a Slice parameter received a value expression instead of a section name.
     /// Centralizes the error code so the uniqueness check finds exactly one occurrence.
     fn err_bytearray_needs_section(
         ir: &IR,
@@ -667,20 +667,20 @@ impl IRDb {
              not a value expression",
             ext_name, param_name
         );
-        diags.err2("IRDB_52", &m, ir.src_loc.clone(), opnd.src_loc.clone());
+        diags.err2("ERR_108", &m, ir.src_loc.clone(), opnd.src_loc.clone());
     }
 
     /// Validates and canonicalizes named/positional arguments for one ExtensionCall IR.
     ///
     /// When the extension declares params() and the call site uses named args:
-    ///   - Validates every arg name against params() (IRDB_48).
-    ///   - Rejects duplicate names (IRDB_49).
-    ///   - Rejects missing required params (IRDB_51).
-    ///   - Rejects Slice params that received a non-Identifier value (IRDB_52).
+    ///   - Validates every arg name against params() (ERR_104).
+    ///   - Rejects duplicate names (ERR_105).
+    ///   - Rejects missing required params (ERR_107).
+    ///   - Rejects Slice params that received a non-Identifier value (ERR_108).
     ///   - Reorders ir.operands[1..last] to declaration order.
     ///
     /// When the extension declares params() and the call site uses positional args:
-    ///   - Validates argument count matches params() length (IRDB_53).
+    ///   - Validates argument count matches params() length (ERR_109).
     ///
     fn resolve_named_ext_args(
         &self,
@@ -691,7 +691,7 @@ impl IRDb {
     ) -> bool {
         let name = self.get_opnd_as_identifier(ir, 0);
         let Some(entry) = ext_registry.get(name) else {
-            return true; // Unknown extension; validate_operands fires IRDB_40.
+            return true; // Unknown extension; validate_operands fires ERR_99.
         };
         let params = &entry.cached_params;
 
@@ -711,42 +711,42 @@ impl IRDb {
                 let opnd = &self.parms[opnd_idx];
                 let param_name = match &opnd.param_name {
                     Some(n) => n.as_str(),
-                    None => continue, // AST_40 would have caught mixing; skip stray positional.
+                    None => continue, // ERR_35 would have caught mixing; skip stray positional.
                 };
-                // IRDB_48: unknown param name.
+                // ERR_104: unknown param name.
                 if !params.iter().any(|p| p.name == param_name) {
                     let m = format!(
                         "Extension '{}': unknown parameter name '{}'",
                         name, param_name
                     );
-                    diags.err2("IRDB_48", &m, ir.src_loc.clone(), opnd.src_loc.clone());
+                    diags.err2("ERR_104", &m, ir.src_loc.clone(), opnd.src_loc.clone());
                     return false;
                 }
-                // IRDB_49: duplicate name.
+                // ERR_105: duplicate name.
                 if name_to_opnd_idx.contains_key(param_name) {
                     let m = format!(
                         "Extension '{}': duplicate parameter name '{}'",
                         name, param_name
                     );
-                    diags.err2("IRDB_49", &m, ir.src_loc.clone(), opnd.src_loc.clone());
+                    diags.err2("ERR_105", &m, ir.src_loc.clone(), opnd.src_loc.clone());
                     return false;
                 }
                 name_to_opnd_idx.insert(param_name, opnd_idx);
             }
 
-            // IRDB_51: every declared param must be present.
+            // ERR_107: every declared param must be present.
             for p in params.iter() {
                 if !name_to_opnd_idx.contains_key(p.name) {
                     let m = format!(
                         "Extension '{}': missing required parameter '{}'",
                         name, p.name
                     );
-                    diags.err1("IRDB_51", &m, ir.src_loc.clone());
+                    diags.err1("ERR_107", &m, ir.src_loc.clone());
                     return false;
                 }
             }
 
-            // IRDB_52: Slice params must receive a section name (DeferredRef).
+            // ERR_108: Slice params must receive a section name (DeferredRef).
             for p in params.iter() {
                 if p.kind == ParamKind::Slice {
                     let opnd_idx = name_to_opnd_idx[p.name];
@@ -763,7 +763,7 @@ impl IRDb {
                 ir.operands[1 + i] = name_to_opnd_idx[p.name];
             }
         } else {
-            // Positional mode with params declared: validate count (IRDB_53).
+            // Positional mode with params declared: validate count (ERR_109).
             if user_count != params.len() {
                 let m = format!(
                     "Extension '{}': expected {} argument(s), got {}",
@@ -771,7 +771,7 @@ impl IRDb {
                     params.len(),
                     user_count
                 );
-                diags.err1("IRDB_53", &m, ir.src_loc.clone());
+                diags.err1("ERR_109", &m, ir.src_loc.clone());
                 return false;
             }
             // Validate Slice positional params received a section name (DeferredRef).
@@ -779,11 +779,11 @@ impl IRDb {
                 if p.kind == ParamKind::Slice {
                     let opnd = &self.parms[ir.operands[1 + i]];
                     if !matches!(opnd.val, ParameterValue::DeferredRef(_)) {
-                        // IRDB_52: value expression where a section name is required.
+                        // ERR_108: value expression where a section name is required.
                         Self::err_bytearray_needs_section(ir, p.name, opnd, name, diags);
                         return false;
                     }
-                    // IRDB_54: the identifier does not name a known section.
+                    // ERR_110: the identifier does not name a known section.
                     let ParameterValue::DeferredRef(ref sec_name) = opnd.val else {
                         unreachable!()
                     };
@@ -792,7 +792,7 @@ impl IRDb {
                             "Extension '{}': parameter '{}' names an unknown section '{}'",
                             name, p.name, sec_name
                         );
-                        diags.err2("IRDB_54", &m, ir.src_loc.clone(), opnd.src_loc.clone());
+                        diags.err2("ERR_110", &m, ir.src_loc.clone(), opnd.src_loc.clone());
                         return false;
                     }
                 }

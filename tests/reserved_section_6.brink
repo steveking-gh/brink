@@ -1,5 +1,5 @@
 // Identifiers starting with '__' are reserved and cannot be used as section names.
-// Expected: AST_32.
+// Expected: ERR_27.
 section __builtin {
     wr8 1;
 }

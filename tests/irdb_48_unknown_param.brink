@@ -1,5 +1,5 @@
 // Named argument with a name that does not appear in the extension's params().
-// IRDb rejects the call with IRDB_48.
+// IRDb rejects the call with ERR_104.
 section top {
     wr brink::test_crc(no_such_param=42);
 }

@@ -112,7 +112,7 @@ impl LayoutPhase {
         }
 
         diags.err1(
-            "EXEC_50",
+            "ERR_168",
             &format!(
                 "Failed to resolve extension '{}' size during layout.",
                 ext_name
@@ -160,7 +160,7 @@ impl LayoutPhase {
                             temp
                         );
                         let src_loc = irdb.parms[ir.operands[1]].src_loc.clone();
-                        diags.err1("EXEC_32", &msg, src_loc);
+                        diags.err1("ERR_154", &msg, src_loc);
                         result = false;
                         repeat_count = 0;
                     } else {
@@ -170,7 +170,7 @@ impl LayoutPhase {
                 bad => {
                     let msg = format!("Repeat count cannot be type '{:?}'", bad);
                     let src_loc = irdb.parms[ir.operands[1]].src_loc.clone();
-                    diags.err1("EXEC_31", &msg, src_loc);
+                    diags.err1("ERR_153", &msg, src_loc);
                     result = false;
                 }
             }
@@ -186,7 +186,7 @@ impl LayoutPhase {
             .src_loc
             .clone();
             diags.err1(
-                "EXEC_36",
+                "ERR_158",
                 "Write repeat count causes size overflow",
                 src_loc,
             );
@@ -274,7 +274,7 @@ impl LayoutPhase {
                 bad => {
                     let msg = format!("Cannot stringify type '{:?}'", bad);
                     let src_loc = irdb.parms[op_num].src_loc.clone();
-                    diags.err1("EXEC_14", &msg, src_loc);
+                    diags.err1("ERR_138", &msg, src_loc);
                     result = false;
                 }
             }
@@ -287,7 +287,7 @@ impl LayoutPhase {
     fn do_u64_add(ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
         let Some(checked_result) = in0.checked_add(in1) else {
             let msg = format!("Add expression '{in0} + {in1}' will overflow type U64");
-            diags.err1("EXEC_1", &msg, ir.src_loc.clone());
+            diags.err1("ERR_125", &msg, ir.src_loc.clone());
             return false;
         };
         *out = checked_result;
@@ -297,7 +297,7 @@ impl LayoutPhase {
     fn do_i64_add(ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
         let Some(checked_result) = in0.checked_add(in1) else {
             let msg = format!("Add expression '{in0} + {in1}' will overflow type I64");
-            diags.err1("EXEC_21", &msg, ir.src_loc.clone());
+            diags.err1("ERR_145", &msg, ir.src_loc.clone());
             return false;
         };
         *out = checked_result;
@@ -307,7 +307,7 @@ impl LayoutPhase {
     fn do_u64_sub(ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
         let Some(checked_result) = in0.checked_sub(in1) else {
             let msg = format!("Subtract expression '{in0} - {in1}' will underflow type U64");
-            diags.err1("EXEC_4", &msg, ir.src_loc.clone());
+            diags.err1("ERR_128", &msg, ir.src_loc.clone());
             return false;
         };
         *out = checked_result;
@@ -317,7 +317,7 @@ impl LayoutPhase {
     fn do_i64_sub(ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
         let Some(checked_result) = in0.checked_sub(in1) else {
             let msg = format!("Subtract expression '{in0} - {in1}' will underflow type I64");
-            diags.err1("EXEC_24", &msg, ir.src_loc.clone());
+            diags.err1("ERR_147", &msg, ir.src_loc.clone());
             return false;
         };
         *out = checked_result;
@@ -327,7 +327,7 @@ impl LayoutPhase {
     fn do_u64_mul(ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
         let Some(checked_result) = in0.checked_mul(in1) else {
             let msg = format!("Multiply expression '{in0} * {in1}' will overflow type U64");
-            diags.err1("EXEC_6", &msg, ir.src_loc.clone());
+            diags.err1("ERR_130", &msg, ir.src_loc.clone());
             return false;
         };
         *out = checked_result;
@@ -337,7 +337,7 @@ impl LayoutPhase {
     fn do_i64_mul(ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
         let Some(checked_result) = in0.checked_mul(in1) else {
             let msg = format!("Multiply expression '{in0} * {in1}' will overflow data type I64");
-            diags.err1("EXEC_26", &msg, ir.src_loc.clone());
+            diags.err1("ERR_148", &msg, ir.src_loc.clone());
             return false;
         };
         *out = checked_result;
@@ -347,7 +347,7 @@ impl LayoutPhase {
     fn do_u64_div(ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
         let Some(checked_result) = in0.checked_div(in1) else {
             let msg = format!("Exception in divide expression '{in0} / {in1}'");
-            diags.err1("EXEC_7", &msg, ir.src_loc.clone());
+            diags.err1("ERR_131", &msg, ir.src_loc.clone());
             return false;
         };
         *out = checked_result;
@@ -357,7 +357,7 @@ impl LayoutPhase {
     fn do_u64_mod(ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
         let Some(checked_result) = in0.checked_rem(in1) else {
             let msg = format!("Exception in modulo expression '{in0} % {in1}'");
-            diags.err1("EXEC_28", &msg, ir.src_loc.clone());
+            diags.err1("ERR_150", &msg, ir.src_loc.clone());
             return false;
         };
         *out = checked_result;
@@ -367,7 +367,7 @@ impl LayoutPhase {
     fn do_i64_div(ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
         let Some(checked_result) = in0.checked_div(in1) else {
             let msg = format!("Exception in divide expression '{in0} / {in1}'");
-            diags.err1("EXEC_27", &msg, ir.src_loc.clone());
+            diags.err1("ERR_149", &msg, ir.src_loc.clone());
             return false;
         };
         *out = checked_result;
@@ -377,7 +377,7 @@ impl LayoutPhase {
     fn do_i64_mod(ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
         let Some(checked_result) = in0.checked_rem(in1) else {
             let msg = format!("Exception in modulo expression '{in0} % {in1}'");
-            diags.err1("EXEC_30", &msg, ir.src_loc.clone());
+            diags.err1("ERR_152", &msg, ir.src_loc.clone());
             return false;
         };
         *out = checked_result;
@@ -389,7 +389,7 @@ impl LayoutPhase {
             let msg = format!(
                 "Shift amount {in1} is too large in Left Shift expression '{in0} << {in1}'"
             );
-            diags.err1("EXEC_9", &msg, ir.src_loc.clone());
+            diags.err1("ERR_133", &msg, ir.src_loc.clone());
             return false;
         };
         *out = in0.checked_shl(shift_amount).unwrap_or(0);
@@ -401,7 +401,7 @@ impl LayoutPhase {
             let msg = format!(
                 "Shift amount {in1} is too large in Left Shift expression '{in0} << {in1}'"
             );
-            diags.err1("EXEC_29", &msg, ir.src_loc.clone());
+            diags.err1("ERR_151", &msg, ir.src_loc.clone());
             return false;
         };
         *out = in0.checked_shl(shift_amount).unwrap_or(0);
@@ -413,7 +413,7 @@ impl LayoutPhase {
             let msg = format!(
                 "Shift amount {in1} is too large in Right Shift expression '{in0} >> {in1}'"
             );
-            diags.err1("EXEC_10", &msg, ir.src_loc.clone());
+            diags.err1("ERR_134", &msg, ir.src_loc.clone());
             return false;
         };
         *out = in0.checked_shr(shift_amount).unwrap_or(0);
@@ -425,7 +425,7 @@ impl LayoutPhase {
             let msg = format!(
                 "Shift amount {in1} is too large in Right Shift expression '{in0} >> {in1}'"
             );
-            diags.err1("EXEC_20", &msg, ir.src_loc.clone());
+            diags.err1("ERR_144", &msg, ir.src_loc.clone());
             return false;
         };
         *out = in0.checked_shr(shift_amount).unwrap_or(0);
@@ -468,7 +468,7 @@ impl LayoutPhase {
                     bad => {
                         let src_loc = irdb.parms[in_parm_num0].src_loc.clone();
                         let msg = format!("Can't convert from {bad:?} to U64");
-                        diags.err1("EXEC_17", &msg, src_loc);
+                        diags.err1("ERR_141", &msg, src_loc);
                         result = false;
                     }
                 }
@@ -489,7 +489,7 @@ impl LayoutPhase {
                     bad => {
                         let src_loc = irdb.parms[in_parm_num0].src_loc.clone();
                         let msg = format!("Can't convert from {bad:?} to I64");
-                        diags.err1("EXEC_12", &msg, src_loc);
+                        diags.err1("ERR_136", &msg, src_loc);
                         result = false;
                     }
                 }
@@ -545,7 +545,7 @@ impl LayoutPhase {
                     "Input operand types do not match.  Left is '{:?}', right is '{:?}'",
                     lhs_dt, rhs_dt
                 );
-                diags.err2("EXEC_13", &msg, loc0, loc1);
+                diags.err2("ERR_137", &msg, loc0, loc1);
                 return false;
             }
         }
@@ -686,7 +686,7 @@ impl LayoutPhase {
                 "Unexpected input operand types '{:?}'  Expected I64 or U64.",
                 lhs_dt
             );
-            diags.err2("EXEC_19", &msg, loc0, loc1);
+            diags.err2("ERR_143", &msg, loc0, loc1);
             return false;
         }
         result
@@ -756,7 +756,7 @@ impl LayoutPhase {
         }
 
         diags.err1(
-            "EXEC_52",
+            "ERR_169",
             "sizeof() only accepts section or region names.",
             ir.src_loc.clone(),
         );
@@ -778,7 +778,7 @@ impl LayoutPhase {
             true
         } else {
             diags.err1(
-                "EXEC_53",
+                "ERR_170",
                 &format!("Unknown extension '{}' in sizeof().", name),
                 ir.src_loc.clone(),
             );
@@ -818,7 +818,7 @@ impl LayoutPhase {
 
         let Some(ir_rng) = irdb.sized_locs.get(sec_name) else {
             let msg = format!("__OUTPUT_SIZE: output section '{}' not found.", sec_name);
-            diags.err1("EXEC_57", &msg, ir.src_loc.clone());
+            diags.err1("ERR_174", &msg, ir.src_loc.clone());
             return false;
         };
         assert!(ir_rng.start <= ir_rng.end);
@@ -844,7 +844,7 @@ impl LayoutPhase {
                 "__OUTPUT_ADDR: output section '{}' not reachable.",
                 sec_name
             );
-            diags.err1("EXEC_58", &msg, ir.src_loc.clone());
+            diags.err1("ERR_175", &msg, ir.src_loc.clone());
             return false;
         };
         let start_loc = &self.ir_locs[*ir_num];
@@ -855,7 +855,7 @@ impl LayoutPhase {
             .checked_add(start_loc.addr.addr_offset)
         else {
             diags.err1(
-                "EXEC_59",
+                "ERR_176",
                 "__OUTPUT_ADDR: address overflow.",
                 ir.src_loc.clone(),
             );
@@ -906,7 +906,7 @@ impl LayoutPhase {
             IRKind::Addr => {
                 let Some(val) = current.addr.addr_base.checked_add(current.addr.addr_offset) else {
                     diags.err1(
-                        "EXEC_39",
+                        "ERR_161",
                         "Absolute address (abs_base + off) overflow",
                         ir.src_loc.clone(),
                     );
@@ -963,7 +963,7 @@ impl LayoutPhase {
         if align_val == 0 {
             // Align 0 causes division by zero at checked_rem.
             let src_loc = irdb.parms[align_parm_num].src_loc.clone();
-            diags.err1("EXEC_38", "Alignment amount cannot be zero", src_loc);
+            diags.err1("ERR_160", "Alignment amount cannot be zero", src_loc);
             return false;
         }
 
@@ -972,7 +972,7 @@ impl LayoutPhase {
 
         let Some(abs_val) = current.addr.addr_base.checked_add(current.addr.addr_offset) else {
             diags.err1(
-                "EXEC_42",
+                "ERR_164",
                 "Absolute address (abs_base + off) overflow",
                 ir.src_loc.clone(),
             );
@@ -1040,7 +1040,7 @@ impl LayoutPhase {
                 "Set statement moves location counter backwards from {} to {}.",
                 loc, set_val
             );
-            diags.err1("EXEC_22", &msg, ir.src_loc.clone());
+            diags.err1("ERR_146", &msg, ir.src_loc.clone());
             return false;
         }
 
@@ -1086,7 +1086,7 @@ impl LayoutPhase {
             && let Some(effective) = frame.effective_region.as_ref()
             && !effective.contains_addr(set_val)
         {
-            if self.warned_lids.insert((lid, "EXEC_72")) {
+            if self.warned_lids.insert((lid, "ERR_185")) {
                 let b = &effective.effective_region;
                 let msg = format!(
                     "set_addr target {:#X} is outside region '{}' bounds [{:#X}, {:#X}).",
@@ -1095,7 +1095,7 @@ impl LayoutPhase {
                     b.addr,
                     b.addr + b.size
                 );
-                diags.err2("EXEC_72", &msg, ir.src_loc.clone(), b.src_loc.clone());
+                diags.err2("ERR_185", &msg, ir.src_loc.clone(), b.src_loc.clone());
             }
             return false;
         }
@@ -1150,7 +1150,7 @@ impl LayoutPhase {
                         .checked_add(start_loc.addr.addr_offset)
                     else {
                         diags.err1(
-                            "EXEC_44",
+                            "ERR_166",
                             "Absolute address (abs_base + off) overflow for identifier",
                             ir.src_loc.clone(),
                         );
@@ -1194,7 +1194,7 @@ impl LayoutPhase {
                         "{}({}) is not valid for region '{}'; use addr({}) instead.",
                         kind_str, name, name, name
                     );
-                    diags.err1("EXEC_76", &msg, ir.src_loc.clone());
+                    diags.err1("ERR_189", &msg, ir.src_loc.clone());
                     return false;
                 }
                 bad => {
@@ -1204,7 +1204,7 @@ impl LayoutPhase {
         }
 
         let msg = format!("Section, label, or region '{}' not found in output.", name);
-        diags.err1("EXEC_11", &msg, ir.src_loc.clone());
+        diags.err1("ERR_135", &msg, ir.src_loc.clone());
         false
     }
 
@@ -1487,20 +1487,20 @@ impl LayoutPhase {
                     IRKind::SetSecOffset | IRKind::SetAddrOffset | IRKind::SetFileOffset => {
                         if ir.kind != IRKind::SetFileOffset
                             && let Some(true) = self.scope_stack.last().map(|f| &f.set_addr_seen)
-                                && self.warned_lids.insert((lid, "EXEC_54")) {
+                                && self.warned_lids.insert((lid, "ERR_171")) {
                                     let cmd = if ir.kind == IRKind::SetSecOffset {
                                         "pad_sec_offset"
                                     } else {
                                         "pad_addr_offset"
                                     };
                                     let msg = format!(
-                                        "[EXEC_54] Warning: '{}' follows 'set_addr' in the same \
+                                        "[ERR_171] Warning: '{}' follows 'set_addr' in the same \
                                          section scope.  '{}' pads to a sec/addr_offset value, \
                                          not to an address.  Consider 'pad_addr_offset' after \
                                          'set_addr' to pad relative to the address anchor.",
                                         cmd, cmd
                                     );
-                                    diags.warn1("EXEC_54", &msg, ir.src_loc.clone());
+                                    diags.warn1("ERR_171", &msg, ir.src_loc.clone());
                                 }
                         self.iterate_set(ir, irdb, diags, &current)
                     }
@@ -1542,7 +1542,7 @@ impl LayoutPhase {
                     let culprit_idx = diff_i.saturating_sub(1);
                     let msg = "Cyclic dependency detected: layout failed to stabilize after maximum iterations.";
                     let src_loc = irdb.ir_vec[culprit_idx].src_loc.clone();
-                    diags.err1("EXEC_62", msg, src_loc);
+                    diags.err1("ERR_179", msg, src_loc);
                     return false;
                 }
                 // Record the current location information

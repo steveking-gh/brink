@@ -1,5 +1,5 @@
 // 'include' is a reserved identifier and may not be used as a label name.
-// Expected: LINEAR_13.
+// Expected: ERR_212.
 section foo {
     include:
     wr8 1;

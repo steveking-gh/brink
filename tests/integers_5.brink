@@ -1,5 +1,5 @@
 section foo {
-    assert 42u == 42i; // EXPECT-FAIL: LINEAR_5
+    assert 42u == 42i; // EXPECT-FAIL: ERR_207
 }
 
 output foo;

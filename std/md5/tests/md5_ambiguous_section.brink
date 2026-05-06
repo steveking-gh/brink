@@ -1,5 +1,5 @@
 // Section 'data' is written twice by the parent, so the section-name form
-// is ambiguous.  Expects EXEC_56.
+// is ambiguous.  Expects ERR_173.
 section data {
     wr8 0x01; wr8 0x02; wr8 0x03; wr8 0x04;
 }

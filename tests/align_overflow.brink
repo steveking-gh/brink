@@ -1,4 +1,4 @@
-// pad_addr_offset pads to off = 0xFFFF...E; align 4 needs 2 more bytes, the second overflows file_pos -> EXEC_37.
+// pad_addr_offset pads to off = 0xFFFF...E; align 4 needs 2 more bytes, the second overflows file_pos -> ERR_159.
 section main {
     pad_addr_offset 0xFFFFFFFFFFFFFFFE;
     align 4;

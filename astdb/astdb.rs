@@ -150,12 +150,12 @@ impl AstDb {
 
         if is_reserved_identifier(name_str) {
             let m = format!("'{}' is a reserved identifier and cannot be used as an obj name", name_str);
-            diags.err1("AST_67", &m, name_tinfo.span());
+            diags.err1("ERR_62", &m, name_tinfo.span());
             return false;
         }
         if let Some(existing) = obj_decls.get(name_str) {
             let m = format!("Duplicate obj name '{}'", name_str);
-            diags.err2("AST_68", &m, name_tinfo.span(), existing.src_loc.clone());
+            diags.err2("ERR_63", &m, name_tinfo.span(), existing.src_loc.clone());
             return false;
         }
 
@@ -203,12 +203,12 @@ impl AstDb {
                 "'{}' is a reserved identifier and cannot be used as a region name",
                 name_str
             );
-            diags.err1("AST_61", &m, name_tinfo.span());
+            diags.err1("ERR_56", &m, name_tinfo.span());
             return false;
         }
         if let Some(existing) = regions.get(name_str) {
             let m = format!("Duplicate region name '{}'", name_str);
-            diags.err2("AST_60", &m, name_tinfo.span(), existing.src_loc.clone());
+            diags.err2("ERR_55", &m, name_tinfo.span(), existing.src_loc.clone());
             return false;
         }
 
@@ -234,12 +234,12 @@ impl AstDb {
                 "'{}' is a reserved identifier and cannot be used as a section name",
                 sec_str
             );
-            diags.err1("AST_32", &m, sec_tinfo.span());
+            diags.err1("ERR_27", &m, sec_tinfo.span());
             return false;
         }
         if let Some(orig_section) = sections.get(sec_str) {
             let m = format!("Duplicate section name '{}'", sec_str);
-            diags.err2("AST_29", &m, sec_tinfo.span(), orig_section.src_loc.clone());
+            diags.err2("ERR_24", &m, sec_tinfo.span(), orig_section.src_loc.clone());
             return false;
         }
         sections.insert(sec_str.to_string(), Section::new(ast, sec_nid));
@@ -263,12 +263,12 @@ impl AstDb {
                 "'{}' is a reserved identifier and cannot be used as a const name",
                 const_str
             );
-            diags.err1("AST_33", &m, const_tinfo.span());
+            diags.err1("ERR_28", &m, const_tinfo.span());
             return false;
         }
         if let Some(orig_span) = consts.get(const_str) {
             let m = format!("Duplicate const name '{}'", const_str);
-            diags.err2("AST_30", &m, const_tinfo.span(), orig_span.clone());
+            diags.err2("ERR_25", &m, const_tinfo.span(), orig_span.clone());
             return false;
         }
         consts.insert(const_str.to_string(), const_tinfo.span());
@@ -295,7 +295,7 @@ impl AstDb {
             if sec_name_nid_opt.is_none() {
                 let m = "Missing section name".to_string();
                 let section_tinfo = ast.get_tinfo(parent_nid);
-                diags.err1("AST_23", &m, section_tinfo.span());
+                diags.err1("ERR_20", &m, section_tinfo.span());
                 return false;
             }
             num += 1;
@@ -303,14 +303,14 @@ impl AstDb {
         let Some(sec_name_nid) = children.next() else {
             let m = "Missing section name".to_string();
             let section_tinfo = ast.get_tinfo(parent_nid);
-            diags.err1("AST_11", &m, section_tinfo.span());
+            diags.err1("ERR_10", &m, section_tinfo.span());
             return false;
         };
         let sec_tinfo = ast.get_tinfo(sec_name_nid);
         let sec_str = sec_tinfo.val;
         if !self.sections.contains_key(sec_str) {
             let m = format!("Unknown or unreachable section name '{}'", sec_str);
-            diags.err1("AST_16", &m, sec_tinfo.span());
+            diags.err1("ERR_14", &m, sec_tinfo.span());
             return false;
         }
         true
@@ -326,7 +326,7 @@ impl AstDb {
         if output.is_some() {
             let m = "Multiple output statements are not allowed.";
             let orig_src_loc = output.as_ref().unwrap().src_loc.clone();
-            diags.err2("AST_10", m, orig_src_loc, tinfo.span());
+            diags.err2("ERR_9", m, orig_src_loc, tinfo.span());
             return false;
         }
         *output = Some(Output::new(ast, nid));
@@ -351,7 +351,7 @@ impl AstDb {
                 "Maximum recursion depth ({MAX_RECURSION_DEPTH}) exceeded when processing '{}'.",
                 tinfo.val
             );
-            diags.err1("AST_5", &m, tinfo.span());
+            diags.err1("ERR_4", &m, tinfo.span());
             return false;
         };
 
@@ -377,7 +377,7 @@ impl AstDb {
 
                     if nested_sections.contains(sec_str) {
                         let m = "Writing section creates a cycle.";
-                        diags.err1("AST_6", m, sec_tinfo.span());
+                        diags.err1("ERR_5", m, sec_tinfo.span());
                         false
                     } else {
                         nested_sections.insert(sec_str.to_string());
@@ -454,9 +454,9 @@ impl AstDb {
                     }
                     _ => {
                         let msg = format!("Invalid top-level expression {}", tinfo.val);
-                        diags.err1("AST_24", &msg, tinfo.span().clone());
+                        diags.err1("ERR_21", &msg, tinfo.span().clone());
                         diags.note0(
-                            "AST_25",
+                            "ERR_22",
                             "At top-level, allowed expressions are 'section' and 'output'",
                         );
                         false
@@ -469,7 +469,7 @@ impl AstDb {
         }
 
         let Some(output) = output else {
-            diags.err0("AST_8", "Missing output statement");
+            diags.err0("ERR_7", "Missing output statement");
             bail!("AST construction failed");
         };
 
@@ -477,7 +477,7 @@ impl AstDb {
         for (const_name, const_span) in &const_names {
             if let Some(sec_item) = sections.get(const_name.as_str()) {
                 let m = format!("Const name '{}' conflicts with a section name", const_name);
-                diags.err2("AST_31", &m, const_span.clone(), sec_item.src_loc.clone());
+                diags.err2("ERR_26", &m, const_span.clone(), sec_item.src_loc.clone());
                 result = false;
             }
         }
@@ -487,7 +487,7 @@ impl AstDb {
             if let Some(sec_item) = sections.get(reg_name.as_str()) {
                 let m = format!("Region name '{}' conflicts with a section name", reg_name);
                 diags.err2(
-                    "AST_48",
+                    "ERR_43",
                     &m,
                     reg_entry.src_loc.clone(),
                     sec_item.src_loc.clone(),
@@ -496,7 +496,7 @@ impl AstDb {
             }
             if let Some(const_span) = const_names.get(reg_name.as_str()) {
                 let m = format!("Region name '{}' conflicts with a const name", reg_name);
-                diags.err2("AST_63", &m, reg_entry.src_loc.clone(), const_span.clone());
+                diags.err2("ERR_58", &m, reg_entry.src_loc.clone(), const_span.clone());
                 result = false;
             }
         }
@@ -514,7 +514,7 @@ impl AstDb {
                         "Section '{}' binds to region '{}' which is already bound to another section",
                         sec_name, reg_name
                     );
-                    diags.err2("AST_57", &m, sec_entry.src_loc.clone(), prev_span.clone());
+                    diags.err2("ERR_52", &m, sec_entry.src_loc.clone(), prev_span.clone());
                     result = false;
                 } else {
                     bound_regions.insert(reg_name.clone(), sec_entry.src_loc.clone());
@@ -525,7 +525,7 @@ impl AstDb {
                     "Section '{}' references undeclared region '{}'",
                     sec_name, reg_name
                 );
-                diags.err1("AST_56", &m, sec_entry.src_loc.clone());
+                diags.err1("ERR_51", &m, sec_entry.src_loc.clone());
                 result = false;
             }
         }
@@ -538,17 +538,17 @@ impl AstDb {
         for (obj_name, obj_entry) in &obj_decls {
             if let Some(sec_item) = sections.get(obj_name.as_str()) {
                 let m = format!("Obj name '{}' conflicts with a section name", obj_name);
-                diags.err2("AST_69", &m, obj_entry.src_loc.clone(), sec_item.src_loc.clone());
+                diags.err2("ERR_64", &m, obj_entry.src_loc.clone(), sec_item.src_loc.clone());
                 result = false;
             }
             if let Some(const_span) = const_names.get(obj_name.as_str()) {
                 let m = format!("Obj name '{}' conflicts with a const name", obj_name);
-                diags.err2("AST_70", &m, obj_entry.src_loc.clone(), const_span.clone());
+                diags.err2("ERR_65", &m, obj_entry.src_loc.clone(), const_span.clone());
                 result = false;
             }
             if let Some(reg_entry) = regions.get(obj_name.as_str()) {
                 let m = format!("Obj name '{}' conflicts with a region name", obj_name);
-                diags.err2("AST_71", &m, obj_entry.src_loc.clone(), reg_entry.src_loc.clone());
+                diags.err2("ERR_66", &m, obj_entry.src_loc.clone(), reg_entry.src_loc.clone());
                 result = false;
             }
         }

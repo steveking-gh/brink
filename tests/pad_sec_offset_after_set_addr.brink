@@ -1,11 +1,11 @@
 // Verifies that pad_sec_offset following set_addr in the same section scope
-// triggers warning EXEC_54.  The program is otherwise valid and produces
+// triggers warning ERR_171.  The program is otherwise valid and produces
 // correct output; the warning is advisory only.
 section foo {
     set_addr 0x1000;
     wrs "Hello";          // sec_offset == 5
     set_addr 0x2000;     // addr rebased; sec_offset unchanged (still 5)
-    pad_sec_offset 16;    // pads 11 bytes -- EXEC_54 warning expected here
+    pad_sec_offset 16;    // pads 11 bytes -- ERR_171 warning expected here
     assert sec_offset() == 16;
     assert addr() == 0x200B;  // 0x2000 + (16 - 5) = 0x200B
 }

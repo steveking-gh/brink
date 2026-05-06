@@ -1,5 +1,5 @@
-// IRDB_15: wr8 repeat count operand is a quoted string, not a numeric value.
-// validate_numeric_1_or_2 rejects a non-integer second operand — IRDB_15 must fire.
+// ERR_83: wr8 repeat count operand is a quoted string, not a numeric value.
+// validate_numeric_1_or_2 rejects a non-integer second operand — ERR_83 must fire.
 
 section foo {
     wr8 0x42, "not_a_count";

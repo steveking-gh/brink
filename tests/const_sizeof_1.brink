@@ -1,5 +1,5 @@
 // Const expression depends on sizeof, which requires engine-time layout.
-// Const values must be resolvable before the engine runs.  Expected: IRDB_19.
+// Const values must be resolvable before the engine runs.  Expected: ERR_85.
 section foo {
     wr8 1;
 }

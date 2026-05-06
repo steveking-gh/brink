@@ -1,5 +1,5 @@
-// IRDB_32: assert expression evaluates to false inside a const if/else body.
-// The assert 0; in the taken then-branch must fire IRDB_32 at const-resolution time.
+// ERR_98: assert expression evaluates to false inside a const if/else body.
+// The assert 0; in the taken then-branch must fire ERR_98 at const-resolution time.
 
 if 1 {
     assert 0;

@@ -1,5 +1,5 @@
 // 'true' is a reserved identifier and may not be used as a label name.
-// Expected: LINEAR_13.
+// Expected: ERR_212.
 section foo {
     true:
     wr8 1;

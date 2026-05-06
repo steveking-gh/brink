@@ -24,7 +24,7 @@ impl Location {
     pub fn advance(&mut self, size: u64, src_loc: &SourceSpan, diags: &mut Diags) -> bool {
         let Some(new_file_pos) = self.file_offset.checked_add(size) else {
             diags.err1(
-                "EXEC_37",
+                "ERR_159",
                 "Write operation causes file offset overflow",
                 src_loc.clone(),
             );
@@ -33,7 +33,7 @@ impl Location {
         let new_off = self.addr.addr_offset + size; // safe: off <= file_pos
         if self.addr.addr_base.checked_add(new_off).is_none() {
             diags.err1(
-                "EXEC_43",
+                "ERR_165",
                 "Write operation causes absolute address overflow",
                 src_loc.clone(),
             );

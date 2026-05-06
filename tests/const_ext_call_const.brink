@@ -1,7 +1,7 @@
-// brink::test_logger() in a const expression is rejected with IRDB_21.
+// brink::test_logger() in a const expression is rejected with ERR_87.
 // With the op-first dispatch fix, eval_const_expr_r reaches the ExtensionCall
-// arm and emits IRDB_21 ("not supported in a const expression") cleanly.
-// Expected: IRDB_21.
+// arm and emits ERR_87 ("not supported in a const expression") cleanly.
+// Expected: ERR_87.
 const A = brink::test_logger();
 section foo {
     wr8 0;

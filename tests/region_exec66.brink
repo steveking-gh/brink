@@ -1,4 +1,4 @@
-// region_exec66.brink: EXEC_66 -- region property evaluates to a non-numeric type.
+// region_exec66.brink: ERR_180 -- region property evaluates to a non-numeric type.
 region FLASH {
     addr = "not a number";
     size = 0x1000;

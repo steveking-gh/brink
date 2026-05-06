@@ -177,13 +177,13 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 ## [1.2.6] - 2026-03-12
 
 - Extended `error_codes_are_unique` scanner to include `ir/ir.rs`.
-- Renamed duplicate error code `IR_3` (ambiguous-integer overflow) to `IR_4`; updated `fuzz_found_10` test accordingly.
-- Added tests `integer_overflow_i64` (`[IR_4]`) and `integer_overflow_u64` (`[IR_1]`) to cover integer literal overflow paths in `ir/ir.rs`.
+- Renamed duplicate error code `ERR_200` (ambiguous-integer overflow) to `ERR_201`; updated `fuzz_found_10` test accordingly.
+- Added tests `integer_overflow_i64` (`[ERR_201]`) and `integer_overflow_u64` (`[ERR_198]`) to cover integer literal overflow paths in `ir/ir.rs`.
 
 ## [1.2.5] - 2026-03-12
 
 - Added `error_codes_are_unique` test that scans all source files and asserts no diagnostic error code string appears at more than one call site.
-- Fixed pre-existing duplicate: `IRDB_9` was used at two sites in `irdb/irdb.rs`; the second site is now `IRDB_15`.
+- Fixed pre-existing duplicate: `ERR_79` was used at two sites in `irdb/irdb.rs`; the second site is now `ERR_83`.
 
 ## [1.2.4] - 2026-03-12
 

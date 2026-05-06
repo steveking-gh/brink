@@ -113,7 +113,7 @@ mod tests {
 
     #[test]
     fn accidental_infix() {
-        assert_brink_failure("tests/accidental_infix.brink", &["AST_9"]);
+        assert_brink_failure("tests/accidental_infix.brink", &["ERR_8"]);
     }
 
     #[test]
@@ -140,27 +140,27 @@ mod tests {
 
     #[test]
     fn line_comment_1() {
-        assert_brink_failure("tests/line_comment_1.brink", &["[AST_8]"]);
+        assert_brink_failure("tests/line_comment_1.brink", &["[ERR_7]"]);
     }
 
     #[test]
     fn line_comment_2() {
-        assert_brink_failure("tests/line_comment_2.brink", &["[AST_8]"]);
+        assert_brink_failure("tests/line_comment_2.brink", &["[ERR_7]"]);
     }
 
     #[test]
     fn multi_comment_1() {
-        assert_brink_failure("tests/multi_comment_1.brink", &["[AST_8]"]);
+        assert_brink_failure("tests/multi_comment_1.brink", &["[ERR_7]"]);
     }
 
     #[test]
     fn multi_comment_2() {
-        assert_brink_failure("tests/multi_comment_2.brink", &["[AST_8]"]);
+        assert_brink_failure("tests/multi_comment_2.brink", &["[ERR_7]"]);
     }
 
     #[test]
     fn multi_comment_3() {
-        assert_brink_failure("tests/multi_comment_3.brink", &["[AST_8]"]);
+        assert_brink_failure("tests/multi_comment_3.brink", &["[ERR_7]"]);
     }
 
     #[test]
@@ -271,7 +271,7 @@ mod tests {
 
     #[test]
     fn assert_15() {
-        assert_brink_failure("tests/assert_15.brink", &["[IRDB_4]"]);
+        assert_brink_failure("tests/assert_15.brink", &["[ERR_77]"]);
     }
 
     #[test]
@@ -281,77 +281,77 @@ mod tests {
 
     #[test]
     fn fuzz_found_1() {
-        assert_brink_failure("tests/fuzz_found_1.brink", &["[PROC_1]"]);
+        assert_brink_failure("tests/fuzz_found_1.brink", &["[ERR_218]"]);
     }
 
     #[test]
     fn fuzz_found_2() {
-        assert_brink_failure("tests/fuzz_found_2.brink", &["[AST_13]"]);
+        assert_brink_failure("tests/fuzz_found_2.brink", &["[ERR_12]"]);
     }
 
     #[test]
     fn fuzz_found_3() {
-        assert_brink_failure("tests/fuzz_found_3.brink", &["[AST_13]"]);
+        assert_brink_failure("tests/fuzz_found_3.brink", &["[ERR_12]"]);
     }
 
     #[test]
     fn fuzz_found_4() {
-        assert_brink_failure("tests/fuzz_found_4.brink", &["[AST_13]"]);
+        assert_brink_failure("tests/fuzz_found_4.brink", &["[ERR_12]"]);
     }
 
     #[test]
     fn fuzz_found_5() {
-        assert_brink_failure("tests/fuzz_found_5.brink", &["[AST_16]"]);
+        assert_brink_failure("tests/fuzz_found_5.brink", &["[ERR_14]"]);
     }
 
     #[test]
     fn fuzz_found_6() {
-        assert_brink_failure("tests/fuzz_found_6.brink", &["[AST_16]"]);
+        assert_brink_failure("tests/fuzz_found_6.brink", &["[ERR_14]"]);
     }
 
     #[test]
     fn fuzz_found_7() {
-        assert_brink_failure("tests/fuzz_found_7.brink", &["[AST_13]", "[AST_14]"]);
+        assert_brink_failure("tests/fuzz_found_7.brink", &["[ERR_12]", "[ERR_13]"]);
     }
 
     #[test]
     fn fuzz_found_8() {
-        assert_brink_failure("tests/fuzz_found_8.brink", &["[AST_20]"]);
+        assert_brink_failure("tests/fuzz_found_8.brink", &["[ERR_18]"]);
     }
 
     #[test]
     fn fuzz_found_9() {
-        assert_brink_failure("tests/fuzz_found_9.brink", &["[IRDB_5]"]);
+        assert_brink_failure("tests/fuzz_found_9.brink", &["[ERR_78]"]);
     }
 
     #[test]
     fn fuzz_found_10() {
-        assert_brink_failure("tests/fuzz_found_10.brink", &["[IR_4]"]);
+        assert_brink_failure("tests/fuzz_found_10.brink", &["[ERR_201]"]);
     }
 
     #[test]
     fn fuzz_found_11() {
-        assert_brink_failure("tests/fuzz_found_11.brink", &["[AST_19]"]);
+        assert_brink_failure("tests/fuzz_found_11.brink", &["[ERR_17]"]);
     }
 
     #[test]
     fn fuzz_found_12() {
-        assert_brink_failure("tests/fuzz_found_12.brink", &["[AST_19]"]);
+        assert_brink_failure("tests/fuzz_found_12.brink", &["[ERR_17]"]);
     }
 
     #[test]
     fn fuzz_found_13() {
-        assert_brink_failure("tests/fuzz_found_13.brink", &["[EXEC_26]"]);
+        assert_brink_failure("tests/fuzz_found_13.brink", &["[ERR_148]"]);
     }
 
     #[test]
     fn fuzz_found_14() {
-        assert_brink_failure("tests/fuzz_found_14.brink", &["[LINEAR_6]"]);
+        assert_brink_failure("tests/fuzz_found_14.brink", &["[ERR_208]"]);
     }
 
     #[test]
     fn fuzz_found_15() {
-        assert_brink_failure("tests/fuzz_found_15.brink", &["[AST_21]"]);
+        assert_brink_failure("tests/fuzz_found_15.brink", &["[ERR_19]"]);
     }
 
     #[test]
@@ -362,75 +362,75 @@ mod tests {
 
     #[test]
     fn fuzz_found_17() {
-        assert_brink_failure("tests/fuzz_found_17.brink", &["[LINEAR_5]"]);
+        assert_brink_failure("tests/fuzz_found_17.brink", &["[ERR_207]"]);
     }
 
     #[test]
     fn fuzz_found_18() {
-        assert_brink_failure("tests/fuzz_found_18.brink", &["[LINEAR_3]"]);
+        assert_brink_failure("tests/fuzz_found_18.brink", &["[ERR_205]"]);
     }
 
     #[test]
     fn fuzz_found_19() {
-        assert_brink_failure("tests/fuzz_found_19.brink", &["[PROC_7]"]);
+        assert_brink_failure("tests/fuzz_found_19.brink", &["[ERR_224]"]);
     }
 
     #[test]
     fn fuzz_found_20() {
-        assert_brink_failure("tests/fuzz_found_20.brink", &["[AST_42]"]);
+        assert_brink_failure("tests/fuzz_found_20.brink", &["[ERR_37]"]);
     }
 
     #[test]
     fn fuzz_found_21() {
-        assert_brink_failure("tests/fuzz_found_21.brink", &["[IRDB_55]"]);
+        assert_brink_failure("tests/fuzz_found_21.brink", &["[ERR_111]"]);
     }
 
     #[test]
     fn fuzz_found_22() {
-        assert_brink_failure("tests/fuzz_found_22.brink", &["[IRDB_56]"]);
+        assert_brink_failure("tests/fuzz_found_22.brink", &["[ERR_112]"]);
     }
 
     #[test]
     fn fuzz_found_23() {
-        assert_brink_failure("tests/fuzz_found_23.brink", &["[AST_43]"]);
+        assert_brink_failure("tests/fuzz_found_23.brink", &["[ERR_38]"]);
     }
 
     #[test]
     fn fuzz_found_24() {
-        assert_brink_failure("tests/fuzz_found_24.brink", &["[IRDB_59]"]);
+        assert_brink_failure("tests/fuzz_found_24.brink", &["[ERR_115]"]);
     }
 
     #[test]
     fn fuzz_found_25() {
-        assert_brink_failure("tests/fuzz_found_25.brink", &["[IRDB_40]"]);
+        assert_brink_failure("tests/fuzz_found_25.brink", &["[ERR_99]"]);
     }
 
     #[test]
     fn fuzz_found_26() {
-        assert_brink_failure("tests/fuzz_found_26.brink", &["[EXEC_62]"]);
+        assert_brink_failure("tests/fuzz_found_26.brink", &["[ERR_179]"]);
     }
 
     #[test]
     fn fuzz_found_27() {
-        assert_brink_failure("tests/fuzz_found_27.brink", &["[AST_18]"]);
+        assert_brink_failure("tests/fuzz_found_27.brink", &["[ERR_16]"]);
     }
 
     /// assert inside a top-level if body with a string condition panics -- latent bug.
     #[test]
     fn const_bool_string_assert() {
-        assert_brink_failure("tests/const_bool_string_assert.brink", &["[IRDB_57]"]);
+        assert_brink_failure("tests/const_bool_string_assert.brink", &["[ERR_113]"]);
     }
 
     /// && with a string lhs panics -- latent bug.
     #[test]
     fn const_bool_string_and() {
-        assert_brink_failure("tests/const_bool_string_and.brink", &["[IRDB_58]"]);
+        assert_brink_failure("tests/const_bool_string_and.brink", &["[ERR_114]"]);
     }
 
     /// || with a string lhs panics -- latent bug.
     #[test]
     fn const_bool_string_or() {
-        assert_brink_failure("tests/const_bool_string_or.brink", &["[IRDB_58]"]);
+        assert_brink_failure("tests/const_bool_string_or.brink", &["[ERR_114]"]);
     }
 
     /// --max-output-size 0 rejects a 1-byte output.
@@ -443,27 +443,27 @@ mod tests {
             .arg("0")
             .assert()
             .failure()
-            .stderr(predicates::str::contains("[PROC_7]"));
+            .stderr(predicates::str::contains("[ERR_224]"));
     }
 
     #[test]
     fn missing_brace_1() {
-        assert_brink_failure("tests/missing_brace_1.brink", &["[AST_3]", "[AST_14]"]);
+        assert_brink_failure("tests/missing_brace_1.brink", &["[ERR_3]", "[ERR_13]"]);
     }
 
     #[test]
     fn multiple_outputs_1() {
-        assert_brink_failure("tests/multiple_outputs_1.brink", &["[AST_10]"]);
+        assert_brink_failure("tests/multiple_outputs_1.brink", &["[ERR_9]"]);
     }
 
     #[test]
     fn section_self_ref_1() {
-        assert_brink_failure("tests/section_self_ref_1.brink", &["[AST_6]"]);
+        assert_brink_failure("tests/section_self_ref_1.brink", &["[ERR_5]"]);
     }
 
     #[test]
     fn section_self_ref_2() {
-        assert_brink_failure("tests/section_self_ref_2.brink", &["[AST_6]"]);
+        assert_brink_failure("tests/section_self_ref_2.brink", &["[ERR_5]"]);
     }
 
     #[test]
@@ -566,13 +566,13 @@ mod tests {
     #[test]
 
     fn integers_4() {
-        assert_brink_failure("tests/integers_4.brink", &["[AST_19]"]);
+        assert_brink_failure("tests/integers_4.brink", &["[ERR_17]"]);
     }
 
     #[test]
 
     fn integers_5() {
-        assert_brink_failure("tests/integers_5.brink", &["[LINEAR_5]"]);
+        assert_brink_failure("tests/integers_5.brink", &["[ERR_207]"]);
     }
 
     #[test]
@@ -583,7 +583,7 @@ mod tests {
 
     #[test]
     fn neq_2() {
-        assert_brink_failure("tests/neq_2.brink", &["[EXEC_2]"]);
+        assert_brink_failure("tests/neq_2.brink", &["[ERR_126]"]);
     }
 
     #[test]
@@ -594,7 +594,7 @@ mod tests {
 
     #[test]
     fn add_2() {
-        assert_brink_failure("tests/add_2.brink", &["[EXEC_1]"]);
+        assert_brink_failure("tests/add_2.brink", &["[ERR_125]"]);
     }
 
     #[test]
@@ -605,12 +605,12 @@ mod tests {
 
     #[test]
     fn subtract_2() {
-        assert_brink_failure("tests/subtract_2.brink", &["[EXEC_4]"]);
+        assert_brink_failure("tests/subtract_2.brink", &["[ERR_128]"]);
     }
 
     #[test]
     fn subtract_3() {
-        assert_brink_failure("tests/subtract_3.brink", &["[EXEC_4]"]);
+        assert_brink_failure("tests/subtract_3.brink", &["[ERR_128]"]);
     }
 
     #[test]
@@ -627,7 +627,7 @@ mod tests {
 
     #[test]
     fn multiply_2() {
-        assert_brink_failure("tests/multiply_2.brink", &["[EXEC_6]"]);
+        assert_brink_failure("tests/multiply_2.brink", &["[ERR_130]"]);
     }
 
     #[test]
@@ -710,42 +710,42 @@ mod tests {
 
     #[test]
     fn address_4() {
-        assert_brink_failure("tests/address_4.brink", &["[LINEAR_6]"]);
+        assert_brink_failure("tests/address_4.brink", &["[ERR_208]"]);
     }
 
     #[test]
     fn address_5() {
-        assert_brink_failure("tests/address_5.brink", &["[LINEAR_7]"]);
+        assert_brink_failure("tests/address_5.brink", &["[ERR_209]"]);
     }
 
     #[test]
     fn address_6() {
-        assert_brink_failure("tests/address_6.brink", &["[LINEAR_6]"]);
+        assert_brink_failure("tests/address_6.brink", &["[ERR_208]"]);
     }
 
     #[test]
     fn address_7() {
-        assert_brink_failure("tests/address_7.brink", &["[LINEAR_6]"]);
+        assert_brink_failure("tests/address_7.brink", &["[ERR_208]"]);
     }
 
     #[test]
     fn abs_overflow() {
-        assert_brink_failure("tests/abs_overflow.brink", &["[EXEC_43]"]);
+        assert_brink_failure("tests/abs_overflow.brink", &["[ERR_165]"]);
     }
 
     #[test]
     fn align_overflow() {
-        assert_brink_failure("tests/align_overflow.brink", &["[EXEC_37]"]);
+        assert_brink_failure("tests/align_overflow.brink", &["[ERR_159]"]);
     }
 
     #[test]
     fn set_addr_overflow() {
-        assert_brink_failure("tests/set_addr_overflow.brink", &["[EXEC_43]"]);
+        assert_brink_failure("tests/set_addr_overflow.brink", &["[ERR_165]"]);
     }
 
     #[test]
     fn abs_identifier_overflow() {
-        assert_brink_failure("tests/abs_identifier_overflow.brink", &["[EXEC_43]"]);
+        assert_brink_failure("tests/abs_identifier_overflow.brink", &["[ERR_165]"]);
     }
 
     #[test]
@@ -756,12 +756,12 @@ mod tests {
 
     #[test]
     fn label_2() {
-        assert_brink_failure("tests/label_2.brink", &["[LINEAR_9]"]);
+        assert_brink_failure("tests/label_2.brink", &["[ERR_211]"]);
     }
 
     #[test]
     fn label_3() {
-        assert_brink_failure("tests/label_3.brink", &["[LINEAR_2]"]);
+        assert_brink_failure("tests/label_3.brink", &["[ERR_204]"]);
     }
 
     #[test]
@@ -800,14 +800,14 @@ mod tests {
         assert_brink_success("tests/const_to_i64_const.brink", None, None);
     }
 
-    /// brink::logger() in a const expression is rejected with IRDB_21
+    /// brink::logger() in a const expression is rejected with ERR_87
     /// (ExtensionCall not supported in const expressions) now that eval_const_expr_r
     /// dispatches on op before reading operands.  Previously the name was
-    /// accidentally caught by IRDB_20 before the dispatch reached eval_const_expr_r.
+    /// accidentally caught by ERR_86 before the dispatch reached eval_const_expr_r.
     #[test]
 
     fn const_ext_call_const() {
-        assert_brink_failure("tests/const_ext_call_const.brink", &["[IRDB_60]"]);
+        assert_brink_failure("tests/const_ext_call_const.brink", &["[ERR_116]"]);
     }
 
     #[test]
@@ -842,20 +842,20 @@ mod tests {
 
     #[test]
     fn wrs_overflow() {
-        assert_brink_failure("tests/wrs_overflow.brink", &["[EXEC_37]"]);
+        assert_brink_failure("tests/wrs_overflow.brink", &["[ERR_159]"]);
     }
 
     #[test]
     fn wrx_overflow() {
-        assert_brink_failure("tests/wrx_overflow.brink", &["[EXEC_36]"]);
+        assert_brink_failure("tests/wrx_overflow.brink", &["[ERR_158]"]);
     }
 
     /// brink::huge_ext has cached_size = usize::MAX.  After one preceding
     /// byte advances file_offset to 1, iterate_wrext attempts 1 + usize::MAX
-    /// (as u64) which overflows and must emit EXEC_37.
+    /// (as u64) which overflows and must emit ERR_159.
     #[test]
     fn wrext_overflow() {
-        assert_brink_failure("tests/wrext_overflow.brink", &["[EXEC_37]"]);
+        assert_brink_failure("tests/wrext_overflow.brink", &["[ERR_159]"]);
     }
 
     #[test]
@@ -1032,7 +1032,7 @@ mod tests {
 
     #[test]
     fn align_0() {
-        assert_brink_failure("tests/align_0.brink", &["[EXEC_38]"]);
+        assert_brink_failure("tests/align_0.brink", &["[ERR_160]"]);
     }
 
     #[test]
@@ -1072,7 +1072,7 @@ mod tests {
 
     #[test]
     fn pad_sec_offset_2() {
-        assert_brink_failure("tests/pad_sec_offset_2.brink", &["[EXEC_22]"]);
+        assert_brink_failure("tests/pad_sec_offset_2.brink", &["[ERR_146]"]);
     }
 
     #[test]
@@ -1083,7 +1083,7 @@ mod tests {
 
     #[test]
     fn pad_addr_offset_2() {
-        assert_brink_failure("tests/pad_addr_offset_2.brink", &["[EXEC_22]"]);
+        assert_brink_failure("tests/pad_addr_offset_2.brink", &["[ERR_146]"]);
     }
 
     #[test]
@@ -1099,7 +1099,7 @@ mod tests {
 
     #[test]
     fn pad_sec_offset_after_set_addr() {
-        assert_brink_warning("tests/pad_sec_offset_after_set_addr.brink", &["[EXEC_54]"]);
+        assert_brink_warning("tests/pad_sec_offset_after_set_addr.brink", &["[ERR_171]"]);
     }
 
     #[test]
@@ -1169,10 +1169,10 @@ mod tests {
     #[test]
     fn pad_sec_offset_after_set_addr_no_warn() {
         // set_addr as the first statement keeps addr_offset and sec_offset in
-        // sync, so EXEC_54 must not fire.
+        // sync, so ERR_171 must not fire.
         assert_brink_no_warning(
             "tests/pad_sec_offset_after_set_addr_no_warn.brink",
-            &["[EXEC_54]"],
+            &["[ERR_171]"],
         );
     }
 
@@ -1230,8 +1230,8 @@ mod tests {
 
     #[test]
     fn file_offset_overflow() {
-        // pad_file_offset backwards (target < current) must produce EXEC_22.
-        assert_brink_failure("tests/file_offset_overflow.brink", &["[EXEC_22]"]);
+        // pad_file_offset backwards (target < current) must produce ERR_146.
+        assert_brink_failure("tests/file_offset_overflow.brink", &["[ERR_146]"]);
     }
 
     #[test]
@@ -1241,12 +1241,12 @@ mod tests {
 
     #[test]
     fn wrf_2() {
-        assert_brink_failure("tests/wrf_2.brink", &["[IRDB_13]"]);
+        assert_brink_failure("tests/wrf_2.brink", &["[ERR_81]"]);
     }
 
     #[test]
     fn wrf_3() {
-        assert_brink_failure("tests/wrf_3.brink", &["[IRDB_11]"]);
+        assert_brink_failure("tests/wrf_3.brink", &["[ERR_80]"]);
     }
 
     #[test]
@@ -1266,33 +1266,33 @@ mod tests {
     /// sizeof() with extension call syntax (arguments) is a compile error.
     #[test]
     fn sizeof_ext_name_with_args_fails() {
-        assert_brink_failure("tests/extension_sizeof_fail.brink", &["[AST_40]"]);
+        assert_brink_failure("tests/extension_sizeof_fail.brink", &["[ERR_35]"]);
     }
 
     /// Trying to use non-wr command on the extension output.
     #[test]
     fn extension_non_wr_1_fails() {
-        assert_brink_failure("tests/extension_non_wr_1.brink", &["[EXEC_14]"]);
+        assert_brink_failure("tests/extension_non_wr_1.brink", &["[ERR_138]"]);
     }
 
     /// Trying to use non-wr command on the extension output.
     #[test]
     fn extension_non_wr_2_fails() {
-        assert_brink_failure("tests/extension_non_wr_2.brink", &["[IRDB_9]"]);
+        assert_brink_failure("tests/extension_non_wr_2.brink", &["[ERR_79]"]);
     }
 
     /// A string const passed as an extension argument is valid at IRDb time but
-    /// the extension rejects it at runtime with EXEC_47.
+    /// the extension rejects it at runtime with ERR_167.
     #[test]
     fn extension_str_arg_fails() {
-        assert_brink_failure("tests/extension_str_arg.brink", &["[EXEC_47]"]);
+        assert_brink_failure("tests/extension_str_arg.brink", &["[ERR_167]"]);
     }
 
     /// An integer followed by a string const as extension arguments; the extension
-    /// rejects the string arg at runtime with EXEC_47.
+    /// rejects the string arg at runtime with ERR_167.
     #[test]
     fn extension_int_str_arg_fails() {
-        assert_brink_failure("tests/extension_int_str_arg.brink", &["[EXEC_47]"]);
+        assert_brink_failure("tests/extension_int_str_arg.brink", &["[ERR_167]"]);
     }
 
     /// sizeof(section) produces a numeric u64 and is valid as an extension
@@ -1482,10 +1482,10 @@ mod tests {
         assert_brink_success("tests/global_assert.brink", None, None);
     }
 
-    /// A global assert that evaluates false must emit EXEC_2.
+    /// A global assert that evaluates false must emit ERR_126.
     #[test]
     fn global_assert_fails() {
-        assert_brink_failure("tests/global_assert_fail.brink", &["[EXEC_2]"]);
+        assert_brink_failure("tests/global_assert_fail.brink", &["[ERR_126]"]);
     }
 
     /// Assert that every error/warning/note code string passed to the diags API
@@ -1583,16 +1583,16 @@ mod tests {
     }
 
     /// A decimal integer literal that exceeds i64::MAX cannot be stored
-    /// as the ambiguous-integer type and produces IR_4.
+    /// as the ambiguous-integer type and produces ERR_201.
     #[test]
     fn integer_overflow_i64() {
-        assert_brink_failure("tests/integer_overflow_i64.brink", &["[IR_4]"]);
+        assert_brink_failure("tests/integer_overflow_i64.brink", &["[ERR_201]"]);
     }
 
-    /// A hex integer literal with a 'u' suffix that exceeds u64::MAX produces IR_1.
+    /// A hex integer literal with a 'u' suffix that exceeds u64::MAX produces ERR_198.
     #[test]
     fn integer_overflow_u64() {
-        assert_brink_failure("tests/integer_overflow_u64.brink", &["[IR_1]"]);
+        assert_brink_failure("tests/integer_overflow_u64.brink", &["[ERR_198]"]);
     }
 
     /// K/M/G magnitude suffixes parse correctly in const expressions.
@@ -1613,16 +1613,16 @@ mod tests {
         assert_brink_success("tests/kmg_suffix_3.brink", None, None);
     }
 
-    /// K/M/G with u suffix: value * multiplier overflowing u64::MAX produces IR_1.
+    /// K/M/G with u suffix: value * multiplier overflowing u64::MAX produces ERR_198.
     #[test]
     fn kmg_overflow_u64() {
-        assert_brink_failure("tests/kmg_overflow_u64.brink", &["[IR_1]"]);
+        assert_brink_failure("tests/kmg_overflow_u64.brink", &["[ERR_198]"]);
     }
 
-    /// K/M/G on a const Integer: value * multiplier overflowing i64::MAX produces IRDB_22.
+    /// K/M/G on a const Integer: value * multiplier overflowing i64::MAX produces ERR_88.
     #[test]
     fn kmg_overflow_i64() {
-        assert_brink_failure("tests/kmg_overflow_i64.brink", &["[IRDB_22]"]);
+        assert_brink_failure("tests/kmg_overflow_i64.brink", &["[ERR_88]"]);
     }
 
     // -------------------------------------------------------------------------
@@ -1687,31 +1687,31 @@ mod tests {
 
     #[test]
     fn const_deferred_assignment_3() {
-        assert_brink_failure("tests/const_deferred_assignment_3.brink", &["[SYMTAB_4]"]);
+        assert_brink_failure("tests/const_deferred_assignment_3.brink", &["[ERR_231]"]);
     }
 
     #[test]
     fn const_deferred_assignment_4() {
-        assert_brink_failure("tests/const_deferred_assignment_4.brink", &["[SYMTAB_4]"]);
+        assert_brink_failure("tests/const_deferred_assignment_4.brink", &["[ERR_231]"]);
     }
 
     /// A const is declared before the consts it depends on in source order.
     /// Resolution must be order-independent since consts have global scope.
     #[test]
     fn const_rev_decl_1() {
-        assert_brink_failure("tests/const_rev_decl_1.brink", &["[IRDB_20]"]);
+        assert_brink_failure("tests/const_rev_decl_1.brink", &["[ERR_86]"]);
     }
 
     /// A malformed const expression.
     #[test]
     fn const_malformed_1() {
-        assert_brink_failure("tests/const_malformed_1.brink", &["[AST_9]"]);
+        assert_brink_failure("tests/const_malformed_1.brink", &["[ERR_8]"]);
     }
 
     /// No dynamic built-ins allowed in const
     #[test]
     fn const_builtins_2() {
-        assert_brink_failure("tests/const_builtins_2.brink", &["[IRDB_19]"]);
+        assert_brink_failure("tests/const_builtins_2.brink", &["[ERR_85]"]);
     }
 
     /// A const is used as one operand of an assert expression inside a section.
@@ -1747,73 +1747,73 @@ mod tests {
     /// Two const declarations share the same name.
     #[test]
     fn const_duplicate_1() {
-        assert_brink_failure("tests/const_duplicate_1.brink", &["[AST_30]"]);
+        assert_brink_failure("tests/const_duplicate_1.brink", &["[ERR_25]"]);
     }
 
     /// Two const declarations share the same name.
     #[test]
     fn const_duplicate_2() {
-        assert_brink_failure("tests/const_duplicate_2.brink", &["[AST_30]"]);
+        assert_brink_failure("tests/const_duplicate_2.brink", &["[ERR_25]"]);
     }
 
     /// A const name collides with an existing section name.
     #[test]
     fn const_name_conflict_1() {
-        assert_brink_failure("tests/const_name_conflict_1.brink", &["[AST_31]"]);
+        assert_brink_failure("tests/const_name_conflict_1.brink", &["[ERR_26]"]);
     }
 
     /// Two consts mutually depend on each other, forming a cycle.
     #[test]
     fn const_circular_1() {
-        assert_brink_failure("tests/const_circular_1.brink", &["[IRDB_20]"]);
+        assert_brink_failure("tests/const_circular_1.brink", &["[ERR_86]"]);
     }
 
     /// Two consts mutually depend on each other, forming a cycle.
     #[test]
     fn const_circular_2() {
-        assert_brink_failure("tests/const_circular_2.brink", &["[IRDB_20]"]);
+        assert_brink_failure("tests/const_circular_2.brink", &["[ERR_86]"]);
     }
 
     /// A const expression depends on sizeof(), which requires engine-time layout.
     /// Consts must be resolvable before the engine runs.
     #[test]
     fn const_sizeof_1() {
-        assert_brink_failure("tests/const_sizeof_1.brink", &["[IRDB_19]"]);
+        assert_brink_failure("tests/const_sizeof_1.brink", &["[ERR_85]"]);
     }
 
     /// A const expression uses __OUTPUT_SIZE, which requires engine-time layout.
     /// Consts must be resolvable before the engine runs.
     #[test]
     fn output_builtin_const_fail() {
-        assert_brink_failure("tests/output_builtin_const_fail.brink", &["[IRDB_19]"]);
+        assert_brink_failure("tests/output_builtin_const_fail.brink", &["[ERR_85]"]);
     }
 
     /// A const expression depends on addr(), which requires engine-time addressing.
     /// Consts must be resolvable before the engine runs.
     #[test]
     fn const_abs_1() {
-        assert_brink_failure("tests/const_abs_1.brink", &["[IRDB_19]"]);
+        assert_brink_failure("tests/const_abs_1.brink", &["[ERR_85]"]);
     }
 
     /// A const expression references an identifier that is never defined.
-    /// Expected: IRDB_20.
+    /// Expected: ERR_86.
     #[test]
     fn const_undefined_1() {
-        assert_brink_failure("tests/const_undefined_1.brink", &["[IRDB_20]"]);
+        assert_brink_failure("tests/const_undefined_1.brink", &["[ERR_86]"]);
     }
 
     /// A const expression applies arithmetic to a string-typed const.
-    /// Expected: IRDB_25.
+    /// Expected: ERR_91.
     #[test]
     fn const_type_mismatch_1() {
-        assert_brink_failure("tests/const_type_mismatch_1.brink", &["[IRDB_25]"]);
+        assert_brink_failure("tests/const_type_mismatch_1.brink", &["[ERR_91]"]);
     }
 
     /// A const is defined but never used anywhere in the program.
-    /// Expected: SYMTAB_1 warning.
+    /// Expected: ERR_229 warning.
     #[test]
     fn const_unused_1() {
-        assert_brink_warning("tests/const_unused_1.brink", &["[SYMTAB_1]"]);
+        assert_brink_warning("tests/const_unused_1.brink", &["[ERR_229]"]);
     }
 
     /// An I64 const is defined and used as a wr8 operand.
@@ -1845,38 +1845,38 @@ mod tests {
     }
 
     /// A const integer literal overflows i64.
-    /// Expected: IRDB_22.
+    /// Expected: ERR_88.
     #[test]
     fn const_bad_integer_1() {
-        assert_brink_failure("tests/const_bad_integer_1.brink", &["[IRDB_22]"]);
+        assert_brink_failure("tests/const_bad_integer_1.brink", &["[ERR_88]"]);
     }
 
     /// A const U64 literal overflows u64.
-    /// Expected: IRDB_23.
+    /// Expected: ERR_89.
     #[test]
     fn const_bad_u64_1() {
-        assert_brink_failure("tests/const_bad_u64_1.brink", &["[IRDB_23]"]);
+        assert_brink_failure("tests/const_bad_u64_1.brink", &["[ERR_89]"]);
     }
 
     /// A const I64 literal overflows i64.
-    /// Expected: IRDB_24.
+    /// Expected: ERR_90.
     #[test]
     fn const_bad_i64_1() {
-        assert_brink_failure("tests/const_bad_i64_1.brink", &["[IRDB_24]"]);
+        assert_brink_failure("tests/const_bad_i64_1.brink", &["[ERR_90]"]);
     }
 
     /// A const U64 addition overflows u64::MAX.
-    /// Expected: IRDB_27.
+    /// Expected: ERR_93.
     #[test]
     fn const_overflow_1() {
-        assert_brink_failure("tests/const_overflow_1.brink", &["[IRDB_27]"]);
+        assert_brink_failure("tests/const_overflow_1.brink", &["[ERR_93]"]);
     }
 
     /// A const integer division by zero.
-    /// Expected: IRDB_28.
+    /// Expected: ERR_94.
     #[test]
     fn const_divzero_1() {
-        assert_brink_failure("tests/const_divzero_1.brink", &["[IRDB_28]"]);
+        assert_brink_failure("tests/const_divzero_1.brink", &["[ERR_94]"]);
     }
 
     /// Const comparison operators ==, !=, >=, <= produce U64 0/1 results.
@@ -1886,52 +1886,52 @@ mod tests {
     }
 
     /// Comparing a numeric const with a string const is a type error.
-    /// Expected: IRDB_29.
+    /// Expected: ERR_95.
     #[test]
     fn const_cmp_mismatch_1() {
-        assert_brink_failure("tests/const_cmp_mismatch_1.brink", &["[IRDB_29]"]);
+        assert_brink_failure("tests/const_cmp_mismatch_1.brink", &["[ERR_95]"]);
     }
 
     /// 'include' is reserved and cannot be used as a section name.
     #[test]
     fn reserved_section_1() {
-        assert_brink_failure("tests/reserved_section_1.brink", &["[AST_32]"]);
+        assert_brink_failure("tests/reserved_section_1.brink", &["[ERR_27]"]);
     }
 
     /// Identifiers starting with 'wr' are reserved as section names.
     #[test]
     fn reserved_section_2() {
-        assert_brink_failure("tests/reserved_section_2.brink", &["[AST_32]"]);
+        assert_brink_failure("tests/reserved_section_2.brink", &["[ERR_27]"]);
     }
 
     /// 'include' is reserved and cannot be used as a const name.
     #[test]
     fn reserved_const_1() {
-        assert_brink_failure("tests/reserved_const_1.brink", &["[AST_33]"]);
+        assert_brink_failure("tests/reserved_const_1.brink", &["[ERR_28]"]);
     }
 
     /// Identifiers starting with 'wr' are reserved as const names.
     #[test]
     fn reserved_const_2() {
-        assert_brink_failure("tests/reserved_const_2.brink", &["[AST_33]"]);
+        assert_brink_failure("tests/reserved_const_2.brink", &["[ERR_28]"]);
     }
 
     /// 'include' is reserved and cannot be used as a label name.
     #[test]
     fn reserved_label_1() {
-        assert_brink_failure("tests/reserved_label_1.brink", &["[LINEAR_13]"]);
+        assert_brink_failure("tests/reserved_label_1.brink", &["[ERR_212]"]);
     }
 
     /// Identifiers starting with 'wr' are reserved as label names.
     #[test]
     fn reserved_label_2() {
-        assert_brink_failure("tests/reserved_label_2.brink", &["[LINEAR_13]"]);
+        assert_brink_failure("tests/reserved_label_2.brink", &["[ERR_212]"]);
     }
 
     /// Identifiers starting with 'set_' are reserved as section names.
     #[test]
     fn reserved_section_3() {
-        assert_brink_failure("tests/reserved_section_3.brink", &["[AST_32]"]);
+        assert_brink_failure("tests/reserved_section_3.brink", &["[ERR_27]"]);
     }
 
     /// 'wrs' is a dedicated lexer token and cannot be used as a section name.
@@ -1951,13 +1951,13 @@ mod tests {
     /// Identifiers starting with '__' are reserved as section names.
     #[test]
     fn reserved_section_6() {
-        assert_brink_failure("tests/reserved_section_6.brink", &["[AST_32]"]);
+        assert_brink_failure("tests/reserved_section_6.brink", &["[ERR_27]"]);
     }
 
     /// 'let' is reserved and cannot be used as a const name.
     #[test]
     fn reserved_const_3() {
-        assert_brink_failure("tests/reserved_const_3.brink", &["[AST_33]"]);
+        assert_brink_failure("tests/reserved_const_3.brink", &["[ERR_28]"]);
     }
 
     /// 'wrs' is a dedicated lexer token and cannot be used as a const name.
@@ -1970,25 +1970,25 @@ mod tests {
     /// Identifiers starting with '__' are reserved as const names.
     #[test]
     fn reserved_const_5() {
-        assert_brink_failure("tests/reserved_const_5.brink", &["[AST_33]"]);
+        assert_brink_failure("tests/reserved_const_5.brink", &["[ERR_28]"]);
     }
 
     /// 'true' is reserved and cannot be used as a label name.
     #[test]
     fn reserved_label_3() {
-        assert_brink_failure("tests/reserved_label_3.brink", &["[LINEAR_13]"]);
+        assert_brink_failure("tests/reserved_label_3.brink", &["[ERR_212]"]);
     }
 
     /// 'wrs' is a reserved exact keyword and cannot be used as a label name.
     #[test]
     fn reserved_label_4() {
-        assert_brink_failure("tests/reserved_label_4.brink", &["[LINEAR_13]"]);
+        assert_brink_failure("tests/reserved_label_4.brink", &["[ERR_212]"]);
     }
 
     /// Identifiers starting with '__' are reserved as label names.
     #[test]
     fn reserved_label_5() {
-        assert_brink_failure("tests/reserved_label_5.brink", &["[LINEAR_13]"]);
+        assert_brink_failure("tests/reserved_label_5.brink", &["[ERR_212]"]);
     }
 
     /// 'wr' without a following digit is now a valid identifier prefix.
@@ -2387,27 +2387,27 @@ mod tests {
 
     #[test]
     fn include_missing_string() {
-        assert_brink_failure("tests/include_missing_string.brink", &["[AST_34]"]);
+        assert_brink_failure("tests/include_missing_string.brink", &["[ERR_29]"]);
     }
 
     #[test]
     fn include_missing_semi() {
-        assert_brink_failure("tests/include_missing_semi.brink", &["[AST_35]"]);
+        assert_brink_failure("tests/include_missing_semi.brink", &["[ERR_30]"]);
     }
 
     #[test]
     fn include_cycle() {
-        assert_brink_failure("tests/include_cycle.brink", &["[AST_36]"]);
+        assert_brink_failure("tests/include_cycle.brink", &["[ERR_31]"]);
     }
 
     #[test]
     fn include_cycle_multi() {
-        assert_brink_failure("tests/include_cycle_a.brink", &["[AST_36]"]);
+        assert_brink_failure("tests/include_cycle_a.brink", &["[ERR_31]"]);
     }
 
     #[test]
     fn include_missing_file() {
-        assert_brink_failure("tests/include_missing_file.brink", &["[AST_37]"]);
+        assert_brink_failure("tests/include_missing_file.brink", &["[ERR_32]"]);
     }
 
     #[test]
@@ -2560,7 +2560,7 @@ mod tests {
 
     #[test]
     fn invalid_namespace() {
-        assert_brink_failure("tests/invalid_namespace.brink", &["IRDB_40"]);
+        assert_brink_failure("tests/invalid_namespace.brink", &["ERR_99"]);
     }
 
     #[test]
@@ -2601,36 +2601,36 @@ mod tests {
         fs::remove_file("execute_extension_crc.bin").ok();
     }
 
-    // ── Address overwrite detection (EXEC_55) ─────────────────────────────────
+    // ── Address overwrite detection (ERR_172) ─────────────────────────────────
 
     /// Two sections placed at the exact same address — complete overlap.
     #[test]
     fn addr_overwrite_1() {
-        assert_brink_failure("tests/addr_overwrite_1.brink", &["EXEC_55"]);
+        assert_brink_failure("tests/addr_overwrite_1.brink", &["ERR_172"]);
     }
 
     /// Second section starts inside the first section's range — partial overlap.
     #[test]
     fn addr_overwrite_2() {
-        assert_brink_failure("tests/addr_overwrite_2.brink", &["EXEC_55"]);
+        assert_brink_failure("tests/addr_overwrite_2.brink", &["ERR_172"]);
     }
 
     /// Second section is entirely contained within the first — engulfed overlap.
     #[test]
     fn addr_overwrite_3() {
-        assert_brink_failure("tests/addr_overwrite_3.brink", &["EXEC_55"]);
+        assert_brink_failure("tests/addr_overwrite_3.brink", &["ERR_172"]);
     }
 
-    /// Two sections placed back-to-back with no gap — valid, no EXEC_55.
+    /// Two sections placed back-to-back with no gap — valid, no ERR_172.
     #[test]
     fn addr_no_overwrite_1() {
-        assert_brink_no_warning("tests/addr_no_overwrite_1.brink", &["EXEC_55"]);
+        assert_brink_no_warning("tests/addr_no_overwrite_1.brink", &["ERR_172"]);
     }
 
-    /// Two sections with a gap between them — valid, no EXEC_55.
+    /// Two sections with a gap between them — valid, no ERR_172.
     #[test]
     fn addr_no_overwrite_2() {
-        assert_brink_no_warning("tests/addr_no_overwrite_2.brink", &["EXEC_55"]);
+        assert_brink_no_warning("tests/addr_no_overwrite_2.brink", &["ERR_172"]);
     }
 
     // ── if/else tests ────────────────────────────────────────────────────────
@@ -2671,31 +2671,31 @@ mod tests {
         assert_brink_success("tests/if_print_assert.brink", None, None);
     }
 
-    /// Bare assignment to an undeclared name emits SYMTAB_3.
+    /// Bare assignment to an undeclared name emits ERR_230.
     #[test]
     fn if_bare_assign_undeclared() {
-        assert_brink_failure("tests/if_bare_assign_undeclared.brink", &["SYMTAB_3"]);
+        assert_brink_failure("tests/if_bare_assign_undeclared.brink", &["ERR_230"]);
     }
 
-    /// Declared-only const never assigned and never used: no SYMTAB_1 warning.
+    /// Declared-only const never assigned and never used: no ERR_229 warning.
     #[test]
     fn if_unused_declared() {
-        assert_brink_no_warning("tests/if_unused_declared.brink", &["SYMTAB_1"]);
+        assert_brink_no_warning("tests/if_unused_declared.brink", &["ERR_229"]);
     }
 
     /// A deferred assignment inside an if-block targets a const declared later
-    /// in source.  The assignment must fail with SYMTAB_3 because the const
+    /// in source.  The assignment must fail with ERR_230 because the const
     /// has not been declared at the point the if-block executes.
     #[test]
     fn if_interleaved_order() {
-        assert_brink_failure("tests/if_interleaved_order.brink", &["SYMTAB_3"]);
+        assert_brink_failure("tests/if_interleaved_order.brink", &["ERR_230"]);
     }
 
     /// An if-block condition references a const defined later in source order.
-    /// The const must not be visible to the if-block; expected IRDB_20.
+    /// The const must not be visible to the if-block; expected ERR_86.
     #[test]
     fn if_full_const_after_if() {
-        assert_brink_failure("tests/if_full_const_after_if.brink", &["IRDB_20"]);
+        assert_brink_failure("tests/if_full_const_after_if.brink", &["ERR_86"]);
     }
 
     /// A top-level assert after an if-block that performs a deferred assignment
@@ -2707,61 +2707,61 @@ mod tests {
 
     // ── IRDB error path coverage ──────────────────────────────────────────────
 
-    /// IRDB_1: binary operator applied to two typed but incompatible operands
+    /// ERR_75: binary operator applied to two typed but incompatible operands
     #[test]
     fn irdb_1_type_mismatch() {
-        assert_brink_failure("tests/irdb_1_type_mismatch.brink", &["[LINEAR_4]"]);
+        assert_brink_failure("tests/irdb_1_type_mismatch.brink", &["[ERR_206]"]);
     }
 
-    /// IRDB_9: wr8 operand is a quoted string rather than a numeric value.
+    /// ERR_79: wr8 operand is a quoted string rather than a numeric value.
     /// validate_numeric_1_or_2 must reject the non-integer first operand.
     #[test]
     fn irdb_9_wr_bad_type() {
-        assert_brink_failure("tests/irdb_9_wr_bad_type.brink", &["[IRDB_9]"]);
+        assert_brink_failure("tests/irdb_9_wr_bad_type.brink", &["[ERR_79]"]);
     }
 
-    /// IRDB_14: wrf path exists but is a directory, not a regular file.
+    /// ERR_82: wrf path exists but is a directory, not a regular file.
     /// The is_file() check in validate_wrf_operands must reject it.
     #[test]
     fn irdb_14_wrf_dir() {
-        assert_brink_failure("tests/irdb_14_wrf_dir.brink", &["[IRDB_14]"]);
+        assert_brink_failure("tests/irdb_14_wrf_dir.brink", &["[ERR_82]"]);
     }
 
-    /// IRDB_26: arithmetic operator applied to a non-numeric type (QuotedString)
+    /// ERR_92: arithmetic operator applied to a non-numeric type (QuotedString)
     /// in a const expression.  apply_binary_op catches string operands in the
     /// final match arm after the reconciliation step passes.
     #[test]
     fn irdb_26_const_string_arith() {
-        assert_brink_failure("tests/irdb_26_const_string_arith.brink", &["[IRDB_26]"]);
+        assert_brink_failure("tests/irdb_26_const_string_arith.brink", &["[ERR_92]"]);
     }
 
-    /// IRDB_30: ordered comparison (>=) applied to two string operands in a
+    /// ERR_96: ordered comparison (>=) applied to two string operands in a
     /// const expression.  Strings support only == and !=; apply_comparison_op
-    /// must reject >= with IRDB_30.
+    /// must reject >= with ERR_96.
     #[test]
     fn irdb_30_const_str_ordered_cmp() {
-        assert_brink_failure("tests/irdb_30_const_str_ordered_cmp.brink", &["[IRDB_30]"]);
+        assert_brink_failure("tests/irdb_30_const_str_ordered_cmp.brink", &["[ERR_96]"]);
     }
 
-    /// IRDB_32: assert expression evaluates to false inside a const if/else body.
-    /// exec_const_statements must emit IRDB_32 when the assert condition is 0.
+    /// ERR_98: assert expression evaluates to false inside a const if/else body.
+    /// exec_const_statements must emit ERR_98 when the assert condition is 0.
     #[test]
     fn irdb_32_const_assert_fails() {
-        assert_brink_failure("tests/irdb_32_const_assert_fails.brink", &["[IRDB_32]"]);
+        assert_brink_failure("tests/irdb_32_const_assert_fails.brink", &["[ERR_98]"]);
     }
 
-    /// IRDB_44: sizeof() applied to a namespace-qualified name not in the
+    /// ERR_100: sizeof() applied to a namespace-qualified name not in the
     /// extension registry.  validate_operands must reject unknown SizeofExt names.
     #[test]
     fn irdb_44_unknown_sizeof_ext() {
-        assert_brink_failure("tests/irdb_44_unknown_sizeof_ext.brink", &["[IRDB_44]"]);
+        assert_brink_failure("tests/irdb_44_unknown_sizeof_ext.brink", &["[ERR_100]"]);
     }
 
     /// A Slice-kinded extension parameter receives a quoted string instead of a
-    /// section name.  IRDb rejects the call with IRDB_52.
+    /// section name.  IRDb rejects the call with ERR_108.
     #[test]
     fn irdb_46_ranged_ext_bad_range() {
-        assert_brink_failure("tests/irdb_46_ranged_ext_bad_range.brink", &["[IRDB_52]"]);
+        assert_brink_failure("tests/irdb_46_ranged_ext_bad_range.brink", &["[ERR_108]"]);
     }
 
     // ── Named extension arguments ─────────────────────────────────────────────
@@ -2835,53 +2835,53 @@ mod tests {
         fs::remove_file(out).ok();
     }
 
-    /// Mixed positional and named arguments in one call: AST rejects with AST_40.
+    /// Mixed positional and named arguments in one call: AST rejects with ERR_35.
     #[test]
     fn ast_40_mixed_args() {
-        assert_brink_failure("tests/ast_40_mixed_args.brink", &["[AST_40]"]);
+        assert_brink_failure("tests/ast_40_mixed_args.brink", &["[ERR_35]"]);
     }
 
-    /// Named argument with no value after '=': AST rejects with AST_41.
+    /// Named argument with no value after '=': AST rejects with ERR_36.
     #[test]
     fn ast_41_empty_rhs() {
-        assert_brink_failure("tests/ast_41_empty_rhs.brink", &["[AST_41]"]);
+        assert_brink_failure("tests/ast_41_empty_rhs.brink", &["[ERR_36]"]);
     }
 
-    /// Named argument with an unrecognized parameter name: IRDb rejects with IRDB_48.
+    /// Named argument with an unrecognized parameter name: IRDb rejects with ERR_104.
     #[test]
     fn irdb_48_unknown_param() {
-        assert_brink_failure("tests/irdb_48_unknown_param.brink", &["[IRDB_48]"]);
+        assert_brink_failure("tests/irdb_48_unknown_param.brink", &["[ERR_104]"]);
     }
 
-    /// The same named parameter appears twice in one call: IRDb rejects with IRDB_49.
+    /// The same named parameter appears twice in one call: IRDb rejects with ERR_105.
     #[test]
     fn irdb_49_dup_param() {
-        assert_brink_failure("tests/irdb_49_dup_param.brink", &["[IRDB_49]"]);
+        assert_brink_failure("tests/irdb_49_dup_param.brink", &["[ERR_105]"]);
     }
 
-    /// Named-arg call missing required parameters: IRDb emits IRDB_51 for each absent param.
+    /// Named-arg call missing required parameters: IRDb emits ERR_107 for each absent param.
     #[test]
     fn irdb_51_missing_param() {
-        assert_brink_failure("tests/irdb_51_missing_param.brink", &["[IRDB_51]"]);
+        assert_brink_failure("tests/irdb_51_missing_param.brink", &["[ERR_107]"]);
     }
 
-    /// Positional call with wrong argument count: IRDb rejects with IRDB_53.
+    /// Positional call with wrong argument count: IRDb rejects with ERR_109.
     #[test]
     fn irdb_53_positional_count() {
-        assert_brink_failure("tests/irdb_53_positional_count.brink", &["[IRDB_53]"]);
+        assert_brink_failure("tests/irdb_53_positional_count.brink", &["[ERR_109]"]);
     }
 
-    /// Positional Slice argument names a section that does not exist: IRDb rejects with IRDB_54.
+    /// Positional Slice argument names a section that does not exist: IRDb rejects with ERR_110.
     #[test]
     fn irdb_54_unknown_section() {
-        assert_brink_failure("tests/irdb_54_unknown_section.brink", &["[IRDB_54]"]);
+        assert_brink_failure("tests/irdb_54_unknown_section.brink", &["[ERR_110]"]);
     }
 
-    /// IRDB_15: wr repeat-count operand is a quoted string, not a numeric value.
+    /// ERR_83: wr repeat-count operand is a quoted string, not a numeric value.
     /// validate_numeric_1_or_2 rejects a non-integer second operand.
     #[test]
     fn irdb_15_wr_bad_repeat_type() {
-        assert_brink_failure("tests/irdb_15_wr_bad_repeat_type.brink", &["[IRDB_15]"]);
+        assert_brink_failure("tests/irdb_15_wr_bad_repeat_type.brink", &["[ERR_83]"]);
     }
 
     // ── Section-level if/else (Phase 1: runtime statements in const conditions) ──
@@ -3083,17 +3083,17 @@ mod tests {
 
     #[test]
     fn layout_empty_sizeof() {
-        assert_brink_failure("tests/layout_empty_sizeof.brink", &["[AST_40]"]);
+        assert_brink_failure("tests/layout_empty_sizeof.brink", &["[ERR_35]"]);
     }
 
     #[test]
     fn engine_infinite_loop() {
-        assert_brink_failure("tests/engine_infinite_loop.brink", &["[EXEC_62]"]);
+        assert_brink_failure("tests/engine_infinite_loop.brink", &["[ERR_179]"]);
     }
 
     #[test]
     fn engine_mmap_0_byte() {
-        assert_brink_failure("tests/engine_mmap_0_byte.brink", &["[EXEC_47]"]);
+        assert_brink_failure("tests/engine_mmap_0_byte.brink", &["[ERR_167]"]);
     }
 
     // ── Region system (Steps 3+4 AST layer) ─────────────────────────────────
@@ -3105,72 +3105,72 @@ mod tests {
 
     #[test]
     fn region_ast45_unknown_prop() {
-        assert_brink_failure("tests/region_ast45_unknown_prop.brink", &["[AST_45]"]);
+        assert_brink_failure("tests/region_ast45_unknown_prop.brink", &["[ERR_40]"]);
     }
 
     #[test]
     fn region_ast46_dup_prop() {
-        assert_brink_failure("tests/region_ast46_dup_prop.brink", &["[AST_46]"]);
+        assert_brink_failure("tests/region_ast46_dup_prop.brink", &["[ERR_41]"]);
     }
 
     #[test]
     fn region_ast47_missing_addr() {
-        assert_brink_failure("tests/region_ast47_missing_addr.brink", &["[AST_47]"]);
+        assert_brink_failure("tests/region_ast47_missing_addr.brink", &["[ERR_42]"]);
     }
 
     #[test]
     fn region_ast48_conflicts_section() {
-        assert_brink_failure("tests/region_ast48_conflicts_section.brink", &["[AST_48]"]);
+        assert_brink_failure("tests/region_ast48_conflicts_section.brink", &["[ERR_43]"]);
     }
 
     #[test]
     fn region_ast49_in_no_name() {
-        assert_brink_failure("tests/region_ast49_in_no_name.brink", &["[AST_49]"]);
+        assert_brink_failure("tests/region_ast49_in_no_name.brink", &["[ERR_44]"]);
     }
 
     #[test]
     fn region_ast56_undeclared() {
-        assert_brink_failure("tests/region_ast56_undeclared.brink", &["[AST_56]"]);
+        assert_brink_failure("tests/region_ast56_undeclared.brink", &["[ERR_51]"]);
     }
 
     #[test]
     fn region_ast57_dup_binding() {
-        assert_brink_failure("tests/region_ast57_dup_binding.brink", &["[AST_57]"]);
+        assert_brink_failure("tests/region_ast57_dup_binding.brink", &["[ERR_52]"]);
     }
 
     #[test]
     fn region_ast58_no_name() {
-        assert_brink_failure("tests/region_ast58_no_name.brink", &["[AST_58]"]);
+        assert_brink_failure("tests/region_ast58_no_name.brink", &["[ERR_53]"]);
     }
 
     #[test]
     fn region_ast59_no_brace() {
-        assert_brink_failure("tests/region_ast59_no_brace.brink", &["[AST_59]"]);
+        assert_brink_failure("tests/region_ast59_no_brace.brink", &["[ERR_54]"]);
     }
 
     #[test]
     fn region_ast60_dup_name() {
-        assert_brink_failure("tests/region_ast60_dup_name.brink", &["[AST_60]"]);
+        assert_brink_failure("tests/region_ast60_dup_name.brink", &["[ERR_55]"]);
     }
 
     #[test]
     fn region_ast61_reserved_name() {
-        assert_brink_failure("tests/region_ast61_reserved_name.brink", &["[AST_61]"]);
+        assert_brink_failure("tests/region_ast61_reserved_name.brink", &["[ERR_56]"]);
     }
 
     #[test]
     fn region_ast62_missing_eq() {
-        assert_brink_failure("tests/region_ast62_missing_eq.brink", &["[AST_62]"]);
+        assert_brink_failure("tests/region_ast62_missing_eq.brink", &["[ERR_57]"]);
     }
 
     #[test]
     fn region_ast63_conflicts_const() {
-        assert_brink_failure("tests/region_ast63_conflicts_const.brink", &["[AST_63]"]);
+        assert_brink_failure("tests/region_ast63_conflicts_const.brink", &["[ERR_58]"]);
     }
 
     #[test]
     fn region_ast64_missing_size() {
-        assert_brink_failure("tests/region_ast64_missing_size.brink", &["[AST_64]"]);
+        assert_brink_failure("tests/region_ast64_missing_size.brink", &["[ERR_59]"]);
     }
 
     #[test]
@@ -3185,17 +3185,17 @@ mod tests {
 
     #[test]
     fn region_exec66() {
-        assert_brink_failure("tests/region_exec66.brink", &["[EXEC_66]"]);
+        assert_brink_failure("tests/region_exec66.brink", &["[ERR_180]"]);
     }
 
     #[test]
     fn region_exec72() {
-        assert_brink_failure("tests/region_exec72.brink", &["[EXEC_72]"]);
+        assert_brink_failure("tests/region_exec72.brink", &["[ERR_185]"]);
     }
 
     #[test]
     fn region_exec73() {
-        assert_brink_failure("tests/region_exec73.brink", &["[EXEC_73]"]);
+        assert_brink_failure("tests/region_exec73.brink", &["[ERR_186]"]);
     }
     #[test]
     fn region_nested() {
@@ -3203,14 +3203,14 @@ mod tests {
     }
     #[test]
     /// Containment (FLASH1 fully inside FLASH) is allowed.  Previously expected
-    /// EXEC_70; now succeeds because containment is valid for nested sub-regions.
+    /// ERR_183; now succeeds because containment is valid for nested sub-regions.
     fn region_nested_2() {
         assert_brink_success("tests/region_nested_2.brink", None, None);
     }
 
     #[test]
     fn region_nested_overflow() {
-        assert_brink_failure("tests/region_nested_overflow.brink", &["[EXEC_73]"]);
+        assert_brink_failure("tests/region_nested_overflow.brink", &["[ERR_186]"]);
     }
 
     #[test]
@@ -3227,9 +3227,9 @@ mod tests {
 
     #[test]
     /// Inner section in B called from outer in A (partial overlap).
-    /// Writing 192 bytes exceeds intersection size 128 -> EXEC_73.
+    /// Writing 192 bytes exceeds intersection size 128 -> ERR_186.
     fn region_exec73_partial_overlap() {
-        assert_brink_failure("tests/region_exec73_partial_overlap.brink", &["[EXEC_73]"]);
+        assert_brink_failure("tests/region_exec73_partial_overlap.brink", &["[ERR_186]"]);
     }
 
     #[test]
@@ -3241,32 +3241,32 @@ mod tests {
 
     #[test]
     /// Inner section (no direct binding) inherits FLASH from outer.
-    /// set_addr outside FLASH triggers EXEC_72 via inherited region constraint.
+    /// set_addr outside FLASH triggers ERR_185 via inherited region constraint.
     fn region_nested_exec72() {
-        assert_brink_failure("tests/region_nested_exec72.brink", &["[EXEC_72]"]);
+        assert_brink_failure("tests/region_nested_exec72.brink", &["[ERR_185]"]);
     }
 
     #[test]
     /// Inner section is bound to SRAM, which is disjoint from outer's FLASH.
-    /// Empty intersection triggers EXEC_77.
+    /// Empty intersection triggers ERR_190.
     fn region_nested_exec77() {
-        assert_brink_failure("tests/region_nested_exec77.brink", &["[EXEC_77]"]);
+        assert_brink_failure("tests/region_nested_exec77.brink", &["[ERR_190]"]);
     }
 
     #[test]
     /// Inner section in B called from outer in A. B and A partially overlap but
     /// B.addr (0x1000) is before A.addr (0x1080), so the section would anchor
-    /// outside the parent region. EXEC_78 must fire.
+    /// outside the parent region. ERR_191 must fire.
     fn region_exec78_bad_start() {
-        assert_brink_failure("tests/region_exec78_bad_start.brink", &["[EXEC_78]"]);
+        assert_brink_failure("tests/region_exec78_bad_start.brink", &["[ERR_191]"]);
     }
 
     #[test]
     /// Section 'pinned' is bound to a region and included twice via wr.
     /// Region-bound sections anchor to a fixed address; re-use is disallowed.
-    /// EXEC_79 must fire.
+    /// ERR_192 must fire.
     fn region_exec79_reuse() {
-        assert_brink_failure("tests/region_exec79_reuse.brink", &["[EXEC_79]"]);
+        assert_brink_failure("tests/region_exec79_reuse.brink", &["[ERR_192]"]);
     }
 
     // ── obj / wr obj ──────────────────────────────────────────────────────────
@@ -3296,21 +3296,21 @@ mod tests {
     }
 
     #[test]
-    /// obj with a section name not present in the ELF fails with IRDB_63.
+    /// obj with a section name not present in the ELF fails with ERR_119.
     fn wrobj_bad_section() {
-        assert_brink_failure("tests/wrobj_bad_section.brink", &["[IRDB_63]"]);
+        assert_brink_failure("tests/wrobj_bad_section.brink", &["[ERR_119]"]);
     }
 
     #[test]
-    /// obj with a non-existent file path fails with IRDB_62.
+    /// obj with a non-existent file path fails with ERR_118.
     fn wrobj_bad_file() {
-        assert_brink_failure("tests/wrobj_bad_file.brink", &["[IRDB_62]"]);
+        assert_brink_failure("tests/wrobj_bad_file.brink", &["[ERR_118]"]);
     }
 
     #[test]
-    /// obj block missing the required 'file' property fails with AST_76.
+    /// obj block missing the required 'file' property fails with ERR_71.
     fn wrobj_wrong_args() {
-        assert_brink_failure("tests/wrobj_wrong_args.brink", &["[AST_76]"]);
+        assert_brink_failure("tests/wrobj_wrong_args.brink", &["[ERR_71]"]);
     }
 
     #[test]
@@ -3359,9 +3359,9 @@ mod tests {
     }
 
     #[test]
-    /// obj_lma() referencing a file that is not a recognized object format fails with IRDB_64.
+    /// obj_lma() referencing a file that is not a recognized object format fails with ERR_120.
     /// Recognized non-ELF formats return VMA as the LMA by convention.
     fn obj_lma_non_elf() {
-        assert_brink_failure("tests/obj_lma_non_elf.brink", &["[IRDB_64]"]);
+        assert_brink_failure("tests/obj_lma_non_elf.brink", &["[ERR_120]"]);
     }
 } // mod tests

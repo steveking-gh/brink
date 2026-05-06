@@ -84,7 +84,7 @@ impl ExecPhase {
 
         let Some(xstr) = Self::evaluate_string_expr(argvaldb, ir, irdb, diags) else {
             let msg = "Evaluating string expression failed.".to_string();
-            diags.err1("EXEC_16", &msg, ir.src_loc.clone());
+            diags.err1("ERR_140", &msg, ir.src_loc.clone());
             return Err(anyhow!("Wrs failed"));
         };
         print!("{}", xstr);
@@ -105,7 +105,7 @@ impl ExecPhase {
         trace!("Engine::execute_wrs:");
         let Some(xstr) = Self::evaluate_string_expr(argvaldb, ir, irdb, diags) else {
             let msg = "Evaluating string expression failed.".to_string();
-            diags.err1("EXEC_15", &msg, ir.src_loc.clone());
+            diags.err1("ERR_139", &msg, ir.src_loc.clone());
             return Err(anyhow!("Wrs failed"));
         };
         let size = xstr.len() as u64;
@@ -120,7 +120,7 @@ impl ExecPhase {
         let result = file.write_all(bufs).map_err(|err| err.into());
         if result.is_err() {
             let msg = "Writing string failed".to_string();
-            diags.err1("EXEC_3", &msg, ir.src_loc.clone());
+            diags.err1("ERR_127", &msg, ir.src_loc.clone());
         }
 
         result
@@ -159,7 +159,7 @@ impl ExecPhase {
                     "Opening file '{path}' failed with OS error '{:?}'.",
                     err.raw_os_error()
                 );
-                diags.err1("EXEC_33", &msg, ir.src_loc.clone());
+                diags.err1("ERR_155", &msg, ir.src_loc.clone());
                 return Err(anyhow!(err));
             }
         };
@@ -177,7 +177,7 @@ impl ExecPhase {
                         "Reading file '{path}' failed with OS error '{:?}'.",
                         err.raw_os_error()
                     );
-                    diags.err1("EXEC_34", &msg, ir.src_loc.clone());
+                    diags.err1("ERR_156", &msg, ir.src_loc.clone());
                     return Err(anyhow!(err));
                 }
             };
@@ -188,7 +188,7 @@ impl ExecPhase {
                 .map_err(|err| err.into());
             if write_result.is_err() {
                 let msg = "Writing buffer failed".to_string();
-                diags.err1("EXEC_35", &msg, ir.src_loc.clone());
+                diags.err1("ERR_157", &msg, ir.src_loc.clone());
                 return write_result;
             }
 
@@ -235,7 +235,7 @@ impl ExecPhase {
                     "Opening object file '{file_path}' failed with OS error '{:?}'.",
                     err.raw_os_error()
                 );
-                diags.err1("EXEC_80", &msg, ir.src_loc.clone());
+                diags.err1("ERR_193", &msg, ir.src_loc.clone());
                 return Err(anyhow!(err));
             }
         };
@@ -245,7 +245,7 @@ impl ExecPhase {
                 "Seeking in object file '{file_path}' failed with OS error '{:?}'.",
                 err.raw_os_error()
             );
-            diags.err1("EXEC_81", &msg, ir.src_loc.clone());
+            diags.err1("ERR_194", &msg, ir.src_loc.clone());
             return Err(anyhow!(err));
         }
 
@@ -260,13 +260,13 @@ impl ExecPhase {
                         "Reading object file '{file_path}' failed with OS error '{:?}'.",
                         err.raw_os_error()
                     );
-                    diags.err1("EXEC_82", &msg, ir.src_loc.clone());
+                    diags.err1("ERR_195", &msg, ir.src_loc.clone());
                     return Err(anyhow!(err));
                 }
             };
             if let Err(err) = file.write_all(&buf[..bytes_read]) {
                 let msg = "Writing object section bytes failed.".to_string();
-                diags.err1("EXEC_83", &msg, ir.src_loc.clone());
+                diags.err1("ERR_196", &msg, ir.src_loc.clone());
                 return Err(anyhow!(err));
             }
             remaining -= bytes_read as u64;
@@ -341,7 +341,7 @@ impl ExecPhase {
             let result = file.write_all(&buf[0..byte_size]).map_err(|err| err.into());
             if result.is_err() {
                 let msg = format!("{:?} failed", ir.kind);
-                diags.err1("EXEC_18", &msg, ir.src_loc.clone());
+                diags.err1("ERR_142", &msg, ir.src_loc.clone());
                 return result;
             }
             repeat_count -= 1;
@@ -554,7 +554,7 @@ impl ExecPhase {
                         .unwrap_or(&[]);
                     if indices.len() > 1 {
                         diags.err1(
-                            "EXEC_56",
+                            "ERR_173",
                             &format!(
                                 "Extension '{}': section '{}' for parameter '{}' appears {} \
                                  times in the output and is ambiguous.",
@@ -633,7 +633,7 @@ impl ExecPhase {
                 Ok(buf) => buf,
                 Err(e) => {
                     let msg = format!("Extension '{}' execution failed: {}", name, e);
-                    diags.err1("EXEC_47", &msg, ir.src_loc.clone());
+                    diags.err1("ERR_167", &msg, ir.src_loc.clone());
                     return Err(anyhow!(msg));
                 }
             };
@@ -702,7 +702,7 @@ impl ExecPhase {
                 "Address range {:#x}..{:#x} overlaps previously written range {:#x}..{:#x}",
                 start, end, prev_start, prev_end,
             );
-            diags.err2("EXEC_55", &msg, src_loc, prev_loc);
+            diags.err2("ERR_172", &msg, src_loc, prev_loc);
             return false;
         }
 
@@ -737,7 +737,7 @@ impl ExecPhase {
                 bad => {
                     let msg = format!("Cannot stringify type '{:?}'", bad);
                     let src_loc = irdb.parms[op_num].src_loc.clone();
-                    diags.err1("EXEC_67", &msg, src_loc);
+                    diags.err1("ERR_181", &msg, src_loc);
                     result = false;
                 }
             }

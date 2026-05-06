@@ -441,7 +441,7 @@ impl<'toks> Ast<'toks> {
                 // token. Checking whether 'include'appears immediately after a
                 // statement boundary (or at the start of the file) prevents
                 // eagerly intercepting valid parser-level error cases like
-                // AST_32 (Reserved section name) or AST_33 (Reserved const
+                // ERR_27 (Reserved section name) or ERR_28 (Reserved const
                 // name).
                 let is_directive = tv
                     .last()
@@ -451,7 +451,7 @@ impl<'toks> Ast<'toks> {
                     let next_tok = lex.next();
                     if next_tok != Some(LexToken::QuotedString) {
                         diags.err1(
-                            "AST_34",
+                            "ERR_29",
                             "Expected quoted string after include",
                             SourceSpan {
                                 file_id,
@@ -466,7 +466,7 @@ impl<'toks> Ast<'toks> {
                     let semi_tok = lex.next();
                     if semi_tok != Some(LexToken::Semicolon) {
                         diags.err1(
-                            "AST_35",
+                            "ERR_30",
                             "Expected semicolon after include statement",
                             SourceSpan {
                                 file_id,
@@ -496,7 +496,7 @@ impl<'toks> Ast<'toks> {
 
                     if let Some(orig_span) = visited.get(&resolved_path_str) {
                         diags.err2(
-                            "AST_36",
+                            "ERR_31",
                             &format!("Include cycle detected: {}", resolved_path_str),
                             SourceSpan {
                                 file_id,
@@ -518,7 +518,7 @@ impl<'toks> Ast<'toks> {
                         Ok(c) => c,
                         Err(e) => {
                             diags.err1(
-                                "AST_37",
+                                "ERR_32",
                                 &format!(
                                     "Failed to read included file '{}': {}",
                                     resolved_path_str, e
@@ -714,7 +714,7 @@ impl<'toks> Ast<'toks> {
                 // to try to give the user more errors in batches.
                 _ => {
                     let msg = format!("Unrecognized token '{}' at top level scope", tinfo.val);
-                    diags.err1("AST_18", &msg, tinfo.span());
+                    diags.err1("ERR_16", &msg, tinfo.span());
 
                     // Skip the bad token.
                     self.tv.skip();
@@ -742,12 +742,12 @@ impl<'toks> Ast<'toks> {
     }
 
     fn err_no_input(&self, diags: &mut Diags) {
-        diags.err0("AST_13", "Unexpected end of input");
+        diags.err0("ERR_12", "Unexpected end of input");
     }
 
     fn err_no_close_brace(&self, diags: &mut Diags, brace_tok_num: usize) {
         let m = "Missing '}'.  The following open brace is unmatched.".to_string();
-        diags.err1("AST_14", &m, self.tv.get(brace_tok_num).span());
+        diags.err1("ERR_13", &m, self.tv.get(brace_tok_num).span());
     }
 
     /// Attempts to advance the token number past the next semicolon. The final
@@ -825,7 +825,7 @@ impl<'toks> Ast<'toks> {
             self.add_to_parent_and_advance(parent);
             return true;
         }
-        self.err_expected_after(diags, "AST_17", "Expected ';'");
+        self.err_expected_after(diags, "ERR_15", "Expected ';'");
         false
     }
 
@@ -843,7 +843,7 @@ impl<'toks> Ast<'toks> {
         }
 
         let msg = format!("Expected {:?}", expected_tok);
-        self.err_expected_after(diags, "AST_26", &msg);
+        self.err_expected_after(diags, "ERR_23", &msg);
         false
     }
 
@@ -859,7 +859,7 @@ impl<'toks> Ast<'toks> {
                 "Expected valid expression inside parentheses after {:?}",
                 tinfo.tok
             );
-            diags.err1("AST_12", &msg, tinfo.span());
+            diags.err1("ERR_11", &msg, tinfo.span());
             return false;
         };
         // Success, add the expression a child of the input parent node.
@@ -929,7 +929,7 @@ impl<'toks> Ast<'toks> {
         }
 
         let msg = format!("Expected {:?}", tok);
-        self.err_expected_after(diags, "AST_20", &msg);
+        self.err_expected_after(diags, "ERR_18", &msg);
         false
     }
 
@@ -957,7 +957,7 @@ impl<'toks> Ast<'toks> {
         if self.expect_name_leaf(
             diags,
             reg_nid,
-            "AST_58",
+            "ERR_53",
             "Expected an identifier after region",
         ) {
             // After a region identifier, expect an open brace.
@@ -968,7 +968,7 @@ impl<'toks> Ast<'toks> {
                 diags,
                 reg_nid,
                 LexToken::OpenBrace,
-                "AST_59",
+                "ERR_54",
                 "Expected { after region name",
             ) {
                 result = self.parse_region_contents(reg_nid, diags, brace_toknum);
@@ -1000,14 +1000,14 @@ impl<'toks> Ast<'toks> {
         if !self.expect_name_leaf(
             diags,
             obj_nid,
-            "AST_66",
+            "ERR_61",
             "Expected an identifier after 'obj'",
         ) {
             return self.dbg_exit("parse_obj", false);
         }
 
         if self.tv.peek().tok != LexToken::OpenBrace {
-            self.err_expected_after(diags, "AST_66", "'obj <name>': expected '{'");
+            self.err_expected_after(diags, "ERR_61", "'obj <name>': expected '{'");
             return self.dbg_exit("parse_obj", false);
         }
         let brace_tok_num = self.tv.get_index();
@@ -1038,21 +1038,21 @@ impl<'toks> Ast<'toks> {
                         "Unknown obj property '{}'. Expected 'section' or 'file'.",
                         prop_name
                     );
-                    diags.err1("AST_75", &m, prop_loc);
+                    diags.err1("ERR_70", &m, prop_loc);
                     return self.dbg_exit("parse_obj", false);
                 }
             };
 
             if (is_section && section_seen) || (!is_section && file_seen) {
                 let m = format!("Duplicate '{}' property in obj block.", prop_name);
-                diags.err1("AST_74", &m, prop_loc);
+                diags.err1("ERR_69", &m, prop_loc);
                 return self.dbg_exit("parse_obj", false);
             }
 
             self.tv.skip(); // consume property name
 
             if self.tv.peek().tok != LexToken::Eq {
-                self.err_expected_after(diags, "AST_72", &format!("'{}': expected '='", prop_name));
+                self.err_expected_after(diags, "ERR_67", &format!("'{}': expected '='", prop_name));
                 return self.dbg_exit("parse_obj", false);
             }
             self.tv.skip(); // consume '='
@@ -1060,7 +1060,7 @@ impl<'toks> Ast<'toks> {
             if self.tv.peek().tok != LexToken::QuotedString {
                 self.err_expected_after(
                     diags,
-                    "AST_73",
+                    "ERR_68",
                     &format!("'{} =': expected a quoted string value", prop_name),
                 );
                 return self.dbg_exit("parse_obj", false);
@@ -1078,7 +1078,7 @@ impl<'toks> Ast<'toks> {
             self.parse_leaf(prop_nid); // attaches QuotedString child and advances
 
             if self.tv.peek().tok != LexToken::Semicolon {
-                self.err_expected_after(diags, "AST_77", "Expected ';' after obj property value");
+                self.err_expected_after(diags, "ERR_72", "Expected ';' after obj property value");
                 return self.dbg_exit("parse_obj", false);
             }
             self.tv.skip(); // consume ';'
@@ -1095,7 +1095,7 @@ impl<'toks> Ast<'toks> {
             let m = format!("obj block is missing required property '{}'.", missing);
             let name_nid = obj_nid.children(&self.arena).next().unwrap();
             let name_loc = self.arena[name_nid].get().loc.clone();
-            diags.err1("AST_76", &m, name_loc);
+            diags.err1("ERR_71", &m, name_loc);
             return self.dbg_exit("parse_obj", false);
         }
 
@@ -1150,7 +1150,7 @@ impl<'toks> Ast<'toks> {
                         "Unknown region property '{}'; expected addr or size",
                         prop_val
                     );
-                    diags.err1("AST_45", &msg, prop_loc);
+                    diags.err1("ERR_40", &msg, prop_loc);
                     self.tv.skip();
                     self.advance_past_semicolon();
                     result = false;
@@ -1160,7 +1160,7 @@ impl<'toks> Ast<'toks> {
 
             if duplicate_property {
                 let msg = format!("Duplicate region property '{}'", prop_val);
-                diags.err1("AST_46", &msg, prop_loc);
+                diags.err1("ERR_41", &msg, prop_loc);
                 self.tv.skip();
                 self.advance_past_semicolon();
                 result = false;
@@ -1176,7 +1176,7 @@ impl<'toks> Ast<'toks> {
         let reg_tinfo = self.get_tinfo(reg_nid);
         if !seen_addr {
             diags.err1(
-                "AST_47",
+                "ERR_42",
                 "Region is missing required property 'addr'",
                 reg_tinfo.span(),
             );
@@ -1184,7 +1184,7 @@ impl<'toks> Ast<'toks> {
         }
         if !seen_size {
             diags.err1(
-                "AST_64",
+                "ERR_59",
                 "Region is missing required property 'size'",
                 reg_tinfo.span(),
             );
@@ -1214,7 +1214,7 @@ impl<'toks> Ast<'toks> {
         }
         if eq_tinfo.tok != LexToken::Eq {
             let msg = format!("Expected '=' after region property '{}'", prop_val);
-            diags.err1("AST_62", &msg, eq_tinfo.span());
+            diags.err1("ERR_57", &msg, eq_tinfo.span());
             self.advance_past_semicolon();
             return self.dbg_exit("parse_region_property", false);
         }
@@ -1261,7 +1261,7 @@ impl<'toks> Ast<'toks> {
         if self.expect_name_leaf(
             diags,
             sec_nid,
-            "AST_1",
+            "ERR_1",
             "Expected an identifier after section",
         ) {
             // Optional `in REGION` binding between the name and opening brace.
@@ -1282,7 +1282,7 @@ impl<'toks> Ast<'toks> {
                 if !val_is_name {
                     self.err_expected_after(
                         diags,
-                        "AST_49",
+                        "ERR_44",
                         "'in': expected region name after 'in'",
                     );
                     return self.dbg_exit("parse_section", false);
@@ -1306,7 +1306,7 @@ impl<'toks> Ast<'toks> {
                 diags,
                 sec_nid,
                 LexToken::OpenBrace,
-                "AST_2",
+                "ERR_2",
                 "Expected { after identifier",
             ) {
                 result = self.parse_section_contents(sec_nid, diags, brace_toknum);
@@ -1419,7 +1419,7 @@ impl<'toks> Ast<'toks> {
             } else if let Some(result) = self.try_parse_section_stmt(parent, diags) {
                 result
             } else {
-                self.err_invalid_expression(diags, "AST_3");
+                self.err_invalid_expression(diags, "ERR_3");
                 false
             };
 
@@ -1546,7 +1546,7 @@ impl<'toks> Ast<'toks> {
                     named_nid.append(rhs_nid, &mut self.arena);
                 } else {
                     diags.err1(
-                        "AST_41",
+                        "ERR_36",
                         "Expected expression after '=' in named argument",
                         param_loc,
                     );
@@ -1567,7 +1567,7 @@ impl<'toks> Ast<'toks> {
             // Reject mixed positional and named arguments.
             if saw_named && saw_positional {
                 diags.err1(
-                    "AST_40",
+                    "ERR_35",
                     "Cannot mix positional and named arguments in an extension call",
                     self.tv.peek().loc.clone(),
                 );
@@ -1589,7 +1589,7 @@ impl<'toks> Ast<'toks> {
                 break;
             } else {
                 diags.err1(
-                    "AST_38",
+                    "ERR_33",
                     "Expected ',' or ')' in function call",
                     delim_tinfo.span(),
                 );
@@ -1632,7 +1632,7 @@ impl<'toks> Ast<'toks> {
         let Some(_guard) = DepthGuard::enter(MAX_RECURSION_DEPTH) else {
             let tinfo = self.tv.peek();
             diags.err1(
-                "AST_43",
+                "ERR_38",
                 &format!("Expression nesting depth exceeds maximum ({MAX_RECURSION_DEPTH})."),
                 tinfo.loc.clone(),
             );
@@ -1700,7 +1700,7 @@ impl<'toks> Ast<'toks> {
                     self.tv.skip();
                 } else {
                     diags.err1(
-                        "AST_39",
+                        "ERR_34",
                         "Expected identifier after namespace",
                         next_tinfo.span(),
                     );
@@ -1793,7 +1793,7 @@ impl<'toks> Ast<'toks> {
                     let err_span = arg_opt.map_or(self.get_tinfo(top.unwrap()).span(), |nid| {
                         self.get_tinfo(nid).span()
                     });
-                    diags.err1("AST_40", "sizeof() accepts only a section name or an extension identifier without arguments", err_span);
+                    diags.err1("ERR_35", "sizeof() accepts only a section name or an extension identifier without arguments", err_span);
                     return self.dbg_exit_pratt("parse_pratt", &None, false);
                 }
 
@@ -1823,7 +1823,7 @@ impl<'toks> Ast<'toks> {
                         self.get_tinfo(nid).span()
                     });
                     diags.err1(
-                        "AST_78",
+                        "ERR_73",
                         "obj_align/obj_lma/obj_vma requires exactly one obj name",
                         err_span,
                     );
@@ -1865,7 +1865,7 @@ impl<'toks> Ast<'toks> {
 
             _ => {
                 let msg = format!("Invalid expression operand '{}'", lhs_tinfo.val);
-                diags.err1("AST_19", &msg, lhs_tinfo.span());
+                diags.err1("ERR_17", &msg, lhs_tinfo.span());
                 return self.dbg_exit_pratt("parse_pratt", &None, false);
             }
         };
@@ -1901,7 +1901,7 @@ impl<'toks> Ast<'toks> {
 
             let Some((lbp, rbp)) = Ast::get_infix_binding_power(tok) else {
                 let msg = format!("Invalid operation '{}'", op_tinfo.val);
-                diags.err1("AST_9", &msg, op_tinfo.span());
+                diags.err1("ERR_8", &msg, op_tinfo.span());
                 return self.dbg_exit_pratt("parse_pratt", &None, false);
             };
 
@@ -1976,7 +1976,7 @@ impl<'toks> Ast<'toks> {
                     && self.tv.peek().tok == LexToken::Comma
                 {
                     diags.err1(
-                        "AST_42",
+                        "ERR_37",
                         "'wrf' takes exactly one argument",
                         self.get_tinfo(print_nid).span(),
                     );
@@ -1999,7 +1999,7 @@ impl<'toks> Ast<'toks> {
                 // fuzz test found this with print 1,;
                 let msg = "Statement ended unexpectedly";
                 let tinfo = self.get_tinfo(print_nid);
-                diags.err1("AST_21", msg, tinfo.span());
+                diags.err1("ERR_19", msg, tinfo.span());
                 result = false;
                 break;
             }
@@ -2045,7 +2045,7 @@ impl<'toks> Ast<'toks> {
         if self.expect_name_leaf(
             diags,
             output_nid,
-            "AST_7",
+            "ERR_6",
             "Expected a section name after output",
         ) {
             // Reject old syntax: output <name> <addr>;
@@ -2059,7 +2059,7 @@ impl<'toks> Ast<'toks> {
                     "output no longer accepts a starting address ('{}'); use set_addr inside the section instead",
                     tinfo.val
                 );
-                diags.err1("AST_55", &msg, tinfo.span());
+                diags.err1("ERR_50", &msg, tinfo.span());
                 // Consume the address token and the trailing semicolon so that
                 // the parser does not emit cascading errors for those tokens.
                 self.tv.skip();
@@ -2101,7 +2101,7 @@ impl<'toks> Ast<'toks> {
         if self.expect_name_leaf(
             diags,
             const_nid,
-            "AST_8",
+            "ERR_7",
             "Expected an identifier after 'const'",
         ) {
             // After the identifier: either '=' (full definition) or ';' (declare-only).
@@ -2121,7 +2121,7 @@ impl<'toks> Ast<'toks> {
             } else {
                 self.err_expected_after(
                     diags,
-                    "AST_50",
+                    "ERR_45",
                     "Expected '=' or ';' after const identifier",
                 );
             }
@@ -2150,7 +2150,7 @@ impl<'toks> Ast<'toks> {
         let Some(_guard) = DepthGuard::enter(MAX_RECURSION_DEPTH) else {
             let tinfo = self.tv.peek();
             diags.err1(
-                "AST_44",
+                "ERR_39",
                 &format!("if/else nesting depth exceeds maximum ({MAX_RECURSION_DEPTH})."),
                 tinfo.loc.clone(),
             );
@@ -2171,7 +2171,7 @@ impl<'toks> Ast<'toks> {
             diags,
             if_nid,
             LexToken::OpenBrace,
-            "AST_51",
+            "ERR_46",
             "Expected '{' after if condition",
         ) {
             return self.dbg_exit("parse_if", false);
@@ -2199,7 +2199,7 @@ impl<'toks> Ast<'toks> {
                 self.err_no_input(diags);
                 false
             } else {
-                self.err_expected_after(diags, "AST_52", "Expected '{' or 'if' after 'else'");
+                self.err_expected_after(diags, "ERR_47", "Expected '{' or 'if' after 'else'");
                 false
             }
         } else {
@@ -2265,7 +2265,7 @@ impl<'toks> Ast<'toks> {
                     };
                     maybe.unwrap_or_else(|| {
                         let msg = format!("'{}' is not allowed inside an if/else body", err_val);
-                        diags.err1("AST_53", &msg, err_span);
+                        diags.err1("ERR_48", &msg, err_span);
                         false
                     })
                 }
@@ -2305,7 +2305,7 @@ impl<'toks> Ast<'toks> {
                 "Expected '=' after identifier in deferred const assignment, found '{}'",
                 found
             );
-            diags.err1("AST_54", &msg, self.tv.peek().span());
+            diags.err1("ERR_49", &msg, self.tv.peek().span());
             // We don't want the arbitrary chars in an unknown identifier to
             // propogate any further, so eat the identifier here.
             self.tv.skip();

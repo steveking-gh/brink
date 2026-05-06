@@ -1,5 +1,5 @@
 // Region name conflicts with an existing const name.
-// AST_63: "FLASH" is already declared as a const.
+// ERR_58: "FLASH" is already declared as a const.
 const FLASH = 0x08000000;
 region FLASH {
     addr = 0x1000;

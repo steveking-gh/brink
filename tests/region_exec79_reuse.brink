@@ -1,6 +1,6 @@
 // region_exec79_reuse.brink: 'pinned' is bound to a region and included twice.
 // Region-bound sections anchor to a fixed address; a second inclusion always
-// produces an address conflict.  EXEC_79 must fire.
+// produces an address conflict.  ERR_192 must fire.
 region FLASH {
     addr = 0x08000000;
     size = 256;

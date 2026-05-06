@@ -1,7 +1,7 @@
 // A deferred assignment inside an if-block targets a const that is declared
 // later in source order.  The assignment must not succeed because the const
 // has not been declared yet at the point the if-block executes.
-// Expected: SYMTAB_3 error.
+// Expected: ERR_230 error.
 
 if 1 == 1 {
     LATE = 7;

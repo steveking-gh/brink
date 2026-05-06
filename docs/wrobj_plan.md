@@ -37,12 +37,12 @@ platform-native form.
 
 | Code    | Location                 | Condition                                                                               |
 |---------|--------------------------|-----------------------------------------------------------------------------------------|
-| AST_65  | ast/ast.rs               | `wrobj` argument count is not exactly 2                                                 |
-| AST_66  | ast/ast.rs               | `sizeof` with a quoted first arg: count is not exactly 2, or second arg is missing      |
-| IRDB_61 | irdb/irdb.rs             | `wrobj` or `sizeof` operand is not a quoted string                                      |
-| IRDB_62 | irdb/irdb.rs             | File not found, not readable, or not a recognized object format                         |
-| IRDB_63 | irdb/irdb.rs             | Named section not found in the object file, or section has no file data (e.g. `.bss`)    |
-| EXEC_80 | exec_phase/exec_phase.rs | OS error opening or reading the object file at exec time                                |
+| ERR_60  | ast/ast.rs               | `wrobj` argument count is not exactly 2                                                 |
+| ERR_61  | ast/ast.rs               | `sizeof` with a quoted first arg: count is not exactly 2, or second arg is missing      |
+| ERR_117 | irdb/irdb.rs             | `wrobj` or `sizeof` operand is not a quoted string                                      |
+| ERR_118 | irdb/irdb.rs             | File not found, not readable, or not a recognized object format                         |
+| ERR_119 | irdb/irdb.rs             | Named section not found in the object file, or section has no file data (e.g. `.bss`)    |
+| ERR_193 | exec_phase/exec_phase.rs | OS error opening or reading the object file at exec time                                |
 
 ---
 
@@ -120,10 +120,10 @@ statement node is `LexToken::Wrobj`.  Check the child count of `print_nid` after
 appending each argument:
 
 - After the first argument is appended: if the next token is not `Comma`, emit
-  AST_65 "wrobj requires exactly 2 arguments", call `advance_past_semicolon`,
+  ERR_60 "wrobj requires exactly 2 arguments", call `advance_past_semicolon`,
   and break.
 - After the second argument is appended: if the next token is `Comma`, emit
-  AST_65 "wrobj takes exactly 2 arguments", call `advance_past_semicolon`,
+  ERR_60 "wrobj takes exactly 2 arguments", call `advance_past_semicolon`,
   and break.
 
 Place these checks immediately after the `wrf` guard, using
@@ -134,7 +134,7 @@ second argument.
 sizeof argument parsing to allow a second quoted-string argument: if a comma
 follows the first argument and the first argument is a quoted string, parse the
 second argument and produce a two-child sizeof node.  If the first argument is
-a quoted string but no comma follows (only one quoted-string arg), emit AST_66
+a quoted string but no comma follows (only one quoted-string arg), emit ERR_61
 "sizeof with a section name requires a file path as the second argument".  IRDb
 distinguishes single-identifier `sizeof` from two-quoted-string `sizeof` by
 operand type and count, then sets the IR kind to `SizeofObj` (see Step 6).
@@ -180,9 +180,9 @@ fn load_obj_file_sections(
 If `parsed_obj_files` already contains `file_path`, return true immediately.
 Otherwise:
 
-1. Read the file with `std::fs::read(file_path)`.  On error, emit IRDB_62 and
+1. Read the file with `std::fs::read(file_path)`.  On error, emit ERR_118 and
    return false.
-2. Call `object::File::parse(bytes.as_slice())`.  On error, emit IRDB_62 and
+2. Call `object::File::parse(bytes.as_slice())`.  On error, emit ERR_118 and
    return false.
 3. Iterate `obj.sections()`.  For each section, call `section.name()` and
    `section.file_range()`.  Collect into `HashMap<String, (u64, u64)>`,
@@ -208,11 +208,11 @@ for section in obj.sections() {
 #### 6b — `validate_wrobj_operands`
 
 1. Assert `ir.operands.len() == 2`.
-2. Check both operands have `DataType::QuotedString`; emit IRDB_61 if not.
+2. Check both operands have `DataType::QuotedString`; emit ERR_117 if not.
 3. Extract `section_name` from `operands[0]`, `file_path` from `operands[1]`.
 4. Return true if `obj_sections` already has `(section_name, file_path)`.
 5. Call `load_obj_file_sections(file_path, ...)`.  Return false on failure.
-6. Look up `section_name` in `parsed_obj_files[file_path]`.  Emit IRDB_63 and
+6. Look up `section_name` in `parsed_obj_files[file_path]`.  Emit ERR_119 and
    return false if absent.
 7. Construct and insert `ObjSectionInfo`; return true.
 
@@ -283,7 +283,7 @@ fn execute_wrobj(...) -> Result<()> {
     }
 
     let mut f = File::open(&info.path).map_err(|e| {
-        diags.err1("EXEC_80", &format!("Opening '{}' failed: {:?}", info.path, e.raw_os_error()), ir.src_loc.clone());
+        diags.err1("ERR_193", &format!("Opening '{}' failed: {:?}", info.path, e.raw_os_error()), ir.src_loc.clone());
         anyhow!(e)
     })?;
     f.seek(SeekFrom::Start(info.file_offset))?;
@@ -324,19 +324,19 @@ section foo { wrobj(".rodata", "tests/wrobj_test.elf"); }
 output foo;
 ```
 
-`tests/wrobj_bad_section.brink` — IRDB_63:
+`tests/wrobj_bad_section.brink` — ERR_119:
 ```
 section foo { wrobj(".nonexistent", "tests/wrobj_test.elf"); }
 output foo;
 ```
 
-`tests/wrobj_bad_file.brink` — IRDB_62:
+`tests/wrobj_bad_file.brink` — ERR_118:
 ```
 section foo { wrobj(".rodata", "tests/no_such_file.elf"); }
 output foo;
 ```
 
-`tests/wrobj_wrong_args.brink` — AST_65:
+`tests/wrobj_wrong_args.brink` — ERR_60:
 ```
 section foo { wrobj(".rodata"); }
 output foo;
@@ -354,7 +354,7 @@ section foo {
 output foo;
 ```
 
-`tests/sizeof_obj_bad_section.brink` — IRDB_63:
+`tests/sizeof_obj_bad_section.brink` — ERR_119:
 ```
 section foo {
     assert sizeof(".nonexistent", "tests/wrobj_test.elf") == 0;
@@ -378,17 +378,17 @@ fn wrobj_rodata() {
 
 #[test]
 fn wrobj_bad_section() {
-    assert_brink_failure("tests/wrobj_bad_section.brink", &["[IRDB_63]"]);
+    assert_brink_failure("tests/wrobj_bad_section.brink", &["[ERR_119]"]);
 }
 
 #[test]
 fn wrobj_bad_file() {
-    assert_brink_failure("tests/wrobj_bad_file.brink", &["[IRDB_62]"]);
+    assert_brink_failure("tests/wrobj_bad_file.brink", &["[ERR_118]"]);
 }
 
 #[test]
 fn wrobj_wrong_args() {
-    assert_brink_failure("tests/wrobj_wrong_args.brink", &["[AST_65]"]);
+    assert_brink_failure("tests/wrobj_wrong_args.brink", &["[ERR_60]"]);
 }
 
 #[test]
@@ -398,7 +398,7 @@ fn sizeof_obj() {
 
 #[test]
 fn sizeof_obj_bad_section() {
-    assert_brink_failure("tests/sizeof_obj_bad_section.brink", &["[IRDB_63]"]);
+    assert_brink_failure("tests/sizeof_obj_bad_section.brink", &["[ERR_119]"]);
 }
 ```
 
@@ -406,12 +406,12 @@ fn sizeof_obj_bad_section() {
 
 ### Step 11 — docs/error_codes.md
 
-Add AST_65, AST_66, IRDB_61, IRDB_62, IRDB_63, EXEC_80.
+Add ERR_60, ERR_61, ERR_117, ERR_118, ERR_119, ERR_193.
 
 Update the next-available line:
 
 ```
-Next available per prefix: AST_67, EXEC_81, IR_5, IRDB_64, LINEAR_19, PROC_11, SYMTAB_5.
+Next available per prefix: ERR_62, ERR_194, ERR_202, ERR_120, ERR_216, ERR_228, ERR_232.
 ```
 
 ---

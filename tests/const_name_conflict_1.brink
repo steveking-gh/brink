@@ -1,4 +1,4 @@
-// Const name is the same as an existing section name.  Expected: AST_31.
+// Const name is the same as an existing section name.  Expected: ERR_26.
 section foo {
     wr8 1;
 }

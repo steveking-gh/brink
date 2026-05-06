@@ -1,5 +1,5 @@
 // Const expression references an identifier that is never defined.
-// Expected: IRDB_20.
+// Expected: ERR_86.
 const A = UNDEFINED + 1;
 section foo {
     wr8 A;

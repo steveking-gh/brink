@@ -53,7 +53,7 @@ impl RegionBinding {
 /// The effective region constraint for a section: the geometric intersection of
 /// all ancestor region bindings plus the section's own direct binding.
 /// region_stack holds each RegionBinding that narrowed the intersection,
-/// outermost first, for use in EXEC_73 backtrace diagnostics.
+/// outermost first, for use in ERR_186 backtrace diagnostics.
 #[derive(Clone, Debug)]
 pub struct EffectiveRegion {
     /// Intersection of all regions in the region stack..
@@ -106,7 +106,7 @@ impl EffectiveRegion {
                 format!("region '{}': addr={:#X}, size={}", b.name, b.addr, b.size),
             )]
         };
-        diags.err_with_locs("EXEC_73", &msg, use_src_loc, &secondaries);
+        diags.err_with_locs("ERR_186", &msg, use_src_loc, &secondaries);
         false
     }
 }
@@ -411,7 +411,7 @@ impl IROperand {
                         Some(v) => return Some(ParameterValue::U64(v)),
                         None => {
                             let m = format!("Malformed integer operand {}", sval);
-                            diags.err1("IR_1", &m, src_loc.clone());
+                            diags.err1("ERR_198", &m, src_loc.clone());
                         }
                     }
                 } else {
@@ -428,7 +428,7 @@ impl IROperand {
                         Some(v) => return Some(ParameterValue::I64(v)),
                         None => {
                             let m = format!("Malformed integer operand {}", sval);
-                            diags.err1("IR_3", &m, src_loc.clone());
+                            diags.err1("ERR_200", &m, src_loc.clone());
                         }
                     }
                 } else {
@@ -445,7 +445,7 @@ impl IROperand {
                         Some(v) => return Some(ParameterValue::Integer(v)),
                         None => {
                             let m = format!("Malformed integer operand {}", sval);
-                            diags.err1("IR_4", &m, src_loc.clone());
+                            diags.err1("ERR_201", &m, src_loc.clone());
                         }
                     }
                 } else {
@@ -462,7 +462,7 @@ impl IROperand {
             }
             DataType::Unknown => {
                 let m = format!("Conversion failed for unknown type {}.", sval);
-                diags.err1("IR_2", &m, src_loc.clone());
+                diags.err1("ERR_199", &m, src_loc.clone());
                 return Some(ParameterValue::Unknown);
             }
         };

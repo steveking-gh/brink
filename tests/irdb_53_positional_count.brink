@@ -1,5 +1,5 @@
 // Positional call to brink::test_crc with two arguments instead of one.
-// IRDb rejects the count mismatch with IRDB_53.
+// IRDb rejects the count mismatch with ERR_109.
 section top {
     wr brink::test_crc(1, 2);
 }

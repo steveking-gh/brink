@@ -6,7 +6,7 @@
 //
 // Usage tracking:
 //   mark_used()   sets the used flag on any entry.
-//   warn_unused() emits SYMTAB_1 for every entry with Some(value) whose used
+//   warn_unused() emits ERR_229 for every entry with Some(value) whose used
 //   flag is still false at the end of IRDb construction.
 
 use diags::{Diags, SourceSpan};
@@ -69,7 +69,7 @@ impl SymbolTable {
     }
 
     /// Assign a value to a previously-declared const (bare assignment inside an if/else body).
-    /// Returns false and emits SYMTAB_3 if the name was not declared.
+    /// Returns false and emits ERR_230 if the name was not declared.
     pub fn assign(
         &mut self,
         name: &str,
@@ -84,7 +84,7 @@ impl SymbolTable {
                 };
                 let m = format!("Const '{}' cannot be assigned more than once.", name);
                 diags.err2(
-                    "SYMTAB_4",
+                    "ERR_231",
                     &m,
                     loc.clone(),
                     decl_loc.clone(),
@@ -98,7 +98,7 @@ impl SymbolTable {
                 "Assignment to '{}' which was not pre-declared with 'const {};'.",
                 name, name
             );
-            diags.err1("SYMTAB_3", &m, loc.clone());
+            diags.err1("ERR_230", &m, loc.clone());
             false
         }
     }
@@ -137,13 +137,13 @@ impl SymbolTable {
             .filter_map(|(k, e)| e.value.as_ref().map(|v| (k.as_str(), v, e.used)))
     }
 
-    /// Emit `SYMTAB_1` warnings for every const with a value that was never used.
+    /// Emit `ERR_229` warnings for every const with a value that was never used.
     /// Call this after all operand substitution is complete.
     pub fn warn_unused(&self, diags: &Diags) {
         for (name, entry) in &self.entries {
             if entry.value.is_some() && !entry.used {
                 let m = format!("Const '{}' is defined but never used.", name);
-                diags.warn_opt("SYMTAB_1", &m, entry.decl_loc.clone());
+                diags.warn_opt("ERR_229", &m, entry.decl_loc.clone());
             }
         }
     }

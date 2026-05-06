@@ -40,7 +40,7 @@ pub fn eval_expr_tree(
 ) -> Option<ParameterValue> {
     let _guard = DepthGuard::enter(MAX_RECURSION_DEPTH).or_else(|| {
         diags.err1(
-            "IRDB_59",
+            "ERR_115",
             &format!(
                 "Const expression nesting depth exceeds maximum ({}).",
                 MAX_RECURSION_DEPTH
@@ -64,7 +64,7 @@ pub fn eval_expr_tree(
                 .ok()
                 .or_else(|| {
                     diags.err1(
-                        "IRDB_22",
+                        "ERR_88",
                         &format!("Malformed integer in const expression: {}", tinfo.val),
                         src_loc.clone(),
                     );
@@ -82,7 +82,7 @@ pub fn eval_expr_tree(
                 .ok()
                 .or_else(|| {
                     diags.err1(
-                        "IRDB_23",
+                        "ERR_89",
                         &format!("Malformed U64 in const expression: {}", tinfo.val),
                         src_loc.clone(),
                     );
@@ -100,7 +100,7 @@ pub fn eval_expr_tree(
                 .ok()
                 .or_else(|| {
                     diags.err1(
-                        "IRDB_24",
+                        "ERR_90",
                         &format!("Malformed I64 in const expression: {}", tinfo.val),
                         src_loc.clone(),
                     );
@@ -124,7 +124,7 @@ pub fn eval_expr_tree(
                 symbol_table.mark_used(&name);
                 Some(val)
             } else {
-                diags.err1("IRDB_20", &format!("Unknown or uninitialized identifier '{}' in const expression. Constants must be defined before use.", name), src_loc.clone());
+                diags.err1("ERR_86", &format!("Unknown or uninitialized identifier '{}' in const expression. Constants must be defined before use.", name), src_loc.clone());
                 None
             }
         }
@@ -158,7 +158,7 @@ pub fn eval_expr_tree(
                 ) => Some(ParameterValue::U64(val.to_u64())),
                 _ => {
                     diags.err1(
-                        "IRDB_21",
+                        "ERR_87",
                         &format!(
                             "Cannot apply '{:?}' to {:?} in a const expression.",
                             tinfo.tok,
@@ -207,7 +207,7 @@ pub fn eval_expr_tree(
             let rhs_val = eval_expr_tree(ast, it.next().unwrap(), symbol_table, diags)?;
             let Some(lhs_b) = lhs_val.to_bool() else {
                 diags.err1(
-                    "IRDB_58",
+                    "ERR_114",
                     "'&&'/'||' operands must be numeric",
                     src_loc.clone(),
                 );
@@ -215,7 +215,7 @@ pub fn eval_expr_tree(
             };
             let Some(rhs_b) = rhs_val.to_bool() else {
                 diags.err1(
-                    "IRDB_99",
+                    "ERR_124",
                     "'&&'/'||' operands must be numeric",
                     src_loc.clone(),
                 );
@@ -240,13 +240,13 @@ pub fn eval_expr_tree(
         | LexToken::ObjAlign
         | LexToken::ObjLma
         | LexToken::ObjVma => {
-            diags.err1("IRDB_19", &format!("Operation '{:?}' cannot be used in a const expression because it requires engine-time layout or addressing.", tinfo.tok), src_loc.clone());
+            diags.err1("ERR_85", &format!("Operation '{:?}' cannot be used in a const expression because it requires engine-time layout or addressing.", tinfo.tok), src_loc.clone());
             None
         }
 
         _ => {
             diags.err1(
-                "IRDB_60",
+                "ERR_116",
                 &format!(
                     "Operation '{:?}' is not supported in a const expression.",
                     tinfo.tok
@@ -300,13 +300,13 @@ fn apply_binary_op(
     diags: &mut Diags,
 ) -> Option<ParameterValue> {
     use ParameterValue::*;
-    let (lhs, rhs) = coerce_numeric_pair(lhs, rhs, "IRDB_25", src_loc, diags)?;
+    let (lhs, rhs) = coerce_numeric_pair(lhs, rhs, "ERR_91", src_loc, diags)?;
 
     let emit = |err: CalcErr, diags: &mut Diags| -> Option<ParameterValue> {
         match err {
-            CalcErr::Overflow(msg) => diags.err1("IRDB_27", &msg, src_loc.clone()),
+            CalcErr::Overflow(msg) => diags.err1("ERR_93", &msg, src_loc.clone()),
             CalcErr::DivByZero => diags.err1(
-                "IRDB_28",
+                "ERR_94",
                 "Division by zero in const expression",
                 src_loc.clone(),
             ),
@@ -338,7 +338,7 @@ fn apply_binary_op(
         }
         _ => {
             diags.err1(
-                "IRDB_26",
+                "ERR_92",
                 &format!(
                     "Non-numeric type {:?} in arithmetic const expression.",
                     lhs.data_type()
@@ -364,7 +364,7 @@ fn apply_comparison_op(
             LexToken::NEq => a != b,
             _ => {
                 diags.err1(
-                    "IRDB_30",
+                    "ERR_96",
                     "Ordered comparison (>=, <=) is not supported for strings.",
                     src_loc.clone(),
                 );
@@ -373,7 +373,7 @@ fn apply_comparison_op(
         };
         return Some(U64(if result { 1 } else { 0 }));
     }
-    let (lhs, rhs) = coerce_numeric_pair(lhs, rhs, "IRDB_29", src_loc, diags)?;
+    let (lhs, rhs) = coerce_numeric_pair(lhs, rhs, "ERR_95", src_loc, diags)?;
 
     let result = match lhs {
         U64(a) => {
@@ -511,7 +511,7 @@ pub fn evaluate_regions(
                 Some(val) => {
                     if !val.is_numeric() {
                         diags.err1(
-                            "EXEC_66",
+                            "ERR_180",
                             &format!(
                                 "Region property '{}' must evaluate to a numeric value.",
                                 prop_name
@@ -535,7 +535,7 @@ pub fn evaluate_regions(
     for (name, binding) in &bindings {
         if binding.size > 0 && binding.addr.checked_add(binding.size).is_none() {
             diags.err1(
-                "EXEC_75",
+                "ERR_188",
                 &format!(
                     "Region '{}' addr {:#X} + size {:#X} overflows u64.",
                     name, binding.addr, binding.size
@@ -597,7 +597,7 @@ fn walk_if_statement(
         Some(v) => v,
         None => {
             diags.err1(
-                "IRDB_56",
+                "ERR_112",
                 "if condition must evaluate to a numeric type",
                 cond_loc,
             );
@@ -666,7 +666,7 @@ fn evaluate_stmt(
                     }
                     Some(_) => {
                         diags.err1(
-                            "IRDB_31",
+                            "ERR_97",
                             "Cannot print this value type in a const context",
                             tinfo.loc.clone(),
                         );
@@ -687,7 +687,7 @@ fn evaluate_stmt(
             match eval_expr_tree(ast, expr_nid, symbol_table, diags).and_then(|v| v.to_bool()) {
                 Some(false) => {
                     diags.err1(
-                        "IRDB_32",
+                        "ERR_98",
                         "Assert expression failed in if/else body",
                         tinfo.loc.clone(),
                     );
@@ -695,7 +695,7 @@ fn evaluate_stmt(
                 }
                 None => {
                     diags.err1(
-                        "IRDB_57",
+                        "ERR_113",
                         "assert condition must evaluate to a numeric type",
                         tinfo.loc.clone(),
                     );

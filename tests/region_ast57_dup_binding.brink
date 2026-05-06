@@ -1,5 +1,5 @@
 // Two sections bound to the same region.
-// AST_57: only one section may bind to a given region.
+// ERR_52: only one section may bind to a given region.
 region FLASH {
     addr = 0x1000;
     size = 0x100;

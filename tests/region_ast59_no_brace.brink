@@ -1,5 +1,5 @@
 // Region name not followed by "{".
-// AST_59: expected "{" to open the region body.
+// ERR_54: expected "{" to open the region body.
 region FLASH
     addr = 0x1000;
     size = 0x100;

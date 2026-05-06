@@ -1,4 +1,4 @@
-// Integer division by zero in a const expression must produce IRDB_28.
+// Integer division by zero in a const expression must produce ERR_94.
 const A = 10;
 const B = 0;
 const C = A / B;

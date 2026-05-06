@@ -1,4 +1,4 @@
-// A u64 literal that exceeds u64::MAX triggers IR_1.
+// A u64 literal that exceeds u64::MAX triggers ERR_198.
 // 0x1_0000_0000_0000_0000 = 2^64 > 18446744073709551615 (u64::MAX)
 section foo {
     wr8 0x1_0000_0000_0000_0000u;

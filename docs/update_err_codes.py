@@ -38,8 +38,8 @@ from collections import defaultdict
 BARE_RE = re.compile(r'"([A-Z]+_\d+)"')
 
 # Matches bracket-format codes embedded in anyhow! or .context() strings.
-# Example: return Err(anyhow!("[PROC_9]: Error detected, halting."));
-#          .context("[PROC_3]: Error detected, halting.")?;
+# Example: return Err(anyhow!("[ERR_226]: Error detected, halting."));
+#          .context("[ERR_220]: Error detected, halting.")?;
 # Applied only to non-test source to avoid integration-test assertions.
 BRACKET_RE = re.compile(r'\[([A-Z]+_\d+)\]')
 

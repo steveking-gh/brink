@@ -1,5 +1,5 @@
-// IRDB_44: sizeof() applied to a namespace-qualified name not in the extension registry.
-// brink::no_such_ext is not registered — IRDB_44 must fire during SizeofExt validation.
+// ERR_100: sizeof() applied to a namespace-qualified name not in the extension registry.
+// brink::no_such_ext is not registered — ERR_100 must fire during SizeofExt validation.
 
 section foo {
     assert sizeof(brink::no_such_ext) == 0;

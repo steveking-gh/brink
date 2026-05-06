@@ -1,7 +1,7 @@
 // Second child is entirely contained within the first — engulfed overlap.
 // Section a writes 8 bytes at 0x2000..0x2008.
 // Section b writes 2 bytes at 0x2002..0x2004.
-// Expects EXEC_55.
+// Expects ERR_172.
 section a {
     set_addr 0x2000;
     wr64 0x0102030405060708;

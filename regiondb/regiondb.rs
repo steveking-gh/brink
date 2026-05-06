@@ -54,7 +54,7 @@ impl RegionDb {
                              than once, since doing so produces an address conflict.",
                             sec_name
                         );
-                        diags.err1("EXEC_79", &msg, ir.src_loc.clone());
+                        diags.err1("ERR_192", &msg, ir.src_loc.clone());
                         ok = false;
                     }
 
@@ -138,7 +138,7 @@ impl RegionDb {
                                             intersection.addr + intersection.size, // No overflow, bare addition is safe.
                                         );
                                         diags.err2(
-                                            "EXEC_78",
+                                            "ERR_191",
                                             &msg,
                                             direct.src_loc.clone(),
                                             parent.src_loc.clone(),
@@ -172,7 +172,7 @@ impl RegionDb {
                                         parent.addr + parent.size, // No overflow, bare addition is safe.
                                     );
                                     diags.err2(
-                                        "EXEC_77",
+                                        "ERR_190",
                                         &msg,
                                         direct.src_loc.clone(),
                                         parent.src_loc.clone(),

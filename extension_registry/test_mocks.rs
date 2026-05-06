@@ -314,7 +314,7 @@ impl BrinkExtension for MockNoArgs {
 }
 
 /// Returns `usize::MAX` from `size()` to force a u64 overflow in the iterate
-/// location counter when written after any prior byte. Used to test EXEC_60.
+/// location counter when written after any prior byte. Used to test ERR_177.
 pub struct MockHugeExt;
 
 impl BrinkExtension for MockHugeExt {

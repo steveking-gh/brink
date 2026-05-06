@@ -1,5 +1,5 @@
 // Named argument call to brink::test_sum8 with only 'h' supplied.
-// Parameters 'a' through 'g' are absent; IRDb emits IRDB_51 for each.
+// Parameters 'a' through 'g' are absent; IRDb emits ERR_107 for each.
 section top {
     wr brink::test_sum8(h=8);
 }

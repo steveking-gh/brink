@@ -1,4 +1,4 @@
-// || with a string lhs panics (IRDB_58).
+// || with a string lhs panics (ERR_114).
 const s = "x";
 const x = s || 0;
 section foo { wr8 1; }

@@ -51,8 +51,8 @@ instructions.
 Extracted `Location::advance(&mut self, sz, src_loc, diags) -> bool` to
 deduplicate checked-arithmetic counter advance across all four iterate helpers
 (`iterate_wrs`, `iterate_wrext`, `iterate_wrx`, `iterate_wrf`).  All write
-overflow paths now emit EXEC_37 (file-offset overflow) or EXEC_43 (absolute
-address overflow).  Retired per-helper codes EXEC_41, EXEC_60, EXEC_40.
+overflow paths now emit ERR_159 (file-offset overflow) or ERR_165 (absolute
+address overflow).  Retired per-helper codes ERR_163, ERR_177, ERR_162.
 
 **wrext overflow fix**
 `iterate_wrext` now uses checked arithmetic via `Location::advance`.  Added
@@ -70,8 +70,8 @@ Removed the unnecessary `mut result` variable; failure branch now returns
 
 **build_dispatches: checked arithmetic + diags**
 Added `diags: &mut Diags` parameter to `build_dispatches`.  Replaced two
-`saturating_add` calls with `checked_add`; overflow emits EXEC_60 (section
-address) or EXEC_61 (label address).
+`saturating_add` calls with `checked_add`; overflow emits ERR_177 (section
+address) or ERR_178 (label address).
 
 **execute_extensions: O(N^2) -> O(N) lookups**
 Built two maps before the extension execution loop:
@@ -111,11 +111,11 @@ Only `ExtensionCall` (plain args) and `ExtensionCallSection` (first arg is a
 known section name) remain. `disambiguate_extension_call` now checks for section
 name in first arg for all extensions, not just ranged ones.
 
-**IRDB_47 updated**
+**ERR_103 updated**
 Now allows QuotedString in addition to numeric types. String args pass IRDb
 validation; extensions reject invalid types at runtime.
 
-**IRDB_45, IRDB_46 retired**
+**ERR_101, ERR_102 retired**
 Error codes for ranged-extension-specific constraints removed along with the
 ranged extension concept.
 
@@ -139,7 +139,7 @@ Changes:
   receive image via `ExtArg::Section`.
 - `std/crc32c`, `std/sha256`, `std/md5`: Converted to `BrinkExtension`.
 - `irdb/irdb.rs`: Removed `ExtensionCallRanged` arm; updated disambiguation
-  and IRDB_47 validation.
+  and ERR_103 validation.
 - `ir/ir.rs`: Removed `ExtensionCallRanged` variant.
 - `engine/engine.rs`: Removed `RegisteredExtension` dispatch; builds `ExtArg`
   list per call.
@@ -193,49 +193,49 @@ IR) but harmless.
 **New CLI flag**
 `--max-output-size SIZE` (default 256M, accepts K/M/G suffix).  Parsed by
 `parse_size()` in `src/main.rs`.  Passed as new `max_output_size: u64` parameter
-to `process()`.  Rejects before `execute()` with PROC_7.
+to `process()`.  Rejects before `execute()` with ERR_224.
 
 **New error code**
-PROC_7: output image size exceeds `--max-output-size` limit.
+ERR_224: output image size exceeds `--max-output-size` limit.
 
 **Fuzz target**
 `process/fuzz/fuzz_targets/fuzz_target_1.rs` updated to pass `max_output_size`
 (64 KiB for fast fuzzing).
 
 **Regression test**
-`tests/fuzz_found_19.brink` added to integration suite; expects PROC_7.
+`tests/fuzz_found_19.brink` added to integration suite; expects ERR_224.
 `max_output_size_flag` inline test: `--max-output-size 0` on 1-byte output.
 
 ---
 
 ## 2026-04-17 — fuzz fixes and to_bool() hardening
 
-**fuzz_found_20: wrf extra args (AST_42)**
+**fuzz_found_20: wrf extra args (ERR_37)**
 `wrf(f), "n"` caused IRDb assert.  Parser now rejects extra args after the
-first wrf argument with AST_42 and advances past `;`.
+first wrf argument with ERR_37 and advances past `;`.
 
-**fuzz_found_21: wr32 extra args (IRDB_55)**
+**fuzz_found_21: wr32 extra args (ERR_111)**
 `wr32 a, b, (12)` caused IRDb assert.  `validate_numeric_1_or_2` replaced
-`assert!` with graceful IRDB_55 diagnostic.  Covers all Wr(n), Align,
+`assert!` with graceful ERR_111 diagnostic.  Covers all Wr(n), Align,
 SetAddr*, SetSecOffset, SetFileOffset.
 
-**fuzz_found_22: if with string condition (IRDB_56)**
+**fuzz_found_22: if with string condition (ERR_112)**
 `const MODE = ""; if MODE { }` panicked in `to_bool()`.  Fixed two call
-sites in `const_eval.rs` (IfBegin arm and eval_ast_condition) with IRDB_56.
+sites in `const_eval.rs` (IfBegin arm and eval_ast_condition) with ERR_112.
 
 **to_bool() Option A hardening**
 Changed `ParameterValue::to_bool()` return type from `bool` to `Option<bool>`.
 All five call sites updated:
 
 - `engine/engine.rs` execute_assert: `expect()` (invariant protected by IRDb)
-- `const_eval.rs` IfBegin: `and_then` with IRDB_56
-- `const_eval.rs` Assert in if/else body: `and_then` with IRDB_57
-- `const_eval.rs` LogicalAnd/Or: let-else with IRDB_58
-- `const_eval.rs` eval_ast_condition: match on `to_bool()` with IRDB_56
+- `const_eval.rs` IfBegin: `and_then` with ERR_112
+- `const_eval.rs` Assert in if/else body: `and_then` with ERR_113
+- `const_eval.rs` LogicalAnd/Or: let-else with ERR_114
+- `const_eval.rs` eval_ast_condition: match on `to_bool()` with ERR_112
 
 **New error codes**
-IRDB_57: assert condition in if/else body is non-numeric.
-IRDB_58: `&&`/`||` operand is non-numeric.
+ERR_113: assert condition in if/else body is non-numeric.
+ERR_114: `&&`/`||` operand is non-numeric.
 
 **New test files**
 `fuzz_found_20.brink`, `fuzz_found_21.brink`, `fuzz_found_22.brink`,
@@ -250,35 +250,35 @@ next-available summary line.
 
 ---
 
-## 2026-04-18 -- Recursive depth guards (AST_43, AST_44, IRDB_59)
+## 2026-04-18 -- Recursive depth guards (ERR_38, ERR_39, ERR_115)
 
-**parse_pratt depth guard (AST_43)**
+**parse_pratt depth guard (ERR_38)**
 Added `MAX_PRATT_DEPTH = 200` check at the top of `parse_pratt`.  All recursive
 call sites inside `parse_pratt` pass `depth + 1`; top-level entry points pass `0`.
 
-**parse_if_r / parse_if_body_r mutual recursion guard (AST_44)**
+**parse_if_r / parse_if_body_r mutual recursion guard (ERR_39)**
 Added `MAX_IF_DEPTH = 100` check at the top of `parse_if_r`.  `parse_if_body_r`
 carries the depth parameter and passes `depth + 1` when recursing into nested `if`.
 
 **parse_function_args depth threading (root cause of fuzz SIGSEGV)**
 `parse_function_args` was calling `parse_pratt(0, 0, ...)` internally, resetting
-the depth counter to zero and bypassing AST_43.  Fixed by threading `depth` through
+the depth counter to zero and bypassing ERR_38.  Fixed by threading `depth` through
 `parse_function_args` and passing `depth + 1` at both call sites inside `parse_pratt`
 and both internal `parse_pratt` calls within `parse_function_args`.
 
-**eval_const_expr_r depth guard (IRDB_59)**
+**eval_const_expr_r depth guard (ERR_115)**
 Added `MAX_EVAL_DEPTH = 100` check (matching `Linearizer::MAX_RECURSION_DEPTH`) to
 `eval_const_expr_r`.  Adds `depth: usize` parameter threaded through all 7 internal
 recursive calls.  Six external call sites pass `0`.  For inputs going through the
-linearizer, LINEAR_1 fires first; IRDB_59 provides defense-in-depth for eval paths
+linearizer, ERR_203 fires first; ERR_115 provides defense-in-depth for eval paths
 that bypass the linearizer.
 
 **Error codes**
-AST_43, AST_44, IRDB_59 added to `docs/error-codes.md`.
-Next available: AST_45, EXEC_62, IR_5, IRDB_60, LINEAR_18, PROC_8, SYMTAB_5.
+ERR_38, ERR_39, ERR_115 added to `docs/error-codes.md`.
+Next available: ERR_40, ERR_179, ERR_202, ERR_116, ERR_215, ERR_225, ERR_232.
 
-Regression tests: `fuzz_found_23` (250-level `f(f(...))` fires AST_43),
-`fuzz_found_24` (5000-term flat `1 + 1 + ...` fires LINEAR_1).
+Regression tests: `fuzz_found_23` (250-level `f(f(...))` fires ERR_38),
+`fuzz_found_24` (5000-term flat `1 + 1 + ...` fires ERR_203).
 
 314 tests pass.
 
@@ -288,7 +288,7 @@ Regression tests: `fuzz_found_23` (250-level `f(f(...))` fires AST_43),
 
 **output statement address removed**
 `output <section> <addr>;` syntax removed.  Use `set_addr <addr>;` as the first
-statement inside the section instead.  Old syntax emits AST_55.
+statement inside the section instead.  Old syntax emits ERR_50.
 
 **Pipeline cleanup**
 Removed: `Output.addr_nid`, `LayoutDb.output_addr_str/loc`,
@@ -309,7 +309,7 @@ SectionStart before any `set_addr`.  It no longer tracks a separate base set
 in the output statement.
 
 **New error code**
-AST_55: `output` address argument; use `set_addr` or region binding.
+ERR_50: `output` address argument; use `set_addr` or region binding.
 
 **Test migration**
 ~80 `.brink` test files updated.  Zero-address files: remove address.
@@ -329,7 +329,7 @@ values recalculated with `addr(foo)=0`; `output_addr_1` and
 Extracted `execute_validation`, `execute_assert`, `assert_info`, and
 `assert_info_operand` from `exec_phase` into a new `validation_phase` crate.
 `process.rs` now calls `ValidationPhase::validate` between `LayoutPhase::build`
-and `ExecPhase::execute` (error code PROC_8).  Assert evaluation confirmed
+and `ExecPhase::execute` (error code ERR_225).  Assert evaluation confirmed
 independent of generated bytes: `ParmValDb` is immutable during exec and no IR
 instruction reads back output-file bytes.
 
@@ -358,21 +358,21 @@ Parser changes:
 AstDb changes:
 
 - `AstDb::regions: HashMap<String, RegionEntry>` added.
-- `record_region`: reserved name (AST_61), duplicate name (AST_60).
+- `record_region`: reserved name (ERR_56), duplicate name (ERR_55).
 - `AstDb::new`: Region nodes processed at root; region/section/const name
-  conflicts detected (AST_48, AST_63); section region-ref validation (AST_56,
-  AST_57).
+  conflicts detected (ERR_43, ERR_58); section region-ref validation (ERR_51,
+  ERR_52).
 - `Section::region: Option<String>` added; set from RegionRef child if present.
 
 Linearizer: `RegionRef` added to syntactic noise (no IR emitted).
 
-New error codes: AST_45–49, AST_56–64, PROC_8.
+New error codes: ERR_40–49, ERR_51–64, ERR_225.
 
 **Region integration tests**
-15 new test fixtures and functions covering all region error codes (AST_45–64)
+15 new test fixtures and functions covering all region error codes (ERR_40–64)
 plus one success case (`region_valid`).
 
-**Bug fix: infinite loop in AST_45/AST_46 paths**
+**Bug fix: infinite loop in ERR_40/ERR_41 paths**
 `parse_region_contents` error paths for unknown and duplicate property names
 called `advance_past_semicolon()` while the property name token was still the
 current (not yet consumed) token.  `advance_past_semicolon` checked the
@@ -391,7 +391,7 @@ New public function in `const_eval/const_eval.rs`.  Called in `process.rs` after
 `AstDb::new(true)` and before `LayoutDb::new`.  Walks each RegionProp child of
 each Region node, lowers the expression subtree with `Linearizer::record_expr_r`,
 evaluates with `ConstIR::eval_const_expr_r`, and stores `addr`, `size`,
-`default_align`, `default_fill` into the matching `RegionEntry`.  Emits EXEC_66
+`default_align`, `default_fill` into the matching `RegionEntry`.  Emits ERR_180
 for non-numeric property values.
 
 **Section address anchoring in LayoutPhase**
@@ -407,19 +407,19 @@ sets `current.addr.addr_base = anchor` and `current.addr.addr_offset = 0`.
 parent address.
 
 **New error codes**
-EXEC_66: region property value is not numeric.
-PROC_9: evaluate_regions failure halt.
+ERR_180: region property value is not numeric.
+ERR_226: evaluate_regions failure halt.
 
 **Tests**
 `region_anchor.brink`: writes `addr(top)` as `wr32`; verifies bytes equal
 `0x08000000` LE, confirming the anchor is applied correctly.
-`region_exec66.brink`: string-valued region property triggers EXEC_66.
+`region_exec66.brink`: string-valued region property triggers ERR_180.
 
 336 tests pass.
 
 ---
 
-## 2026-04-26 — Region plan Steps 4-5 (RegionBinding, size enforcement, EXEC_70)
+## 2026-04-26 — Region plan Steps 4-5 (RegionBinding, size enforcement, ERR_183)
 
 **RegionBinding on IRDb**
 Removed `section_anchors: HashMap<String, u64>` from `LayoutPhase`.  Added
@@ -431,33 +431,33 @@ All downstream phases read region data from `irdb.section_regions`.
 **default_align and default_fill removed**
 These region properties were unimplemented and had no planned use in the
 near term.  Removed from `RegionEntry`, `parse_region_contents`, and
-`evaluate_regions`.  AST_45 message updated to "expected addr or size".
+`evaluate_regions`.  ERR_40 message updated to "expected addr or size".
 
-**Region size enforcement (EXEC_72, EXEC_73, EXEC_74)**
+**Region size enforcement (ERR_185, ERR_186, ERR_187)**
 `iterate_set_addr` in `layout_phase.rs` now accepts `irdb`, `lid`, and
 `diags`.  For region-bound sections:
 
-- EXEC_72: `set_addr` target is outside `[binding.addr, binding.addr+binding.size)`.
-- EXEC_74: `binding.addr + binding.size` overflows u64 (uses `checked_add`).
+- ERR_185: `set_addr` target is outside `[binding.addr, binding.addr+binding.size)`.
+- ERR_187: `binding.addr + binding.size` overflows u64 (uses `checked_add`).
 
 `validate_section_regions` called after `iterate` converges:
 
-- EXEC_73: `sizeof(section)` exceeds `binding.size`.
+- ERR_186: `sizeof(section)` exceeds `binding.size`.
 
 Deduplication via `warned_lids: HashSet<(usize, &'static str)>` prevents
 repeated errors across iterate passes.
 
-**Overlapping region detection (EXEC_70)**
+**Overlapping region detection (ERR_183)**
 `evaluate_regions` now checks all region pairs after property evaluation.
-Two regions with non-zero size that share any address range emit EXEC_70.
-`region_nested_2.brink` converted from a success fixture to an EXEC_70
+Two regions with non-zero size that share any address range emit ERR_183.
+`region_nested_2.brink` converted from a success fixture to an ERR_183
 error fixture.
 
 **New error codes**
-EXEC_70: overlapping regions.
-EXEC_72: set_addr target outside region bounds.
-EXEC_73: section size exceeds region size.
-EXEC_74: region addr + size overflows u64.
+ERR_183: overlapping regions.
+ERR_185: set_addr target outside region bounds.
+ERR_186: section size exceeds region size.
+ERR_187: region addr + size overflows u64.
 
 342 tests pass.
 
@@ -480,9 +480,9 @@ Changes:
   `strip_kmg` after stripping the type suffix and apply `checked_mul` for
   overflow detection.
 - `const_eval/const_eval.rs`: imports `strip_kmg` from `ir`. All three integer
-  arms of the inline literal evaluator (Integer/IRDB_22, U64/IRDB_23, I64/IRDB_24)
+  arms of the inline literal evaluator (Integer/ERR_88, U64/ERR_89, I64/ERR_90)
   apply `strip_kmg` + `checked_mul`. Overflow is reported via the existing
-  IRDB_22/23/24 codes.
+  ERR_88/23/24 codes.
 - 5 new integration tests: `kmg_suffix_1`, `kmg_suffix_2`, `kmg_suffix_3`,
   `kmg_overflow_u64`, `kmg_overflow_i64`.
 - `README.md`: region size example updated to use `64K` and `1M`.
@@ -504,7 +504,7 @@ Changes:
 
 - `layoutdb/layoutdb.rs`: `LayoutDb` gains `region_names: HashSet<String>`,
   populated from `ast_db.regions` in `new()`.  `IdentDb::verify_operand_refs`
-  checks `lindb.region_names` before emitting LINEAR_6, so region names pass
+  checks `lindb.region_names` before emitting ERR_208, so region names pass
   the identifier validation gate.
 - `irdb/irdb.rs`: `IRDb` gains `region_bindings: HashMap<String, RegionBinding>`
   (keyed by region name, parallel to `section_regions` which is keyed by section
@@ -513,13 +513,13 @@ Changes:
   not consumed when building `section_regions`) to `IRDb::new`.
 - `layout_phase/layout_phase.rs`:
   - `iterate_sizeof`: falls back to `irdb.region_bindings` when the name is not
-    in `sized_locs`; returns `binding.size`.  EXEC_5 message updated to mention
-    regions.  EXEC_52 message updated to "section or region names".
+    in `sized_locs`; returns `binding.size`.  ERR_129 message updated to mention
+    regions.  ERR_169 message updated to "section or region names".
   - `iterate_identifier_address`: restructured into three paths — section/label,
     region, not-found.  For regions: `addr(REGION)` returns `binding.addr`;
-    `addr_offset`/`sec_offset`/`file_offset` applied to a region emit EXEC_76.
-    EXEC_11 message updated to "section, label, or region".
-- New error code EXEC_76: offset-style address operation applied to a region name.
+    `addr_offset`/`sec_offset`/`file_offset` applied to a region emit ERR_189.
+    ERR_135 message updated to "section, label, or region".
+- New error code ERR_189: offset-style address operation applied to a region name.
 - `tests/region_addr_sizeof.brink`: verifies `addr()` and `sizeof()` on two
   regions with asserts and `wr32` output bytes.
 - 1 new integration test: `region_addr_sizeof`.
@@ -538,27 +538,27 @@ Changes:
 
 - `ir/ir.rs`: `RegionBinding` now carries `name` and `src_loc`.  `Copy` derive removed.
 - `const_eval/const_eval.rs`: binding constructor populates `name` and `src_loc`.
-  EXEC_75 message includes region name, points at declaration site.
-  EXEC_70 upgraded from `err1` to `err2`; both overlapping declarations highlighted.
+  ERR_188 message includes region name, points at declaration site.
+  ERR_183 upgraded from `err1` to `err2`; both overlapping declarations highlighted.
   Redundant `name_a`/`name_b` destructures in the overlap loop replaced with `_`.
 - `process/process.rs`: `*binding` (copy) changed to `binding.clone()`.
 - `layout_phase/layout_phase.rs`:
-  - EXEC_72 upgraded to `err2`; message includes region name; second label at declaration.
-  - EXEC_73 upgraded to `err2`; message includes region name; second label at declaration.
-  - EXEC_74 upgraded to `err2`; message includes region name; second label at declaration.
+  - ERR_185 upgraded to `err2`; message includes region name; second label at declaration.
+  - ERR_186 upgraded to `err2`; message includes region name; second label at declaration.
+  - ERR_187 upgraded to `err2`; message includes region name; second label at declaration.
 
 347 tests pass.
 
 ---
 
-## 2026-04-28 — Nested region support (region_intersection + EXEC_77)
+## 2026-04-28 — Nested region support (region_intersection + ERR_190)
 
-**EXEC_70 relaxed for containment**
+**ERR_183 relaxed for containment**
 `evaluate_regions` in `const_eval.rs` previously rejected any two regions that
 shared any address range, including containment (A fully inside B).  The check
 now detects only *partial* overlap (ranges overlap but neither contains the other).
 Containment is allowed so that inner sections can bind to sub-regions of an outer
-region without triggering EXEC_70.
+region without triggering ERR_183.
 
 **region_intersection on ScopeFrame**
 `layout_phase.rs` gains `region_intersection: Option<RegionBinding>` on `ScopeFrame`.
@@ -570,42 +570,42 @@ region binding (from `irdb.region_for_section`):
 - Parent only or direct only: inherit as-is.
 - Both: compute geometric intersection -- `addr = max`, `end = min(ends)`.
   - Non-empty: `Some(intersection)` with name `"{parent} & {direct}"`.
-  - Empty (disjoint): emit EXEC_77, fall back to direct binding.
+  - Empty (disjoint): emit ERR_190, fall back to direct binding.
 
 `iterate_set_addr` now reads `frame.region_intersection` instead of calling
 `irdb.region_for_section`.  This means inner sections without a direct binding
-still get EXEC_72 enforcement from the inherited parent region.
+still get ERR_185 enforcement from the inherited parent region.
 
 `intersect_regions` static helper added to `LayoutPhase`.
 
-**New error code EXEC_77**
-EXEC_77: section's direct region binding does not intersect the enclosing
+**New error code ERR_190**
+ERR_190: section's direct region binding does not intersect the enclosing
 region inherited from the parent scope (mutually exclusive regions in nested
 sections).  Emitted in `iterate_section_start` via `warned_lids` deduplication.
 
 Tests:
 
 - `region_exec70_partial.brink`: two partially-overlapping regions (A straddles B)
-  still trigger EXEC_70. Integration test `region_exec70_partial`.
-- `region_nested_2.brink`: comment updated; test changed from failure (EXEC_70) to
+  still trigger ERR_183. Integration test `region_exec70_partial`.
+- `region_nested_2.brink`: comment updated; test changed from failure (ERR_183) to
   success -- FLASH1 fully inside FLASH is valid containment.
 - `region_nested_containment.brink`: outer in FLASH, inner (called via `wr`) in CODE
   where CODE is a subset of FLASH; both fit; no errors. Integration test
   `region_nested_containment`.
 - `region_nested_exec72.brink`: inner section (no direct binding) inherits FLASH
-  from outer; `set_addr` outside FLASH triggers EXEC_72. Integration test
+  from outer; `set_addr` outside FLASH triggers ERR_185. Integration test
   `region_nested_exec72`.
 - `region_nested_exec77.brink`: inner bound to SRAM (disjoint from outer's FLASH);
-  EXEC_77 fires. Integration test `region_nested_exec77`.
+  ERR_190 fires. Integration test `region_nested_exec77`.
 
 352 tests pass.
 
 ---
 
-## 2026-04-28 — Allow partial region overlap; intersection-based EXEC_73
+## 2026-04-28 — Allow partial region overlap; intersection-based ERR_186
 
-**EXEC_70 retired**
-The compile-time region overlap check (EXEC_70) is removed entirely.  Any two
+**ERR_183 retired**
+The compile-time region overlap check (ERR_183) is removed entirely.  Any two
 regions may share address space -- containment, partial overlap, or identical
 ranges are all valid.  Enforcement that writes stay within the effective
 intersection is handled at layout time by the `section_effective_regions` map
@@ -618,7 +618,7 @@ on every iterate pass; the final pass holds the post-convergence value.
 
 `validate_section_regions` now prefers `section_effective_regions[sec]` over the
 raw `irdb.region_for_section()` lookup.  When two regions partially overlap, the
-stored intersection is tighter than the direct binding, so EXEC_73 fires if the
+stored intersection is tighter than the direct binding, so ERR_186 fires if the
 section's byte count exceeds the intersection size rather than the (wider) direct
 binding size.
 
@@ -628,32 +628,32 @@ Tests:
   overlap A & B = 128 bytes); inner writes exactly 128 bytes -- succeeds.
   Integration test `region_exec70_partial` changed from failure to success.
 - `region_exec73_partial_overlap.brink`: same regions, inner writes 192 bytes;
-  exceeds intersection 128 -> EXEC_73.  Integration test `region_exec73_partial_overlap`.
+  exceeds intersection 128 -> ERR_186.  Integration test `region_exec73_partial_overlap`.
 
 353 tests pass.
 
 ---
 
-## 2026-04-28 — EffectiveRegion backtrace + EXEC_78 starting-address check
+## 2026-04-28 — EffectiveRegion backtrace + ERR_191 starting-address check
 
 **EffectiveRegion struct**
 Replaced the ad-hoc `region_intersection: Option<RegionBinding>` + separate
 `region_contributors: Vec<RegionBinding>` fields on `ScopeFrame` with a single
 `effective_region: Option<EffectiveRegion>` field.  `EffectiveRegion` carries:
 
-- `binding: RegionBinding` — the geometric intersection (used for EXEC_72/73/74
+- `binding: RegionBinding` — the geometric intersection (used for ERR_185/73/74
   enforcement, unchanged).
 - `contributors: Vec<RegionBinding>` — every region that narrowed the bound,
-  outermost first, for use in EXEC_73 backtrace diagnostics.
+  outermost first, for use in ERR_186 backtrace diagnostics.
 
 `section_effective_regions: HashMap<String, EffectiveRegion>` (was
 `HashMap<String, RegionBinding>`) persists the converged value for
 `validate_section_regions`.
 
-**EXEC_73 backtrace via err_with_locs**
+**ERR_186 backtrace via err_with_locs**
 `diags::Diags` gains `err_with_locs(code, msg, primary, &[(SourceSpan, String)])`:
 builds an ariadne report with one red primary label and N yellow secondary labels,
-each carrying its own `.with_message(text)`.  When EXEC_73 fires and
+each carrying its own `.with_message(text)`.  When ERR_186 fires and
 `contributors.len() > 0`, one yellow label per contributing region is emitted,
 each annotated with `"region 'X': addr=0x…, size=…"`.  The addr/size text is
 necessary because ariadne shows only the `region NAME {` declaration line, not
@@ -664,26 +664,26 @@ the property values.
 (the effective intersection start).  The README states that a section `in R`
 always starts at `R.addr`.  Anchor changed to `d.addr` (direct region's addr).
 
-**EXEC_78 — starting address outside parent intersection**
+**ERR_191 — starting address outside parent intersection**
 When a section has both a parent inherited region and a direct binding, and the
 intersection is non-empty but `d.addr < intersection.addr` (the direct region
-starts before the parent region), EXEC_78 fires.  This covers the case where
+starts before the parent region), ERR_191 fires.  This covers the case where
 the anchor `d.addr` would lie outside the effective parent constraint.  Emitted
 via `err2` with both region declaration sites highlighted.
 
-New error code: EXEC_78.
+New error code: ERR_191.
 
 Tests:
 
 - `region_exec78_bad_start.brink`: A=[0x1080,0x100), B=[0x1000,0x200); B starts
   before A; intersection non-empty but B.addr (0x1000) < intersection start
-  (0x1080); EXEC_78 fires.  Integration test `region_exec78_bad_start`.
+  (0x1080); ERR_191 fires.  Integration test `region_exec78_bad_start`.
 
 354 tests pass.
 
 ---
 
-## 2026-04-28 — RegionDb crate; EXEC_79 region-bound section re-use
+## 2026-04-28 — RegionDb crate; ERR_192 region-bound section re-use
 
 **RegionDb crate**
 New first-class pipeline stage inserted between IRDb and LayoutPhase.
@@ -700,7 +700,7 @@ and `layout_phase` can share the type without a circular dependency.
 recomputed on every iterate pass) to `regiondb/regiondb.rs` (a module-level
 free function called exactly once during `RegionDb::build`).
 
-EXEC_77 and EXEC_78 detection moved from `layout_phase::iterate_section_start`
+ERR_190 and ERR_191 detection moved from `layout_phase::iterate_section_start`
 (fired with `warned_lids` deduplication across every iterate pass) into
 `RegionDb::build` (fired once, naturally deduplicated).
 
@@ -715,20 +715,20 @@ LayoutPhase simplification:
 - `validate_section_regions`: reads from `RegionDb` instead of the removed map.
 - `build` and `iterate` gain `region_db: &RegionDb` parameter.
 
-EXEC_79 — region-bound section used more than once: Region-bound sections
+ERR_192 — region-bound section used more than once: Region-bound sections
 anchor to a fixed address on every inclusion; a second `wr` is guaranteed to
 produce an address conflict.  `RegionDb::build` detects the second `SectionStart`
-for any region-bound section and emits EXEC_79.
+for any region-bound section and emits ERR_192.
 
 Pipeline ordering: `process.rs` builds `RegionDb` immediately after `IRDb`,
-before `LayoutPhase`.  Failure halts with PROC_10.
+before `LayoutPhase`.  Failure halts with ERR_227.
 
-New error codes: EXEC_79, PROC_10.
+New error codes: ERR_192, ERR_227.
 
 Tests:
 
 - `region_exec79_reuse.brink`: `wr pinned` twice where `pinned in FLASH`;
-  EXEC_79 fires.  Integration test `region_exec79_reuse`.
+  ERR_192 fires.  Integration test `region_exec79_reuse`.
 
 355 tests pass.
 
@@ -781,7 +781,7 @@ Key design decisions:
 - `obj` is a top-level declaration (parallel to `region`).
 - `wr obj_name` dispatches to `IRKind::Wrobj` at layoutdb time (like `wrf`).
 - `sizeof(obj_name)` resolves via `irdb.obj_sections` in `iterate_sizeof`.
-- Section/const/region name conflict checks added (AST_69, AST_70, AST_71).
+- Section/const/region name conflict checks added (ERR_64, ERR_65, ERR_66).
 - `obj_sections` keyed by declared name (was `(section_name, file_path)` tuple).
 - `wrobj` keyword and `LexToken::Wrobj` removed; `LexToken::Obj` added.
 
@@ -790,7 +790,7 @@ Changes:
 - `ast/lexer.rs`: removed `wrobj` keyword, added `obj`.
 - `ast/ast.rs`: added `parse_obj`, `LexToken::Obj` top-level dispatch.
 - `astdb/astdb.rs`: `ObjDecl` struct, `obj_decls` map, `record_obj`,
-  conflict checks (AST_67..71), `validate_nesting_r` obj bypass.
+  conflict checks (ERR_62..71), `validate_nesting_r` obj bypass.
 - `layoutdb/layoutdb.rs`: `obj_decls`/`obj_names` fields, `wr obj_name`
   path emits `IRKind::Wrobj`, removed `LexToken::Wrobj` arm,
   `verify_operand_refs` accepts obj names.
@@ -801,9 +801,9 @@ Changes:
 - `layout_phase/layout_phase.rs`: `iterate_wrobj` uses single Name operand,
   `iterate_sizeof` gains obj path.
 - `exec_phase/exec_phase.rs`: `execute_wrobj` uses single Name operand.
-- `docs/error_codes.md`: AST_67..71 added; next available updated to AST_72.
+- `docs/error_codes.md`: ERR_62..71 added; next available updated to ERR_67.
 - Test fixtures `wrobj_*.brink` rewritten for new syntax.
-- `tests/integration.rs`: `wrobj_wrong_args` now checks AST_66.
+- `tests/integration.rs`: `wrobj_wrong_args` now checks ERR_61.
 
 361 tests pass.
 
@@ -819,15 +819,15 @@ Converted `obj` declaration from inline `= "section" in "file"` style to
 brace-block style: `obj name { section = "..."; file = "..."; }`.  Properties
 may appear in any order.  The synthesized `ObjProp` AST node carries the
 property name in `val` (matched by string, not by token type, to avoid the
-`LexToken::Section` collision).  Error codes AST_66..77 were assigned and
-individualized; AST_76 fires when a required property is missing.  The
+`LexToken::Section` collision).  Error codes ERR_61..77 were assigned and
+individualized; ERR_71 fires when a required property is missing.  The
 `error_codes_are_unique` test was extended to scan `err_expected_after` and
 `err_invalid_expression` wrapper calls.  `obj_names: HashSet` removed from
 `LayoutDb`; replaced by `obj_decls.contains_key`.
 
 Changed files: `ast/lexer.rs`, `ast/ast.rs`, `astdb/astdb.rs`,
 `layoutdb/layoutdb.rs`, `tests/wrobj_*.brink`, `tests/integration.rs`,
-`docs/error_codes.md` (AST_67..77, next AST_78).
+`docs/error_codes.md` (ERR_62..77, next ERR_73).
 
 ### obj_align / obj_lma / obj_vma
 
@@ -837,8 +837,8 @@ Three new layout-time expression builtins returning U64.  All follow the
 - `obj_align(obj)` -- section alignment (unified `object` API).
 - `obj_vma(obj)` -- section virtual address (unified `object` API).
 - `obj_lma(obj)` -- section load address (ELF program-header scan).
-  Non-ELF recognized formats: IRDB_66.  Unrecognized formats: IRDB_64.
-  With current features `["read","elf"]`, only ELF is parseable; IRDB_66
+  Non-ELF recognized formats: ERR_122.  Unrecognized formats: ERR_120.
+  With current features `["read","elf"]`, only ELF is parseable; ERR_122
   is reserved for future COFF/Mach-O feature additions.
 
 `ObjSectionInfo` gained `align`, `vma`, `lma` fields.  `parsed_obj_files`
@@ -849,7 +849,7 @@ cache updated to `HashMap<String, SectionProps>` (adds align/vma/lma).
 Changed files: `ir/ir.rs`, `ast/lexer.rs`, `ast/ast.rs`,
 `linearizer/linearizer.rs`, `irdb/irdb.rs`, `layout_phase/layout_phase.rs`,
 `exec_phase/exec_phase.rs`, `const_eval/const_eval.rs`,
-`docs/error_codes.md` (AST_78, IRDB_66, next AST_79/IRDB_67),
+`docs/error_codes.md` (ERR_73, ERR_122, next ERR_74/ERR_123),
 `docs/ai/02-system.yaml`, `tests/obj_align_1.brink`, `tests/obj_vma_1.brink`,
 `tests/obj_lma_1.brink`, `tests/obj_lma_non_elf.brink`, `tests/integration.rs`.
 
@@ -863,7 +863,7 @@ Changed files: `ir/ir.rs`, `ast/lexer.rs`, `ast/ast.rs`,
 `const_eval` transitioned into a pure AST walker, evaluating and pruning in one pass. It clones the input AST into a "working" pruned AST. `LexToken::Const` evaluation correctly differentiates between declarations (`const X;`) and assignments (`const X = 1;`) by inspecting the node structure dynamically.
 
 **Typed Lowering in Linearizer**
-Type deduction pushed out of `IRDb` and into the shared `Linearizer::record_expr_r`. `LinOperand` now carries a `DataType`. Arithmetic and comparison expressions fail early during linearization with robust type-mismatch diagnostic codes (e.g. `LINEAR_3`, `LINEAR_4`, `LINEAR_5`).
+Type deduction pushed out of `IRDb` and into the shared `Linearizer::record_expr_r`. `LinOperand` now carries a `DataType`. Arithmetic and comparison expressions fail early during linearization with robust type-mismatch diagnostic codes (e.g. `ERR_205`, `ERR_206`, `ERR_207`).
 
 **IRDb Simplification**
 `get_operand_data_type_r` entirely eliminated from `IRDb`. The `IRDb` now reads guaranteed correct types from `LinOperand::data_type()` rather than inferring them through recursive lookups, greatly improving stability and separation of concerns.

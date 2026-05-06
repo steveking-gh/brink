@@ -58,7 +58,7 @@ impl ValidationPhase {
             .expect("assert operand must be numeric; IRDb type check failed")
         {
             let msg = "Assert expression failed".to_string();
-            diags.err1("EXEC_2", &msg, ir.src_loc.clone());
+            diags.err1("ERR_126", &msg, ir.src_loc.clone());
 
             // Backtrack to print the operand values of the failing comparison.
             let src_lid = irdb.get_operand_ir_lid(opnd_num);
@@ -99,7 +99,7 @@ impl ValidationPhase {
             let val = opnd.to_u64();
             let msg = format!("Operand has value {}", val);
             let primary_code_ref = ir_opnd.src_loc.clone();
-            diags.note1("EXEC_8", &msg, primary_code_ref);
+            diags.note1("ERR_132", &msg, primary_code_ref);
         }
     }
 }

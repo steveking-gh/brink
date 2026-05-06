@@ -112,7 +112,7 @@ pub fn list_extensions() -> Vec<String> {
 ///                      Some("-") = stdout, Some(path) = file
 /// `map_json`         — JSON map destination: None = skip,
 ///                      Some("-") = stdout, Some(path) = file
-/// `max_output_size`  — reject images larger than this many bytes (EXEC_62)
+/// `max_output_size`  — reject images larger than this many bytes (ERR_179)
 #[allow(clippy::too_many_arguments)]
 pub fn process(
     name: &str,
@@ -139,7 +139,7 @@ pub fn process(
         const_defines.insert(n, v);
     }
 
-    let ast = Ast::new(name, fstr, &mut diags).context("[PROC_1]: Error detected, halting.")?;
+    let ast = Ast::new(name, fstr, &mut diags).context("[ERR_218]: Error detected, halting.")?;
 
     if verbosity > 2 {
         ast.dump("ast.dot")?;
@@ -151,17 +151,17 @@ pub fn process(
     let ast_db = AstDb::new(&mut diags, &ast, false)?;
 
     let (mut symbol_table, pruned_ast) = const_eval::evaluate_and_prune(&mut diags, &ast, &ast_db, &const_defines)
-        .context("[PROC_2]: Error detected, halting.")?;
+        .context("[ERR_219]: Error detected, halting.")?;
 
     // Second AstDb: built from the pruned AST with full nesting validation.
     // Sections promoted from top-level if/else blocks are now at root level.
     let pruned_ast_db =
-        AstDb::new(&mut diags, &pruned_ast, true).context("[PROC_3]: Error detected, halting.")?;
+        AstDb::new(&mut diags, &pruned_ast, true).context("[ERR_220]: Error detected, halting.")?;
 
     let Some(region_bindings) =
         const_eval::evaluate_regions(&mut diags, &pruned_ast, &pruned_ast_db, &mut symbol_table)
     else {
-        return Err(anyhow!("[PROC_9]: Error detected, halting."));
+        return Err(anyhow!("[ERR_226]: Error detected, halting."));
     };
 
     // Build the section-to-region-name map (foreign key into region_bindings).
@@ -173,7 +173,7 @@ pub fn process(
     }
 
     let layout_db = LayoutDb::new(&mut diags, &pruned_ast, &pruned_ast_db, &symbol_table)
-        .context("[PROC_4]: Error detected, halting.")?;
+        .context("[ERR_221]: Error detected, halting.")?;
     if verbosity > 2 {
         layout_db.dump();
     }
@@ -190,7 +190,7 @@ pub fn process(
         section_region_names,
         region_bindings,
     )
-    .context("[PROC_5]: Error detected, halting.")?;
+    .context("[ERR_222]: Error detected, halting.")?;
 
     debug!("Dumping ir_db");
     if verbosity > 2 {
@@ -198,11 +198,11 @@ pub fn process(
     }
 
     let region_db = RegionDb::build(&ir_db, &mut diags)
-        .ok_or_else(|| anyhow!("[PROC_10]: Error detected, halting."))?;
+        .ok_or_else(|| anyhow!("[ERR_227]: Error detected, halting."))?;
 
     let (location_db, argval_db) =
         LayoutPhase::build(&ir_db, &region_db, &ext_registry, &mut diags)
-            .context("[PROC_6]: Error detected, halting.")?;
+            .context("[ERR_223]: Error detected, halting.")?;
     if verbosity > 2 {
         // LayoutPhase debug dump removed
     }
@@ -221,12 +221,12 @@ pub fn process(
              Use --max-output-size to increase the limit.",
             final_size, max_output_size
         );
-        diags.err0("PROC_7", &msg);
-        return Err(anyhow!("[PROC_7]: Error detected, halting."));
+        diags.err0("ERR_224", &msg);
+        return Err(anyhow!("[ERR_224]: Error detected, halting."));
     }
 
     ValidationPhase::validate(&argval_db, &ir_db, &mut diags)
-        .context("[PROC_8]: Error detected, halting.")?;
+        .context("[ERR_225]: Error detected, halting.")?;
 
     let mut file = std::fs::OpenOptions::new()
         .read(true)
@@ -247,7 +247,7 @@ pub fn process(
     )
     .is_err()
     {
-        return Err(anyhow!("[PROC_6]: Error detected, halting."));
+        return Err(anyhow!("[ERR_223]: Error detected, halting."));
     }
 
     // Generate map output if requested.  MapDb derives all data from the

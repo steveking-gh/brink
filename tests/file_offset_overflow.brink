@@ -1,7 +1,7 @@
 // file_offset_overflow.brink
 //
 // pad_file_offset with a target less than the current file_offset must
-// produce EXEC_22 (location counter cannot move backwards).
+// produce ERR_146 (location counter cannot move backwards).
 
 section foo {
     wrs "Hello";                // file_offset() is now 5

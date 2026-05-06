@@ -1,5 +1,5 @@
 // Passes an integer followed by a string const as extension arguments.
-// IRDB accepts both; brink::test_sum8 rejects the string at runtime with EXEC_47.
+// IRDB accepts both; brink::test_sum8 rejects the string at runtime with ERR_167.
 const LABEL = "world";
 section top {
     wr brink::test_sum8(1, 2, 3, 4, 5, 6, 7, LABEL);

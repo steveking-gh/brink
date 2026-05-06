@@ -1,5 +1,5 @@
 // Identifiers starting with 'set_' are reserved and may not be used as section names.
-// Expected: AST_32.
+// Expected: ERR_27.
 section pad_addr_offset {
     wr8 1;
 }

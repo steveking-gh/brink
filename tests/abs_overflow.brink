@@ -1,4 +1,4 @@
-// abs_base = 0xFFFF...F from set_addr; writing one byte makes abs_base + off overflow -> EXEC_43.
+// abs_base = 0xFFFF...F from set_addr; writing one byte makes abs_base + off overflow -> ERR_165.
 section main {
     set_addr 0xFFFFFFFFFFFFFFFF;
     wr8 1;

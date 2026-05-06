@@ -1,4 +1,4 @@
-// K/M/G overflow: value * multiplier exceeds i64::MAX produces IR_4.
+// K/M/G overflow: value * multiplier exceeds i64::MAX produces ERR_201.
 // i64::MAX / 1G = 8589934591, so 8589934592G overflows.
 
 const A = 8589934592G;

@@ -1,6 +1,6 @@
 // Two child sections placed at the same address overlap completely.
 // Both call set_addr 0x1000 and write one byte, so they collide.
-// Expects EXEC_55.
+// Expects ERR_172.
 section a {
     set_addr 0x1000;
     wr8 0xAA;

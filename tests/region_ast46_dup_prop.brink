@@ -1,5 +1,5 @@
 // Duplicate property in a region block.
-// AST_46: "addr" appears twice.
+// ERR_41: "addr" appears twice.
 region FLASH {
     addr = 0x1000;
     size = 0x100;

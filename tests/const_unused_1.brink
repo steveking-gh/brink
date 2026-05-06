@@ -1,4 +1,4 @@
-// SYMTAB_1: a const is defined but never referenced anywhere.
+// ERR_229: a const is defined but never referenced anywhere.
 const UNUSED = 0x1234u;
 
 section image {

@@ -1,5 +1,5 @@
 // Reserved identifier used as a region name.
-// AST_61: "fill" is a reserved identifier.
+// ERR_56: "fill" is a reserved identifier.
 region fill {
     addr = 0x1000;
     size = 0x100;

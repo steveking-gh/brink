@@ -1,7 +1,7 @@
 // Second child starts inside the first child's range — partial overlap.
 // Section a writes 4 bytes at 0x1000..0x1004.
 // Section b writes 4 bytes at 0x1002..0x1006, overlapping by 2 bytes.
-// Expects EXEC_55.
+// Expects ERR_172.
 section a {
     set_addr 0x1000;
     wr32 0xDEADBEEF;

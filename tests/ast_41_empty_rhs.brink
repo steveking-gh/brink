@@ -1,5 +1,5 @@
 // Named argument with nothing after the '='.
-// AST rejects this with AST_41.
+// AST rejects this with ERR_36.
 section top {
     wr brink::test_crc(value=);
 }

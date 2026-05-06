@@ -1,4 +1,4 @@
-// IRDB_14: wrf operand resolves to a path that exists but is not a regular file.
+// ERR_82: wrf operand resolves to a path that exists but is not a regular file.
 // "." is always a directory, so the regular-file check must reject it.
 
 section foo {

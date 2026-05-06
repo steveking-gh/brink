@@ -58,14 +58,14 @@ pipeline:
         ExecPhase writes core bytes and patches extension output via mmap.
 
   error_codes:
-    PROC_1: AST parse failure
-    PROC_2: const_eval failure
-    PROC_3: prune or second AstDb failure
-    PROC_4: LayoutDb failure
-    PROC_5: IRDb failure
-    PROC_6: LayoutPhase failure
-    PROC_7: Output image size exceeds --max-output-size limit
-    PROC_8: ValidationPhase failure (assert evaluation)
+    ERR_218: AST parse failure
+    ERR_219: const_eval failure
+    ERR_220: prune or second AstDb failure
+    ERR_221: LayoutDb failure
+    ERR_222: IRDb failure
+    ERR_223: LayoutPhase failure
+    ERR_224: Output image size exceeds --max-output-size limit
+    ERR_225: ValidationPhase failure (assert evaluation)
 
 extensions:
   api_crate: brink_extension
@@ -109,27 +109,27 @@ extensions:
          pushing to ir_vec.  The engine receives args in declaration order; only section
          resolution (converting Identifier to ParamArg::Slice) remains engine-side.
 
-      4. Mixed positional+named is rejected at parse time (AST_40).
+      4. Mixed positional+named is rejected at parse time (ERR_35).
 
       5. LexToken::NamedArg node in AST; param_name: Option<String> field on LinOperand and
          IROperand carries the name from parser through to IRDb.
 
-      6. New error codes: IRDB_48 (unknown param name), IRDB_49 (duplicate name),
-         IRDB_50 (mixed positional+named), IRDB_51 (missing required param),
-         IRDB_52 (Slice param received non-section-name value),
-         IRDB_53 (positional count mismatch when params declared).
-         EXEC_56 (ambiguous section) now fires per-Slice-param, not once globally.
+      6. New error codes: ERR_104 (unknown param name), ERR_105 (duplicate name),
+         ERR_106 (mixed positional+named), ERR_107 (missing required param),
+         ERR_108 (Slice param received non-section-name value),
+         ERR_109 (positional count mismatch when params declared).
+         ERR_173 (ambiguous section) now fires per-Slice-param, not once globally.
 
       Phase order:
         1. brink_extension/lib.rs -- ParamDesc, ParamKind (Int|Str|Slice), params() default
         2. std extensions + mocks -- implement params() with Slice where applicable
-        3. ast/ast.rs -- LexToken::NamedArg, named-arg parsing, AST_40/AST_41
+        3. ast/ast.rs -- LexToken::NamedArg, named-arg parsing, ERR_35/ERR_36
         4. linearizer/linearizer.rs -- param_name on LinOperand, Namespace arm update
         5. ir/ir.rs -- param_name on IROperand; remove ExtensionCallSection variant
         6. irdb/irdb.rs -- remove disambiguate_extension_call; name resolution, reorder,
            validate Slice params, new IRDB_4x/5x error codes
         7. engine/engine.rs -- merge ExtensionCallSection arms into ExtensionCall;
-           resolve Slice params from cached_params; per-param EXEC_56 check
+           resolve Slice params from cached_params; per-param ERR_173 check
         8. ext/ext.rs -- add cached_params: Vec<ParamDesc> to ExtensionEntry
         9. tests
     return_values: >
@@ -157,14 +157,14 @@ language_features:
   sizeof(obj_name): returns the byte size of the named obj section (resolved at IRDb validation time)
   align: pad to alignment boundary
   set_addr / pad_addr_offset / pad_sec_offset / pad_file_offset: address control
-  --max-output-size: CLI flag (default 256M); rejects images exceeding the limit before execute (PROC_7)
+  --max-output-size: CLI flag (default 256M); rejects images exceeding the limit before execute (ERR_224)
   label: named location for map output
   assert: compile-time or layout-time assertion
   print: compile-time diagnostic output
   sizeof / addr / addr_offset / sec_offset / file_offset: layout-time builtins
   obj_align(obj_name): returns section alignment from the object file (layout-time, ELF unified API)
   obj_vma(obj_name): returns section virtual memory address (layout-time, ELF unified API)
-  obj_lma(obj_name): returns section load memory address (layout-time, ELF only; IRDB_66 for non-ELF when additional format features enabled)
+  obj_lma(obj_name): returns section load memory address (layout-time, ELF only; ERR_122 for non-ELF when additional format features enabled)
   include: include another .brink file
 
 diagnostics:

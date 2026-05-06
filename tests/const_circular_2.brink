@@ -1,4 +1,4 @@
-// Two consts that mutually depend on each other.  Expected: IRDB_18.
+// Two consts that mutually depend on each other.  Expected: ERR_84.
 const A;
 const B;
 A = B + 1;

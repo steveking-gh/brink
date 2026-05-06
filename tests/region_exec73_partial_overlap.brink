@@ -1,6 +1,6 @@
 // region_exec73_partial_overlap.brink: inner section (in B) is called from outer
 // (in A).  Effective region is the intersection A & B ([0x1080, 0x1100),
-// size = 128 bytes).  Writing 192 bytes exceeds the intersection -> EXEC_73.
+// size = 128 bytes).  Writing 192 bytes exceeds the intersection -> ERR_186.
 region A {
     addr = 0x1000;
     size = 0x100;

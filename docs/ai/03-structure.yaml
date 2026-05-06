@@ -25,9 +25,9 @@ crates:
           addr/size populated to 0/0 by AstDb; filled by const_eval::evaluate_regions.
         Section::region — Option<String> set from RegionRef child if present.
         AstDb::regions — HashMap<String, RegionEntry>; name conflicts with
-          sections (AST_48) and consts (AST_63) detected in AstDb::new.
-        Section binding validation: undeclared region → AST_56; duplicate
-          binding to same region → AST_57.
+          sections (ERR_43) and consts (ERR_58) detected in AstDb::new.
+        Section binding validation: undeclared region → ERR_51; duplicate
+          binding to same region → ERR_52.
         linearizer treats RegionRef as syntactic noise (no IR emitted).
 
   const_eval:

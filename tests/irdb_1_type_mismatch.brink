@@ -1,6 +1,6 @@
-// EXPECT-FAIL: LINEAR_4: binary operator applied to two typed but incompatible operands.
+// EXPECT-FAIL: ERR_206: binary operator applied to two typed but incompatible operands.
 // U64 (1u) and I64 (1i) are both typed and neither is the untyped Integer class,
-// so the type reconciler cannot promote either side — IRDB_1 must fire.
+// so the type reconciler cannot promote either side — ERR_75 must fire.
 
 section foo {
     assert 1u + 1i;

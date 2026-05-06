@@ -1,6 +1,6 @@
 // __OUTPUT_SIZE and __OUTPUT_ADDR cannot be used in const expressions
 // because they require engine-time layout information.
-// This file tests that __OUTPUT_ADDR in a const is rejected with IRDB_19.
+// This file tests that __OUTPUT_ADDR in a const is rejected with ERR_85.
 
 section foo {
     wrs "test";

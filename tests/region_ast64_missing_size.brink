@@ -1,5 +1,5 @@
 // Region declaration is missing the required "size" property.
-// AST_64: size must be present.
+// ERR_59: size must be present.
 region FLASH {
     addr = 0x1000;
 }

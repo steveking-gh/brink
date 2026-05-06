@@ -1,5 +1,5 @@
 // region_nested_2.brink: FLASH1 is fully inside FLASH (containment).  This is
-// allowed so that nested sections can bind to sub-regions.  No EXEC_70.
+// allowed so that nested sections can bind to sub-regions.  No ERR_183.
 // inner section nest1 anchors to FLASH1.addr; effective constraint is FLASH & FLASH1 = FLASH1.
 region FLASH {
     addr = 0x08000000;

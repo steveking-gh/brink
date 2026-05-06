@@ -1,5 +1,5 @@
 // 'wrs' is a reserved exact keyword and cannot be used as a label name.
-// Expected: LINEAR_13.
+// Expected: ERR_212.
 section foo {
     wrs:
     wr8 1;

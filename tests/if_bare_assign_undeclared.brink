@@ -1,4 +1,4 @@
-// Bare assignment to a name not declared — should produce SYMTAB_3.
+// Bare assignment to a name not declared — should produce ERR_230.
 if 1 == 1 {
     UNDECLARED = 5;
 }

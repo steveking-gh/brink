@@ -13,7 +13,7 @@ lessons_learned:
     detail: >
       First AstDb (validate=false) skips nesting validation so that wr
       references to sections defined inside top-level if/else blocks do not
-      produce false-positive AST_16 errors.  Second AstDb (validate=true)
+      produce false-positive ERR_14 errors.  Second AstDb (validate=true)
       runs full validation on the pruned AST where those sections are at root.
 
   - id: L3
@@ -94,6 +94,6 @@ open_debt:
 
   - id: D3
     item: const declarations (const X = V;) inside top-level if/else bodies
-      are not supported by the parser (fall to AST_53 error).  Only deferred
+      are not supported by the parser (fall to ERR_48 error).  Only deferred
       assigns (X = V;) work inside if bodies.  This is consistent but may
       surprise users expecting const inside if.

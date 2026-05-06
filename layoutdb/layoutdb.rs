@@ -124,7 +124,7 @@ impl<'toks> LayoutDb {
                 "Maximum recursion depth ({MAX_RECURSION_DEPTH}) exceeded when processing '{}'.",
                 tinfo.val
             );
-            diags.err1("LINEAR_18", &m, tinfo.span());
+            diags.err1("ERR_215", &m, tinfo.span());
             return false;
         };
 
@@ -229,7 +229,7 @@ impl<'toks> LayoutDb {
                         tok,
                         lops.len()
                     );
-                    diags.err1("LINEAR_8", &m, tinfo.span());
+                    diags.err1("ERR_210", &m, tinfo.span());
                     return false;
                 }
 
@@ -306,17 +306,17 @@ impl<'toks> LayoutDb {
 
             // ── Error arms ────────────────────────────────────────────────
             LexToken::Unknown => {
-                diags.err1("LINEAR_19", "Unexpected character.", tinfo.span());
+                diags.err1("ERR_216", "Unexpected character.", tinfo.span());
                 result = false;
             }
             LexToken::Output => {
                 let m = format!("Unexpected '{}' expression not allowed here.", tinfo.val);
-                diags.err1("LINEAR_20", &m, tinfo.span());
+                diags.err1("ERR_217", &m, tinfo.span());
                 result = false;
             }
             LexToken::If | LexToken::Else => {
                 let m = format!("Unexpected '{}' in linearization context.", tinfo.val);
-                diags.err1("LINEAR_16", &m, tinfo.span());
+                diags.err1("ERR_213", &m, tinfo.span());
                 result = false;
             }
 
@@ -516,14 +516,14 @@ impl IdentDb {
                 "'{}' is a reserved identifier and cannot be used as a label name",
                 name
             );
-            diags.err1("LINEAR_13", &m, src_loc.clone());
+            diags.err1("ERR_212", &m, src_loc.clone());
             return false;
         }
         if self.label_idents.contains_key(name) {
             let orig_loc = self.label_idents.get(name).unwrap();
             let msg = format!("Duplicate label name {}", name);
             diags.err2(
-                "LINEAR_2",
+                "ERR_204",
                 &msg,
                 src_loc.clone(),
                 orig_loc.clone(),
@@ -596,7 +596,7 @@ impl IdentDb {
                 "Reference to section '{}' is ambiguous. This section occurs {} times in the output",
                 sval, *count
             );
-            diags.err1("LINEAR_7", &msg, src_loc.clone());
+            diags.err1("ERR_209", &msg, src_loc.clone());
         }
         false
     }
@@ -624,7 +624,7 @@ impl IdentDb {
                     if lir.op == IRKind::Sizeof {
                         let msg = "Sizeof cannot refer to a label name.  Labels have no size."
                             .to_string();
-                        diags.err1("LINEAR_9", &msg, src_loc.clone());
+                        diags.err1("ERR_211", &msg, src_loc.clone());
                         result = false;
                     }
                     continue;
@@ -636,7 +636,7 @@ impl IdentDb {
                     continue;
                 }
                 let msg = format!("Unknown or unreachable identifier {}", sval);
-                diags.err1("LINEAR_6", &msg, src_loc.clone());
+                diags.err1("ERR_208", &msg, src_loc.clone());
                 result = false;
             }
         }

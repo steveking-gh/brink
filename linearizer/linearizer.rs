@@ -311,7 +311,7 @@ impl Linearizer {
         let found = lops.len();
         if found != expected {
             diags.err1(
-                "LINEAR_2",
+                "ERR_204",
                 &format!(
                     "Expected {} operand(s), but found {} for '{}' expression",
                     expected, found, tinfo.val
@@ -397,7 +397,7 @@ impl Linearizer {
         let Some(_guard) = DepthGuard::enter(MAX_RECURSION_DEPTH) else {
             let tinfo = ast.get_tinfo(parent_nid);
             diags.err1(
-                "LINEAR_1",
+                "ERR_203",
                 &format!(
                     "Maximum recursion depth ({MAX_RECURSION_DEPTH}) exceeded when processing '{}'.",
                     tinfo.val
@@ -588,7 +588,7 @@ impl Linearizer {
                             "Type mismatch in comparison: '{:?}' and '{:?}'.",
                             lhs_dt, rhs_dt
                         );
-                        diags.err1("LINEAR_5", &msg, tinfo.loc.clone());
+                        diags.err1("ERR_207", &msg, tinfo.loc.clone());
                         result = false;
                     }
                 }
@@ -630,7 +630,7 @@ impl Linearizer {
                                 "Invalid operand types for arithmetic: '{:?}' and '{:?}'.",
                                 lhs_dt, rhs_dt
                             );
-                            diags.err1("LINEAR_3", &msg, tinfo.loc.clone());
+                            diags.err1("ERR_205", &msg, tinfo.loc.clone());
                             result = false;
                         }
                     } else if rhs_dt == DataType::Integer
@@ -659,7 +659,7 @@ impl Linearizer {
                             "Type mismatch in arithmetic: '{:?}' and '{:?}'.",
                             lhs_dt, rhs_dt
                         );
-                        diags.err1("LINEAR_4", &msg, tinfo.loc.clone());
+                        diags.err1("ERR_206", &msg, tinfo.loc.clone());
                         result = false;
                     }
                 }
@@ -766,7 +766,7 @@ impl Linearizer {
             // ── Anything else is a bug: statement tokens must not reach here
             _ => {
                 let msg = format!("'{}' is not valid in an expression context", tinfo.val);
-                diags.err1("LINEAR_17", &msg, tinfo.span());
+                diags.err1("ERR_214", &msg, tinfo.span());
                 result = false;
             }
         }

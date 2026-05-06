@@ -1,5 +1,5 @@
 // 'include' is a reserved identifier and may not be used as a section name.
-// Expected: AST_32.
+// Expected: ERR_27.
 section include {
     wr8 1;
 }

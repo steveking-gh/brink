@@ -1,5 +1,5 @@
 // Error case: brink::test_ranged_sum is a BrinkExtension but is called
-// with no range specifier.  Brink must reject this at IRDB time with IRDB_45.
+// with no range specifier.  Brink must reject this at IRDB time with ERR_101.
 section top {
     wr8 0x01;
     wr brink::test_ranged_sum();

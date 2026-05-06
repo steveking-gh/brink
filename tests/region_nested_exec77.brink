@@ -1,6 +1,6 @@
 // region_nested_exec77.brink: inner section is bound to SRAM, which is disjoint
 // from the outer section's FLASH region.  When inner is called from outer the
-// effective region intersection is empty -> EXEC_77.
+// effective region intersection is empty -> ERR_190.
 region FLASH {
     addr = 0x08000000;
     size = 0x10000;

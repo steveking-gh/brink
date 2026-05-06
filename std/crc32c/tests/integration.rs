@@ -87,7 +87,7 @@ mod tests {
     }
 
     /// Wrapping each occurrence of a repeated section in a unique section
-    /// resolves the EXEC_56 ambiguity.  CRC32C([0x01,0x02,0x03,0x04]) =
+    /// resolves the ERR_173 ambiguity.  CRC32C([0x01,0x02,0x03,0x04]) =
     /// 0x29308CF4, LE: [0xF4, 0x8C, 0x30, 0x29].  Total output: 12 bytes.
     #[test]
     fn crc32c_wrapped_section() {
@@ -107,7 +107,7 @@ mod tests {
     }
 
     /// Section-name form is ambiguous when the named section appears more
-    /// than once in the output.  Expects EXEC_56 and a non-zero exit code.
+    /// than once in the output.  Expects ERR_173 and a non-zero exit code.
     #[test]
     fn crc32c_ambiguous_section() {
         let src_path = workspace_path("std/crc32c/tests/crc32c_ambiguous_section.brink");
@@ -116,6 +116,6 @@ mod tests {
             .arg(&src_path)
             .assert()
             .failure()
-            .stderr(predicates::str::contains("EXEC_56"));
+            .stderr(predicates::str::contains("ERR_173"));
     }
 }

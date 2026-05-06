@@ -1,5 +1,5 @@
 // "in" keyword in section declaration not followed by a region name.
-// AST_49: a "{" is not a valid region identifier.
+// ERR_44: a "{" is not a valid region identifier.
 region FLASH {
     addr = 0x1000;
     size = 0x100;
