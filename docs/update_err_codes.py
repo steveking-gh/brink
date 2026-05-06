@@ -5,7 +5,7 @@ rewrite docs/error_codes.md with a sorted, de-duplicated inventory.
 
 Two emission patterns are recognized:
 
-  1. Bare "CODE" string literals in any .rs file (excluding target/).
+  1. Bare "CODE" string literals in any .rs file tracked by git.
      Catches diags.err*/warn*/note* calls, and codes passed to internal
      helpers such as err_expected_after, err_invalid_expression,
      coerce_numeric_pair, etc.  Test assertions use "[CODE]" (with
@@ -26,6 +26,7 @@ Options:
 """
 
 import re
+import subprocess
 import sys
 import argparse
 from pathlib import Path
@@ -72,11 +73,13 @@ def scan_file(path: Path, root: Path, codes: set) -> None:
 
 
 def scan_tree(root: Path) -> set:
+    result = subprocess.run(
+        ['git', 'ls-files', '*.rs', '**/*.rs'],
+        capture_output=True, text=True, check=True, cwd=root,
+    )
     codes = set()
-    for rs_file in root.rglob('*.rs'):
-        if 'target' in rs_file.parts:
-            continue
-        scan_file(rs_file, root, codes)
+    for line in result.stdout.splitlines():
+        scan_file(root / line, root, codes)
     return codes
 
 
