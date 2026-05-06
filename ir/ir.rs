@@ -112,23 +112,6 @@ impl EffectiveRegion {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DataType {
-    U64,
-    I64,
-    Integer, // ambiguously U64 or I64
-    QuotedString,
-    /// A structural name whose string is the final value: extension call names,
-    /// label declarations, const LHS, section start/end markers.  Never substituted.
-    Identifier,
-    /// An identifier reference whose concrete type is not yet known at linearization
-    /// time.  The layout engine resolves it to an address, size, or section bytes.
-    DeferredRef,
-    /// Output type of an extension call.  All type checks reject Extension
-    /// except for the ExtensionCall/ExtensionCallSection IR output slot.
-    Extension,
-    Unknown,
-}
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IRKind {
     Addr,
     Add,
@@ -204,18 +187,40 @@ pub enum IRKind {
     Wrs,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DataType {
+    U64,
+    I64,
+    Integer, // ambiguously U64 or I64
+    QuotedString,
+    /// A name whose string is the final value.  Never substituted.
+    Identifier,
+    /// An identifier that refers to a concrete type not yet known at
+    /// linearization time.  The layout engine resolves DeferredRef.
+    DeferredRef,
+    /// Output type of an extension call.  All type checks reject Extension
+    /// except for the ExtensionCall/ExtensionCallSection IR output slot.
+    Extension,
+    /// An operand that failed to convert to a known type.  Eventually
+    /// becomes an error.
+    Unknown,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum ParameterValue {
     U64(u64),
     I64(i64),
     Integer(i64), // ambiguously U64 or I64, physically backed by i64
     QuotedString(String),
+    /// An identifier whose string is the final value.  Never substituted.
     Identifier(String),
-    /// An identifier reference whose concrete type is not yet known at linearization
-    /// time.  The layout engine resolves it to an address, size, or section bytes.
+    /// An identifier that refers to a concrete type not yet known at
+    /// linearization time.  The layout engine resolves DeferredRef.
     DeferredRef(String),
     /// Placeholder value for the output slot of an extension call.
     Extension,
+    /// An operand that failed to convert to a known type.  Eventually
+    /// becomes an error.
     Unknown,
 }
 
