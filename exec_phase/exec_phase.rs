@@ -4,9 +4,10 @@
 // LocationDb and MapDb to construct the output binary file.  Core operations
 // include writing inline data, padding bytes, and referenced file contents.
 //
-// ExecPhase invokes compiler extensions, granting direct memory-mapped write
-// access to the binary output.  Extension calls evaluate sequentially after
-// core operations complete.
+// ExecPhase invokes compiler extensions.  Pass 1 builds the image in an
+// OutputBuffer, pre-filling each extension slot with zeros.  Pass 2 executes
+// extensions, reading section slices from the buffer and patching their output
+// back in place.  The completed buffer is written to disk once at the end.
 
 use anyhow::{Result, anyhow};
 use diags::{Diags, SourceSpan};
@@ -16,9 +17,10 @@ use irdb::IRDb;
 use locationdb::LocationDb;
 use mapdb::MapDb;
 use argvaldb::ParmValDb;
+use output_buffer::OutputBuffer;
 use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::io::{Seek, SeekFrom};
 
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};
@@ -46,6 +48,7 @@ impl ExecPhase {
     ) -> Result<()> {
         trace!("Engine::execute:");
         let mut written_ranges = BTreeMap::new();
+        let mut output = OutputBuffer::new();
 
         Self::execute_core_operations(
             location_db,
@@ -53,7 +56,7 @@ impl ExecPhase {
             &mut written_ranges,
             irdb,
             diags,
-            file,
+            &mut output,
             ext_registry,
         )?;
         Self::execute_extensions(
@@ -62,11 +65,11 @@ impl ExecPhase {
             map_db,
             irdb,
             diags,
-            file,
+            &mut output,
             ext_registry,
         )?;
 
-        Ok(())
+        output.write_to_file(file).map_err(|e| anyhow!("Failed to write output file: {}", e))
     }
 
     fn execute_print(
@@ -74,7 +77,6 @@ impl ExecPhase {
         ir: &IR,
         irdb: &IRDb,
         diags: &mut Diags,
-        _file: &File,
     ) -> Result<()> {
         trace!("Engine::execute_print:");
         if diags.noprint {
@@ -100,7 +102,7 @@ impl ExecPhase {
         ir: &IR,
         irdb: &IRDb,
         diags: &mut Diags,
-        file: &mut File,
+        output: &mut OutputBuffer,
     ) -> Result<()> {
         trace!("Engine::execute_wrs:");
         let Some(xstr) = Self::evaluate_string_expr(argvaldb, ir, irdb, diags) else {
@@ -115,15 +117,8 @@ impl ExecPhase {
             return Err(anyhow!("Address overwrite detected"));
         }
 
-        let bufs = xstr.as_bytes();
-        // the map_error lambda just converts io::error to a std::error
-        let result = file.write_all(bufs).map_err(|err| err.into());
-        if result.is_err() {
-            let msg = "Writing string failed".to_string();
-            diags.err1("ERR_127", &msg, ir.src_loc.clone());
-        }
-
-        result
+        output.append(xstr.as_bytes());
+        Ok(())
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -135,14 +130,13 @@ impl ExecPhase {
         ir: &IR,
         irdb: &IRDb,
         diags: &mut Diags,
-        file: &mut File,
+        output: &mut OutputBuffer,
     ) -> Result<()> {
         trace!("Engine::execute_wrf:");
 
         let path = argvaldb.parms[ir.operands[0]].to_str().to_owned();
 
-        // we already verified this is a legit file path,
-        // so unwrap is ok.
+        // IRDb pre-validated this path; unwrap is safe.
         let file_size = irdb.files.get(path.as_str()).unwrap().size;
 
         let loc = &location_db.ir_locs[lid];
@@ -164,40 +158,14 @@ impl ExecPhase {
             }
         };
 
-        // read/write in 64K chunks
-        // TODO don't hardcode this number
-        let mut buf = [0u8; 0x10000];
-        let mut total_bytes = 0;
-        loop {
-            // the map_error lambda just converts io::error to a std::error
-            let bytes_read = match source_file.read(&mut buf) {
-                Ok(bytes) => bytes,
-                Err(err) => {
-                    let msg = format!(
-                        "Reading file '{path}' failed with OS error '{:?}'.",
-                        err.raw_os_error()
-                    );
-                    diags.err1("ERR_156", &msg, ir.src_loc.clone());
-                    return Err(anyhow!(err));
-                }
-            };
-
-            total_bytes += bytes_read;
-            let write_result = file
-                .write_all(&buf[0..bytes_read])
-                .map_err(|err| err.into());
-            if write_result.is_err() {
-                let msg = "Writing buffer failed".to_string();
-                diags.err1("ERR_157", &msg, ir.src_loc.clone());
-                return write_result;
-            }
-
-            if bytes_read < buf.len() {
-                break; // source file is exhausted, nothing more to write
-            }
+        if let Err(err) = output.append_from_file(&mut source_file, file_size) {
+            let msg = format!(
+                "Reading file '{path}' failed with OS error '{:?}'.",
+                err.raw_os_error()
+            );
+            diags.err1("ERR_156", &msg, ir.src_loc.clone());
+            return Err(anyhow!(err));
         }
-
-        assert!(total_bytes as u64 == file_size);
 
         Ok(())
     }
@@ -211,7 +179,7 @@ impl ExecPhase {
         ir: &IR,
         irdb: &IRDb,
         diags: &mut Diags,
-        file: &mut File,
+        output: &mut OutputBuffer,
     ) -> Result<()> {
         trace!("Engine::execute_wrobj:");
 
@@ -249,27 +217,13 @@ impl ExecPhase {
             return Err(anyhow!(err));
         }
 
-        let mut remaining = info.size;
-        let mut buf = [0u8; 0x10000];
-        while remaining > 0 {
-            let to_read = remaining.min(buf.len() as u64) as usize;
-            let bytes_read = match source_file.read(&mut buf[..to_read]) {
-                Ok(n) => n,
-                Err(err) => {
-                    let msg = format!(
-                        "Reading object file '{file_path}' failed with OS error '{:?}'.",
-                        err.raw_os_error()
-                    );
-                    diags.err1("ERR_195", &msg, ir.src_loc.clone());
-                    return Err(anyhow!(err));
-                }
-            };
-            if let Err(err) = file.write_all(&buf[..bytes_read]) {
-                let msg = "Writing object section bytes failed.".to_string();
-                diags.err1("ERR_196", &msg, ir.src_loc.clone());
-                return Err(anyhow!(err));
-            }
-            remaining -= bytes_read as u64;
+        if let Err(err) = output.append_from_file(&mut source_file, info.size) {
+            let msg = format!(
+                "Reading object file '{file_path}' failed with OS error '{:?}'.",
+                err.raw_os_error()
+            );
+            diags.err1("ERR_195", &msg, ir.src_loc.clone());
+            return Err(anyhow!(err));
         }
 
         Ok(())
@@ -282,7 +236,7 @@ impl ExecPhase {
         lid: usize,
         ir: &IR,
         diags: &mut Diags,
-        file: &mut File,
+        output: &mut OutputBuffer,
     ) -> Result<()> {
         trace!("{}", format!("Engine::execute_wrx: {:?}", ir.kind).as_str());
         let byte_size = get_wrx_byte_width(ir);
@@ -338,12 +292,7 @@ impl ExecPhase {
         // The map_error lambda just converts io::error to a std::error
         // Write only the number of bytes required for the width of the wrx
         while repeat_count > 0 {
-            let result = file.write_all(&buf[0..byte_size]).map_err(|err| err.into());
-            if result.is_err() {
-                let msg = format!("{:?} failed", ir.kind);
-                diags.err1("ERR_142", &msg, ir.src_loc.clone());
-                return result;
-            }
+            output.append(&buf[0..byte_size]);
             repeat_count -= 1;
         }
 
@@ -356,7 +305,7 @@ impl ExecPhase {
         written_ranges: &mut WrittenRanges,
         irdb: &IRDb,
         diags: &mut Diags,
-        file: &mut File,
+        output: &mut OutputBuffer,
         ext_registry: &ExtensionRegistry,
     ) -> Result<()> {
         trace!("Engine::execute_core_operations:");
@@ -364,11 +313,11 @@ impl ExecPhase {
         let mut error_count = 0;
         for (lid, ir) in irdb.ir_vec.iter().enumerate() {
             result = match ir.kind {
-                IRKind::Wr(_) => Self::execute_wrx(location_db, argvaldb, written_ranges, lid, ir, diags, file),
-                IRKind::Print => Self::execute_print(argvaldb, ir, irdb, diags, file),
-                IRKind::Wrs => Self::execute_wrs(location_db, argvaldb, written_ranges, lid, ir, irdb, diags, file),
-                IRKind::Wrf => Self::execute_wrf(location_db, argvaldb, written_ranges, lid, ir, irdb, diags, file),
-                IRKind::Wrobj => Self::execute_wrobj(location_db, argvaldb, written_ranges, lid, ir, irdb, diags, file),
+                IRKind::Wr(_) => Self::execute_wrx(location_db, argvaldb, written_ranges, lid, ir, diags, output),
+                IRKind::Print => Self::execute_print(argvaldb, ir, irdb, diags),
+                IRKind::Wrs => Self::execute_wrs(location_db, argvaldb, written_ranges, lid, ir, irdb, diags, output),
+                IRKind::Wrf => Self::execute_wrf(location_db, argvaldb, written_ranges, lid, ir, irdb, diags, output),
+                IRKind::Wrobj => Self::execute_wrobj(location_db, argvaldb, written_ranges, lid, ir, irdb, diags, output),
                 // Assert evaluates in the validation phase, before byte generation.
                 IRKind::Assert => Ok(()),
                 // the rest of these operations are computed during iteration
@@ -425,21 +374,13 @@ impl ExecPhase {
                 | IRKind::IfEnd
                 | IRKind::BareAssign => Ok(()),
                 IRKind::ExtensionCall => {
-                    // Pre-pad zeroed bytes to expand the output file to cover
-                    // the extension's output region before memory mapping.
+                    // Reserve zeroed bytes for the extension output slot.
+                    // Pass 2 patches the actual output back into this region.
                     let ext_name = argvaldb.parms[ir.operands[0]].identifier_to_str();
                     if let Some(entry) = ext_registry.get(ext_name) {
-                        let buf = vec![0u8; entry.cached_size];
-                        file.write_all(&buf).map_err(|e| {
-                            anyhow::anyhow!(
-                                "Failed to pre-pad space for extension '{}': {}",
-                                ext_name,
-                                e
-                            )
-                        })
-                    } else {
-                        Ok(())
+                        output.append_zeros(entry.cached_size);
                     }
+                    Ok(())
                 }
             };
 
@@ -464,13 +405,11 @@ impl ExecPhase {
         map_db: &MapDb,
         irdb: &IRDb,
         diags: &mut Diags,
-        file: &mut File,
+        output: &mut OutputBuffer,
         ext_registry: &ExtensionRegistry,
     ) -> Result<()> {
         trace!("Engine::execute_extensions:");
 
-        // Scope extraction: we isolate ONLY the extension calls
-        // decoupled from the core pipeline logic.
         let mut extension_nodes = Vec::new();
         for (idx, ir) in irdb.ir_vec.iter().enumerate() {
             if ir.kind == IRKind::ExtensionCall {
@@ -481,24 +420,6 @@ impl ExecPhase {
         if extension_nodes.is_empty() {
             return Ok(());
         }
-
-        use memmap2::MmapOptions;
-
-        // We memory-map the output file to allow extensions zero-copy access to the fully generated image,
-        // and allow zero-copy patching of the extension's execution output without re-reading from disk.
-        // We synchronize the file first to ensure the OS sees all written data/padding before mapping.
-        if let Err(e) = file.sync_all() {
-            return Err(anyhow!(
-                "Failed to sync output file before memory mapping: {}",
-                e
-            ));
-        }
-
-        // This is the only bit of unsafe code in brink.
-        let mut mmap = match unsafe { MmapOptions::new().map_mut(&*file) } {
-            Ok(m) => m,
-            Err(e) => return Err(anyhow!("Failed to memory map output file: {}", e)),
-        };
 
         // Maps each section name to a list of indices into wr_dispatches.
         // Slice param resolution uses the map to check for ambiguity and to
@@ -605,7 +526,7 @@ impl ExecPhase {
                     if p.kind == ParamKind::Slice {
                         if let Some((_file_offset, _len, start, end)) = resolved_sections[i] {
                             ext_args.push(ParamArg::Slice {
-                                data: &mmap[start..end],
+                                data: output.slice(start, end),
                             });
                         }
                     } else {
@@ -644,22 +565,17 @@ impl ExecPhase {
             let loc = &location_db.ir_locs[idx];
             let abs_offset = loc.file_offset as usize;
 
-            if abs_offset + byte_width > mmap.len() {
+            if abs_offset + byte_width > output.len() {
                 return Err(anyhow!(
-                    "Extension bounded write exceeds file bounds. This is a severe compiler bug."
+                    "Extension bounded write exceeds buffer bounds. This is a severe compiler bug."
                 ));
             }
 
-            // Zero-copy assignment back into OS memory map.
-            mmap[abs_offset..abs_offset + byte_width].copy_from_slice(&out_buffer);
+            output.patch(abs_offset, &out_buffer);
         }
 
         if error_count > 0 {
             return Err(anyhow!("Error detected in extension execution"));
-        }
-
-        if let Err(e) = mmap.flush() {
-            return Err(anyhow!("Failed to flush memory-mapped file patches: {}", e));
         }
 
         Ok(())

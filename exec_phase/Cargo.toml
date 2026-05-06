@@ -16,5 +16,5 @@ locationdb = { path = "../locationdb" }
 mapdb = { path = "../mapdb" }
 extension_registry = { path = "../extension_registry" }
 tracing = "0.1.44"
-memmap2 = "0.9.10"
+output_buffer = { path = "../output_buffer" }
 argvaldb = { path = "../argvaldb" }

@@ -21,6 +21,7 @@ members = [
     "const_eval",
     "brink_extension",
     "argvaldb",
+    "output_buffer",
     "std/crc32c",
     "std/sha256",
     "std/md5",
