@@ -11,6 +11,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - REMOVED: Removed support for old style extension args
 - ADDED: Support for `obj` external ELF format file sections.
 - ADDED: Support for `obj_lma`, `obj_vma`, `obj_align`
+- CHANGED: Unify all error codes as ERR_<n>
 - README: Added Brink features overview to the introduction
 - INTERNAL: Enormous simplification of const eval to just use the AST
 - INTERNAL: Type deduction moves from IRDB to the Linearizer
