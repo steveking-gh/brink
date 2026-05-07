@@ -1,0 +1,7 @@
+// Verifies that sizeof(std::xor) reports 1 (byte).
+section data {
+    wr8 0x00;
+    assert sizeof(std::xor) == 1;
+}
+
+output data;

@@ -778,6 +778,7 @@ output firmware;
 ```
 
 Key design decisions:
+
 - `obj` is a top-level declaration (parallel to `region`).
 - `wr obj_name` dispatches to `IRKind::Wrobj` at layoutdb time (like `wrf`).
 - `sizeof(obj_name)` resolves via `irdb.obj_sections` in `iterate_sizeof`.
@@ -857,6 +858,32 @@ Changed files: `ir/ir.rs`, `ast/lexer.rs`, `ast/ast.rs`,
 
 ---
 
+## 2026-05-06 — std::xor extension
+
+New `std::xor` standard extension.  Computes an XOR checksum over a
+caller-specified image region and writes the 1-byte result into the output image.
+
+Follows the same crate layout, feature-gating, and `BrinkExtension` trait
+implementation as `std::crc32c`, `std::sha256`, and `std::md5`.
+
+Changes:
+
+- `std/xor/src/xor.rs`: `Xor` struct implementing `BrinkExtension`.
+  `size()` = 1.  `execute` folds all bytes with `^`.
+- `std/xor/Cargo.toml`: new crate `std_xor`, no external dependencies.
+- `std/xor/tests/integration.rs`: 4 tests --
+  `xor_section_form`, `xor_explicit_range`, `xor_sizeof`, `xor_ambiguous_section`.
+- `std/xor/tests/*.brink`: 4 test fixtures.
+- `extensions/Cargo.toml`: `std-xor` feature + `std_xor` optional dep.
+- `extensions/src/lib.rs`: `#[cfg(feature = "std-xor")] std_xor::register(...)`.
+- `process/Cargo.toml`: `std-xor` feature propagated to extensions.
+- `Cargo.toml`: `std/xor` workspace member; `std-xor` default feature.
+- `docs/ai/03-structure.yaml`: `std/xor` added to `std_extensions`.
+
+All 4 std::xor tests pass.
+
+---
+
 ## 2026-05-05 — Typed-lowering architecture integration
 
 **Const Evaluation as AST Walker**
@@ -870,4 +897,3 @@ Type deduction pushed out of `IRDb` and into the shared `Linearizer::record_expr
 
 **Diagnostic Code Resolution & Test Alignment**
 Cleaned up duplicate diagnostic codes across `const_eval.rs`, `linearizer.rs`, and `layoutdb.rs` after the architectural shift merged their diagnostic paths. The test harness (`tests/integration.rs`) was strictly realigned to expect typed-lowering's `[LINEAR_*]` codes instead of deferred execution `[EXEC_*]` or legacy `[IRDB_*]` codes.
-

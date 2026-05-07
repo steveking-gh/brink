@@ -22,4 +22,6 @@ pub fn register_all(registry: &mut ExtensionRegistry) {
     std_sha256::register(registry);
     #[cfg(feature = "std-md5")]
     std_md5::register(registry);
+    #[cfg(feature = "std-xor")]
+    std_xor::register(registry);
 }

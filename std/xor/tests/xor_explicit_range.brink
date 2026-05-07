@@ -1,0 +1,16 @@
+// Computes XOR checksum over exactly the data bytes, excluding the checksum field.
+// Separating payload into its own section lets the section-name form hash
+// only those bytes (no checksum placeholder included).
+//
+// XOR([0x01, 0x02, 0x04, 0x08]) = 0x0F.
+// Total output: 5 bytes.
+section payload {
+    wr8 0x01; wr8 0x02; wr8 0x04; wr8 0x08;
+}
+section data {
+    wr payload;
+    wr std::xor(payload);
+    assert sizeof(data) == 5;
+}
+
+output data;

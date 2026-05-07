@@ -136,6 +136,7 @@ std_extensions:
   std/crc32c:  CRC-32C checksum extension
   std/sha256:  SHA-256 hash extension
   std/md5:     MD5 hash extension
+  std/xor:     XOR checksum extension (1-byte output)
 
 # ── Binary entry point ────────────────────────────────────────────────────────
 binary:

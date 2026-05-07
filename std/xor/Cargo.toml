@@ -1,0 +1,19 @@
+[package]
+name = "std_xor"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+path = "src/xor.rs"
+
+[dependencies]
+brink_extension = { path = "../../brink_extension" }
+extension_registry = { path = "../../extension_registry" }
+
+[dev-dependencies]
+assert_cmd = "2.2.1"
+predicates = "3.1.4"

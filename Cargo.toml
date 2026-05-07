@@ -28,6 +28,7 @@ members = [
     "std/crc32c",
     "std/sha256",
     "std/md5",
+    "std/xor",
     "extensions",
 ]
 
@@ -73,10 +74,11 @@ inherits = "release"
 lto = "thin"
 
 [features]
-default = ["std-crc32c", "std-sha256", "std-md5"]
+default = ["std-crc32c", "std-sha256", "std-md5", "std-xor"]
 std-crc32c = ["process/std-crc32c"]
 std-sha256  = ["process/std-sha256"]
 std-md5     = ["process/std-md5"]
+std-xor     = ["process/std-xor"]
 
 [dependencies]
 indextree = "4.3.1"

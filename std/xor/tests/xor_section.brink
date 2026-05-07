@@ -1,0 +1,21 @@
+// Computes XOR checksum using the section-name form.
+//
+// The section-name form slices the entire section from the output image,
+// including the 1 zeroed placeholder byte pre-allocated for the XOR
+// field itself.  Input to the checksum is therefore 5 bytes:
+//   [0x01, 0x02, 0x03, 0x04, 0x00]
+//
+// XOR of those 5 bytes = 0x04.
+// Total output: 5 bytes.
+//
+// To XOR only the data bytes (excluding the checksum field), place them
+// in a separate section and pass that section to the extension.
+section data {
+    wr8 0x01; wr8 0x02; wr8 0x03; wr8 0x04;
+    wr std::xor(data);
+    assert sizeof(data) == 5;
+}
+
+assert sizeof(std::xor) == 1;
+
+output data;

@@ -11,6 +11,7 @@ workspace = true
 std-crc32c = ["extensions/std-crc32c"]
 std-sha256  = ["extensions/std-sha256"]
 std-md5     = ["extensions/std-md5"]
+std-xor     = ["extensions/std-xor"]
 
 [lib]
 path = "process.rs"
