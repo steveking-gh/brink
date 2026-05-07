@@ -10,7 +10,7 @@
 // through every stage — ast, lineardb, irdb and engine — as the single
 // channel through which all diagnostics flow.
 
-use ariadne::{Color, Label, Report, ReportKind, sources};
+use ariadne::{CharSet, Color, Config, Label, Report, ReportBuilder, ReportKind, sources};
 use std::ops::Range;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -24,15 +24,22 @@ pub struct Diags {
     pub files: Vec<(String, String)>,
     verbosity: u64,
     pub noprint: bool,
+    config: Config,
 }
 
 impl Diags {
     pub fn new(name: &str, fstr: &str, verbosity: u64, noprint: bool) -> Self {
+        let char_set = if supports_unicode::on(supports_unicode::Stream::Stderr) {
+            CharSet::Unicode
+        } else {
+            CharSet::Ascii
+        };
         Self {
             name: name.to_string(),
             files: vec![(name.to_string(), fstr.to_string())],
             verbosity,
             noprint,
+            config: Config::default().with_char_set(char_set),
         }
     }
 
@@ -44,6 +51,14 @@ impl Diags {
         let id = self.files.len();
         self.files.push((name.to_string(), content.to_string()));
         id
+    }
+
+    fn build_report<'a>(
+        &self,
+        kind: ReportKind<'a>,
+        span: (String, Range<usize>),
+    ) -> ReportBuilder<'a, (String, Range<usize>)> {
+        Report::build(kind, span).with_config(self.config)
     }
 
     /// Helper to print ariadne reports
@@ -62,7 +77,7 @@ impl Diags {
             return;
         }
 
-        let report = Report::build(ReportKind::Warning, (self.name.clone(), 0..0))
+        let report = self.build_report(ReportKind::Warning, (self.name.clone(), 0..0))
             .with_code(code)
             .with_message(msg)
             .finish();
@@ -84,7 +99,7 @@ impl Diags {
         }
 
         let id = self.files[loc.file_id].0.clone();
-        let report = Report::build(ReportKind::Warning, (id.clone(), loc.range.clone()))
+        let report = self.build_report(ReportKind::Warning, (id.clone(), loc.range.clone()))
             .with_code(code)
             .with_message(msg)
             .with_label(Label::new((id, loc.range)).with_color(Color::Yellow))
@@ -99,7 +114,7 @@ impl Diags {
             return;
         }
 
-        let report = Report::build(ReportKind::Error, (self.name.clone(), 0..0))
+        let report = self.build_report(ReportKind::Error, (self.name.clone(), 0..0))
             .with_code(code)
             .with_message(msg)
             .finish();
@@ -114,7 +129,7 @@ impl Diags {
         }
 
         let id = self.files[loc.file_id].0.clone();
-        let report = Report::build(ReportKind::Error, (id.clone(), loc.range.clone()))
+        let report = self.build_report(ReportKind::Error, (id.clone(), loc.range.clone()))
             .with_code(code)
             .with_message(msg)
             .with_label(Label::new((id, loc.range)).with_color(Color::Red))
@@ -129,7 +144,7 @@ impl Diags {
             return;
         }
 
-        let report = Report::build(
+        let report = self.build_report(
             ReportKind::Custom("Note", Color::Blue),
             (self.name.clone(), 0..0),
         )
@@ -147,7 +162,7 @@ impl Diags {
         }
 
         let id = self.files[loc.file_id].0.clone();
-        let report = Report::build(
+        let report = self.build_report(
             ReportKind::Custom("Note", Color::Blue),
             (id.clone(), loc.range.clone()),
         )
@@ -174,7 +189,7 @@ impl Diags {
         }
 
         let pid = self.files[primary.file_id].0.clone();
-        let mut builder = Report::build(ReportKind::Error, (pid.clone(), primary.range.clone()))
+        let mut builder = self.build_report(ReportKind::Error, (pid.clone(), primary.range.clone()))
             .with_code(code)
             .with_message(msg)
             .with_label(Label::new((pid, primary.range)).with_color(Color::Red));
@@ -199,7 +214,7 @@ impl Diags {
         let id1 = self.files[loc1.file_id].0.clone();
         let id2 = self.files[loc2.file_id].0.clone();
 
-        let report = Report::build(ReportKind::Error, (id1.clone(), loc1.range.clone()))
+        let report = self.build_report(ReportKind::Error, (id1.clone(), loc1.range.clone()))
             .with_code(code)
             .with_message(msg)
             .with_label(Label::new((id1, loc1.range)).with_color(Color::Red))
