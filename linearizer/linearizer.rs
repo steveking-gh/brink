@@ -580,12 +580,10 @@ impl Linearizer {
                         {
                             ok = true;
                         }
-                    } else if rhs_dt == DataType::Integer
-                        && [DataType::I64, DataType::U64].contains(&lhs_dt)
-                    {
-                        ok = true;
-                    } else if lhs_dt == DataType::Integer
-                        && [DataType::I64, DataType::U64].contains(&rhs_dt)
+                    } else if (rhs_dt == DataType::Integer
+                        && [DataType::I64, DataType::U64].contains(&lhs_dt))
+                        || (lhs_dt == DataType::Integer
+                            && [DataType::I64, DataType::U64].contains(&rhs_dt))
                     {
                         ok = true;
                     } else if lhs_dt == DataType::DeferredRef || rhs_dt == DataType::DeferredRef {
