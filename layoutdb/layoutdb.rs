@@ -237,7 +237,7 @@ impl<'toks> LayoutDb {
                 let count_output =
                     lz.add_new_operand_to_ir(ir_lid, LinOperand::new_output(ir_lid, tinfo.loc.clone(), ir::DataType::U64));
 
-                let wr8_lid = lz.new_ir(parent_nid, ast, IRKind::Wr(1));
+                let wr8_lid = lz.new_ir(parent_nid, ast, IRKind::Wr(1, false));
 
                 if lops.len() == 2 {
                     lz.add_existing_operand_to_ir(wr8_lid, lops[1]);
@@ -264,6 +264,14 @@ impl<'toks> LayoutDb {
             | LexToken::Wr48
             | LexToken::Wr56
             | LexToken::Wr64
+            | LexToken::Wrbe8
+            | LexToken::Wrbe16
+            | LexToken::Wrbe24
+            | LexToken::Wrbe32
+            | LexToken::Wrbe40
+            | LexToken::Wrbe48
+            | LexToken::Wrbe56
+            | LexToken::Wrbe64
             | LexToken::Wrs
             | LexToken::Wrf
             | LexToken::Print => {

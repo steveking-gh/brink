@@ -52,7 +52,7 @@ pub struct LayoutPhase {
 
 fn get_wrx_byte_width(ir: &IR) -> usize {
     match ir.kind {
-        IRKind::Wr(w) => w as usize,
+        IRKind::Wr(w, _) => w as usize,
         bad => {
             panic!("Called get_wrx_byte_width with {:?}", bad);
         }
@@ -1479,7 +1479,7 @@ impl LayoutPhase {
                     }
                     IRKind::SectionEnd => self.iterate_section_end(ir, irdb, diags, &mut current),
 
-                    IRKind::Wr(_) => self.iterate_wrx(ir, irdb, diags, &mut current),
+                    IRKind::Wr(_, _) => self.iterate_wrx(ir, irdb, diags, &mut current),
                     IRKind::ExtensionCall => {
                         self.iterate_ext(ir, &mut current, ext_registry, diags)
                     }

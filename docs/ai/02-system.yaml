@@ -150,7 +150,8 @@ language_features:
   section: named block of layout-time statements
   output: single required directive naming the root section to emit
   wr: write a named section or obj into the current section
-  wr8/wr16/.../wr64: write integer literals
+  wr8/wr16/.../wr64: write integer literals, little-endian
+  wrbe8/wrbe16/.../wrbe64: write integer literals, big-endian
   wrs: write a string literal
   wrf: write a binary file
   obj: top-level declaration binding a name to a section in an object file; syntax: obj name { section = "..."; file = "..."; }

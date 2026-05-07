@@ -1,0 +1,16 @@
+// Test big-endian write instructions wrbe8..wrbe64.
+// Uses the same value as wrx_5.brink so the byte output is the byte-reversed
+// counterpart of the little-endian wrx_5 output.
+section foo {
+    wrbe8  0x42EF_CDAB_7856_3412; // 12
+    wrbe16 0x42EF_CDAB_7856_3412; // 34 12
+    wrbe24 0x42EF_CDAB_7856_3412; // 56 34 12
+    wrbe32 0x42EF_CDAB_7856_3412; // 78 56 34 12
+    wrbe40 0x42EF_CDAB_7856_3412; // AB 78 56 34 12
+    wrbe48 0x42EF_CDAB_7856_3412; // CD AB 78 56 34 12
+    wrbe56 0x42EF_CDAB_7856_3412; // EF CD AB 78 56 34 12
+    wrbe64 0x42EF_CDAB_7856_3412; // 42 EF CD AB 78 56 34 12
+    assert sizeof(foo) == 36;
+}
+
+output foo;

@@ -569,7 +569,7 @@ impl IRDb {
             | IRKind::SetAddrOffset
             | IRKind::SetAddr
             | IRKind::SetFileOffset
-            | IRKind::Wr(_) => self.validate_numeric_1_or_2(ir, diags),
+            | IRKind::Wr(_, _) => self.validate_numeric_1_or_2(ir, diags),
             IRKind::Assert => self.validate_numeric_1(ir, diags),
             IRKind::Wrf => self.validate_wrf_operands(ir, diags),
             IRKind::Wrobj => self.validate_wrobj_operands(ir, diags),

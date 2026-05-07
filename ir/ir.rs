@@ -180,8 +180,8 @@ pub enum IRKind {
     ToI64,
     ToU64,
     U64,
-    /// Write N bytes (little-endian). N is the byte width: 1..=8.
-    Wr(u8),
+    /// Write N=1 to 8 bytes. Bool true = big-endian, otherwise little-endian.
+    Wr(u8, bool),
     Wrf,
     Wrobj,
     Wrs,

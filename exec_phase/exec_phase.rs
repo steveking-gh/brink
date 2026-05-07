@@ -29,7 +29,7 @@ type WrittenRanges = BTreeMap<u64, (u64, SourceSpan)>;
 
 fn get_wrx_byte_width(ir: &IR) -> usize {
     match ir.kind {
-        IRKind::Wr(w) => w as usize,
+        IRKind::Wr(w, _) => w as usize,
         bad => panic!("Called get_wrx_byte_width with {:?}", bad),
     }
 }
@@ -248,17 +248,19 @@ impl ExecPhase {
         );
         let parm = &argvaldb.parms[opnd_num];
 
-        // Extract bytes as little-endian.  One a big-endian machine, the LSB will
-        // bit the highest address location, which is wrong since we're writing
-        // from the lowest address.
+        let big_endian = matches!(ir.kind, IRKind::Wr(_, true));
+
+        // Extract 8 bytes in the requested byte order, then slice to byte_size.
+        // For little-endian the LSB is at index 0; for big-endian the MSB is at
+        // index 0 and the desired bytes are the trailing byte_size bytes.
         let buf = match parm.data_type() {
             DataType::Integer | DataType::I64 => {
                 let val = parm.to_i64();
-                val.to_le_bytes()
+                if big_endian { val.to_be_bytes() } else { val.to_le_bytes() }
             }
             DataType::U64 => {
                 let val = parm.to_u64();
-                val.to_le_bytes()
+                if big_endian { val.to_be_bytes() } else { val.to_le_bytes() }
             }
             bad => {
                 panic!("Unexpected parameter type {:?} in execute_wrx", bad);
@@ -289,10 +291,11 @@ impl ExecPhase {
             return Err(anyhow!("Address overwrite detected"));
         }
 
-        // The map_error lambda just converts io::error to a std::error
-        // Write only the number of bytes required for the width of the wrx
+        // For LE, take the first byte_size bytes.  For BE, to_be_bytes() places
+        // the MSB at index 0, so the significant byte_size bytes are at the end.
+        let start = if big_endian { 8 - byte_size } else { 0 };
         while repeat_count > 0 {
-            output.append(&buf[0..byte_size]);
+            output.append(&buf[start..start + byte_size]);
             repeat_count -= 1;
         }
 
@@ -313,7 +316,7 @@ impl ExecPhase {
         let mut error_count = 0;
         for (lid, ir) in irdb.ir_vec.iter().enumerate() {
             result = match ir.kind {
-                IRKind::Wr(_) => Self::execute_wrx(location_db, argvaldb, written_ranges, lid, ir, diags, output),
+                IRKind::Wr(_, _) => Self::execute_wrx(location_db, argvaldb, written_ranges, lid, ir, diags, output),
                 IRKind::Print => Self::execute_print(argvaldb, ir, irdb, diags),
                 IRKind::Wrs => Self::execute_wrs(location_db, argvaldb, written_ranges, lid, ir, irdb, diags, output),
                 IRKind::Wrf => Self::execute_wrf(location_db, argvaldb, written_ranges, lid, ir, irdb, diags, output),

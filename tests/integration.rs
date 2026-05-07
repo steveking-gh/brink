@@ -1000,6 +1000,66 @@ mod tests {
     }
 
     #[test]
+    fn wrx_7() {
+        // Big-endian counterpart of wrx_5: same value, reversed byte order per width.
+        let _cmd = Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/wrx_7.brink")
+            .arg("-o wrx_7.bin")
+            .assert()
+            .success();
+
+        let bytevec = fs::read("wrx_7.bin").unwrap();
+        assert!(bytevec.len() == 36);
+        // wrbe8
+        assert_eq!(bytevec[0], 0x12);
+        // wrbe16
+        assert_eq!(bytevec[1], 0x34);
+        assert_eq!(bytevec[2], 0x12);
+        // wrbe24
+        assert_eq!(bytevec[3], 0x56);
+        assert_eq!(bytevec[4], 0x34);
+        assert_eq!(bytevec[5], 0x12);
+        // wrbe32
+        assert_eq!(bytevec[6], 0x78);
+        assert_eq!(bytevec[7], 0x56);
+        assert_eq!(bytevec[8], 0x34);
+        assert_eq!(bytevec[9], 0x12);
+        // wrbe40
+        assert_eq!(bytevec[10], 0xAB);
+        assert_eq!(bytevec[11], 0x78);
+        assert_eq!(bytevec[12], 0x56);
+        assert_eq!(bytevec[13], 0x34);
+        assert_eq!(bytevec[14], 0x12);
+        // wrbe48
+        assert_eq!(bytevec[15], 0xCD);
+        assert_eq!(bytevec[16], 0xAB);
+        assert_eq!(bytevec[17], 0x78);
+        assert_eq!(bytevec[18], 0x56);
+        assert_eq!(bytevec[19], 0x34);
+        assert_eq!(bytevec[20], 0x12);
+        // wrbe56
+        assert_eq!(bytevec[21], 0xEF);
+        assert_eq!(bytevec[22], 0xCD);
+        assert_eq!(bytevec[23], 0xAB);
+        assert_eq!(bytevec[24], 0x78);
+        assert_eq!(bytevec[25], 0x56);
+        assert_eq!(bytevec[26], 0x34);
+        assert_eq!(bytevec[27], 0x12);
+        // wrbe64
+        assert_eq!(bytevec[28], 0x42);
+        assert_eq!(bytevec[29], 0xEF);
+        assert_eq!(bytevec[30], 0xCD);
+        assert_eq!(bytevec[31], 0xAB);
+        assert_eq!(bytevec[32], 0x78);
+        assert_eq!(bytevec[33], 0x56);
+        assert_eq!(bytevec[34], 0x34);
+        assert_eq!(bytevec[35], 0x12);
+
+        fs::remove_file("wrx_7.bin").unwrap();
+    }
+
+    #[test]
     fn wrx_6() {
         let _cmd = Command::cargo_bin("brink")
             .unwrap()

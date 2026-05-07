@@ -858,6 +858,40 @@ Changed files: `ir/ir.rs`, `ast/lexer.rs`, `ast/ast.rs`,
 
 ---
 
+## 2026-05-06 — wrbe8..wrbe64 big-endian write instructions
+
+Full set of big-endian integer write instructions, parallel to wr8..wr64.
+
+Design: `IRKind::Wr(u8)` extended to `IRKind::Wr(u8, bool)` where the bool
+is `true` for big-endian. All existing `Wr(w)` match sites updated to `Wr(w, _)`;
+the compiler enforced exhaustiveness at every site. Only `exec_phase` inspects
+the flag.
+
+Changes:
+
+- `ir/ir.rs`: `IRKind::Wr(u8, bool)`.
+- `ast/ast.rs`: `LexToken::Wrbe8`..`Wrbe64` variants; `is_section_expr_tok`
+  extended; `is_reserved_identifier` gains `"wrbe" + digit` prefix check.
+- `ast/lexer.rs`: `"wrbe8"`..`"wrbe64"` keyword entries.
+- `layoutdb/layoutdb.rs`: `Wrbe8`..`Wrbe64` added to dispatch arm; direct
+  `IRKind::Wr(1)` fill call updated to `IRKind::Wr(1, false)`.
+- `linearizer/linearizer.rs`: LE tokens updated to `Wr(n, false)`; BE tokens
+  mapped to `Wr(n, true)`.
+- `irdb/irdb.rs`: `Wr(_, _)` pattern.
+- `layout_phase/layout_phase.rs`: `Wr(w, _)` in size helper and iterate dispatch.
+- `exec_phase/exec_phase.rs`: `Wr(w, _)` in width helper and dispatch;
+  `execute_wrx` branches on the flag: `to_be_bytes()` with trailing `byte_size`
+  slice (`buf[8-byte_size..8]`) vs `to_le_bytes()` with leading slice.
+- `tests/brink_fuzz.dict`: all 8 wrbe keywords added.
+- `vscode-brink/syntaxes/brink.tmLanguage.json`: wrbe variants added to regex.
+- `docs/ai/02-system.yaml`: `wrbe8/wrbe16/.../wrbe64` documented.
+- `tests/wrx_7.brink` + `tests::wrx_7` integration test: all 8 widths verified
+  against known big-endian byte sequences.
+
+367 tests pass.
+
+---
+
 ## 2026-05-06 — std::xor extension
 
 New `std::xor` standard extension.  Computes an XOR checksum over a

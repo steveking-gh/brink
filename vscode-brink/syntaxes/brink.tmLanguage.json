@@ -114,7 +114,7 @@
         {
           "comment": "Write/emit instructions — sized variants listed before bare wr",
           "name": "keyword.other.write.brink",
-          "match": "\\b(wr64|wr56|wr48|wr40|wr32|wr24|wr16|wr8|wrs|wrf|wr|output)\\b"
+          "match": "\\b(wrbe64|wrbe56|wrbe48|wrbe40|wrbe32|wrbe24|wrbe16|wrbe8|wr64|wr56|wr48|wr40|wr32|wr24|wr16|wr8|wrs|wrf|wr|output)\\b"
         },
         {
           "comment": "Control flow",

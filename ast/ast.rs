@@ -64,6 +64,14 @@ pub enum LexToken {
     Wr48,
     Wr56,
     Wr64,
+    Wrbe8,
+    Wrbe16,
+    Wrbe24,
+    Wrbe32,
+    Wrbe40,
+    Wrbe48,
+    Wrbe56,
+    Wrbe64,
     Wrf,
     Wr,
     Obj,
@@ -157,6 +165,12 @@ pub enum LexToken {
 pub fn is_reserved_identifier(name: &str) -> bool {
     // "wr" followed by at least one digit reserves the numeric write variants.
     if let Some(rest) = name.strip_prefix("wr")
+        && rest.starts_with(|c: char| c.is_ascii_digit())
+    {
+        return true;
+    }
+    // "wrbe" followed by at least one digit reserves big-endian write variants.
+    if let Some(rest) = name.strip_prefix("wrbe")
         && rest.starts_with(|c: char| c.is_ascii_digit())
     {
         return true;
@@ -1333,6 +1347,14 @@ impl<'toks> Ast<'toks> {
                 | LexToken::Wr48
                 | LexToken::Wr56
                 | LexToken::Wr64
+                | LexToken::Wrbe8
+                | LexToken::Wrbe16
+                | LexToken::Wrbe24
+                | LexToken::Wrbe32
+                | LexToken::Wrbe40
+                | LexToken::Wrbe48
+                | LexToken::Wrbe56
+                | LexToken::Wrbe64
                 | LexToken::Wrs
                 | LexToken::Assert
                 | LexToken::Align

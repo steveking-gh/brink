@@ -472,10 +472,10 @@ Like C language, statements must be terminated with a trailing semicolon charact
 
 Brink supports the following data types:
 
-* U64: 64-bit unsigned values
-* I64: 64-bit signed values
-* Integer: 64-bit integers with flexible sign treatment
-* String: UTF-8 string in double quotes
+- U64: 64-bit unsigned values
+- I64: 64-bit signed values
+- Integer: 64-bit integers with flexible sign treatment
+- String: UTF-8 string in double quotes
 
 Brink reports an error for under/overflow on arithmetic operations on U64, I64
 and Integer types as described in [Arithmetic Operators](#arithmetic-operators).
@@ -1026,8 +1026,8 @@ For example:
 
 Obj definitions support the following properties:
 
-* `file` Path to the object or executable file (required)
-* `section` Name of the section in the object file (required)
+- `file` Path to the object or executable file (required)
+- `section` Name of the section in the object file (required)
 
 #### Obj Property `file`
 
@@ -1084,7 +1084,8 @@ the scope of Brink.
 
 `obj_align(<obj>) -> U64`
 
-Returns the *alignment* of the specified [obj](#obj) as a U64.  The external object file defines this value as set by a compiler toolchain.
+Returns the *alignment* of the specified [obj](#obj) as a U64.  The external
+object file defines this value as set by a compiler toolchain.
 
 For example:
 
@@ -1104,7 +1105,9 @@ For example:
 
 `obj_lma(<obj>) -> U64`
 
-Returns the *load memory address* (LMA) of the specified [obj](#obj) as a U64.  The external object file defines this value as set by a compiler toolchain.  See [LMA and VMA](#obj-lma-and-vma) for more information.
+Returns the *load memory address* (LMA) of the specified [obj](#obj) as a U64.
+The external object file defines this value as set by a compiler toolchain.  See
+[LMA and VMA](#obj-lma-and-vma) for more information.
 
 For example:
 
@@ -1131,7 +1134,9 @@ value.  In this way, a user can consistently use `obj_lma` for all formats.
 
 `obj_vma(<obj>) -> U64`
 
-Returns the *virtual memory address* (VMA) of the specified [obj](#obj) as a U64.  The external object file defines this value as set by a compiler toolchain.  See [LMA and VMA](#obj-lma-and-vma) for more information.
+Returns the *virtual memory address* (VMA) of the specified [obj](#obj) as a
+U64.  The external object file defines this value as set by a compiler
+toolchain.  See [LMA and VMA](#obj-lma-and-vma) for more information.
 
 For example:
 
@@ -1173,7 +1178,7 @@ control the output style.
 
 Brink executes a given print statement for each instance found in the output
 file.  In other words, a print statement in a section written multiple times
-will execute multiple times in the order found.
+will execute multiple times in output order.
 
 Example:
 
@@ -1197,7 +1202,7 @@ Example:
 
     output foo;
 
-Will result in the following console output:
+Results in the following console output:
 
     Output spans address range 0x1000-0x100C (12 bytes)
     Section 'bar' starts at 0x1003
@@ -1219,8 +1224,8 @@ Users place *exactly one* section `in` a region.  We refer to this section as
 the *bound section* of the region.  The bound section is a normal
 section with the following extra behaviors:
 
-* The region sets the starting address of the bound section.
-* The region caps the size of the bound section.
+- The region sets the starting address of the bound section.
+- The region caps the size of the bound section.
 
 For example:
 
@@ -1275,8 +1280,8 @@ For example:
 
 Regions support the following properties:
 
-* `addr` Starting address (required)
-* `size` Size in bytes (required)
+- `addr` Starting address (required)
+- `size` Size in bytes (required)
 
 #### Region Property `addr`
 
@@ -1298,10 +1303,10 @@ The size value accepts a [K/M/G magnitude suffix](#number-magnitude).
 Regions provide automatic size and boundary checking for all operations in the
 region.  In practical terms this means:
 
-* Write commands in a region cannot extend outside the region
-* Address manipulation in a region cannot result in an address outside the
+- Write commands in a region cannot extend outside the region
+- Address manipulation in a region cannot result in an address outside the
   region
-* Offset manipulations in a region cannot result in a offset outside the
+- Offset manipulations in a region cannot result in a offset outside the
   region.
 
 For example, the following `wr32` command would extend outside the region by one
@@ -1396,9 +1401,9 @@ For completeness, the region of a nested section need not be a proper subset of
 the parent region. Brink still enforces the constraints of *all* parent sections
 as follows:
 
-* Any address written by the child section must lie in the intersection of *all*
+- Any address written by the child section must lie in the intersection of *all*
   parent regions.
-* The starting address of a nested section must fit the address range allowed by all
+- The starting address of a nested section must fit the address range allowed by all
   parent regions.
 
 ### Sections in Regions are Single Use
@@ -1831,6 +1836,8 @@ Example:
 
 ## wr8 to wr64
 
+Little-endian:
+
 `wr8 <expression> [, <expression>];`
 `wr16 <expression> [, <expression>];`
 `wr24 <expression> [, <expression>];`
@@ -1840,9 +1847,20 @@ Example:
 `wr56 <expression> [, <expression>];`
 `wr64 <expression> [, <expression>];`
 
-Evaluates the first expression and writes the result as a little-endian binary
-value to the output file.  The optional second expression specifies the
-repetition count.
+Big-endian:
+
+`wrbe8 <expression> [, <expression>];`
+`wrbe16 <expression> [, <expression>];`
+`wrbe24 <expression> [, <expression>];`
+`wrbe32 <expression> [, <expression>];`
+`wrbe40 <expression> [, <expression>];`
+`wrbe48 <expression> [, <expression>];`
+`wrbe56 <expression> [, <expression>];`
+`wrbe64 <expression> [, <expression>];`
+
+Evaluates the first expression and writes the result as a little-endian
+value to the output file, or as a big-endian value for the `be` form.  The
+optional second expression specifies the repetition count.
 
 > [!IMPORTANT] Brink silently truncates the upper bits of the expression to fit the specified width.
 
@@ -2051,27 +2069,27 @@ Brink requires compile time construction to eliminate ABI incompatibilities and
 enable the use of safe Rust.  The following bullets provide an overview of how
 extensions work:
 
-* Extensions interact with Brink through the `BrinkExtension` trait.
+- Extensions interact with Brink through the `BrinkExtension` trait.
 
-* Extensions can read directly from the output buffer for a specified section
+- Extensions can read directly from the output buffer for a specified section
   via zero-copy and safe-memory slices (`&[u8]`).
 
-* In addition to output buffer access, extensions can have their own input
+- In addition to output buffer access, extensions can have their own input
   parameters like a normal function call.
 
-* Extensions are identified by a **name** in a **namespace**.  Brink reserves
+- Extensions are identified by a **name** in a **namespace**.  Brink reserves
   the namespaces `std` and `brink`.
 
-* Extensions report their fixed length binary footprint by implementing the
+- Extensions report their fixed length binary footprint by implementing the
   `.size()` trait method. Brink calls each extension's `.size()` method
   **exactly once** during output layout calculations and caches the result.
   Brink always passes a mutable output slice (`&mut [u8]`) of the reported size
   to the extension's `.generate()` method.
 
-* Extensions register themselves at compile time in Brink's internal extension
+- Extensions register themselves at compile time in Brink's internal extension
   registry.
 
-* The `BrinkExtension` trait interface allows extensions to return logging and
+- The `BrinkExtension` trait interface allows extensions to return logging and
   error diagnostics integrated with Brink's own diagnostic output.  See []
 
 ---
