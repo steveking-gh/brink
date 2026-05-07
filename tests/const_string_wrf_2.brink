@@ -1,0 +1,7 @@
+// String const used as a wrf path; value supplied via CLI -D define.
+const F;
+section foo {
+    wrf F;
+    assert sizeof(foo) == 6;
+}
+output foo;

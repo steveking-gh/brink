@@ -21,7 +21,6 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - INTERNAL: Replace `unsafe` mmap with OutputBuffer wrapper for vec<>
 - INTERNAL: Forbid unsafe rust code
 
-
 ## [7.0.0] - 2026-05-02
 
 - REMOVED: With `region`, remove obsolete starting address from `output`

@@ -1,0 +1,11 @@
+// String const in an if-guard; variant name supplied via CLI -D define.
+const VARIANT;
+section foo {
+    if VARIANT == "v1" {
+        wr8 0x01;
+    } else {
+        wr8 0x02;
+    }
+    assert sizeof(foo) == 1;
+}
+output foo;

@@ -1794,6 +1794,69 @@ mod tests {
         );
     }
 
+    /// String const used as a wrf path (source literal).
+    #[test]
+    fn const_string_wrf_1() {
+        assert_brink_success(
+            "tests/const_string_wrf_1.brink",
+            Some("const_string_wrf_1.bin"),
+            Some("Hello!"),
+        );
+    }
+
+    /// String const used as a wrf path; value supplied via CLI -D define.
+    #[test]
+    fn const_string_wrf_2() {
+        let out = "const_string_wrf_2.bin";
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/const_string_wrf_2.brink")
+            .arg("-o")
+            .arg(out)
+            .arg(r#"-DF="tests/test_source_1.txt""#)
+            .assert()
+            .success()
+            .stderr(predicates::str::is_empty());
+        let actual = fs::read_to_string(out).unwrap_or_default();
+        assert_eq!(actual, "Hello!");
+        fs::remove_file(out).ok();
+    }
+
+    /// String const in an if-guard selects the matching branch (source literal).
+    #[test]
+    fn const_string_if_1() {
+        let out = "const_string_if_1.bin";
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/const_string_if_1.brink")
+            .arg("-o")
+            .arg(out)
+            .assert()
+            .success()
+            .stderr(predicates::str::is_empty());
+        let bytes = fs::read(out).unwrap_or_default();
+        assert_eq!(bytes, vec![0x01u8]);
+        fs::remove_file(out).ok();
+    }
+
+    /// String const in an if-guard; variant name supplied via CLI -D define.
+    #[test]
+    fn const_string_if_2() {
+        let out = "const_string_if_2.bin";
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/const_string_if_2.brink")
+            .arg("-o")
+            .arg(out)
+            .arg(r#"-DVARIANT="v1""#)
+            .assert()
+            .success()
+            .stderr(predicates::str::is_empty());
+        let bytes = fs::read(out).unwrap_or_default();
+        assert_eq!(bytes, vec![0x01u8]);
+        fs::remove_file(out).ok();
+    }
+
     /// A const identifier is used as the starting address via set_addr inside the section.
     #[test]
     fn const_as_output_addr_1() {

@@ -143,7 +143,14 @@ extensions:
       extensions remain valid; return-value style is additive.
 
 language_features:
-  const: compile-time integer/string constants; arithmetic, comparison, logical ops
+  const: >
+    Compile-time integer/string constants; arithmetic, comparison, and logical ops.
+    String consts (QuotedString) are supported as source literals or CLI -D defines.
+    Usage: 'const NAME = "value";' or '-DNAME="value"'.
+    String consts are valid as wrf path operands, wrs operands, and in == / !=
+    comparisons. Arithmetic and ordered comparisons on strings are rejected
+    (ERR_92, ERR_96). CLI defines without quotes are parsed as integers; a
+    non-numeric unquoted value fails with an "invalid integer" error.
   if_else:
     top_level: conditions are const; body may contain section definitions or const assigns
     section_body: conditions are const; body may contain layout-time statements (wr8, wr, etc.)

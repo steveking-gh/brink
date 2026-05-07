@@ -1,0 +1,11 @@
+// String const in an if-guard selects the matching branch (source literal).
+const VARIANT = "v1";
+section foo {
+    if VARIANT == "v1" {
+        wr8 0x01;
+    } else {
+        wr8 0x02;
+    }
+    assert sizeof(foo) == 1;
+}
+output foo;

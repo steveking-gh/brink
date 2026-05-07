@@ -1,0 +1,7 @@
+// String const used as a wrf path (source literal).
+const F = "tests/test_source_1.txt";
+section foo {
+    wrf F;
+    assert sizeof(foo) == 6;
+}
+output foo;

@@ -918,6 +918,29 @@ All 4 std::xor tests pass.
 
 ---
 
+## 2026-05-07 — String const tests
+
+No functional changes. Added tests confirming that string consts already work
+end-to-end across the full pipeline.
+
+New test fixtures and integration tests:
+
+- `tests/const_string_wrf_1.brink` + `const_string_wrf_1`: source literal
+  `const F = "..."; wrf F;` reads the file and verifies output bytes.
+- `tests/const_string_wrf_2.brink` + `const_string_wrf_2`: CLI define
+  `-DF="..."` supplies the path; `const F;` in source declares without default.
+- `tests/const_string_if_1.brink` + `const_string_if_1`: string const in an
+  `if` guard prunes the dead else branch; verifies `[0x01]` in output.
+- `tests/const_string_if_2.brink` + `const_string_if_2`: same but the variant
+  name comes from `-DVARIANT="v1"` CLI define.
+
+`docs/ai/02-system.yaml`: `const` entry expanded to document string const
+support and the CLI quoting requirement.
+
+371 tests pass.
+
+---
+
 ## 2026-05-05 — Typed-lowering architecture integration
 
 **Const Evaluation as AST Walker**
