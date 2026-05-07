@@ -12,5 +12,4 @@ path = "diags.rs"
 
 [dependencies]
 ariadne = "0.6.0"
-supports-unicode = "3.0.0"
 

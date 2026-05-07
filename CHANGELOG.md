@@ -13,7 +13,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - ADDED: Support for `obj_lma`, `obj_vma`, `obj_align`
 - ADDED: std::xor extension
 - ADDED: Support for big-endian writes
-- ADDED: Support plain-ASCII terminals without UTF-8 support
+- ADDED: Support plain-ASCII for non-terminal output, e.g. pipes
 - CHANGED: Unify all error codes as ERR_<n>
 - README: Added Brink features overview to the introduction
 - README: Added Brink standard extensions table

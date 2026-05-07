@@ -11,6 +11,7 @@
 // channel through which all diagnostics flow.
 
 use ariadne::{CharSet, Color, Config, Label, Report, ReportBuilder, ReportKind, sources};
+use std::io::IsTerminal;
 use std::ops::Range;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -29,7 +30,9 @@ pub struct Diags {
 
 impl Diags {
     pub fn new(name: &str, fstr: &str, verbosity: u64, noprint: bool) -> Self {
-        let char_set = if supports_unicode::on(supports_unicode::Stream::Stderr) {
+        // Use Unicode characters for terminal output, but fall back to ASCII if
+        // stderr is not a terminal (e.g. when redirecting to a file).
+        let char_set = if std::io::stderr().is_terminal() {
             CharSet::Unicode
         } else {
             CharSet::Ascii
