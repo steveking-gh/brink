@@ -416,11 +416,11 @@ program from the command line. This option is modelled after the GCC `-D`
 preprocessor syntax.  You can specify `-D` multiple times, once per each
 definition.  For example:
 
-    brink -DBASE=0x8000 -DCOUNT=16 firmware.brink
+    brink -DBASE=0x8000 -DCOUNT=16 -DSOME_PATH="/path/to/file" firmware.brink
 
 The `name` must be a valid Brink [identifier](#identifiers).  The `value` is
-optional; without a value, Brink sets the `const` to 1, with type `Integer`,
-following the GCC boolean-flag convention.
+optional and can be numeric or a quoted string.  Without a value, Brink sets the
+`const` to 1, with type `Integer`, following the GCC boolean-flag convention.
 
 `-D` **overrides** any same-named `const` definition in the source.
 
@@ -431,14 +431,15 @@ Map output lists all `const` definitions including `-D` consts.
 Brink knows or infers the type from the value string using the same rules as
 source code for type inference.
 
-| Example          | Value  | Type      | Description                                |
-| ---------------- | ------ | --------- | ------------------------------------------ |
-| `-DFLAG`         | 1      | `Integer` | Defaults to true (1).                      |
-| `-DCOUNT=16`     | 16     | `Integer` | Plain decimal → `Integer`                  |
-| `-DBASE=0x1000`  | 0x1000 | `U64`     | Hex/binary without suffix → implicit `U64` |
-| `-DBASE=0x1000u` | 0x1000 | `U64`     | `u` suffix → explicit `U64`                |
-| `-DOFFSET=0x40i` | 0x40   | `I64`     | `i` suffix → explicit `I64`                |
-| `-DDELTA=-4`     | -4     | `I64`     | Negative decimal → implicit `I64`          |
+| Example          | Value   | Type      | Description                                |
+| ---------------- | ------- | --------- | ------------------------------------------ |
+| `-DFLAG`         | 1       | `Integer` | Defaults to true (1).                      |
+| `-DCOUNT=16`     | 16      | `Integer` | Plain decimal → `Integer`                  |
+| `-DBASE=0x1000`  | 0x1000  | `U64`     | Hex/binary without suffix → implicit `U64` |
+| `-DBASE=0x1000u` | 0x1000  | `U64`     | `u` suffix → explicit `U64`                |
+| `-DOFFSET=0x40i` | 0x40    | `I64`     | `i` suffix → explicit `I64`                |
+| `-DDELTA=-4`     | -4      | `I64`     | Negative decimal → implicit `I64`          |
+| `-DMSG="Hello"`  | "Hello" | `String`  | Quoted string → `String`                   |
 
 ### Example
 
