@@ -80,8 +80,17 @@ fn parse_define(s: &str) -> Result<(String, ParameterValue)> {
             .map_err(|_| anyhow!("Invalid U64 value in define '{}': '{}'", s, val_str))?;
         ParameterValue::U64(v)
     } else {
-        let v = parse::<i64>(val_str)
-            .map_err(|_| anyhow!("Invalid integer value in define '{}': '{}'", s, val_str))?;
+        let v = parse::<i64>(val_str).map_err(|_| {
+            if val_str.chars().any(|c| !c.is_ascii_digit()) {
+                anyhow!(
+                    "Invalid value in define '{}': '{}' is not an integer. \
+                     To pass a string, use quotes: -D{}=\"{}\"",
+                    s, val_str, name, val_str
+                )
+            } else {
+                anyhow!("Invalid integer value in define '{}': '{}'", s, val_str)
+            }
+        })?;
         ParameterValue::Integer(v)
     };
     Ok((name.to_string(), value))
