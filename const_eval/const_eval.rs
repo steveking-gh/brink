@@ -563,7 +563,7 @@ pub fn evaluate_obj_props(
         let file    = resolve_obj_prop(obj_decl.nid, ast, "file",    obj_name, &obj_decl.src_loc, symbol_table, diags);
         let section = resolve_obj_prop(obj_decl.nid, ast, "section", obj_name, &obj_decl.src_loc, symbol_table, diags);
         match (file, section) {
-            (Some(f), Some(s)) => { props.insert(obj_name.clone(), ObjProps { file: f, objsec: s, src_loc: obj_decl.src_loc.clone() }); }
+            (Some(f), Some(s)) => { props.insert(obj_name.clone(), ObjProps { file: f, name: s, src_loc: obj_decl.src_loc.clone() }); }
             _ => ok = false,
         }
     }

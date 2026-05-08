@@ -1,0 +1,16 @@
+[package]
+name = "objfile"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+path = "objfile.rs"
+
+[dependencies]
+object = { version = "0.36", default-features = false, features = ["read", "elf"] }
+diags = { path = "../diags" }
+ir = { path = "../ir" }

@@ -187,7 +187,7 @@ impl ExecPhase {
 
         // IRDb pre-validated this entry; unwrap is safe.
         let info = irdb.objsecs.get(&obj_name).unwrap();
-        let file_path = info.path.clone();
+        let file_path = info.file.clone();
 
         let loc = &location_db.ir_locs[lid];
         let addr = loc.addr.addr_base + loc.addr.addr_offset;

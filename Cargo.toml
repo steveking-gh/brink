@@ -30,6 +30,7 @@ members = [
     "std/md5",
     "std/xor",
     "extensions",
+    "objfile",
 ]
 
 [workspace.package]

@@ -443,15 +443,13 @@ name = "irdb"
 version = "8.0.0"
 dependencies = [
  "anyhow",
- "ast",
- "astdb",
  "diags",
  "extension_registry",
  "indextree",
  "ir",
  "layoutdb",
  "linearizer",
- "object",
+ "objfile",
  "parse_int",
  "symtable",
  "tracing",
@@ -637,6 +635,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "62948e14d923ea95ea2c7c86c71013138b66525b86bdc08d2dcc262bdb497b87"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "objfile"
+version = "8.0.0"
+dependencies = [
+ "diags",
+ "ir",
+ "object",
 ]
 
 [[package]]

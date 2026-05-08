@@ -22,8 +22,28 @@ use parse_int::parse;
 #[derive(Clone, Debug)]
 pub struct ObjProps {
     pub file: String,
-    pub objsec: String,
+    pub name: String,
     /// Source location of the `obj` declaration, for two-location diagnostics.
+    pub src_loc: SourceSpan,
+}
+
+/// Resolved metadata for one `obj` declaration, extracted from the object file.
+/// Produced by the `objfile` crate during IRDb construction; consumed by
+/// layout_phase and exec_phase.
+#[derive(Clone, Debug)]
+pub struct ObjsecInfo {
+    /// Path to the object file.
+    pub file: String,
+    /// Name of the section within the object file.
+    pub name: String,
+    pub file_offset: u64,
+    pub size: u64,
+    /// Required alignment of the section as declared in the object file.
+    pub align: u64,
+    /// Virtual memory address of the section.
+    pub vma: u64,
+    /// Load memory address of the section.  Equals VMA for non-ELF formats.
+    pub lma: u64,
     pub src_loc: SourceSpan,
 }
 
