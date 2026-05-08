@@ -426,8 +426,8 @@ impl<'toks> LayoutDb {
             anyhow::bail!("LayoutDb construction failed.");
         }
 
-        // Linearize top-level assert statements into layout-time IR.
-        for &nid in &ast_db.global_asserts {
+        // Linearize top-level print and assert statements into layout-time IR.
+        for &nid in ast_db.global_prints.iter().chain(ast_db.global_asserts.iter()) {
             let mut lops = Vec::new();
             if !Self::record_r(
                 &mut layout_lz,

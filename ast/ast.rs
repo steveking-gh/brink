@@ -726,6 +726,13 @@ impl<'toks> Ast<'toks> {
                     }
                     ok
                 }
+                LexToken::Print => {
+                    let ok = self.parse_expr(self.root, diags);
+                    if !ok {
+                        self.advance_past_semicolon();
+                    }
+                    ok
+                }
 
                 // Unrecognized top level token.  Report the error, but keep going
                 // to try to give the user more errors in batches.

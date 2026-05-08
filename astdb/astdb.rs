@@ -124,6 +124,7 @@ pub struct AstDb {
     pub labels: HashMap<String, Label>,
     pub output: Output,
     pub global_asserts: Vec<NodeId>,
+    pub global_prints: Vec<NodeId>,
     /// All top-level const definitions, declarations, and if/else blocks
     /// in their original source token order.
     pub const_statements: Vec<NodeId>,
@@ -403,6 +404,7 @@ impl AstDb {
         let mut sections: HashMap<String, Section> = HashMap::new();
         let mut output: Option<Output> = None;
         let mut global_asserts: Vec<NodeId> = Vec::new();
+        let mut global_prints: Vec<NodeId> = Vec::new();
         let mut const_statements: Vec<NodeId> = Vec::new();
         let mut const_names: HashMap<String, SourceSpan> = HashMap::new();
         let mut regions: HashMap<String, Region> = HashMap::new();
@@ -430,6 +432,10 @@ impl AstDb {
                     }
                     LexToken::Assert => {
                         global_asserts.push(nid);
+                        true
+                    }
+                    LexToken::Print => {
+                        global_prints.push(nid);
                         true
                     }
                     _ => {
@@ -539,6 +545,7 @@ impl AstDb {
             labels: HashMap::new(),
             output,
             global_asserts,
+            global_prints,
             const_statements,
             const_names,
             regions,

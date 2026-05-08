@@ -14,6 +14,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - ADDED: std::xor extension
 - ADDED: Support for big-endian writes
 - ADDED: Support plain-ASCII for non-terminal output, e.g. pipes
+- FIXED: Top level print statements
 - CHANGED: Unify all error codes as ERR_<n>
 - README: Added Brink features overview to the introduction
 - README: Added Brink standard extensions table
