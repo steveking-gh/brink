@@ -1,0 +1,6 @@
+section foo {
+    print "hello from const print\n";
+    wr8 0x42;
+    assert 0;
+}
+output foo;

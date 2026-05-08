@@ -822,6 +822,37 @@ mod tests {
         assert_brink_success("tests/print_2.brink", None, None);
     }
 
+    /// All-immediate print fires at IRDb time on a clean file.
+    #[test]
+    fn print_immediate_1() {
+        let src = "tests/print_immediate_1.brink";
+        let derived_out = format!("{}.bin", src.replace('/', "_").replace('\\', "_"));
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg(src)
+            .arg("-o")
+            .arg(&derived_out)
+            .assert()
+            .success()
+            .stderr(predicates::str::is_empty())
+            .stdout(predicates::str::contains("hello from const print"));
+        if fs::metadata(&derived_out).is_ok() {
+            fs::remove_file(&derived_out).unwrap();
+        }
+    }
+
+    /// All-immediate print fires at IRDb time even when a later stage reports an error.
+    #[test]
+    fn print_immediate_on_error() {
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/print_immediate_on_error.brink")
+            .assert()
+            .failure()
+            .stderr(predicates::str::contains("ERR_126"))
+            .stdout(predicates::str::contains("hello from const print"));
+    }
+
     #[test]
     fn wrs_1() {
         assert_brink_success(

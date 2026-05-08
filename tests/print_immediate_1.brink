@@ -1,0 +1,6 @@
+const N = 7;
+section foo {
+    print "hello from const print ", N, "\n";
+    wr8 0x42;
+}
+output foo;

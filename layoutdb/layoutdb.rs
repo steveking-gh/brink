@@ -86,6 +86,7 @@ impl<'toks> LayoutDb {
     // ── Layout: section-body recursion ───────────────────────────────────────
 
     /// Recurse over each child of parent_nid calling record_r.
+    #[allow(clippy::too_many_arguments)]
     fn record_children_r(
         lz: &mut Linearizer,
         parent_nid: NodeId,
