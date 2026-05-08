@@ -1,0 +1,15 @@
+trace "Start!\n";
+section B {
+    trace "Size of B is ", size(B), "\n";
+    wr A;
+    wr A;
+    trace "B1\n";
+}
+
+section A {
+    trace "A1\n";
+}
+
+trace "Top1\n";
+output B;
+trace "Finish!\n";

@@ -1826,6 +1826,60 @@ Example:
 
 ---
 
+## trace
+
+`trace <expression> [, <expression>, ...];`
+
+The `trace` command provides debug output to help diagnose errors before Brink
+is able to internally execute a program.  Trace is especially useful for errors
+reported during layout phase operations before Brink determines the size and
+location of everything in the output file.  During this time, Brink is actively
+*cooking* the output, so layout depend values revealed by `trace` may change as
+iteration proceeds.
+
+> [!NOTE]
+> Brink suppresses `trace` output unless the user specifies at least one `-v`
+> verbosity level on the command line.
+
+The `trace` command has the same form and capability as the [`print`](#print)
+command. However, `trace` executes on every internal iteration pass as Brink
+tries to stabilize the output's layout.
+
+> [!NOTE]
+> Brink does not specify the order of execution of `trace` relative to other
+> statements in the program.
+
+> [!NOTE]
+> As shown by a `trace` command, layout dependent values such as
+> addresses and sizes may change as Brink iterates.  Use `print` to see
+> stabilized values.
+
+For example:
+
+    trace "Start!\n";
+    section B {
+        trace "Size of B is ", size(B), "\n";
+        wr A;
+        wr A;
+        trace "B1\n";
+    }
+
+    section A {
+        trace "A1\n";
+    }
+
+    trace "Top1\n";
+    output B;
+    trace "Finish!\n";
+
+The program above *might* produce an output like the following, the caveat being
+that Brink purposely does not rigorously define trace output:
+
+
+
+
+---
+
 ## wr
 
 The `wr` command has two forms.  The first form writes the contents of another

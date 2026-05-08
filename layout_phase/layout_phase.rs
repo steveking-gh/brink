@@ -1484,6 +1484,7 @@ impl LayoutPhase {
                     | IRKind::Label
                     | IRKind::Assert
                     | IRKind::Print
+                    | IRKind::Trace
                     | IRKind::I64
                     | IRKind::U64
                     // if/else IR only lives in const_ir_vec; never reaches the layout_phase.

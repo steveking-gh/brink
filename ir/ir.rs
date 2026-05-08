@@ -196,6 +196,7 @@ pub enum IRKind {
     SetAddr,
     SetFileOffset,
     Print,
+    Trace,
     RightShift,
     SecOffset,
     FileOffset,

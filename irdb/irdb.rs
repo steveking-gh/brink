@@ -419,7 +419,7 @@ impl IRDb {
             IRKind::ObjAlign | IRKind::ObjVma | IRKind::ObjLma => {
                 self.validate_obj_query_operands(ir, resolver, diags)
             }
-            IRKind::Wrs | IRKind::Print => self.validate_string_expr_operands(ir, diags),
+            IRKind::Wrs | IRKind::Print | IRKind::Trace => self.validate_string_expr_operands(ir, diags),
             IRKind::ExtensionCall => {
                 let name = self.get_opnd_as_identifier(ir, 0);
                 if ext_registry.get(name).is_none() {

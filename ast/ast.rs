@@ -49,6 +49,7 @@ pub enum LexToken {
     Assert,
     Sizeof,
     Print,
+    Trace,
     ToU64,
     ToI64,
     Addr,
@@ -199,6 +200,7 @@ pub fn is_reserved_identifier(name: &str) -> bool {
             | "pad_file_offset"
             | "set_addr"
             | "print"
+            | "trace"
             | "to_u64"
             | "to_i64"
             | "include"
@@ -726,7 +728,7 @@ impl<'toks> Ast<'toks> {
                     }
                     ok
                 }
-                LexToken::Print => {
+                LexToken::Print | LexToken::Trace => {
                     let ok = self.parse_expr(self.root, diags);
                     if !ok {
                         self.advance_past_semicolon();
@@ -1371,6 +1373,7 @@ impl<'toks> Ast<'toks> {
                 | LexToken::SetAddr
                 | LexToken::PadFileOffset
                 | LexToken::Print
+                | LexToken::Trace
         )
     }
 
@@ -2280,7 +2283,7 @@ impl<'toks> Ast<'toks> {
             let parse_ok = match tinfo.tok {
                 // Const-compatible statements (allowed in both TopLevel and Section)
                 LexToken::Identifier => self.parse_deferred_assign(parent, diags),
-                LexToken::Print | LexToken::Assert => self.parse_expr(parent, diags),
+                LexToken::Print | LexToken::Trace | LexToken::Assert => self.parse_expr(parent, diags),
                 LexToken::If => self.parse_if_r(parent, diags, ctx),
                 // Section-level statements: delegate to the shared dispatcher.
                 // try_parse_section_stmt returns None for unrecognized tokens.

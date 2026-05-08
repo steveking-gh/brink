@@ -309,6 +309,7 @@ impl<'src> Lexer<'src> {
             "assert"                 => LexToken::Assert,
             "sizeof"                 => LexToken::Sizeof,
             "print"                  => LexToken::Print,
+            "trace"                  => LexToken::Trace,
             "to_u64"                 => LexToken::ToU64,
             "to_i64"                 => LexToken::ToI64,
             "addr"                   => LexToken::Addr,

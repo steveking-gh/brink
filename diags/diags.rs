@@ -64,6 +64,10 @@ impl Diags {
         Report::build(kind, span).with_config(self.config)
     }
 
+    pub fn trace_enabled(&self) -> bool {
+        self.verbosity > 0
+    }
+
     /// Helper to print ariadne reports
     fn print_report(&self, report: Report<(String, Range<usize>)>) {
         if self.verbosity == 0 {

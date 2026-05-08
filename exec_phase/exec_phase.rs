@@ -339,8 +339,8 @@ impl ExecPhase {
             }
             result = match ir.kind {
                 IRKind::Wr(_, _) => Self::execute_wrx(location_db, argvaldb, written_ranges, lid, ir, diags, output),
-                // Pre-output prints already fired in validation_phase.
-                IRKind::Print => Ok(()),
+                // Pre-output prints and traces already fired in validation_phase.
+                IRKind::Print | IRKind::Trace => Ok(()),
                 IRKind::Wrs => Self::execute_wrs(location_db, argvaldb, written_ranges, lid, ir, irdb, diags, output),
                 IRKind::Wrf => Self::execute_wrf(location_db, argvaldb, written_ranges, lid, ir, irdb, diags, output),
                 IRKind::Wrobj => Self::execute_wrobj(location_db, argvaldb, written_ranges, lid, ir, irdb, diags, output),
