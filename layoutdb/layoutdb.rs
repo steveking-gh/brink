@@ -409,6 +409,23 @@ impl<'toks> LayoutDb {
         let region_names: HashSet<String> = ast_db.regions.keys().map(|s| s.to_string()).collect();
         let mut layout_lz = Linearizer::new();
 
+        // Linearize pre-output top-level statements first.
+        for &nid in ast_db.pre_output_globals.iter() {
+            let mut lops = Vec::new();
+            if !Self::record_r(
+                &mut layout_lz,
+                nid,
+                &mut lops,
+                symbol_table,
+                diags,
+                ast,
+                ast_db,
+                &obj_props,
+            ) {
+                anyhow::bail!("LayoutDb construction failed.");
+            }
+        }
+
         // Linearize the output section body (layout-time IR).
         let section = ast_db.sections.get(output_sec_str.as_str()).unwrap();
         let sec_nid = section.nid;
@@ -426,8 +443,11 @@ impl<'toks> LayoutDb {
             anyhow::bail!("LayoutDb construction failed.");
         }
 
-        // Linearize top-level print and assert statements into layout-time IR.
-        for &nid in ast_db.pre_output_globals.iter().chain(ast_db.post_output_globals.iter()) {
+        // Sentinel: everything after this point executes after the output file is written.
+        layout_lz.new_ir(output_nid, ast, IRKind::Output);
+
+        // Linearize post-output top-level statements last.
+        for &nid in ast_db.post_output_globals.iter() {
             let mut lops = Vec::new();
             if !Self::record_r(
                 &mut layout_lz,

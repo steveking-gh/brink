@@ -853,6 +853,26 @@ mod tests {
             .stdout(predicates::str::contains("hello from const print"));
     }
 
+    /// Prints fire in the correct execution order: pre-output top-level, then section body
+    /// statements in layout order, then post-output top-level.
+    #[test]
+    fn print_order_1() {
+        let src = "tests/print_order_1.brink";
+        let derived_out = format!("{}.bin", src.replace('/', "_").replace('\\', "_"));
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg(src)
+            .arg("-o")
+            .arg(&derived_out)
+            .assert()
+            .success()
+            .stderr(predicates::str::is_empty())
+            .stdout("Start!\nTop1\nTop2\nA1\nA2\nB1\nB2\nFinish!\n");
+        if fs::metadata(&derived_out).is_ok() {
+            fs::remove_file(&derived_out).unwrap();
+        }
+    }
+
     #[test]
     fn wrs_1() {
         assert_brink_success(
