@@ -1,0 +1,16 @@
+print "Start!\n";
+section B {
+    wr A;
+    print "B1\n";
+    print "B2\n";
+}
+
+section A {
+    print "A1\n";
+    print "A2\n";
+}
+
+print "Top1\n";
+print "Top2\n";
+output B;
+print "Finish!\n";

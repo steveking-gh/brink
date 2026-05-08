@@ -375,7 +375,8 @@ impl ExecPhase {
                 | IRKind::IfBegin
                 | IRKind::ElseBegin
                 | IRKind::IfEnd
-                | IRKind::BareAssign => Ok(()),
+                | IRKind::BareAssign
+                | IRKind::Output => Ok(()),
                 IRKind::ExtensionCall => {
                     // Reserve zeroed bytes for the extension output slot.
                     // Pass 2 patches the actual output back into this region.

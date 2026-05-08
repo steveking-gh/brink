@@ -483,7 +483,8 @@ impl IRDb {
             | IRKind::AddrOffset
             | IRKind::Eq
             | IRKind::SecOffset
-            | IRKind::FileOffset => true,
+            | IRKind::FileOffset
+            | IRKind::Output => true,
             // These kinds are emitted only into ConstDb's internal IR vector and
             // are fully consumed during const evaluation.  They never enter the
             // layout IR vector that process_linear_ir iterates.

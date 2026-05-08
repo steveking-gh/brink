@@ -215,6 +215,11 @@ pub enum IRKind {
     Wrf,
     Wrobj,
     Wrs,
+    /// Sentinel marking the boundary between pre-output and post-output IR.
+    /// Instructions before this point contribute to the output file.
+    /// Instructions after this point execute after the file is written.
+    /// Carries no operands and produces no bytes.
+    Output,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

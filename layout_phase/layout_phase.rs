@@ -1523,7 +1523,8 @@ impl LayoutPhase {
                     | IRKind::IfBegin
                     | IRKind::ElseBegin
                     | IRKind::IfEnd
-                    | IRKind::BareAssign => true,
+                    | IRKind::BareAssign
+                    | IRKind::Output => true,
                 }
             }
             if self.ir_locs == old_locations {

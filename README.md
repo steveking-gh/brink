@@ -340,16 +340,52 @@ to 0.
 
 # Order of Execution
 
-As a mental model, user's can think of program execution as occurring in *output
-order*.  Output order means the sequence of operations that produce bytes
-in-order starting with the initial byte of the output file.  In other words, an
-operation producing the first byte of the output will execute before an
-operation producing the second byte.
+As a mental model, users can think of program execution as occurring in *output
+order*.  In other words, an operation producing the first byte of the output
+will execute before an operation producing the second byte.
 
-Within a section definition, output order and source code order are the same.
-However, outside of a section definition, output order and program order may
-differ.  For example, source code may define whole sections in a different order
-than instantiated into in the output.
+Within a section, output order and source code order are the same. Outside of a
+section, output order and source code order may differ.  For example, source
+code may define whole sections in a different order than instantiated into in
+the output.
+
+For top-level statements outside of a section, Brink orders execution as
+follows:
+
+1. Top level statements *before* the [`output`](#output) statement execute
+   *before* Brink begins producing output bytes.
+2. Top level statements *after* the output statement execute *after* Brink
+   produces the output file.
+
+For example:
+
+    print "Start!";
+    section B {
+        wr A;
+        print "B1\n";
+        print "B2\n";
+    }
+
+    section A {
+        print "A1\n";
+        print "A2\n";
+    }
+
+    print "Top1\n";
+    print "Top2\n";
+    output B;
+    print "Finish!";
+
+Produces the output:
+
+    Start!
+    Top1
+    Top2
+    A1
+    A2
+    B1
+    B2
+    Finish!
 
 ## Output Creation Phases
 
