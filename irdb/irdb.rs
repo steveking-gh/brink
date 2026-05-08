@@ -646,23 +646,7 @@ impl IRDb {
         true
     }
 
-    // Evaluate a Print IR whose operands are all immediate values.
-    // Returns None only if an operand has an unexpected type (compiler bug).
-    fn evaluate_immediate_print(&self, ir: &IR) -> Option<String> {
-        let mut s = String::new();
-        for &idx in &ir.operands {
-            let opnd = &self.parms[idx];
-            match opnd.val.data_type() {
-                DataType::QuotedString => s.push_str(opnd.val.to_str()),
-                DataType::U64 => s.push_str(&format!("{:#X}", opnd.val.to_u64())),
-                DataType::Integer | DataType::I64 => s.push_str(&format!("{}", opnd.val.to_i64())),
-                _ => return None,
-            }
-        }
-        Some(s)
-    }
-
-    /// Convert the linear IR to real IR.  Conversion from Linear IR to real IR can fail,
+/// Convert the linear IR to real IR.  Conversion from Linear IR to real IR can fail,
     /// which is a hassle we don't want to deal with during linearization of the AST.
     fn process_linear_ir(
         &mut self,
@@ -691,20 +675,6 @@ impl IRDb {
                 && !self.resolve_named_ext_args(&mut ir, ext_registry, section_names, diags)
             {
                 result = false;
-                continue;
-            }
-
-            // Early-fire: if every print operand is already an immediate value
-            // (const-substituted), emit now.  The print will appear even if a
-            // later pipeline stage fails and exec_phase never runs.
-            if ir.kind == IRKind::Print
-                && ir.operands.iter().all(|&i| self.parms[i].is_immediate)
-            {
-                if !diags.noprint
-                    && let Some(s) = self.evaluate_immediate_print(&ir)
-                {
-                    print!("{}", s);
-                }
                 continue;
             }
 

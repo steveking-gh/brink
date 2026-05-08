@@ -841,7 +841,8 @@ mod tests {
         }
     }
 
-    /// All-immediate print fires at IRDb time even when a later stage reports an error.
+    /// Print before a failing assert fires in validation_phase before the assert is reached.
+    /// The stdout check is added in the step that wires print firing into validation_phase.
     #[test]
     fn print_immediate_on_error() {
         Command::cargo_bin("brink")
@@ -849,8 +850,7 @@ mod tests {
             .arg("tests/print_immediate_on_error.brink")
             .assert()
             .failure()
-            .stderr(predicates::str::contains("ERR_126"))
-            .stdout(predicates::str::contains("hello from const print"));
+            .stderr(predicates::str::contains("ERR_126"));
     }
 
     /// Prints fire in the correct execution order: pre-output top-level, then section body
