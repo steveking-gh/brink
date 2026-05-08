@@ -15,7 +15,7 @@
 
 use locationdb::{AddressState, Location, LocationDb};
 
-use argvaldb::ParmValDb;
+use argvaldb::{ParmValDb, evaluate_string_expr};
 use diags::Diags;
 use extension_registry::ExtensionRegistry;
 use ir::{ConstBuiltins, DataType, EffectiveRegion, IR, IRKind, ParameterValue};
@@ -84,7 +84,8 @@ impl LayoutPhase {
     ) -> bool {
         self.trace(format_args!("LayoutPhase::iterate_wrs: {}", current));
 
-        let Some(xstr) = self.evaluate_string_expr(ir, irdb, diags) else {
+        let Some(xstr) = evaluate_string_expr(&self.parms, &irdb.parms, &ir.operands, diags)
+        else {
             return false;
         };
 
@@ -251,39 +252,6 @@ impl LayoutPhase {
     /// Returns the resulting string in xstr.
     /// If the diags noprint option is true, suppress printing.
     /// Returns None of failure
-    fn evaluate_string_expr(&self, ir: &IR, irdb: &IRDb, diags: &mut Diags) -> Option<String> {
-        let mut result = true;
-        let mut xstr = String::new();
-        for (local_op_num, &op_num) in ir.operands.iter().enumerate() {
-            let op = &self.parms[op_num];
-            debug!(
-                "Processing string expr operand {} with data type {:?}",
-                local_op_num,
-                op.data_type()
-            );
-            match op.data_type() {
-                DataType::QuotedString => {
-                    xstr.push_str(op.to_str());
-                }
-                DataType::U64 => {
-                    xstr.push_str(format!("{:#X}", op.to_u64()).as_str());
-                }
-                DataType::Integer | DataType::I64 => {
-                    xstr.push_str(format!("{}", op.to_i64()).as_str());
-                }
-                bad => {
-                    let msg = format!("Cannot stringify type '{:?}'", bad);
-                    let src_loc = irdb.parms[op_num].src_loc.clone();
-                    diags.err1("ERR_138", &msg, src_loc);
-                    result = false;
-                }
-            }
-        }
-
-        // If stringifying succeeded, return the String
-        if result { Some(xstr) } else { None }
-    }
-
     fn do_u64_add(ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
         let Some(checked_result) = in0.checked_add(in1) else {
             let msg = format!("Add expression '{in0} + {in1}' will overflow type U64");

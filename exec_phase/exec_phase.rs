@@ -16,7 +16,7 @@ use ir::{DataType, IR, IRKind, ParameterValue};
 use irdb::IRDb;
 use locationdb::LocationDb;
 use mapdb::MapDb;
-use argvaldb::ParmValDb;
+use argvaldb::{ParmValDb, evaluate_string_expr};
 use output_buffer::OutputBuffer;
 use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
@@ -84,7 +84,8 @@ impl ExecPhase {
             return Ok(());
         }
 
-        let Some(xstr) = Self::evaluate_string_expr(argvaldb, ir, irdb, diags) else {
+        let Some(xstr) = evaluate_string_expr(&argvaldb.parms, &irdb.parms, &ir.operands, diags)
+        else {
             let msg = "Evaluating string expression failed.".to_string();
             diags.err1("ERR_140", &msg, ir.src_loc.clone());
             return Err(anyhow!("Wrs failed"));
@@ -105,7 +106,8 @@ impl ExecPhase {
         output: &mut OutputBuffer,
     ) -> Result<()> {
         trace!("Engine::execute_wrs:");
-        let Some(xstr) = Self::evaluate_string_expr(argvaldb, ir, irdb, diags) else {
+        let Some(xstr) = evaluate_string_expr(&argvaldb.parms, &irdb.parms, &ir.operands, diags)
+        else {
             let msg = "Evaluating string expression failed.".to_string();
             diags.err1("ERR_139", &msg, ir.src_loc.clone());
             return Err(anyhow!("Wrs failed"));
@@ -627,44 +629,6 @@ impl ExecPhase {
         }
 
         true
-    }
-
-    fn evaluate_string_expr(
-        argvaldb: &ParmValDb,
-        ir: &IR,
-        irdb: &IRDb,
-        diags: &mut Diags,
-    ) -> Option<String> {
-        let mut result = true;
-        let mut xstr = String::new();
-        for (local_op_num, &op_num) in ir.operands.iter().enumerate() {
-            let op = &argvaldb.parms[op_num];
-            debug!(
-                "Processing string expr operand {} with data type {:?}",
-                local_op_num,
-                op.data_type()
-            );
-            match op.data_type() {
-                DataType::QuotedString => {
-                    xstr.push_str(op.to_str());
-                }
-                DataType::U64 => {
-                    xstr.push_str(format!("{:#X}", op.to_u64()).as_str());
-                }
-                DataType::Integer | DataType::I64 => {
-                    xstr.push_str(format!("{}", op.to_i64()).as_str());
-                }
-                bad => {
-                    let msg = format!("Cannot stringify type '{:?}'", bad);
-                    let src_loc = irdb.parms[op_num].src_loc.clone();
-                    diags.err1("ERR_181", &msg, src_loc);
-                    result = false;
-                }
-            }
-        }
-
-        // If stringifying succeeded, return the String
-        if result { Some(xstr) } else { None }
     }
 
 }
