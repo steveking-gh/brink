@@ -123,7 +123,11 @@ pub struct AstDb {
     pub sections: HashMap<String, Section>,
     pub labels: HashMap<String, Label>,
     pub output: Output,
-    pub global_statements: Vec<NodeId>,
+    /// Top-level print and assert statements that appear before the `output` declaration.
+    pub pre_output_globals: Vec<NodeId>,
+    /// Top-level print statements that appear after the `output` declaration.
+    /// assert is not permitted after output and is rejected during construction.
+    pub post_output_globals: Vec<NodeId>,
     /// All top-level const definitions, declarations, and if/else blocks
     /// in their original source token order.
     pub const_statements: Vec<NodeId>,
@@ -402,7 +406,9 @@ impl AstDb {
         let mut result = true;
         let mut sections: HashMap<String, Section> = HashMap::new();
         let mut output: Option<Output> = None;
-        let mut global_statements: Vec<NodeId> = Vec::new();
+        let mut pre_output_globals: Vec<NodeId> = Vec::new();
+        let mut post_output_globals: Vec<NodeId> = Vec::new();
+        let mut output_seen = false;
         let mut const_statements: Vec<NodeId> = Vec::new();
         let mut const_names: HashMap<String, SourceSpan> = HashMap::new();
         let mut regions: HashMap<String, Region> = HashMap::new();
@@ -415,7 +421,10 @@ impl AstDb {
                     LexToken::Section => Self::record_section(diags, nid, ast, &mut sections),
                     LexToken::Region => Self::record_region(diags, nid, ast, &mut regions),
                     LexToken::Obj => Self::record_obj(diags, nid, ast, &mut obj_decls),
-                    LexToken::Output => Self::record_output(diags, nid, ast, &mut output),
+                    LexToken::Output => {
+                        output_seen = true;
+                        Self::record_output(diags, nid, ast, &mut output)
+                    }
                     LexToken::Const => {
                         const_statements.push(nid);
                         Self::record_const(diags, nid, ast, &mut const_names)
@@ -428,8 +437,25 @@ impl AstDb {
                         const_statements.push(nid);
                         true
                     }
-                    LexToken::Assert | LexToken::Print => {
-                        global_statements.push(nid);
+                    LexToken::Assert => {
+                        if output_seen {
+                            diags.err1(
+                                "ERR_230",
+                                "assert is not permitted after the output statement",
+                                tinfo.span().clone(),
+                            );
+                            false
+                        } else {
+                            pre_output_globals.push(nid);
+                            true
+                        }
+                    }
+                    LexToken::Print => {
+                        if output_seen {
+                            post_output_globals.push(nid);
+                        } else {
+                            pre_output_globals.push(nid);
+                        }
                         true
                     }
                     _ => {
@@ -538,7 +564,8 @@ impl AstDb {
             sections,
             labels: HashMap::new(),
             output,
-            global_statements,
+            pre_output_globals,
+            post_output_globals,
             const_statements,
             const_names,
             regions,

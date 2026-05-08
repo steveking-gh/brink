@@ -427,7 +427,7 @@ impl<'toks> LayoutDb {
         }
 
         // Linearize top-level print and assert statements into layout-time IR.
-        for &nid in &ast_db.global_statements {
+        for &nid in ast_db.pre_output_globals.iter().chain(ast_db.post_output_globals.iter()) {
             let mut lops = Vec::new();
             if !Self::record_r(
                 &mut layout_lz,
