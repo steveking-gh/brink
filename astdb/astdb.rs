@@ -88,14 +88,13 @@ impl Output {
 // -- ObjDecl ------------------------------------------------------------------
 
 /// AST-phase record of an `obj` declaration.
-/// Section name and file path are literal strings resolved at parse time.
+/// Holds the parse-tree position and source location; property values
+/// (file, section) are extracted by the consumer via the AST node.
 #[derive(Clone, Debug)]
 pub struct ObjDecl {
-    /// ELF/Mach-O/PE section name (e.g. ".rodata").
-    pub section_name: String,
-    /// Path to the object file.
-    pub file_path: String,
-    /// Source location of the `obj` keyword, for diagnostics.
+    /// AST node ID of the obj root; used by irdb to find properties.
+    pub nid: NodeId,
+    /// Source location of the obj name, for diagnostics.
     pub src_loc: SourceSpan,
 }
 
@@ -159,27 +158,8 @@ impl AstDb {
             return false;
         }
 
-        // Children after the name are ObjProp nodes; find section and file by val.
-        let mut section_name = String::new();
-        let mut file_path    = String::new();
-        for prop_nid in children {
-            let prop_tinfo = ast.get_tinfo(prop_nid);
-            if prop_tinfo.tok != LexToken::ObjProp { continue; }
-            // The ObjProp's single child is the QuotedString value.
-            let val_nid  = ast.children(prop_nid).next().unwrap();
-            let raw      = ast.get_tinfo(val_nid).val;
-            // Strip surrounding double-quotes that the lexer includes in val.
-            let stripped = raw.strip_prefix('"').unwrap_or("").strip_suffix('"').unwrap_or("").to_string();
-            match prop_tinfo.val {
-                "section" => section_name = stripped,
-                "file"    => file_path    = stripped,
-                _         => {}
-            }
-        }
-
         obj_decls.insert(name_str.to_string(), ObjDecl {
-            section_name,
-            file_path,
+            nid: obj_nid,
             src_loc: name_tinfo.span(),
         });
         true

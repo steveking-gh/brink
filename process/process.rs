@@ -173,6 +173,12 @@ pub fn process(
         return Err(anyhow!("[ERR_226]: Error detected, halting."));
     };
 
+    let Some(obj_props) =
+        const_eval::evaluate_obj_props(&mut diags, &pruned_ast, &pruned_ast_db, &mut symbol_table)
+    else {
+        return Err(anyhow!("[ERR_232]: Error detected, halting."));
+    };
+
     // Build the section-to-region-name map (foreign key into region_bindings).
     let mut section_region_names: HashMap<String, String> = HashMap::new();
     for (sec_name, section) in &pruned_ast_db.sections {
@@ -181,7 +187,7 @@ pub fn process(
         }
     }
 
-    let layout_db = LayoutDb::new(&mut diags, &pruned_ast, &pruned_ast_db, &symbol_table)
+    let layout_db = LayoutDb::new(&mut diags, &pruned_ast, &pruned_ast_db, &symbol_table, obj_props)
         .context("[ERR_221]: Error detected, halting.")?;
     if verbosity > 2 {
         layout_db.dump();

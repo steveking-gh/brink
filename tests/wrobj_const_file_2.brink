@@ -1,0 +1,12 @@
+// obj file path supplied via -D define; section is a source string const.
+const OBJ_FILE;
+const OBJ_SECTION = ".rodata";
+obj rodata {
+    file    = OBJ_FILE;
+    section = OBJ_SECTION;
+}
+section out {
+    wr rodata;
+    assert sizeof(rodata) == 23;
+}
+output out;

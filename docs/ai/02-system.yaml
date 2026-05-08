@@ -63,9 +63,14 @@ pipeline:
     ERR_220: prune or second AstDb failure
     ERR_221: LayoutDb failure
     ERR_222: IRDb failure
-    ERR_223: LayoutPhase failure
+    ERR_223: LayoutPhase / ExecPhase failure
     ERR_224: Output image size exceeds --max-output-size limit
     ERR_225: ValidationPhase failure (assert evaluation)
+    ERR_226: evaluate_regions failure
+    ERR_227: RegionDb build failure
+    ERR_228: obj property const is not a string value
+    ERR_229: obj property const is not defined
+    ERR_232: evaluate_obj_props failure
 
 extensions:
   api_crate: brink_extension
@@ -162,6 +167,10 @@ language_features:
   wrs: write a string literal
   wrf: write a binary file
   obj: top-level declaration binding a name to a section in an object file; syntax: obj name { section = "..."; file = "..."; }
+       Naming convention: the section inside an external object file is called "objsec"
+       in code (ObjProps.objsec, ObjSectionInfo.section_name) to avoid confusion with
+       Brink's own Section construct. Never use the bare word "section" for ELF/object
+       file sections in identifiers or comments.
   sizeof(obj_name): returns the byte size of the named obj section (resolved at IRDb validation time)
   align: pad to alignment boundary
   set_addr / pad_addr_offset / pad_sec_offset / pad_file_offset: address control

@@ -17,12 +17,22 @@ use diags::Diags;
 use diags::SourceSpan;
 use parse_int::parse;
 
+/// Resolved properties of an `obj` declaration: the ELF file path and the
+/// objsec name to extract from it.
+#[derive(Clone, Debug)]
+pub struct ObjProps {
+    pub file: String,
+    pub objsec: String,
+    /// Source location of the `obj` declaration, for two-location diagnostics.
+    pub src_loc: SourceSpan,
+}
+
 /// Region properties bound to a section via `section NAME in REGION`.
 /// Stored on IRDb; consumed by LayoutPhase and later execution phases.
 /// Carries the region name and declaration source location so that every
 /// error site can report which region was violated without extra lookups.
 #[derive(Clone, Debug)]
-pub struct RegionBinding {
+pub struct RegionProps {
     pub addr: u64,
     pub size: u64,
     /// The region name as written in source, e.g. "FLASH".
@@ -31,17 +41,17 @@ pub struct RegionBinding {
     pub src_loc: SourceSpan,
 }
 
-impl RegionBinding {
+impl RegionProps {
     /// Returns the intersection of self and other, or None when disjoint.
     /// The intersection name is "{self} & {other}" for diagnostics.
-    pub fn intersect(&self, other: &RegionBinding) -> Option<RegionBinding> {
+    pub fn intersect(&self, other: &RegionProps) -> Option<RegionProps> {
         let addr = self.addr.max(other.addr);
         // No overflow, bare addition is safe.
         let end = (self.addr + self.size).min(other.addr + other.size);
         if end <= addr {
             return None;
         }
-        Some(RegionBinding {
+        Some(RegionProps {
             addr,
             size: end - addr,
             name: format!("{} & {}", self.name, other.name),
@@ -52,14 +62,14 @@ impl RegionBinding {
 
 /// The effective region constraint for a section: the geometric intersection of
 /// all ancestor region bindings plus the section's own direct binding.
-/// region_stack holds each RegionBinding that narrowed the intersection,
+/// region_stack holds each RegionProps that narrowed the intersection,
 /// outermost first, for use in ERR_186 backtrace diagnostics.
 #[derive(Clone, Debug)]
 pub struct EffectiveRegion {
     /// Intersection of all regions in the region stack..
-    pub effective_region: RegionBinding,
+    pub effective_region: RegionProps,
     /// All applicable regions, outermost first.
-    pub region_stack: Vec<RegionBinding>,
+    pub region_stack: Vec<RegionProps>,
 }
 
 impl EffectiveRegion {

@@ -19,7 +19,7 @@ use tracing::{debug, trace};
 
 use ast::{Ast, LexToken};
 use astdb::AstDb;
-use ir::{ConstBuiltins, ParameterValue, RegionBinding, strip_kmg};
+use ir::{ConstBuiltins, ObjProps, ParameterValue, RegionProps, strip_kmg};
 use symtable::SymbolTable;
 
 // ── Internal error type for const arithmetic ─────────────────────────────────
@@ -484,12 +484,12 @@ pub fn evaluate_regions(
     ast: &Ast,
     ast_db: &AstDb,
     symbol_table: &mut SymbolTable,
-) -> Option<HashMap<String, RegionBinding>> {
-    let mut bindings: HashMap<String, RegionBinding> = HashMap::new();
+) -> Option<HashMap<String, RegionProps>> {
+    let mut bindings: HashMap<String, RegionProps> = HashMap::new();
     let mut ok = true;
 
     for (name, region) in &ast_db.regions {
-        let mut binding = RegionBinding {
+        let mut binding = RegionProps {
             addr: 0,
             size: 0,
             name: name.clone(),
@@ -546,6 +546,88 @@ pub fn evaluate_regions(
         }
     }
     if ok { Some(bindings) } else { None }
+}
+
+/// Resolves obj block property values (file, objsec) against the symbol table.
+/// Returns a map of obj name -> ObjProps, or None on error.
+pub fn evaluate_obj_props(
+    diags: &mut Diags,
+    ast: &Ast,
+    ast_db: &AstDb,
+    symbol_table: &mut SymbolTable,
+) -> Option<HashMap<String, ObjProps>> {
+    let mut props: HashMap<String, ObjProps> = HashMap::new();
+    let mut ok = true;
+
+    for (obj_name, obj_decl) in &ast_db.obj_decls {
+        let file    = resolve_obj_prop(obj_decl.nid, ast, "file",    obj_name, &obj_decl.src_loc, symbol_table, diags);
+        let section = resolve_obj_prop(obj_decl.nid, ast, "section", obj_name, &obj_decl.src_loc, symbol_table, diags);
+        match (file, section) {
+            (Some(f), Some(s)) => { props.insert(obj_name.clone(), ObjProps { file: f, objsec: s, src_loc: obj_decl.src_loc.clone() }); }
+            _ => ok = false,
+        }
+    }
+    if ok { Some(props) } else { None }
+}
+
+fn resolve_obj_prop(
+    obj_nid: NodeId,
+    ast: &Ast,
+    prop: &str,
+    obj_name: &str,
+    src_loc: &diags::SourceSpan,
+    symbol_table: &mut SymbolTable,
+    diags: &mut Diags,
+) -> Option<String> {
+    let val_nid = ast
+        .children(obj_nid)
+        .filter_map(|prop_nid| {
+            let tinfo = ast.get_tinfo(prop_nid);
+            if tinfo.tok == LexToken::ObjProp && tinfo.val == prop {
+                ast.children(prop_nid).next()
+            } else {
+                None
+            }
+        })
+        .next()
+        .unwrap(); // parser guarantees both section and file are present
+    let val_tinfo = ast.get_tinfo(val_nid);
+    match val_tinfo.tok {
+        LexToken::QuotedString => Some(
+            val_tinfo.val
+                .strip_prefix('"')
+                .unwrap_or("")
+                .strip_suffix('"')
+                .unwrap_or("")
+                .to_string(),
+        ),
+        LexToken::Identifier => {
+            let name = val_tinfo.val;
+            match symbol_table.get_value(name) {
+                Some(ParameterValue::QuotedString(s)) => {
+                    symbol_table.mark_used(name);
+                    Some(s)
+                }
+                Some(_) => {
+                    let m = format!(
+                        "obj '{}': '{}' const '{}' must be a string value",
+                        obj_name, prop, name
+                    );
+                    diags.err1("ERR_228", &m, src_loc.clone());
+                    None
+                }
+                None => {
+                    let m = format!(
+                        "obj '{}': '{}' const '{}' is not defined",
+                        obj_name, prop, name
+                    );
+                    diags.err1("ERR_229", &m, src_loc.clone());
+                    None
+                }
+            }
+        }
+        _ => unreachable!("obj property value must be QuotedString or Identifier"),
+    }
 }
 
 // ── Top-Level AST Walker & Pruner ─────────────────────────────────────────────

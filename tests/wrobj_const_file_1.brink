@@ -1,0 +1,12 @@
+// obj file and section paths supplied via source string consts.
+const OBJ_FILE    = "tests/obj_test.elf";
+const OBJ_SECTION = ".rodata";
+obj rodata {
+    file    = OBJ_FILE;
+    section = OBJ_SECTION;
+}
+section out {
+    wr rodata;
+    assert sizeof(rodata) == 23;
+}
+output out;

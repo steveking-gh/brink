@@ -63,6 +63,30 @@ lessons_learned:
       AST memory, eliminates borrow checker friction, and requires zero downstream
       changes because Ast::get_tinfo(nid) returns a reference to the stored value.
 
+  - id: L9
+    topic: AstDb records store nid only -- no pre-extracted values
+    detail: >
+      AstDb declaration records (Section, Region, ObjDecl, Label) hold nid: NodeId
+      and src_loc: SourceSpan.  They do NOT pre-extract property values from AST
+      children.  When one feature (obj) tried storing pre-extracted values with a
+      custom enum (ObjPropVal { Literal, Ident }), it became the only record in
+      AstDb with a discriminated type, creating an inconsistency that required two
+      further refactors to resolve.  Correct pattern: store nid, let downstream
+      walk the AST.  The token type (QuotedString vs Identifier) is already in the
+      node; no wrapper enum is needed.
+
+  - id: L10
+    topic: String-or-identifier property resolution belongs in const_eval
+    detail: >
+      When a top-level declaration property can be a literal string or a const
+      identifier, the resolution (symbol table lookup + type check) belongs in
+      const_eval as an evaluate_<feature>(diags, ast, ast_db, symbol_table) ->
+      Option<HashMap<...>> function, not in IRDb.  The pattern is established by
+      evaluate_regions.  IRDb receives fully-resolved strings as a direct parameter,
+      the same way it receives region_bindings.  Pushing resolution into IRDb forces
+      IRDb to take &Ast and &SymbolTable for resolution work, which is a sign the
+      responsibility is misplaced.
+
 active_risks:
   - id: R1
     risk: >

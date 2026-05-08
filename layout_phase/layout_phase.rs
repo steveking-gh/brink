@@ -243,7 +243,7 @@ impl LayoutPhase {
         current: &mut Location,
     ) -> bool {
         let obj_name = self.parms[ir.operands[0]].identifier_to_str().to_string();
-        let info = irdb.obj_sections.get(&obj_name).unwrap();
+        let info = irdb.objsecs.get(&obj_name).unwrap();
         current.advance(info.size, &ir.src_loc, diags)
     }
 
@@ -736,13 +736,13 @@ impl LayoutPhase {
             }
 
             // Obj path: size is fixed from the object file section.
-            if let Some(info) = irdb.obj_sections.get(&sec_name) {
+            if let Some(info) = irdb.objsecs.get(&sec_name) {
                 *self.parms[out_parm_num].to_u64_mut() = info.size;
                 return true;
             }
 
             // Region path: size is const-evaluated and stable across iterations.
-            if let Some(binding) = irdb.region_bindings.get(&sec_name) {
+            if let Some(binding) = irdb.region_props.get(&sec_name) {
                 *self.parms[out_parm_num].to_u64_mut() = binding.size;
             } else {
                 unreachable!(
@@ -789,7 +789,7 @@ impl LayoutPhase {
     fn iterate_obj_align(&mut self, ir: &IR, irdb: &IRDb) -> bool {
         assert!(ir.operands.len() == 2);
         let obj_name = self.parms[ir.operands[0]].identifier_to_str().to_string();
-        let info = irdb.obj_sections.get(&obj_name).unwrap();
+        let info = irdb.objsecs.get(&obj_name).unwrap();
         *self.parms[ir.operands[1]].to_u64_mut() = info.align;
         true
     }
@@ -797,7 +797,7 @@ impl LayoutPhase {
     fn iterate_obj_vma(&mut self, ir: &IR, irdb: &IRDb) -> bool {
         assert!(ir.operands.len() == 2);
         let obj_name = self.parms[ir.operands[0]].identifier_to_str().to_string();
-        let info = irdb.obj_sections.get(&obj_name).unwrap();
+        let info = irdb.objsecs.get(&obj_name).unwrap();
         *self.parms[ir.operands[1]].to_u64_mut() = info.vma;
         true
     }
@@ -805,7 +805,7 @@ impl LayoutPhase {
     fn iterate_obj_lma(&mut self, ir: &IR, irdb: &IRDb) -> bool {
         assert!(ir.operands.len() == 2);
         let obj_name = self.parms[ir.operands[0]].identifier_to_str().to_string();
-        let info = irdb.obj_sections.get(&obj_name).unwrap();
+        let info = irdb.objsecs.get(&obj_name).unwrap();
         *self.parms[ir.operands[1]].to_u64_mut() = info.lma;
         true
     }
@@ -1177,7 +1177,7 @@ impl LayoutPhase {
         // Region path: addr and size are const-evaluated, not layout-dependent.
         // Only addr(REGION) is valid; the offset variants have no meaning for a
         // static region declaration.
-        if let Some(binding) = irdb.region_bindings.get(&name) {
+        if let Some(binding) = irdb.region_props.get(&name) {
             match ir.kind {
                 IRKind::Addr => {
                     *self.parms[out_parm_num].to_u64_mut() = binding.addr;

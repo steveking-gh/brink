@@ -15,6 +15,13 @@ crates:
       parse_if_body_r.  Section token allowed in TopLevel if/else bodies.
       Ast nodes hold TokenInfo by value (rustc-style), avoiding arena index lookups.
 
+      AstDb record convention: every top-level declaration record (Section, Region,
+      ObjDecl, Label) stores nid: NodeId + src_loc: SourceSpan only.  AstDb does NOT
+      pre-extract property values from the AST.  Consumers walk the AST from the
+      stored nid.  Do not invent per-feature enums (e.g. PropVal { Literal, Ident })
+      inside AstDb to discriminate token types -- the token type lives in the AST
+      node and is read downstream via ast.get_tinfo(nid).tok.
+
       Region AST layer (Steps 3+4 COMPLETE):
         LexToken::Region and LexToken::In are keywords (lexer-mapped).
         LexToken::RegionProp — synthetic; tok=RegionProp, val=property name,
@@ -34,10 +41,19 @@ crates:
     path: const_eval/const_eval.rs
     role: Const expression evaluation and AST pruning
     key_types: [ConstIR, LinIR, LinOperand]
-    key_fns: [evaluate, evaluate_and_prune]
+    key_fns: [evaluate_and_prune, evaluate_regions, evaluate_obj_props]
     notes: >
       Acts as an AST walker. Evaluates constants and prunes dead if/else branches
       simultaneously, returning a cloned working AST. Eliminates the need for a separate prune crate.
+
+      evaluate_* pattern: when a top-level declaration has properties that can be
+      either a string literal or a const identifier, add an evaluate_<feature>(diags,
+      ast, ast_db, symbol_table) -> Option<HashMap<...>> function here.  Call it in
+      process.rs after evaluate_regions, with its own pipeline-halt error code.
+      IRDb receives the fully-resolved map as a direct parameter -- it never accesses
+      the AST or symbol table for property resolution.  Existing examples:
+        evaluate_regions  -> HashMap<String, RegionProps>  (addr/size expressions)
+        evaluate_obj_props -> HashMap<String, (String, String)>  (file/section strings)
 
   prune:
     path: (removed)

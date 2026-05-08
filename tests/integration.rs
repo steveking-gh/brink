@@ -3437,6 +3437,59 @@ mod tests {
     }
 
     #[test]
+    /// obj file and section supplied as source string consts produce the correct bytes.
+    fn wrobj_const_file_1() {
+        let out = "tests_wrobj_const_file_1.brink.bin";
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/wrobj_const_file_1.brink")
+            .arg("-o")
+            .arg(out)
+            .assert()
+            .success()
+            .stderr(predicates::str::is_empty());
+        let bytes = fs::read(out).unwrap();
+        assert_eq!(
+            bytes,
+            &[
+                0x01, 0x00, 0x02, 0x00, 0x49, 0x20, 0x67, 0x6f, 0x74, 0x20, 0x25, 0x64,
+                0x20, 0x61, 0x72, 0x67, 0x75, 0x6d, 0x65, 0x6e, 0x74, 0x73, 0x00,
+            ]
+        );
+        fs::remove_file(out).unwrap();
+    }
+
+    #[test]
+    /// obj file path supplied via -D define produces the correct bytes.
+    fn wrobj_const_file_2() {
+        let out = "tests_wrobj_const_file_2.brink.bin";
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/wrobj_const_file_2.brink")
+            .arg("-o")
+            .arg(out)
+            .arg(r#"-DOBJ_FILE="tests/obj_test.elf""#)
+            .assert()
+            .success()
+            .stderr(predicates::str::is_empty());
+        let bytes = fs::read(out).unwrap();
+        assert_eq!(
+            bytes,
+            &[
+                0x01, 0x00, 0x02, 0x00, 0x49, 0x20, 0x67, 0x6f, 0x74, 0x20, 0x25, 0x64,
+                0x20, 0x61, 0x72, 0x67, 0x75, 0x6d, 0x65, 0x6e, 0x74, 0x73, 0x00,
+            ]
+        );
+        fs::remove_file(out).unwrap();
+    }
+
+    #[test]
+    /// Integer const used as obj file path fails with ERR_228.
+    fn wrobj_const_file_bad_type() {
+        assert_brink_failure("tests/wrobj_const_file_bad_type.brink", &["[ERR_228]"]);
+    }
+
+    #[test]
     /// obj_align() returns the alignment declared in the ELF section header.
     fn obj_align_1() {
         let out = "tests_obj_align_1.brink.bin";

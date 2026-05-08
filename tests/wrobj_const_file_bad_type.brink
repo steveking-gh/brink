@@ -1,0 +1,10 @@
+// Integer const used as obj file path -- must fail with ERR_228.
+const OBJ_FILE = 42;
+obj rodata {
+    file    = OBJ_FILE;
+    section = ".rodata";
+}
+section out {
+    wr rodata;
+}
+output out;

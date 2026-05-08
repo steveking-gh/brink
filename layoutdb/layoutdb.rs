@@ -19,7 +19,7 @@ use tracing::{debug, trace};
 
 use ast::{Ast, LexToken, is_reserved_identifier};
 use astdb::AstDb;
-use ir::IRKind;
+use ir::{IRKind, ObjProps};
 use std::collections::{HashMap, HashSet};
 use symtable::SymbolTable;
 
@@ -45,8 +45,8 @@ pub struct LayoutDb {
     /// layout_phase resolves them from irdb.region_bindings.
     pub region_names: HashSet<String>,
 
-    /// Obj declarations from the source: declared name -> (section_name, file_path).
-    pub obj_decls: HashMap<String, (String, String)>,
+    /// Obj declarations from the source, unresolved; consumed by IRDb.
+    pub obj_props: HashMap<String, ObjProps>,
 }
 
 impl LayoutDb {
@@ -70,7 +70,7 @@ impl LayoutDb {
                     }
                 }
             }
-             debug!("LayoutDb: {}", op);
+            debug!("LayoutDb: {}", op);
         }
     }
 }
@@ -94,10 +94,11 @@ impl<'toks> LayoutDb {
         diags: &mut Diags,
         ast: &'toks Ast,
         ast_db: &AstDb,
+        obj_props: &HashMap<String, ObjProps>,
     ) -> bool {
         let mut result = true;
         for nid in ast.children(parent_nid) {
-            result &= Self::record_r(lz, nid, lops, symbol_table, diags, ast, ast_db);
+            result &= Self::record_r(lz, nid, lops, symbol_table, diags, ast, ast_db, obj_props);
         }
         result
     }
@@ -115,6 +116,7 @@ impl<'toks> LayoutDb {
         diags: &mut Diags,
         ast: &'toks Ast,
         ast_db: &AstDb,
+        obj_props: &HashMap<String, ObjProps>,
     ) -> bool {
         debug!("LayoutDb::record_r: ENTER for parent nid: {}", parent_nid);
 
@@ -137,7 +139,8 @@ impl<'toks> LayoutDb {
             // Handles the case where `const` appears as a child operand.
             LexToken::Const => {
                 let idx = lz.operand_vec.len();
-                lz.operand_vec.push(LinOperand::new_literal(tinfo, ir::DataType::Unknown));
+                lz.operand_vec
+                    .push(LinOperand::new_literal(tinfo, ir::DataType::Unknown));
                 returned_operands.push(idx);
             }
 
@@ -149,14 +152,23 @@ impl<'toks> LayoutDb {
 
                 if child_tinfo.tok == LexToken::Identifier && !ast.has_children(child_nid) {
                     let sec_name_str = child_tinfo.val;
-                    if ast_db.obj_decls.contains_key(sec_name_str) {
+                    if obj_props.contains_key(sec_name_str) {
                         // wr obj_name — emit Wrobj with single Name operand.
                         let ir_lid = lz.new_ir(parent_nid, ast, IRKind::Wrobj);
                         lz.add_new_operand_to_ir(ir_lid, LinOperand::new_name(child_tinfo));
                     } else {
                         let section = ast_db.sections.get(sec_name_str).unwrap();
                         let sec_nid = section.nid;
-                        result &= Self::record_r(lz, sec_nid, &mut lops, symbol_table, diags, ast, ast_db);
+                        result &= Self::record_r(
+                            lz,
+                            sec_nid,
+                            &mut lops,
+                            symbol_table,
+                            diags,
+                            ast,
+                            ast_db,
+                            obj_props,
+                        );
                         result &= lz.operand_count_is_valid(0, &lops, diags, tinfo);
                     }
                 } else {
@@ -171,6 +183,7 @@ impl<'toks> LayoutDb {
                         diags,
                         ast,
                         ast_db,
+                        obj_props,
                     );
                 }
             }
@@ -188,9 +201,15 @@ impl<'toks> LayoutDb {
                     let ir_lid = lz.new_ir(parent_nid, ast, IRKind::SizeofExt);
                     // Store the full qualified name (e.g. "custom::foo") in sval.
                     // tok is Identifier to match the simple sizeof(section) case below.
-                    lz.add_new_operand_to_ir(ir_lid, LinOperand::new_name_str(full_name, first_child_tinfo.loc.clone()));
+                    lz.add_new_operand_to_ir(
+                        ir_lid,
+                        LinOperand::new_name_str(full_name, first_child_tinfo.loc.clone()),
+                    );
 
-                    let idx = lz.add_new_operand_to_ir(ir_lid, LinOperand::new_output(ir_lid, tinfo.loc.clone(), ir::DataType::U64));
+                    let idx = lz.add_new_operand_to_ir(
+                        ir_lid,
+                        LinOperand::new_output(ir_lid, tinfo.loc.clone(), ir::DataType::U64),
+                    );
                     returned_operands.push(idx);
                 } else {
                     let mut lops = Vec::new();
@@ -198,7 +217,10 @@ impl<'toks> LayoutDb {
                     result &=
                         lz.record_expr_children_r(parent_nid, &mut lops, symbol_table, diags, ast);
                     result &= lz.process_operands(1, &mut lops, ir_lid, diags, tinfo);
-                    let idx = lz.add_new_operand_to_ir(ir_lid, LinOperand::new_output(ir_lid, tinfo.loc.clone(), ir::DataType::U64));
+                    let idx = lz.add_new_operand_to_ir(
+                        ir_lid,
+                        LinOperand::new_output(ir_lid, tinfo.loc.clone(), ir::DataType::U64),
+                    );
                     returned_operands.push(idx);
                 }
             }
@@ -207,9 +229,13 @@ impl<'toks> LayoutDb {
             LexToken::Addr | LexToken::AddrOffset | LexToken::SecOffset | LexToken::FileOffset => {
                 let mut lops = Vec::new();
                 let ir_lid = lz.new_ir(parent_nid, ast, tok_to_irkind(tok));
-                result &= lz.record_expr_children_r(parent_nid, &mut lops, symbol_table, diags, ast);
+                result &=
+                    lz.record_expr_children_r(parent_nid, &mut lops, symbol_table, diags, ast);
                 result &= lz.process_optional_operands(1, &mut lops, ir_lid, diags, tinfo);
-                let idx = lz.add_new_operand_to_ir(ir_lid, LinOperand::new_output(ir_lid, tinfo.loc.clone(), ir::DataType::U64));
+                let idx = lz.add_new_operand_to_ir(
+                    ir_lid,
+                    LinOperand::new_output(ir_lid, tinfo.loc.clone(), ir::DataType::U64),
+                );
                 returned_operands.push(idx);
             }
 
@@ -221,7 +247,8 @@ impl<'toks> LayoutDb {
             | LexToken::Align => {
                 let mut lops = Vec::new();
                 let ir_lid = lz.new_ir(parent_nid, ast, tok_to_irkind(tok));
-                result &= lz.record_expr_children_r(parent_nid, &mut lops, symbol_table, diags, ast);
+                result &=
+                    lz.record_expr_children_r(parent_nid, &mut lops, symbol_table, diags, ast);
 
                 if lops.len() != 1 && lops.len() != 2 {
                     let m = format!(
@@ -234,8 +261,10 @@ impl<'toks> LayoutDb {
                 }
 
                 lz.add_existing_operand_to_ir(ir_lid, lops[0]);
-                let count_output =
-                    lz.add_new_operand_to_ir(ir_lid, LinOperand::new_output(ir_lid, tinfo.loc.clone(), ir::DataType::U64));
+                let count_output = lz.add_new_operand_to_ir(
+                    ir_lid,
+                    LinOperand::new_output(ir_lid, tinfo.loc.clone(), ir::DataType::U64),
+                );
 
                 let wr8_lid = lz.new_ir(parent_nid, ast, IRKind::Wr(1, false));
 
@@ -243,13 +272,16 @@ impl<'toks> LayoutDb {
                     lz.add_existing_operand_to_ir(wr8_lid, lops[1]);
                 } else {
                     // Synthesize a literal 0 pad byte — no source token exists for this value.
-                    lz.add_new_operand_to_ir(wr8_lid, LinOperand::Literal {
-                        src_loc: tinfo.loc.clone(),
-                        tok: LexToken::Integer,
-                        sval: "0".to_string(),
-                        param_name: None,
-                        data_type: ir::DataType::Integer,
-                    });
+                    lz.add_new_operand_to_ir(
+                        wr8_lid,
+                        LinOperand::Literal {
+                            src_loc: tinfo.loc.clone(),
+                            tok: LexToken::Integer,
+                            sval: "0".to_string(),
+                            param_name: None,
+                            data_type: ir::DataType::Integer,
+                        },
+                    );
                 }
                 lz.add_existing_operand_to_ir(wr8_lid, count_output);
             }
@@ -276,7 +308,8 @@ impl<'toks> LayoutDb {
             | LexToken::Wrf
             | LexToken::Print => {
                 let mut lops = Vec::new();
-                result &= lz.record_expr_children_r(parent_nid, &mut lops, symbol_table, diags, ast);
+                result &=
+                    lz.record_expr_children_r(parent_nid, &mut lops, symbol_table, diags, ast);
                 let ir_lid = lz.new_ir(parent_nid, ast, tok_to_irkind(tok));
                 for idx in lops {
                     lz.add_existing_operand_to_ir(ir_lid, idx);
@@ -297,7 +330,16 @@ impl<'toks> LayoutDb {
 
                 let mut dummy = Vec::new();
                 for child_nid in children {
-                    result &= Self::record_r(lz, child_nid, &mut dummy, symbol_table, diags, ast, ast_db);
+                    result &= Self::record_r(
+                        lz,
+                        child_nid,
+                        &mut dummy,
+                        symbol_table,
+                        diags,
+                        ast,
+                        ast_db,
+                        obj_props,
+                    );
                 }
 
                 let end_lid = lz.new_ir(parent_nid, ast, IRKind::SectionEnd);
@@ -309,7 +351,10 @@ impl<'toks> LayoutDb {
                 let ir_lid = lz.new_ir(parent_nid, ast, IRKind::Label);
                 // Strip the trailing ':' from the label token text.
                 let name_without_colon = tinfo.val[..tinfo.val.len() - 1].to_string();
-                lz.add_new_operand_to_ir(ir_lid, LinOperand::new_name_str(name_without_colon, tinfo.loc.clone()));
+                lz.add_new_operand_to_ir(
+                    ir_lid,
+                    LinOperand::new_name_str(name_without_colon, tinfo.loc.clone()),
+                );
             }
 
             // ── Error arms ────────────────────────────────────────────────
@@ -334,15 +379,22 @@ impl<'toks> LayoutDb {
             }
         }
 
-        debug!("LayoutDb::record_r: EXIT({}) for nid: {}", result, parent_nid);
+        debug!(
+            "LayoutDb::record_r: EXIT({}) for nid: {}",
+            result, parent_nid
+        );
         result
     }
 
-
-
     // ── Constructor ───────────────────────────────────────────────────────────
 
-    pub fn new(diags: &mut Diags, ast: &'toks Ast, ast_db: &AstDb, symbol_table: &SymbolTable) -> anyhow::Result<Self> {
+    pub fn new(
+        diags: &mut Diags,
+        ast: &'toks Ast,
+        ast_db: &AstDb,
+        symbol_table: &SymbolTable,
+        obj_props: HashMap<String, ObjProps>,
+    ) -> anyhow::Result<Self> {
         debug!("LayoutDb::new: ENTER");
 
         let output_nid = ast_db.output.nid;
@@ -353,27 +405,39 @@ impl<'toks> LayoutDb {
 
         let section_names: HashSet<String> =
             ast_db.sections.keys().map(|s| s.to_string()).collect();
-        let region_names: HashSet<String> =
-            ast_db.regions.keys().map(|s| s.to_string()).collect();
-        let obj_decls: HashMap<String, (String, String)> = ast_db
-            .obj_decls
-            .iter()
-            .map(|(k, v)| (k.clone(), (v.section_name.clone(), v.file_path.clone())))
-            .collect();
+        let region_names: HashSet<String> = ast_db.regions.keys().map(|s| s.to_string()).collect();
         let mut layout_lz = Linearizer::new();
 
         // Linearize the output section body (layout-time IR).
         let section = ast_db.sections.get(output_sec_str.as_str()).unwrap();
         let sec_nid = section.nid;
         let mut lops = Vec::new();
-        if !Self::record_r(&mut layout_lz, sec_nid, &mut lops, symbol_table, diags, ast, ast_db) {
+        if !Self::record_r(
+            &mut layout_lz,
+            sec_nid,
+            &mut lops,
+            symbol_table,
+            diags,
+            ast,
+            ast_db,
+            &obj_props,
+        ) {
             anyhow::bail!("LayoutDb construction failed.");
         }
 
         // Linearize top-level assert statements into layout-time IR.
         for &nid in &ast_db.global_asserts {
             let mut lops = Vec::new();
-            if !Self::record_r(&mut layout_lz, nid, &mut lops, symbol_table, diags, ast, ast_db) {
+            if !Self::record_r(
+                &mut layout_lz,
+                nid,
+                &mut lops,
+                symbol_table,
+                diags,
+                ast,
+                ast_db,
+                &obj_props,
+            ) {
                 anyhow::bail!("LayoutDb construction failed.");
             }
         }
@@ -386,7 +450,7 @@ impl<'toks> LayoutDb {
             output_sec_loc,
             section_names,
             region_names,
-            obj_decls,
+            obj_props,
         };
 
         layout_db.dump();
@@ -516,7 +580,11 @@ impl IdentDb {
         let mut result = true;
         let name_operand_num = lir.operand_vec[op_num];
         let name_operand = lindb.operand_vec.get(name_operand_num).unwrap();
-        let LinOperand::NameDef { sval: name, src_loc } = name_operand else {
+        let LinOperand::NameDef {
+            sval: name,
+            src_loc,
+        } = name_operand
+        else {
             panic!("label identifier operand must be a NameDef operand type!");
         };
         if is_reserved_identifier(name) {
@@ -530,16 +598,10 @@ impl IdentDb {
         if self.label_idents.contains_key(name) {
             let orig_loc = self.label_idents.get(name).unwrap();
             let msg = format!("Duplicate label name {}", name);
-            diags.err2(
-                "ERR_204",
-                &msg,
-                src_loc.clone(),
-                orig_loc.clone(),
-            );
+            diags.err2("ERR_204", &msg, src_loc.clone(), orig_loc.clone());
             result = false;
         } else {
-            self.label_idents
-                .insert(name.clone(), src_loc.clone());
+            self.label_idents.insert(name.clone(), src_loc.clone());
         }
         result
     }
@@ -610,7 +672,9 @@ impl IdentDb {
     }
 
     fn is_valid_label_ref(&self, lop: &LinOperand) -> bool {
-        let LinOperand::Ref { sval, .. } = lop else { return false; };
+        let LinOperand::Ref { sval, .. } = lop else {
+            return false;
+        };
         self.label_idents.contains_key(sval)
     }
 
@@ -619,7 +683,9 @@ impl IdentDb {
         for &lop_num in &lir.operand_vec {
             let lop = &lindb.operand_vec[lop_num];
             // Only Ref operands (identifier value references) need ref checks.
-            let LinOperand::Ref { sval, src_loc, .. } = lop else { continue; };
+            let LinOperand::Ref { sval, src_loc, .. } = lop else {
+                continue;
+            };
             {
                 debug!(
                     "IdentDb::verify_identifier_refs: Verifying reference to '{}'",
@@ -640,7 +706,7 @@ impl IdentDb {
                 if lindb.region_names.contains(sval) {
                     continue;
                 }
-                if lindb.obj_decls.contains_key(sval) {
+                if lindb.obj_props.contains_key(sval) {
                     continue;
                 }
                 let msg = format!("Unknown or unreachable identifier {}", sval);
@@ -651,4 +717,3 @@ impl IdentDb {
         result
     }
 }
-

@@ -419,12 +419,12 @@ ERR_226: evaluate_regions failure halt.
 
 ---
 
-## 2026-04-26 — Region plan Steps 4-5 (RegionBinding, size enforcement, ERR_183)
+## 2026-04-26 — Region plan Steps 4-5 (RegionProps, size enforcement, ERR_183)
 
-**RegionBinding on IRDb**
+**RegionProps on IRDb**
 Removed `section_anchors: HashMap<String, u64>` from `LayoutPhase`.  Added
-`RegionBinding { addr: u64, size: u64 }` to `ir/ir.rs` and
-`section_regions: HashMap<String, RegionBinding>` to `IRDb`.  Built in
+`RegionProps { addr: u64, size: u64 }` to `ir/ir.rs` and
+`section_regions: HashMap<String, RegionProps>` to `IRDb`.  Built in
 `process.rs` from `pruned_ast_db.sections` and `pruned_ast_db.regions`.
 All downstream phases read region data from `irdb.section_regions`.
 
@@ -506,7 +506,7 @@ Changes:
   populated from `ast_db.regions` in `new()`.  `IdentDb::verify_operand_refs`
   checks `lindb.region_names` before emitting ERR_208, so region names pass
   the identifier validation gate.
-- `irdb/irdb.rs`: `IRDb` gains `region_bindings: HashMap<String, RegionBinding>`
+- `irdb/irdb.rs`: `IRDb` gains `region_bindings: HashMap<String, RegionProps>`
   (keyed by region name, parallel to `section_regions` which is keyed by section
   name).  `IRDb::new` accepts and stores this map.
 - `process/process.rs`: passes `region_bindings` (returned by `evaluate_regions`,
@@ -528,15 +528,15 @@ Changes:
 
 ---
 
-## 2026-04-27 — RegionBinding diagnostic fields (name + src_loc)
+## 2026-04-27 — RegionProps diagnostic fields (name + src_loc)
 
-`RegionBinding` gained two new fields — `name: String` and `src_loc: SourceSpan`
+`RegionProps` gained two new fields — `name: String` and `src_loc: SourceSpan`
 — so every region error site can name the region and point at its declaration
 without extra lookups.  `Copy` dropped (String prevents it); `Clone` retained.
 
 Changes:
 
-- `ir/ir.rs`: `RegionBinding` now carries `name` and `src_loc`.  `Copy` derive removed.
+- `ir/ir.rs`: `RegionProps` now carries `name` and `src_loc`.  `Copy` derive removed.
 - `const_eval/const_eval.rs`: binding constructor populates `name` and `src_loc`.
   ERR_188 message includes region name, points at declaration site.
   ERR_183 upgraded from `err1` to `err2`; both overlapping declarations highlighted.
@@ -561,7 +561,7 @@ Containment is allowed so that inner sections can bind to sub-regions of an oute
 region without triggering ERR_183.
 
 **region_intersection on ScopeFrame**
-`layout_phase.rs` gains `region_intersection: Option<RegionBinding>` on `ScopeFrame`.
+`layout_phase.rs` gains `region_intersection: Option<RegionProps>` on `ScopeFrame`.
 At each `SectionStart`, the effective constraint is computed as the intersection
 of the parent frame's `region_intersection` and the current section's direct
 region binding (from `irdb.region_for_section`):
@@ -612,7 +612,7 @@ intersection is handled at layout time by the `section_effective_regions` map
 and `validate_section_regions`.
 
 **section_effective_regions on LayoutPhase**
-`LayoutPhase` gains `section_effective_regions: HashMap<String, RegionBinding>`.
+`LayoutPhase` gains `section_effective_regions: HashMap<String, RegionProps>`.
 `iterate_section_start` writes the converged `region_intersection` into this map
 on every iterate pass; the final pass holds the post-convergence value.
 
@@ -637,17 +637,17 @@ Tests:
 ## 2026-04-28 — EffectiveRegion backtrace + ERR_191 starting-address check
 
 **EffectiveRegion struct**
-Replaced the ad-hoc `region_intersection: Option<RegionBinding>` + separate
-`region_contributors: Vec<RegionBinding>` fields on `ScopeFrame` with a single
+Replaced the ad-hoc `region_intersection: Option<RegionProps>` + separate
+`region_contributors: Vec<RegionProps>` fields on `ScopeFrame` with a single
 `effective_region: Option<EffectiveRegion>` field.  `EffectiveRegion` carries:
 
-- `binding: RegionBinding` — the geometric intersection (used for ERR_185/73/74
+- `binding: RegionProps` — the geometric intersection (used for ERR_185/73/74
   enforcement, unchanged).
-- `contributors: Vec<RegionBinding>` — every region that narrowed the bound,
+- `contributors: Vec<RegionProps>` — every region that narrowed the bound,
   outermost first, for use in ERR_186 backtrace diagnostics.
 
 `section_effective_regions: HashMap<String, EffectiveRegion>` (was
-`HashMap<String, RegionBinding>`) persists the converged value for
+`HashMap<String, RegionProps>`) persists the converged value for
 `validate_section_regions`.
 
 **ERR_186 backtrace via err_with_locs**

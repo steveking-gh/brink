@@ -19,7 +19,7 @@ use layoutdb::LayoutDb;
 use tracing::{debug, error, info, trace, warn};
 
 use extension_registry::{ExtensionRegistry, ParamKind};
-use ir::{DataType, IR, IRKind, IROperand, ParameterValue, RegionBinding};
+use ir::{DataType, IR, IRKind, IROperand, ObjProps, ParameterValue, RegionProps};
 use object::{Object, ObjectSection};
 use std::{
     collections::{HashMap, HashSet},
@@ -38,7 +38,7 @@ pub struct FileInfo {
 
 pub struct ObjSectionInfo {
     pub path: String,
-    pub section_name: String,
+    pub objsec_name: String,
     pub file_offset: u64,
     pub size: u64,
     /// Required alignment of the section as declared in the object file.
@@ -50,9 +50,9 @@ pub struct ObjSectionInfo {
     pub src_loc: SourceSpan,
 }
 
-// Per-section metadata extracted from one pass over an object file.
+// Per-objsec metadata extracted from one pass over an object file.
 // Keyed by section name inside parsed_obj_files.
-struct SectionProps {
+struct ObjsecProps {
     file_offset: u64,
     size: u64,
     align: u64,
@@ -88,18 +88,11 @@ pub struct IRDb {
 
     /// All declared regions, keyed by region name.  Single source of truth for
     /// region addr/size; use region_for_section() to look up a section's binding.
-    pub region_bindings: HashMap<String, RegionBinding>,
-
-    /// Obj declarations from layoutdb: declared name -> (section_name, file_path).
-    pub obj_decls: HashMap<String, (String, String)>,
+    pub region_props: HashMap<String, RegionProps>,
 
     /// Resolved object-file sections: key = declared obj name.
-    /// Populated during validation; consumed by layout_phase and exec_phase.
-    pub obj_sections: HashMap<String, ObjSectionInfo>,
-
-    /// Per-file parse cache: file_path -> section_name -> SectionProps.
-    /// Ensures each object file is opened and parsed at most once.
-    parsed_obj_files: HashMap<String, HashMap<String, SectionProps>>,
+    /// Populated during IRDb construction; consumed by layout_phase and exec_phase.
+    pub objsecs: HashMap<String, ObjSectionInfo>,
 }
 
 // Scan PT_LOAD program headers and assign each section its LMA.
@@ -107,7 +100,7 @@ pub struct IRDb {
 // Called only for ELF files; non-ELF files leave lma = None.
 fn fill_lma<Elf>(
     elf: &object::read::elf::ElfFile<'_, Elf>,
-    section_map: &mut HashMap<String, SectionProps>,
+    objsec_map: &mut HashMap<String, ObjsecProps>,
 ) where
     Elf: object::read::elf::FileHeader,
     Elf::Word: Into<u64>,
@@ -121,7 +114,7 @@ fn fill_lma<Elf>(
         let seg_vma: u64 = phdr.p_vaddr(endian).into();
         let seg_pma: u64 = phdr.p_paddr(endian).into();
         let seg_end: u64 = seg_vma + Into::<u64>::into(phdr.p_memsz(endian));
-        for props in section_map.values_mut() {
+        for props in objsec_map.values_mut() {
             if props.lma.is_some() {
                 continue;
             }
@@ -130,7 +123,7 @@ fn fill_lma<Elf>(
             }
         }
     }
-    for props in section_map.values_mut() {
+    for props in objsec_map.values_mut() {
         if props.lma.is_none() {
             props.lma = Some(props.vma);
         }
@@ -142,22 +135,78 @@ fn fill_lma<Elf>(
 // Called only for ELF files; non-ELF files leave lma = None.
 fn compute_lma_from_segments(
     obj: &object::File<'_>,
-    section_map: &mut HashMap<String, SectionProps>,
+    objsec_map: &mut HashMap<String, ObjsecProps>,
 ) {
     match obj {
-        object::File::Elf32(elf) => fill_lma(elf, section_map),
-        object::File::Elf64(elf) => fill_lma(elf, section_map),
+        object::File::Elf32(elf) => fill_lma(elf, objsec_map),
+        object::File::Elf64(elf) => fill_lma(elf, objsec_map),
         _ => {}
     }
 }
 
+// Parse the object file at file_path and populate parsed_obj_files with an
+// objsec_name -> ObjsecProps map.  Returns false and emits ERR_118 on any
+// open or parse failure.  Does nothing if already cached.
+// decl_loc is the source location of the obj declaration, used as the second
+// location in two-location diagnostics.
+fn cache_objsec_map(
+    parsed_obj_files: &mut HashMap<String, HashMap<String, ObjsecProps>>,
+    file_path: &str,
+    src_loc: &SourceSpan,
+    decl_loc: &SourceSpan,
+    diags: &mut Diags,
+) -> bool {
+    if parsed_obj_files.contains_key(file_path) {
+        return true;
+    }
+    let bytes = match fs::read(file_path) {
+        Ok(b) => b,
+        Err(e) => {
+            let m = format!("Cannot read object file '{}': {}", file_path, e);
+            diags.err2("ERR_118", &m, src_loc.clone(), decl_loc.clone());
+            return false;
+        }
+    };
+    let obj = match object::File::parse(bytes.as_slice()) {
+        Ok(o) => o,
+        Err(e) => {
+            let m = format!(
+                "'{}' is not a recognized object file format: {}",
+                file_path, e
+            );
+            diags.err2("ERR_120", &m, src_loc.clone(), decl_loc.clone());
+            return false;
+        }
+    };
+    let mut objsec_map: HashMap<String, ObjsecProps> = HashMap::new();
+    for section in obj.sections() {
+        if let Ok(name) = section.name()
+            && let Some((file_offset, size)) = section.file_range()
+        {
+            objsec_map.insert(
+                name.to_string(),
+                ObjsecProps {
+                    file_offset,
+                    size,
+                    align: section.align(),
+                    vma: section.address(),
+                    lma: None,
+                },
+            );
+        }
+    }
+    compute_lma_from_segments(&obj, &mut objsec_map);
+    parsed_obj_files.insert(file_path.to_string(), objsec_map);
+    true
+}
+
 impl IRDb {
-    /// Return the RegionBinding for a section, or None if the section is not
+    /// Return the RegionProps for a section, or None if the section is not
     /// bound to a region.
-    pub fn region_for_section(&self, sec_name: &str) -> Option<&RegionBinding> {
+    pub fn region_for_section(&self, sec_name: &str) -> Option<&RegionProps> {
         self.section_region_names
             .get(sec_name)
-            .and_then(|rname| self.region_bindings.get(rname))
+            .and_then(|rname| self.region_props.get(rname))
     }
 
     /// Returns the value of the specified operand for the specified IR.
@@ -333,97 +382,45 @@ impl IRDb {
         true
     }
 
-    // Parse the object file at file_path and populate parsed_obj_files with a
-    // section_name -> (file_offset, size) map.  Returns false and emits ERR_118
-    // on any open or parse failure.  Does nothing if already cached.
-    fn load_obj_file_sections(
-        &mut self,
-        file_path: &str,
-        src_loc: &SourceSpan,
-        diags: &mut Diags,
-    ) -> bool {
-        if self.parsed_obj_files.contains_key(file_path) {
-            return true;
-        }
-        let bytes = match fs::read(file_path) {
-            Ok(b) => b,
-            Err(e) => {
-                let m = format!("Cannot read object file '{}': {}", file_path, e);
-                diags.err1("ERR_118", &m, src_loc.clone());
-                return false;
-            }
-        };
-        let obj = match object::File::parse(bytes.as_slice()) {
-            Ok(o) => o,
-            Err(e) => {
-                let m = format!(
-                    "'{}' is not a recognized object file format: {}",
-                    file_path, e
-                );
-                diags.err1("ERR_120", &m, src_loc.clone());
-                return false;
-            }
-        };
-        let mut section_map: HashMap<String, SectionProps> = HashMap::new();
-        for section in obj.sections() {
-            if let Ok(name) = section.name()
-                && let Some((file_offset, size)) = section.file_range()
-            {
-                section_map.insert(
-                    name.to_string(),
-                    SectionProps {
-                        file_offset,
-                        size,
-                        align: section.align(),
-                        vma: section.address(),
-                        lma: None,
-                    },
-                );
-            }
-        }
-        compute_lma_from_segments(&obj, &mut section_map);
-        self.parsed_obj_files
-            .insert(file_path.to_string(), section_map);
-        true
-    }
-
     // Resolve and cache an obj section by its declared name.
-    // Looks up (section_name, file_path) from self.obj_decls, parses the object
-    // file if not yet cached, and inserts an ObjSectionInfo keyed by declared name.
-    fn resolve_obj_section(
+    // Looks up (objsec, file_path) from obj_props, parses the object file
+    // if not yet cached, and inserts an ObjSectionInfo keyed by declared name.
+    fn resolve_objsec(
         &mut self,
         obj_name: &str,
         src_loc: &SourceSpan,
+        obj_props: &HashMap<String, ObjProps>,
+        parsed_obj_files: &mut HashMap<String, HashMap<String, ObjsecProps>>,
         diags: &mut Diags,
     ) -> bool {
-        if self.obj_sections.contains_key(obj_name) {
+        if self.objsecs.contains_key(obj_name) {
             return true;
         }
-        let (section_name, file_path) = match self.obj_decls.get(obj_name) {
-            Some(pair) => (pair.0.clone(), pair.1.clone()),
+        let (objsec, file_path, decl_loc) = match obj_props.get(obj_name) {
+            Some(p) => (p.objsec.clone(), p.file.clone(), p.src_loc.clone()),
             None => {
                 let m = format!("Unknown obj name '{}'", obj_name);
                 diags.err1("ERR_117", &m, src_loc.clone());
                 return false;
             }
         };
-        if !self.load_obj_file_sections(&file_path, src_loc, diags) {
+        if !cache_objsec_map(parsed_obj_files, &file_path, src_loc, &decl_loc, diags) {
             return false;
         }
-        let section_map = self.parsed_obj_files.get(&file_path).unwrap();
-        let Some(props) = section_map.get(&section_name) else {
+        let objsec_map = parsed_obj_files.get(&file_path).unwrap();
+        let Some(props) = objsec_map.get(&objsec) else {
             let m = format!(
-                "Section '{}' not found in '{}', or section has no file data (e.g. zero-initialized sections cannot be copied).",
-                section_name, file_path
+                "Objsec '{}' not found in '{}', or objsec has no file data (e.g. zero-initialized sections cannot be copied).",
+                objsec, file_path
             );
-            diags.err1("ERR_119", &m, src_loc.clone());
+            diags.err2("ERR_119", &m, src_loc.clone(), decl_loc.clone());
             return false;
         };
-        self.obj_sections.insert(
+        self.objsecs.insert(
             obj_name.to_string(),
             ObjSectionInfo {
                 path: file_path,
-                section_name,
+                objsec_name: objsec,
                 file_offset: props.file_offset,
                 size: props.size,
                 align: props.align,
@@ -435,7 +432,13 @@ impl IRDb {
         true
     }
 
-    fn validate_wrobj_operands(&mut self, ir: &IR, diags: &mut Diags) -> bool {
+    fn validate_wrobj_operands(
+        &mut self,
+        ir: &IR,
+        obj_props: &HashMap<String, ObjProps>,
+        parsed_obj_files: &mut HashMap<String, HashMap<String, ObjsecProps>>,
+        diags: &mut Diags,
+    ) -> bool {
         assert!(
             ir.operands.len() == 1,
             "wr obj_name must have exactly 1 operand"
@@ -445,18 +448,24 @@ impl IRDb {
             .identifier_to_str()
             .to_string();
         let src_loc = ir.src_loc.clone();
-        self.resolve_obj_section(&obj_name, &src_loc, diags)
+        self.resolve_objsec(&obj_name, &src_loc, obj_props, parsed_obj_files, diags)
     }
 
     // obj_align/obj_lma/obj_vma: [identifier, output]; resolve the obj section.
-    fn validate_obj_query_operands(&mut self, ir: &IR, diags: &mut Diags) -> bool {
+    fn validate_obj_query_operands(
+        &mut self,
+        ir: &IR,
+        obj_props: &HashMap<String, ObjProps>,
+        parsed_obj_files: &mut HashMap<String, HashMap<String, ObjsecProps>>,
+        diags: &mut Diags,
+    ) -> bool {
         assert!(ir.operands.len() == 2);
         let obj_name = self.parms[ir.operands[0]]
             .val
             .identifier_to_str()
             .to_string();
         let src_loc = ir.src_loc.clone();
-        self.resolve_obj_section(&obj_name, &src_loc, diags)
+        self.resolve_objsec(&obj_name, &src_loc, obj_props, parsed_obj_files, diags)
     }
 
     // Expect 1 operand which is an integer of some sort or bool
@@ -562,6 +571,8 @@ impl IRDb {
         diags: &mut Diags,
         ext_registry: &ExtensionRegistry,
         _section_names: &HashSet<String>,
+        obj_props: &HashMap<String, ObjProps>,
+        parsed_obj_files: &mut HashMap<String, HashMap<String, ObjsecProps>>,
     ) -> bool {
         match ir.kind {
             IRKind::Align
@@ -572,9 +583,9 @@ impl IRDb {
             | IRKind::Wr(_, _) => self.validate_numeric_1_or_2(ir, diags),
             IRKind::Assert => self.validate_numeric_1(ir, diags),
             IRKind::Wrf => self.validate_wrf_operands(ir, diags),
-            IRKind::Wrobj => self.validate_wrobj_operands(ir, diags),
+            IRKind::Wrobj => self.validate_wrobj_operands(ir, obj_props, parsed_obj_files, diags),
             IRKind::ObjAlign | IRKind::ObjVma | IRKind::ObjLma => {
-                self.validate_obj_query_operands(ir, diags)
+                self.validate_obj_query_operands(ir, obj_props, parsed_obj_files, diags)
             }
             IRKind::Wrs | IRKind::Print => self.validate_string_expr_operands(ir, diags),
             IRKind::ExtensionCall => {
@@ -809,6 +820,8 @@ impl IRDb {
         lin_db: &LayoutDb,
         diags: &mut Diags,
         ext_registry: &ExtensionRegistry,
+        obj_props: &HashMap<String, ObjProps>,
+        parsed_obj_files: &mut HashMap<String, HashMap<String, ObjsecProps>>,
     ) -> bool {
         // Section names come from LayoutDb, which collected them from ast_db.sections
         // at construction time.  This covers all declared sections, including non-output
@@ -834,7 +847,7 @@ impl IRDb {
             }
 
             let ir_num = self.ir_vec.len();
-            if self.validate_operands(&ir, diags, ext_registry, section_names) {
+            if self.validate_operands(&ir, diags, ext_registry, section_names, obj_props, parsed_obj_files) {
                 match ir.kind {
                     IRKind::Label => {
                         // create the addressable entry and set the IR number
@@ -873,7 +886,7 @@ impl IRDb {
         diags: &mut Diags,
         ext_registry: &ExtensionRegistry,
         section_region_names: HashMap<String, String>,
-        region_bindings: HashMap<String, RegionBinding>,
+        region_bindings: HashMap<String, RegionProps>,
     ) -> anyhow::Result<Self> {
         let mut ir_db = IRDb {
             ir_vec: Vec::new(),
@@ -884,10 +897,8 @@ impl IRDb {
             symbol_table,
             output_sec_str: lin_db.output_sec_str.clone(),
             section_region_names,
-            region_bindings,
-            obj_decls: lin_db.obj_decls.clone(),
-            obj_sections: HashMap::new(),
-            parsed_obj_files: HashMap::new(),
+            region_props: region_bindings,
+            objsecs: HashMap::new(),
         };
 
         if !ir_db.process_lin_operands(lin_db, diags) {
@@ -899,7 +910,8 @@ impl IRDb {
         ir_db.symbol_table.warn_unused(diags);
 
         // To avoid panic, don't proceed into IR if the operands are bad.
-        if !ir_db.process_linear_ir(lin_db, diags, ext_registry) {
+        let mut parsed_obj_files: HashMap<String, HashMap<String, ObjsecProps>> = HashMap::new();
+        if !ir_db.process_linear_ir(lin_db, diags, ext_registry, &lin_db.obj_props, &mut parsed_obj_files) {
             anyhow::bail!("IRDb construction failed");
         }
 

@@ -444,6 +444,7 @@ version = "8.0.0"
 dependencies = [
  "anyhow",
  "ast",
+ "astdb",
  "diags",
  "extension_registry",
  "indextree",

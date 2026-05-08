@@ -186,7 +186,7 @@ impl ExecPhase {
         let obj_name = argvaldb.parms[ir.operands[0]].identifier_to_str().to_owned();
 
         // IRDb pre-validated this entry; unwrap is safe.
-        let info = irdb.obj_sections.get(&obj_name).unwrap();
+        let info = irdb.objsecs.get(&obj_name).unwrap();
         let file_path = info.path.clone();
 
         let loc = &location_db.ir_locs[lid];

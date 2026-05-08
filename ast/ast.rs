@@ -1074,11 +1074,12 @@ impl<'toks> Ast<'toks> {
             }
             self.tv.skip(); // consume '='
 
-            if self.tv.peek().tok != LexToken::QuotedString {
+            let next = self.tv.peek().tok;
+            if next != LexToken::QuotedString && next != LexToken::Identifier {
                 self.err_expected_after(
                     diags,
                     "ERR_68",
-                    &format!("'{} =': expected a quoted string value", prop_name),
+                    &format!("'{} =': expected a quoted string value or const identifier", prop_name),
                 );
                 return self.dbg_exit("parse_obj", false);
             }

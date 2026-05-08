@@ -8,7 +8,7 @@
 //
 
 use diags::Diags;
-use ir::{EffectiveRegion, IRKind, RegionBinding};
+use ir::{EffectiveRegion, IRKind, RegionProps};
 use irdb::IRDb;
 use std::collections::{HashMap, HashSet};
 
@@ -58,8 +58,8 @@ impl RegionDb {
                         ok = false;
                     }
 
-                    // Build region stack: inherit parent's, then append local region binding, if any.
-                    let mut region_stack: Vec<RegionBinding> = parent_effective
+                    // Build region stack: inherit parent's, then append local region props, if any.
+                    let mut region_stack: Vec<RegionProps> = parent_effective
                         .map(|e| e.region_stack.clone())
                         .unwrap_or_default();
                     if let Some(direct) = direct_binding {
