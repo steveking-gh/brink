@@ -439,16 +439,11 @@ impl AstDb {
                     }
                     LexToken::Assert => {
                         if output_seen {
-                            diags.err1(
-                                "ERR_230",
-                                "assert is not permitted after the output statement",
-                                tinfo.span().clone(),
-                            );
-                            false
+                            post_output_globals.push(nid);
                         } else {
                             pre_output_globals.push(nid);
-                            true
                         }
+                        true
                     }
                     LexToken::Print => {
                         if output_seen {

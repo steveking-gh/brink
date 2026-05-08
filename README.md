@@ -31,7 +31,7 @@ when creating FLASH, ROM or other non-volatile memory images.
 - Comfortable curly-brace and semicolon syntax
 - Declarative style so your Brink source resembles your output file
 - Include other `.brink` files for modularity
-- Robust address and offset management with full section scope support
+- Robust address and offset management with full [section](#section) scope support
 - Full support for arithmetic expressions
 - Conditional expressions with if/else
 - Compile-time interface for user-defined extensions
@@ -185,11 +185,11 @@ Produces output.bin containing the string `Hello World!\n`.
 
 # Basic Structure of a Brink Program
 
-A Brink source file consists of one or more section definitions and exactly one
+A Brink source file consists of one or more [section](#section) definitions and exactly one
 [output](#output-statement) statement. The output statement specifies the
-top-level section that defines the output file. Starting from this top section,
-Brink recursively evaluates each nested section and command to produce the
-output file.  For example, we can define a section with a write-string
+top-level [section](#section) that defines the output file. Starting from this top section,
+Brink recursively evaluates each nested [section](#section) and command to produce the
+output file.  For example, we can define a [section](#section) with a write-string
 ([wrs](#write-string)) command:
 
     section foo {        // Start a new section named 'foo'
@@ -224,7 +224,7 @@ Produces `output.bin`:
 
 Users can extend Brink with custom data processing using [Brink
 extensions](#brink-extensions).  Users write the output of their extension call
-into a section with a `wr`.
+into a [section](#section) with a `wr`.
 
     section foo {
         wrs "I'm foo\n";
@@ -251,7 +251,7 @@ To aid in debug, Brink supports `assert` and `print` statements in your
 programs.
 
 Assert expressions automate error checking.  This example verifies our
-expectation that section 'bar' is 13 bytes long.
+expectation that [section](#section) 'bar' is 13 bytes long.
 
     section bar {
         wrs "Hello World!\n";
@@ -288,7 +288,7 @@ Importantly, addresses and offsets are *scoped* to their enclosing section.
 When entering a nested (child) section, Brink saves the outer (parent) section's
 inflight address and offset values.  When exiting a child section, Brink
 restores and updates the parent's address and offset values.  From the
-perspective of the parent section, a child section is a `wr` with the parent's
+perspective of the parent section, a child [section](#section) is a `wr` with the parent's
 addresses and offsets updated per the size of the child.
 
 For the specific case of the address and address offset, a child section
@@ -310,13 +310,13 @@ Brink.
 | File Offset    | No Change     | No Change        | No Change               | Pad Forward                         | Pad Forward                           | Pad Forward                           |
 
 The following diagram shows several address and offset concepts.  Users specify
-the starting logical address of the output section `D` using a region.
+the starting logical address of the output [section](#section) `D` using a region.
 Alternatively, users can change the address within `D` using
 [set_addr](#set_addr) at the top of the output section.
 
 <figure>
   <img src="./images/scoped_address_plain_no_text.svg" width="100%"alt="Scoped Address and Offset Example Image">
-  <figcaption>In this example, section D is the top level binary output and includes three other sections A, B and C.  The starting address of section D is 0x8000 because the user placed D in FLASH region.  Section C is special and defines its own starting address.  A boot loader can find section C using the pointer at the beginning of the file, then copy section C to its proper starting address of 0xF000.  Notice that <code>addr(D)</code> used in the context of section D returns 0x8C00, not the starting address value 0xF000 nested within section C.
+  <figcaption>In this example, [section](#section) D is the top level binary output and includes three other sections A, B and C.  The starting address of [section](#section) D is 0x8000 because the user placed D in FLASH region.  Section C is special and defines its own starting address.  A boot loader can find [section](#section) C using the pointer at the beginning of the file, then copy [section](#section) C to its proper starting address of 0xF000.  Notice that <code>addr(D)</code> used in the context of [section](#section) D returns 0x8C00, not the starting address value 0xF000 nested within [section](#section) C.
   </figcaption>
 </figure>
 
@@ -346,15 +346,18 @@ will execute before an operation producing the second byte.
 
 Within a section, output order and source code order are the same. Outside of a
 section, output order and source code order may differ.  For example, source
-code may define whole sections in a different order than instantiated into in
+code may declare sections in a different order than instantiated into in
 the output.
 
-For top-level statements outside of a section, Brink orders execution as
-follows:
+For top-level statements, i.e. statements outside of a [section](#section) declaration,
+Brink orders execution as follows:
 
 1. Top level statements *before* the [`output`](#output) statement execute
    *before* Brink begins producing output bytes.
-2. Top level statements *after* the output statement execute *after* Brink
+2. The location of the output statement dictates the location of all
+   output-ordered statements relative to top level statements like
+   [`print`](#print) and [`assert`](#assert).
+3. Top level statements *after* the output statement execute *after* Brink
    produces the output file.
 
 For example:
@@ -447,10 +450,9 @@ When the user does not specify a path, Brink writes map file(s) and the output t
 
 ## Command-Line Const Defines
 
-The `-D` option injects a [`const`](#const) definition into the
-program from the command line. This option is modelled after the GCC `-D`
-preprocessor syntax.  You can specify `-D` multiple times, once per each
-definition.  For example:
+The `-D` option injects a [`const`](#const) definition into the program from the
+command line. This option is modelled after the GCC `-D` preprocessor syntax.
+You can specify `-D` multiple times, once per each definition.  For example:
 
     brink -DBASE=0x8000 -DCOUNT=16 -DSOME_PATH="/path/to/file" firmware.brink
 
@@ -479,7 +481,7 @@ source code for type inference.
 
 ### Example
 
-Define a base address and section count at the command line:
+Define a base address at the command line:
 
     brink -DBASE=0x0800_0000 firmware.brink -o firmware.bin
 
@@ -503,7 +505,8 @@ Brink supports lenient C language style whitespace rules.
 
 ## Semicolon Termination
 
-Like C language, statements must be terminated with a trailing semicolon character.
+Like C language, statements must be terminated with a trailing semicolon
+character.
 
 ## Types
 
@@ -525,7 +528,7 @@ case-sensitive.
 
 ### Reserved Identifiers
 
-Brink reserves certain identifiers and rejects their use as section names, const
+Brink reserves certain identifiers and rejects their use as [section](#section) names, const
 names, or label names at compile time.
 
 Brink also reserves two identifier *prefixes*.  Any user defined identifier
@@ -557,8 +560,8 @@ Keyword reservation is case-sensitive.  `Fill` and `FILL` are valid identifiers;
 
 ### Number Literals
 
-Brink supports number literals in decimal, hex (0x) and binary (0b) forms.
-After the first digit, you can use '_' within number literals to help with
+Brink supports number literals in decimal, hex (0x) and binary (0b) forms. After
+the first digit, you can use '_' within number literals to help with
 readability.
 
     assert 42 == 42;
@@ -786,9 +789,10 @@ Example:
 
 `align <expression> [, <pad byte value>];`
 
-The align statement writes pad bytes into the current section until the absolute
-location counter reaches the specified alignment.  Align writes 0 as the default
-pad byte value, but the user may optionally specify a different value.
+The align statement writes pad bytes into the current [section](#section) until
+the absolute location counter reaches the specified alignment.  Align writes 0
+as the default pad byte value, but the user may optionally specify a different
+value.
 
 Example:
 
@@ -827,11 +831,11 @@ Example:
 
 `const <identifier> = <expr>;`
 
-A const expression creates an immutable user defined identifier for a value.
-The value can consist of a number or string literal, or an expression composed
-of other constants and literals.  Const identifier names have global scope and
-must be globally unique.  Const identifiers cannot conflict with any other
-global identifiers such as section names.
+A const expression creates an immutable user defined identifier for a value. The
+value can consist of a number or string literal, or an expression composed of
+other constants and literals.  Const identifier names have global scope and must
+be globally unique.  Const identifiers cannot conflict with any other global
+identifiers such as [section](#section) names.
 
 Example:
 
@@ -845,9 +849,9 @@ Example:
 
     output foo;
 
-Const expressions support the full set of arithmetic, bitwise and comparison operators.
-Comparison operators evaluate to 1 (true) or 0 (false) and are useful for expressing
-relationships between constants:
+Const expressions support the full set of arithmetic, bitwise and comparison
+operators. Comparison operators evaluate to 1 (true) or 0 (false) and are useful
+for expressing relationships between constants:
 
     const FLASH_BASE = 0x0800_0000;
     const FLASH_SIZE = 0x0008_0000;
@@ -1193,9 +1197,10 @@ For example:
 
 `output <section identifier>;`
 
-An output statement specifies the top section to write to the output file. Use
-`set_addr` inside the section to control the absolute starting address, or place
-the top section in region with a start address.
+An output statement specifies the top [section](#section) to write to the output
+file. Use `set_addr` inside the [section](#section) to control the absolute
+starting address, or place the top [section](#section) in region with a start
+address.
 
 **A Brink program must have exactly one output statement.**
 
@@ -1214,8 +1219,8 @@ signed values in decimal.  If needed, the `to_u64` and `to_i64` functions can
 control the output style.
 
 Brink executes a given print statement for each instance found in the output
-file.  In other words, a print statement in a section written multiple times
-will execute multiple times in output order.
+file.  In other words, a print statement in a [section](#section) written
+multiple times will execute multiple times in output order.
 
 Example:
 
@@ -1254,12 +1259,12 @@ Results in the following console output:
 
 A `region` declares the name and *static* properties of an address range.
 Regions provide a way to decouple memory placement and top-down layout control
-from the section content being placed.  Unlike sections, regions are stateless
-and do not track dynamic information during layout.
+from the [section](#section) content being placed.  Unlike sections, regions are
+stateless and do not track dynamic information during layout.
 
-Users place *exactly one* section `in` a region.  We refer to this section as
-the *bound section* of the region.  The bound section is a normal
-section with the following extra behaviors:
+Users place *exactly one* [section](#section) `in` a region.  We refer to this
+[section](#section) as the *bound section* of the region.  The bound
+[section](#section) is a normal section with the following extra behaviors:
 
 - The region sets the starting address of the bound section.
 - The region caps the size of the bound section.
@@ -1323,13 +1328,13 @@ Regions support the following properties:
 #### Region Property `addr`
 
 The `addr` property defines the region's absolute starting address.  The
-region's bound section starts at this address.  Users can query the `addr`
+region's bound [section](#section) starts at this address.  Users can query the `addr`
 property of a region with `addr(<region name>)`.
 
 #### Region Property `size`
 
 Specifies the size of the region in bytes.  Brink reports an error if the
-size of the bound section exceeds this value.
+size of the bound [section](#section) exceeds this value.
 
 Users can query the `size` property of a region with `sizeof(<region name>)`.
 
@@ -1434,20 +1439,21 @@ by *all* the parent regions.  For example:
 
 ### Partially Overlapping Nested Regions
 
-For completeness, the region of a nested section need not be a proper subset of
-the parent region. Brink still enforces the constraints of *all* parent sections
-as follows:
+For completeness, the region of a nested [section](#section) need not be a
+proper subset of the parent region. Brink still enforces the constraints of
+*all* parent sections as follows:
 
-- Any address written by the child section must lie in the intersection of *all*
-  parent regions.
-- The starting address of a nested section must fit the address range allowed by all
-  parent regions.
+- Any address written by the child [section](#section) must lie in the
+  intersection of *all* parent regions.
+- The starting address of a nested [section](#section) must fit the address
+  range allowed by all parent regions.
 
 ### Sections in Regions are Single Use
 
-Placing a section in a region forces the starting address of the section to the
-region's `addr` value.  Writing this section more than once results in an
-address address conflict with the previous instance of the section.
+Placing a [section](#section) in a region forces the starting address of the
+[section](#section) to the region's `addr` value.  Writing this
+[section](#section) more than once results in an address address conflict with
+the previous instance of the section.
 
 ---
 
@@ -1456,9 +1462,9 @@ address address conflict with the previous instance of the section.
 `sec_offset( [identifier] ) -> U64`
 
 When called with an identifier, returns the unsigned 64-bit offset of the
-identifier from the start of the section that contains the identifier.  When
-called without an identifier, returns the offset from the start of the current
-section.
+identifier from the start of the [section](#section) that contains the
+identifier.  When called without an identifier, returns the offset from the
+start of the current section.
 
 Example:
 
@@ -1488,7 +1494,7 @@ Example:
 
     output foo;
 
-When a section offset specifies an identifier, the identifier must be in the
+When a [section](#section) offset specifies an identifier, the identifier must be in the
 scope of the current section.  For example:
 
     section fiz {
@@ -1574,7 +1580,7 @@ resets the current `addr_offset` to zero.  These changes happen within the scope
 of the containing section.  Child sections inherit the parent section's `addr`
 and `addr_offset` values.
 
-Using `set_addr` *does not* change the value of the section offset nor file
+Using `set_addr` *does not* change the value of the [section](#section) offset nor file
 offset.  A `set_addr` command *does not* add pad bytes to the output.
 
 The `set_addr` command may move the address forward or backwards.  However,
@@ -1607,7 +1613,7 @@ Example:
 
     output foo;
 
-When used in a section in a [region](#region), Brink reports an error if the `set_addr` command sets the address outside of a region.
+When used in a [section](#section) in a [region](#region), Brink reports an error if the `set_addr` command sets the address outside of a region.
 
 ---
 
@@ -1663,7 +1669,7 @@ default value of 0.
 
 If the specified offset is less the current offset, Brink reports an error.
 
-`pad_file_offset` is most useful when a section is written inside a parent
+`pad_file_offset` is most useful when a [section](#section) is written inside a parent
 section, because `sec_offset` resets to zero at the start of each child section
 while `file_offset` continues from the parent's position.  This lets a child
 section pad to an absolute file position regardless of where the parent places
@@ -1703,7 +1709,7 @@ Example:
 
 `pad_sec_offset <expression> [, <pad byte value>];`
 
-The pad_sec_offset command pads the current section until the *section offset*
+The pad_sec_offset command pads the current [section](#section) until the *section offset*
 reaches the specified value.  Users may specify an optional pad byte value or
 use the default value of 0.
 
@@ -1767,7 +1773,7 @@ When called with a [region](#region) identifier, `sizeof` returns the fixed size
     ...
     print "FLASH size=", sizeof(FLASH);  // returns "FLASH size=8192"
 
-When called with a [section](#section) identifier, `sizeof` returns the size of the section *in the file*.  Therefore, this size does not take into account operations that do not write data nor pad bytes.  For example, address jumps, e.g. by using [set_addr](#set_addr) do not change the sizeof() result for a section.
+When called with a [section](#section) identifier, `sizeof` returns the size of the [section](#section) *in the file*.  Therefore, this size does not take into account operations that do not write data nor pad bytes.  For example, address jumps, e.g. by using [set_addr](#set_addr) do not change the sizeof() result for a section.
 
     section foo {
         set_addr 0;
@@ -1830,7 +1836,7 @@ writes the output into the current section.
 
 `wr <section identifier>;`
 
-Brink adds the specified in section to the current section at the current
+Brink adds the specified in [section](#section) to the current [section](#section) at the current
 section offset.
 
 ### wr extension
@@ -2005,13 +2011,13 @@ Example — write a 4-byte header field containing the total output size:
 ## `__OUTPUT_ADDR`
 
 Returns the absolute starting address of the output section.  Equivalent to
-`addr(<output-section>)`.  **Without placing the section in region,
+`addr(<output-section>)`.  **Without placing the [section](#section) in region,
 `__OUTPUT_ADDR` is zero regardless of `set_addr` command internal to the output
 section**.  This occurs because `set_addr` is a scoped operation.  A `set_addr`
-within a section affects address calculations for subsequent writes internal to
-the section, not the logical start of the section itself.
+within a [section](#section) affects address calculations for subsequent writes internal to
+the section, not the logical start of the [section](#section) itself.
 
-If user places the output section in a [`region`](#region), then `__OUTPUT_ADDR`
+If user places the output [section](#section) in a [`region`](#region), then `__OUTPUT_ADDR`
 is the starting address of the region.
 
 Example — embed the output base address in a table:
@@ -2143,8 +2149,8 @@ follow the `wr` command with a `pad_sec_offset` or `align` statement.
 
 ### Passing Section Data to Extensions
 
-Users can pass the data in a section to an extension by passing the section name
-as a parameter.  Extensions take section data as an immutable zero-copy slice
+Users can pass the data in a [section](#section) to an extension by passing the [section](#section) name
+as a parameter.  Extensions take [section](#section) data as an immutable zero-copy slice
 parameter of Rust type &[u8].  Section data passed to the extension at the time
 of the call includes all data generated by non-extension write commands.
 Furthermore, the data includes the output of extensions executed *before* the
@@ -2162,7 +2168,7 @@ As an example, consider the `std::crc32c` extension.  This extension generates a
         wr std::crc32c(foo_binary);
     }
 
-Users can also pass the section containing the extensions own output to the extension.  The extension receives a slice of the *full size* of the section, including the size of the extension's own output.  On input, the slice contains zero bytes at the location of the extension's future output.  For example:
+Users can also pass the [section](#section) containing the extensions own output to the extension.  The extension receives a slice of the *full size* of the section, including the size of the extension's own output.  On input, the slice contains zero bytes at the location of the extension's future output.  For example:
 
     section foo_binary {
         wrf "foo.bin";

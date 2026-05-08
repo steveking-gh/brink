@@ -16,7 +16,7 @@ use ir::{DataType, IR, IRKind, ParameterValue};
 use irdb::IRDb;
 use locationdb::LocationDb;
 use mapdb::MapDb;
-use argvaldb::{ParmValDb, evaluate_string_expr};
+use ireval::{ParmValDb, evaluate_string_expr, execute_assert};
 use output_buffer::OutputBuffer;
 use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
@@ -69,30 +69,47 @@ impl ExecPhase {
             ext_registry,
         )?;
 
-        output.write_to_file(file).map_err(|e| anyhow!("Failed to write output file: {}", e))
+        output.write_to_file(file).map_err(|e| anyhow!("Failed to write output file: {}", e))?;
+        Self::execute_post_output(argvaldb, irdb, diags)
     }
 
-    fn execute_print(
+    // Execute print and assert statements that follow the output sentinel.
+    fn execute_post_output(
         argvaldb: &ParmValDb,
-        ir: &IR,
         irdb: &IRDb,
         diags: &mut Diags,
     ) -> Result<()> {
-        trace!("Engine::execute_print:");
-        if diags.noprint {
-            debug!("Suppressing print statements.");
-            return Ok(());
+        let mut past_sentinel = false;
+        for ir in &irdb.ir_vec {
+            if ir.kind == IRKind::Output {
+                past_sentinel = true;
+                continue;
+            }
+            if !past_sentinel {
+                continue;
+            }
+            match ir.kind {
+                IRKind::Print if !diags.noprint => {
+                    if let Some(s) = evaluate_string_expr(
+                        &argvaldb.parms,
+                        &irdb.parms,
+                        &ir.operands,
+                        diags,
+                    ) {
+                        print!("{}", s);
+                    }
+                }
+                IRKind::Assert
+                    if !execute_assert(&argvaldb.parms, &irdb.parms, &irdb.ir_vec, ir, diags) =>
+                {
+                    return Err(anyhow!("Assert failed"));
+                }
+                _ => {}
+            }
         }
-
-        let Some(xstr) = evaluate_string_expr(&argvaldb.parms, &irdb.parms, &ir.operands, diags)
-        else {
-            let msg = "Evaluating string expression failed.".to_string();
-            diags.err1("ERR_140", &msg, ir.src_loc.clone());
-            return Err(anyhow!("Wrs failed"));
-        };
-        print!("{}", xstr);
         Ok(())
     }
+
 
     #[allow(clippy::too_many_arguments)]
     fn execute_wrs(
@@ -317,9 +334,13 @@ impl ExecPhase {
         let mut result;
         let mut error_count = 0;
         for (lid, ir) in irdb.ir_vec.iter().enumerate() {
+            if ir.kind == IRKind::Output {
+                break;
+            }
             result = match ir.kind {
                 IRKind::Wr(_, _) => Self::execute_wrx(location_db, argvaldb, written_ranges, lid, ir, diags, output),
-                IRKind::Print => Self::execute_print(argvaldb, ir, irdb, diags),
+                // Pre-output prints already fired in validation_phase.
+                IRKind::Print => Ok(()),
                 IRKind::Wrs => Self::execute_wrs(location_db, argvaldb, written_ranges, lid, ir, irdb, diags, output),
                 IRKind::Wrf => Self::execute_wrf(location_db, argvaldb, written_ranges, lid, ir, irdb, diags, output),
                 IRKind::Wrobj => Self::execute_wrobj(location_db, argvaldb, written_ranges, lid, ir, irdb, diags, output),
@@ -377,8 +398,9 @@ impl ExecPhase {
                 | IRKind::IfBegin
                 | IRKind::ElseBegin
                 | IRKind::IfEnd
-                | IRKind::BareAssign
-                | IRKind::Output => Ok(()),
+                | IRKind::BareAssign => Ok(()),
+                // Handled by the early break above; the match arm is required for exhaustiveness.
+                IRKind::Output => unreachable!(),
                 IRKind::ExtensionCall => {
                     // Reserve zeroed bytes for the extension output slot.
                     // Pass 2 patches the actual output back into this region.

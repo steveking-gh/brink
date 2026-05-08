@@ -1,0 +1,6 @@
+section foo {
+    wr8 0x42;
+}
+output foo;
+assert 1;
+print "post-output assert passed\n";

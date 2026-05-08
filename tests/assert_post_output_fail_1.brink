@@ -1,0 +1,7 @@
+section foo {
+    wr8 0x42;
+}
+output foo;
+print "before failing assert\n";
+assert 0;
+print "after failing assert\n";

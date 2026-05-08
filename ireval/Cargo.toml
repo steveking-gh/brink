@@ -1,5 +1,5 @@
 [package]
-name = "argvaldb"
+name = "ireval"
 version = "6.1.1"
 edition = "2021"
 
@@ -7,7 +7,7 @@ edition = "2021"
 workspace = true
 
 [lib]
-path = "argvaldb.rs"
+path = "ireval.rs"
 
 [dependencies]
 diags = { path = "../diags" }

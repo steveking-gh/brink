@@ -15,7 +15,7 @@
 
 use locationdb::{AddressState, Location, LocationDb};
 
-use argvaldb::{ParmValDb, evaluate_string_expr};
+use ireval::{ParmValDb, evaluate_string_expr};
 use diags::Diags;
 use extension_registry::ExtensionRegistry;
 use ir::{ConstBuiltins, DataType, EffectiveRegion, IR, IRKind, ParameterValue};

@@ -841,8 +841,20 @@ mod tests {
         }
     }
 
+    /// Print before a failing assert fires; print after a failing assert is suppressed.
+    #[test]
+    fn print_assert_order_1() {
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/print_assert_order_1.brink")
+            .assert()
+            .failure()
+            .stderr(predicates::str::contains("ERR_126"))
+            .stdout(predicates::str::contains("before assert"))
+            .stdout(predicates::str::contains("after assert").not());
+    }
+
     /// Print before a failing assert fires in validation_phase before the assert is reached.
-    /// The stdout check is added in the step that wires print firing into validation_phase.
     #[test]
     fn print_immediate_on_error() {
         Command::cargo_bin("brink")
@@ -850,7 +862,8 @@ mod tests {
             .arg("tests/print_immediate_on_error.brink")
             .assert()
             .failure()
-            .stderr(predicates::str::contains("ERR_126"));
+            .stderr(predicates::str::contains("ERR_126"))
+            .stdout(predicates::str::contains("hello from const print"));
     }
 
     /// Prints fire in the correct execution order: pre-output top-level, then section body
@@ -871,6 +884,38 @@ mod tests {
         if fs::metadata(&derived_out).is_ok() {
             fs::remove_file(&derived_out).unwrap();
         }
+    }
+
+    /// Post-output assert passes: print after it fires normally.
+    #[test]
+    fn assert_post_output_1() {
+        let src = "tests/assert_post_output_1.brink";
+        let derived_out = format!("{}.bin", src.replace('/', "_").replace('\\', "_"));
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg(src)
+            .arg("-o")
+            .arg(&derived_out)
+            .assert()
+            .success()
+            .stderr(predicates::str::is_empty())
+            .stdout(predicates::str::contains("post-output assert passed"));
+        if fs::metadata(&derived_out).is_ok() {
+            fs::remove_file(&derived_out).unwrap();
+        }
+    }
+
+    /// Post-output assert fails: print before it fires, print after it does not.
+    #[test]
+    fn assert_post_output_fail_1() {
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("tests/assert_post_output_fail_1.brink")
+            .assert()
+            .failure()
+            .stderr(predicates::str::contains("ERR_126"))
+            .stdout(predicates::str::contains("before failing assert"))
+            .stdout(predicates::str::contains("after failing assert").not());
     }
 
     #[test]

@@ -23,7 +23,7 @@ members = [
     "extension_registry",
     "const_eval",
     "brink_extension",
-    "argvaldb",
+    "ireval",
     "output_buffer",
     "std/crc32c",
     "std/sha256",

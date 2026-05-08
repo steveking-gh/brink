@@ -23,4 +23,4 @@ tracing = "0.1.44"
 memmap2 = "0.9.10"
 locationdb = { path = "../locationdb" }
 regiondb = { path = "../regiondb" }
-argvaldb = { path = "../argvaldb" }
+ireval = { path = "../ireval" }
