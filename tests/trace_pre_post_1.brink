@@ -1,0 +1,6 @@
+section A {
+    wr8 0x42;
+}
+trace "before output\n";
+output A;
+trace "after output\n";

@@ -99,6 +99,18 @@ impl ExecPhase {
                         print!("{}", s);
                     }
                 }
+                IRKind::Trace if diags.trace_enabled() => {
+                    if let Some(mut s) = evaluate_string_expr(
+                        &argvaldb.parms,
+                        &irdb.parms,
+                        &ir.operands,
+                        diags,
+                    ) {
+                        let prefix = format!("[Trace-{}] ", diags.trace_iteration);
+                        s.insert_str(0, &prefix);
+                        print!("{}", s);
+                    }
+                }
                 IRKind::Assert
                     if !execute_assert(&argvaldb.parms, &irdb.parms, &irdb.ir_vec, ir, diags) =>
                 {

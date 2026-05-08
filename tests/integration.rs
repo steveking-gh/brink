@@ -3636,4 +3636,84 @@ mod tests {
     fn obj_lma_non_elf() {
         assert_brink_failure("tests/obj_lma_non_elf.brink", &["[ERR_120]"]);
     }
+    /// Trace does not fire without -v; stdout is empty.
+    #[test]
+    fn trace_silent_1() {
+        let src = "tests/trace_pre_post_1.brink";
+        let derived_out = format!("{}.bin", src.replace('/', "_").replace('\\', "_"));
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg(src)
+            .arg("-o")
+            .arg(&derived_out)
+            .assert()
+            .success()
+            .stderr(predicates::str::is_empty())
+            .stdout(predicates::str::is_empty());
+        if fs::metadata(&derived_out).is_ok() {
+            fs::remove_file(&derived_out).unwrap();
+        }
+    }
+
+    /// Pre-output trace fires with [Trace-N] prefix when -v is supplied.
+    #[test]
+    fn trace_pre_output_1() {
+        let src = "tests/trace_pre_post_1.brink";
+        let derived_out = format!("{}.bin", src.replace('/', "_").replace('\\', "_"));
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("-v")
+            .arg(src)
+            .arg("-o")
+            .arg(&derived_out)
+            .assert()
+            .success()
+            .stdout(predicates::str::contains("[Trace-1] before output"));
+        if fs::metadata(&derived_out).is_ok() {
+            fs::remove_file(&derived_out).unwrap();
+        }
+    }
+
+    /// Post-output trace fires with [Trace-N] prefix when -v is supplied.
+    #[test]
+    fn trace_post_output_1() {
+        let src = "tests/trace_pre_post_1.brink";
+        let derived_out = format!("{}.bin", src.replace('/', "_").replace('\\', "_"));
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("-v")
+            .arg(src)
+            .arg("-o")
+            .arg(&derived_out)
+            .assert()
+            .success()
+            .stdout(predicates::str::contains("[Trace-1] after output"));
+        if fs::metadata(&derived_out).is_ok() {
+            fs::remove_file(&derived_out).unwrap();
+        }
+    }
+
+    /// trace_1.brink: pre-output and post-output traces fire in the correct order with -v.
+    #[test]
+    fn trace_order_1() {
+        let src = "tests/trace_1.brink";
+        let derived_out = format!("{}.bin", src.replace('/', "_").replace('\\', "_"));
+        Command::cargo_bin("brink")
+            .unwrap()
+            .arg("-v")
+            .arg(src)
+            .arg("-o")
+            .arg(&derived_out)
+            .assert()
+            .success()
+            .stdout(predicates::str::contains("[Trace-1] Start!"))
+            .stdout(predicates::str::contains("[Trace-1] Top1"))
+            .stdout(predicates::str::contains("[Trace-1] Size of B is"))
+            .stdout(predicates::str::contains("[Trace-1] B1"))
+            .stdout(predicates::str::contains("[Trace-1] A1"))
+            .stdout(predicates::str::contains("[Trace-1] Finish!"));
+        if fs::metadata(&derived_out).is_ok() {
+            fs::remove_file(&derived_out).unwrap();
+        }
+    }
 } // mod tests

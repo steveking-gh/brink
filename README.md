@@ -1851,20 +1851,21 @@ tries to stabilize the output's layout.
 
 > [!NOTE]
 > As shown by a `trace` command, layout dependent values such as
-> addresses and sizes may change as Brink iterates.  Use `print` to see
+> addresses and sizes may change as Brink iterates.  Use [`print`](#print) to see
 > stabilized values.
 
 For example:
 
     trace "Start!\n";
     section B {
-        trace "Size of B is ", size(B), "\n";
+        trace "Size of B is ", sizeof(B), "\n";
         wr A;
-        wr A;
+        wr8 0xBB;
         trace "B1\n";
     }
 
     section A {
+        wr8 0xAA;
         trace "A1\n";
     }
 
@@ -1875,8 +1876,26 @@ For example:
 The program above *might* produce an output like the following, the caveat being
 that Brink purposely does not rigorously define trace output:
 
+    [Trace-1] Start!
+    [Trace-1] Top1
+    [Trace-1] Size of B is 0x0
+    [Trace-1] A1
+    [Trace-1] B1
+    [Trace-1] Finish!
+    [Trace-2] Start!
+    [Trace-2] Top1
+    [Trace-2] Size of B is 0x2
+    [Trace-2] A1
+    [Trace-2] B1
+    [Trace-2] Finish!
+    [Trace-2] Start!
+    [Trace-2] Top1
+    [Trace-2] Size of B is 0x2
+    [Trace-2] A1
+    [Trace-2] B1
+    [Trace-2] Finish!
 
-
+The number in Trace-*n* is the internal iteration count.  In this example, Brink required two iterations to stabilize the output.
 
 ---
 

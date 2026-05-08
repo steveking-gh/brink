@@ -25,6 +25,7 @@ pub struct Diags {
     pub files: Vec<(String, String)>,
     verbosity: u64,
     pub noprint: bool,
+    pub trace_iteration: usize,
     config: Config,
 }
 
@@ -42,6 +43,7 @@ impl Diags {
             files: vec![(name.to_string(), fstr.to_string())],
             verbosity,
             noprint,
+            trace_iteration: 0,
             config: Config::default().with_char_set(char_set),
         }
     }
@@ -65,7 +67,7 @@ impl Diags {
     }
 
     pub fn trace_enabled(&self) -> bool {
-        self.verbosity > 0
+        self.verbosity >= 2
     }
 
     /// Helper to print ariadne reports

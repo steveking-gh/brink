@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic
 Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [8.x.x] - 2026-05-05
+## [8.0.0] - 2026-05-05
 
 - REMOVED: Removed support for old style extension args
 - ADDED: Support for `obj` external ELF format file sections.
@@ -14,10 +14,13 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - ADDED: std::xor extension
 - ADDED: Support for big-endian writes
 - ADDED: Support plain-ASCII for non-terminal output, e.g. pipes
+- ADDED: `trace` command for debugging
 - FIXED: Top level print statements
+- FIXED: Print and assert execution order
 - CHANGED: Unify all error codes as ERR_<n>
 - README: Added Brink features overview to the introduction
 - README: Added Brink standard extensions table
+- README: Execution order is now more rigorously specified
 - INTERNAL: Enormous simplification of const eval to just use the AST
 - INTERNAL: Type deduction moves from IRDB to the Linearizer
 - INTERNAL: Replace `unsafe` mmap with OutputBuffer wrapper for vec<>

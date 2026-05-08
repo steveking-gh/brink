@@ -1377,6 +1377,7 @@ impl LayoutPhase {
                 iter_count
             ));
             iter_count += 1;
+            diags.trace_iteration = iter_count;
             let mut current = Location {
                 file_offset: 0,
                 addr: AddressState {
@@ -1476,6 +1477,20 @@ impl LayoutPhase {
 
                     IRKind::Wrf => self.iterate_wrf(ir, irdb, diags, &mut current),
                     IRKind::Wrobj => self.iterate_wrobj(ir, irdb, diags, &mut current),
+
+                    IRKind::Trace if diags.trace_enabled() => {
+                        if let Some(mut s) = evaluate_string_expr(
+                            &self.parms,
+                            &irdb.parms,
+                            &ir.operands,
+                            diags,
+                        ) {
+                            let prefix = format!("[Trace-{}] ", diags.trace_iteration);
+                            s.insert_str(0, &prefix);
+                            print!("{}", s);
+                        }
+                        true
+                    }
 
                     // The following IR types are evaluated only at execute time.
                     // Nothing to do during iteration.

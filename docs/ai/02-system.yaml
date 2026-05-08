@@ -177,7 +177,8 @@ language_features:
   --max-output-size: CLI flag (default 256M); rejects images exceeding the limit before execute (ERR_224)
   label: named location for map output
   assert: compile-time or layout-time assertion
-  print: compile-time diagnostic output
+  print: compile-time diagnostic output (stdout; gated on --noprint; fires pre-output in ValidationPhase, post-output in ExecPhase)
+  trace: verbose diagnostic output (stdout; requires -v; fires every layout iteration in LayoutPhase and once in ValidationPhase/ExecPhase; each line prefixed [Trace-N] where N is the layout iteration count)
   sizeof / addr / addr_offset / sec_offset / file_offset: layout-time builtins
   obj_align(obj_name): returns section alignment from the object file (layout-time, ELF unified API)
   obj_vma(obj_name): returns section virtual memory address (layout-time, ELF unified API)

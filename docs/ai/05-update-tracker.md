@@ -941,6 +941,43 @@ support and the CLI quoting requirement.
 
 ---
 
+## 2026-05-08 — trace instruction (IRKind::Trace)
+
+New `trace` statement for verbose layout diagnostics, controlled by the `-v` flag.
+
+Execution model: fires every layout iteration in `LayoutPhase::iterate` (gated on `diags.trace_enabled()`),
+once in `ValidationPhase::validate` for pre-output traces, and once in `ExecPhase::execute_post_output`
+for post-output traces.  Each output line is prefixed `[Trace-N]` where N is the 1-based layout iteration
+count.  Silent when `-v` is not supplied.
+
+`Diags::trace_enabled()` returns `self.verbosity >= 2`.  Default verbosity is 1 (no flags); `-v` raises
+it to 2.  `pub trace_iteration: usize` added to `Diags`; `LayoutPhase::iterate` writes the 1-based count
+at the start of each pass.  After layout converges the final count is read unchanged by
+`ValidationPhase` and `ExecPhase`.
+
+Language surface: same string-expression operand form as `print`; comma-separated mix of quoted strings
+and expressions.  Example: `trace "size of A = ", sizeof(A), "\n";`
+
+Changes:
+
+- `diags/diags.rs`: `trace_enabled() -> bool` (`verbosity >= 2`); `pub trace_iteration: usize`.
+- `ir/ir.rs`: `IRKind::Trace` variant.
+- `ast/ast.rs`: `LexToken::Trace`; `is_section_expr_tok` + `is_reserved_identifier` + parse dispatch.
+- `ast/lexer.rs`: `"trace"` keyword entry.
+- `astdb/astdb.rs`: `Trace` routed to pre/post output globals (same as `Print`).
+- `layoutdb/layoutdb.rs`: `LexToken::Trace` in write/print dispatch arm.
+- `linearizer/linearizer.rs`: `LexToken::Trace => IRKind::Trace`.
+- `irdb/irdb.rs`: `IRKind::Trace` alongside `Print` in `validate_string_expr_operands`.
+- `layout_phase/layout_phase.rs`: `diags.trace_iteration = iter_count`; `IRKind::Trace if diags.trace_enabled()` arm fires with prefix.
+- `validation_phase/validation_phase.rs`: `IRKind::Trace if diags.trace_enabled()` arm (pre-output only).
+- `exec_phase/exec_phase.rs`: `IRKind::Trace` no-op in `execute_core_operations`; fires in `execute_post_output`.
+- `tests/trace_1.brink`, `tests/trace_pre_post_1.brink`: fixtures.
+- `tests/integration.rs`: `trace_silent_1`, `trace_pre_output_1`, `trace_post_output_1`, `trace_order_1`.
+
+388 tests pass.
+
+---
+
 ## 2026-05-05 — Typed-lowering architecture integration
 
 **Const Evaluation as AST Walker**

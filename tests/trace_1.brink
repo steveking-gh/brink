@@ -1,12 +1,13 @@
 trace "Start!\n";
 section B {
-    trace "Size of B is ", size(B), "\n";
+    trace "Size of B is ", sizeof(B), "\n";
     wr A;
-    wr A;
+    wr8 0xBB;
     trace "B1\n";
 }
 
 section A {
+    wr8 0xAA;
     trace "A1\n";
 }
 
