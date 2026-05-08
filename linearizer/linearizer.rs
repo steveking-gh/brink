@@ -222,6 +222,7 @@ pub fn tok_to_irkind(tok: LexToken) -> IRKind {
         LexToken::Pipe => IRKind::BitOr,
         LexToken::Plus => IRKind::Add,
         LexToken::Print => IRKind::Print,
+        LexToken::Trace => IRKind::Trace,
         LexToken::SecOffset => IRKind::SecOffset,
         LexToken::FileOffset => IRKind::FileOffset,
         LexToken::SetAddr => IRKind::SetAddr,

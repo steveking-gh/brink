@@ -445,7 +445,7 @@ impl AstDb {
                         }
                         true
                     }
-                    LexToken::Print => {
+                    LexToken::Print | LexToken::Trace => {
                         if output_seen {
                             post_output_globals.push(nid);
                         } else {

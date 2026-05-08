@@ -307,7 +307,8 @@ impl<'toks> LayoutDb {
             | LexToken::Wrbe64
             | LexToken::Wrs
             | LexToken::Wrf
-            | LexToken::Print => {
+            | LexToken::Print
+            | LexToken::Trace => {
                 let mut lops = Vec::new();
                 result &=
                     lz.record_expr_children_r(parent_nid, &mut lops, symbol_table, diags, ast);
