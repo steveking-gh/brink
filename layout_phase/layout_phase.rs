@@ -15,11 +15,11 @@
 
 use locationdb::{AddressState, Location, LocationDb};
 
-use ireval::{ParmValDb, evaluate_string_expr};
 use diags::Diags;
 use extension_registry::ExtensionRegistry;
 use ir::{ConstBuiltins, DataType, EffectiveRegion, IR, IRKind, ParameterValue};
 use irdb::IRDb;
+use ireval::{ParmValDb, evaluate_string_expr};
 use regiondb::RegionDb;
 use std::collections::HashSet;
 
@@ -84,8 +84,7 @@ impl LayoutPhase {
     ) -> bool {
         self.trace(format_args!("LayoutPhase::iterate_wrs: {}", current));
 
-        let Some(xstr) = evaluate_string_expr(&self.parms, &irdb.parms, &ir.operands, diags)
-        else {
+        let Some(xstr) = evaluate_string_expr(&self.parms, &irdb.parms, &ir.operands, diags) else {
             return false;
         };
 
@@ -253,151 +252,264 @@ impl LayoutPhase {
     /// If the diags noprint option is true, suppress printing.
     /// Returns None of failure
     fn do_u64_add(ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
-        let Some(checked_result) = in0.checked_add(in1) else {
-            let msg = format!("Add expression '{in0} + {in1}' will overflow type U64");
-            diags.err1("ERR_125", &msg, ir.src_loc.clone());
-            return false;
-        };
-        *out = checked_result;
-        true
+        match in0.checked_add(in1) {
+            Some(v) => {
+                *out = v;
+                true
+            }
+            None if diags.suppress_arith_err => {
+                *out = 0;
+                true
+            }
+            None => {
+                let msg = format!("Add expression '{in0} + {in1}' will overflow type U64");
+                diags.err1("ERR_125", &msg, ir.src_loc.clone());
+                false
+            }
+        }
     }
 
     fn do_i64_add(ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
-        let Some(checked_result) = in0.checked_add(in1) else {
-            let msg = format!("Add expression '{in0} + {in1}' will overflow type I64");
-            diags.err1("ERR_145", &msg, ir.src_loc.clone());
-            return false;
-        };
-        *out = checked_result;
-        true
+        match in0.checked_add(in1) {
+            Some(v) => {
+                *out = v;
+                true
+            }
+            None if diags.suppress_arith_err => {
+                *out = 0;
+                true
+            }
+            None => {
+                let msg = format!("Add expression '{in0} + {in1}' will overflow type I64");
+                diags.err1("ERR_145", &msg, ir.src_loc.clone());
+                false
+            }
+        }
     }
 
     fn do_u64_sub(ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
-        let Some(checked_result) = in0.checked_sub(in1) else {
-            let msg = format!("Subtract expression '{in0} - {in1}' will underflow type U64");
-            diags.err1("ERR_128", &msg, ir.src_loc.clone());
-            return false;
-        };
-        *out = checked_result;
-        true
+        match in0.checked_sub(in1) {
+            Some(v) => {
+                *out = v;
+                true
+            }
+            None if diags.suppress_arith_err => {
+                *out = 0;
+                true
+            }
+            None => {
+                let msg = format!("Subtract expression '{in0} - {in1}' will underflow type U64");
+                diags.err1("ERR_128", &msg, ir.src_loc.clone());
+                false
+            }
+        }
     }
 
     fn do_i64_sub(ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
-        let Some(checked_result) = in0.checked_sub(in1) else {
-            let msg = format!("Subtract expression '{in0} - {in1}' will underflow type I64");
-            diags.err1("ERR_147", &msg, ir.src_loc.clone());
-            return false;
-        };
-        *out = checked_result;
-        true
+        match in0.checked_sub(in1) {
+            Some(v) => {
+                *out = v;
+                true
+            }
+            None if diags.suppress_arith_err => {
+                *out = 0;
+                true
+            }
+            None => {
+                let msg = format!("Subtract expression '{in0} - {in1}' will underflow type I64");
+                diags.err1("ERR_147", &msg, ir.src_loc.clone());
+                false
+            }
+        }
     }
 
     fn do_u64_mul(ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
-        let Some(checked_result) = in0.checked_mul(in1) else {
-            let msg = format!("Multiply expression '{in0} * {in1}' will overflow type U64");
-            diags.err1("ERR_130", &msg, ir.src_loc.clone());
-            return false;
-        };
-        *out = checked_result;
-        true
+        match in0.checked_mul(in1) {
+            Some(v) => {
+                *out = v;
+                true
+            }
+            None if diags.suppress_arith_err => {
+                *out = 0;
+                true
+            }
+            None => {
+                let msg = format!("Multiply expression '{in0} * {in1}' will overflow type U64");
+                diags.err1("ERR_130", &msg, ir.src_loc.clone());
+                false
+            }
+        }
     }
 
     fn do_i64_mul(ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
-        let Some(checked_result) = in0.checked_mul(in1) else {
-            let msg = format!("Multiply expression '{in0} * {in1}' will overflow data type I64");
-            diags.err1("ERR_148", &msg, ir.src_loc.clone());
-            return false;
-        };
-        *out = checked_result;
-        true
+        match in0.checked_mul(in1) {
+            Some(v) => {
+                *out = v;
+                true
+            }
+            None if diags.suppress_arith_err => {
+                *out = 0;
+                true
+            }
+            None => {
+                let msg =
+                    format!("Multiply expression '{in0} * {in1}' will overflow data type I64");
+                diags.err1("ERR_148", &msg, ir.src_loc.clone());
+                false
+            }
+        }
     }
 
     fn do_u64_div(ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
-        let Some(checked_result) = in0.checked_div(in1) else {
-            let msg = format!("Exception in divide expression '{in0} / {in1}'");
-            diags.err1("ERR_131", &msg, ir.src_loc.clone());
-            return false;
-        };
-        *out = checked_result;
-        true
+        match in0.checked_div(in1) {
+            Some(v) => {
+                *out = v;
+                true
+            }
+            None if diags.suppress_arith_err => {
+                *out = 0;
+                true
+            }
+            None => {
+                let msg = format!("Exception in divide expression '{in0} / {in1}'");
+                diags.err1("ERR_131", &msg, ir.src_loc.clone());
+                false
+            }
+        }
     }
 
     fn do_u64_mod(ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
-        let Some(checked_result) = in0.checked_rem(in1) else {
-            let msg = format!("Exception in modulo expression '{in0} % {in1}'");
-            diags.err1("ERR_150", &msg, ir.src_loc.clone());
-            return false;
-        };
-        *out = checked_result;
-        true
+        match in0.checked_rem(in1) {
+            Some(v) => {
+                *out = v;
+                true
+            }
+            None if diags.suppress_arith_err => {
+                *out = 0;
+                true
+            }
+            None => {
+                let msg = format!("Exception in modulo expression '{in0} % {in1}'");
+                diags.err1("ERR_150", &msg, ir.src_loc.clone());
+                false
+            }
+        }
     }
 
     fn do_i64_div(ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
-        let Some(checked_result) = in0.checked_div(in1) else {
-            let msg = format!("Exception in divide expression '{in0} / {in1}'");
-            diags.err1("ERR_149", &msg, ir.src_loc.clone());
-            return false;
-        };
-        *out = checked_result;
-        true
+        match in0.checked_div(in1) {
+            Some(v) => {
+                *out = v;
+                true
+            }
+            None if diags.suppress_arith_err => {
+                *out = 0;
+                true
+            }
+            None => {
+                let msg = format!("Exception in divide expression '{in0} / {in1}'");
+                diags.err1("ERR_149", &msg, ir.src_loc.clone());
+                false
+            }
+        }
     }
 
     fn do_i64_mod(ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
-        let Some(checked_result) = in0.checked_rem(in1) else {
-            let msg = format!("Exception in modulo expression '{in0} % {in1}'");
-            diags.err1("ERR_152", &msg, ir.src_loc.clone());
-            return false;
-        };
-        *out = checked_result;
-        true
+        match in0.checked_rem(in1) {
+            Some(v) => {
+                *out = v;
+                true
+            }
+            None if diags.suppress_arith_err => {
+                *out = 0;
+                true
+            }
+            None => {
+                let msg = format!("Exception in modulo expression '{in0} % {in1}'");
+                diags.err1("ERR_152", &msg, ir.src_loc.clone());
+                false
+            }
+        }
     }
 
     fn do_u64_shl(ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
-        let Ok(shift_amount) = u32::try_from(in1) else {
-            let msg = format!(
-                "Shift amount {in1} is too large in Left Shift expression '{in0} << {in1}'"
-            );
-            diags.err1("ERR_133", &msg, ir.src_loc.clone());
-            return false;
-        };
-        *out = in0.checked_shl(shift_amount).unwrap_or(0);
-        true
+        match u32::try_from(in1) {
+            Ok(shift_amount) => {
+                *out = in0.checked_shl(shift_amount).unwrap_or(0);
+                true
+            }
+            Err(_) if diags.suppress_arith_err => {
+                *out = 0;
+                true
+            }
+            Err(_) => {
+                let msg = format!(
+                    "Shift amount {in1} is too large in Left Shift expression '{in0} << {in1}'"
+                );
+                diags.err1("ERR_133", &msg, ir.src_loc.clone());
+                false
+            }
+        }
     }
 
     fn do_i64_shl(ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
-        let Ok(shift_amount) = u32::try_from(in1) else {
-            let msg = format!(
-                "Shift amount {in1} is too large in Left Shift expression '{in0} << {in1}'"
-            );
-            diags.err1("ERR_151", &msg, ir.src_loc.clone());
-            return false;
-        };
-        *out = in0.checked_shl(shift_amount).unwrap_or(0);
-        true
+        match u32::try_from(in1) {
+            Ok(shift_amount) => {
+                *out = in0.checked_shl(shift_amount).unwrap_or(0);
+                true
+            }
+            Err(_) if diags.suppress_arith_err => {
+                *out = 0;
+                true
+            }
+            Err(_) => {
+                let msg = format!(
+                    "Shift amount {in1} is too large in Left Shift expression '{in0} << {in1}'"
+                );
+                diags.err1("ERR_151", &msg, ir.src_loc.clone());
+                false
+            }
+        }
     }
 
     fn do_u64_shr(ir: &IR, in0: u64, in1: u64, out: &mut u64, diags: &mut Diags) -> bool {
-        let Ok(shift_amount) = u32::try_from(in1) else {
-            let msg = format!(
-                "Shift amount {in1} is too large in Right Shift expression '{in0} >> {in1}'"
-            );
-            diags.err1("ERR_134", &msg, ir.src_loc.clone());
-            return false;
-        };
-        *out = in0.checked_shr(shift_amount).unwrap_or(0);
-        true
+        match u32::try_from(in1) {
+            Ok(shift_amount) => {
+                *out = in0.checked_shr(shift_amount).unwrap_or(0);
+                true
+            }
+            Err(_) if diags.suppress_arith_err => {
+                *out = 0;
+                true
+            }
+            Err(_) => {
+                let msg = format!(
+                    "Shift amount {in1} is too large in Right Shift expression '{in0} >> {in1}'"
+                );
+                diags.err1("ERR_134", &msg, ir.src_loc.clone());
+                false
+            }
+        }
     }
 
     fn do_i64_shr(ir: &IR, in0: i64, in1: i64, out: &mut i64, diags: &mut Diags) -> bool {
-        let Ok(shift_amount) = u32::try_from(in1) else {
-            let msg = format!(
-                "Shift amount {in1} is too large in Right Shift expression '{in0} >> {in1}'"
-            );
-            diags.err1("ERR_144", &msg, ir.src_loc.clone());
-            return false;
-        };
-        *out = in0.checked_shr(shift_amount).unwrap_or(0);
-        true
+        match u32::try_from(in1) {
+            Ok(shift_amount) => {
+                *out = in0.checked_shr(shift_amount).unwrap_or(0);
+                true
+            }
+            Err(_) if diags.suppress_arith_err => {
+                *out = 0;
+                true
+            }
+            Err(_) => {
+                let msg = format!(
+                    "Shift amount {in1} is too large in Right Shift expression '{in0} >> {in1}'"
+                );
+                diags.err1("ERR_144", &msg, ir.src_loc.clone());
+                false
+            }
+        }
     }
 
     fn iterate_type_conversion(
@@ -930,6 +1042,13 @@ impl LayoutPhase {
 
         if align_val == 0 {
             // Align 0 causes division by zero at checked_rem.
+            // During convergence the value may be transiently zero (e.g. sizeof
+            // not yet settled); suppress and emit 0 padding bytes so the loop
+            // can converge, then the strict final pass will catch genuine zeros.
+            if diags.suppress_arith_err {
+                *self.parms[out_parm_num].to_u64_mut() = 0;
+                return true;
+            }
             let src_loc = irdb.parms[align_parm_num].src_loc.clone();
             diags.err1("ERR_160", "Alignment amount cannot be zero", src_loc);
             return false;
@@ -1002,8 +1121,15 @@ impl LayoutPhase {
             bad => panic!("called iterate_set for IR {:?}", bad),
         };
 
-        // The current location can never move backwards
+        // The current location can never move backwards.
+        // During convergence the target value may be transiently too small (e.g.
+        // sizeof not yet settled); suppress and emit 0 padding bytes so the loop
+        // can converge, then the strict final pass will catch genuine reversals.
         if set_val < loc {
+            if diags.suppress_arith_err {
+                *out = 0;
+                return true;
+            }
             let msg = format!(
                 "Set statement moves location counter backwards from {} to {}.",
                 loc, set_val
@@ -1050,7 +1176,11 @@ impl LayoutPhase {
 
         // Check that the target address is within the effective region constraint,
         // which is the intersection of all ancestor and direct region bindings.
-        if let Some(frame) = self.scope_stack.last()
+        // Skip during convergence: set_val may be transiently wrong (e.g. when
+        // sizeof is not yet settled), and the strict final pass will catch genuine
+        // out-of-bounds addresses.
+        if !diags.suppress_arith_err
+            && let Some(frame) = self.scope_stack.last()
             && let Some(effective) = frame.effective_region.as_ref()
             && !effective.contains_addr(set_val)
         {
@@ -1351,14 +1481,164 @@ impl LayoutPhase {
         }
     }
 
+    /// Executes one full pass over `irdb.ir_vec`, updating `self.ir_locs` and
+    /// `self.parms` in place.  Returns `false` if any instruction fails.
+    fn run_one_pass(
+        &mut self,
+        irdb: &IRDb,
+        region_db: &RegionDb,
+        ext_registry: &ExtensionRegistry,
+        diags: &mut Diags,
+    ) -> bool {
+        let mut result = true;
+        let mut current = Location {
+            file_offset: 0,
+            addr: AddressState {
+                addr_offset: 0,
+                sec_offset: 0,
+                addr_base: 0,
+            },
+        };
+
+        assert!(self.scope_stack.is_empty());
+
+        for (lid, ir) in irdb.ir_vec.iter().enumerate() {
+            debug!(
+                "LayoutPhase::iterate on lid {} at file_pos {}",
+                lid, current.file_offset
+            );
+            // record our location after each IR
+            self.ir_locs[lid] = current.clone();
+            let operation = ir.kind;
+            result &= match operation {
+                // Arithmetic with two operands in, one out
+                IRKind::Add
+                | IRKind::Subtract
+                | IRKind::RightShift
+                | IRKind::LeftShift
+                | IRKind::BitAnd
+                | IRKind::LogicalAnd
+                | IRKind::BitOr
+                | IRKind::LogicalOr
+                | IRKind::Multiply
+                | IRKind::Divide
+                | IRKind::Modulo
+                | IRKind::DoubleEq
+                | IRKind::GEq
+                | IRKind::LEq
+                | IRKind::Gt
+                | IRKind::Lt
+                | IRKind::NEq => self.iterate_arithmetic(ir, irdb, operation, &current, diags),
+                IRKind::ToI64 | IRKind::ToU64 => {
+                    self.iterate_type_conversion(ir, irdb, operation, &current, diags)
+                }
+                IRKind::Sizeof => self.iterate_sizeof(ir, irdb, diags, &current),
+                IRKind::SizeofExt => self.iterate_sizeof_ext(ir, diags, ext_registry),
+                IRKind::ObjAlign => self.iterate_obj_align(ir, irdb),
+                IRKind::ObjLma   => self.iterate_obj_lma(ir, irdb),
+                IRKind::ObjVma   => self.iterate_obj_vma(ir, irdb),
+                IRKind::BuiltinOutputSize => self.iterate_output_size(ir, irdb, diags),
+                IRKind::BuiltinOutputAddr => self.iterate_output_addr(ir, irdb, diags),
+                IRKind::BuiltinVersionString => self.iterate_builtin_version_string(ir),
+                IRKind::BuiltinVersionMajor => self.iterate_builtin_version_major(ir),
+                IRKind::BuiltinVersionMinor => self.iterate_builtin_version_minor(ir),
+                IRKind::BuiltinVersionPatch => self.iterate_builtin_version_patch(ir),
+
+                // Unlike print, we have to iterate on the string write operation since
+                // the size of the string affects the size of the output image.
+                IRKind::Addr | IRKind::AddrOffset | IRKind::SecOffset | IRKind::FileOffset => {
+                    self.iterate_address(ir, irdb, diags, &current)
+                }
+                IRKind::Wrs => self.iterate_wrs(ir, irdb, diags, &mut current),
+                IRKind::SectionStart => {
+                    self.iterate_section_start(ir, irdb, region_db, &mut current);
+                    // Re-record after iterate_section_start so that addr(section_name)
+                    // reflects the anchored address, not the pre-entry address.
+                    self.ir_locs[lid] = current.clone();
+                    true
+                }
+                IRKind::SectionEnd => self.iterate_section_end(ir, irdb, diags, &mut current),
+
+                IRKind::Wr(_, _) => self.iterate_wrx(ir, irdb, diags, &mut current),
+                IRKind::ExtensionCall => {
+                    self.iterate_ext(ir, &mut current, ext_registry, diags)
+                }
+                IRKind::Align => self.iterate_align(ir, irdb, diags, &current),
+                IRKind::SetSecOffset | IRKind::SetAddrOffset | IRKind::SetFileOffset => {
+                    if ir.kind != IRKind::SetFileOffset
+                        && let Some(true) = self.scope_stack.last().map(|f| &f.set_addr_seen)
+                            && self.warned_lids.insert((lid, "ERR_171")) {
+                                let cmd = if ir.kind == IRKind::SetSecOffset {
+                                    "pad_sec_offset"
+                                } else {
+                                    "pad_addr_offset"
+                                };
+                                let msg = format!(
+                                    "[ERR_171] Warning: '{}' follows 'set_addr' in the same \
+                                     section scope.  '{}' pads to a sec/addr_offset value, \
+                                     not to an address.  Consider 'pad_addr_offset' after \
+                                     'set_addr' to pad relative to the address anchor.",
+                                    cmd, cmd
+                                );
+                                diags.warn1("ERR_171", &msg, ir.src_loc.clone());
+                            }
+                    self.iterate_set(ir, irdb, diags, &current)
+                }
+                IRKind::SetAddr => self.iterate_set_addr(ir, irdb, lid, diags, &mut current),
+
+                IRKind::Wrf => self.iterate_wrf(ir, irdb, diags, &mut current),
+                IRKind::Wrobj => self.iterate_wrobj(ir, irdb, diags, &mut current),
+
+                IRKind::Trace if diags.trace_enabled() => {
+                    if let Some(mut s) = evaluate_string_expr(
+                        &self.parms,
+                        &irdb.parms,
+                        &ir.operands,
+                        diags,
+                    ) {
+                        let prefix = format!("[Trace-{}] ", diags.trace_iteration);
+                        s.insert_str(0, &prefix);
+                        print!("{}", s);
+                    }
+                    true
+                }
+
+                // The following IR types are evaluated only at execute time.
+                // Nothing to do during iteration.
+                IRKind::Const
+                | IRKind::Eq
+                | IRKind::Label
+                | IRKind::Assert
+                | IRKind::Print
+                | IRKind::Trace
+                | IRKind::I64
+                | IRKind::U64
+                // if/else IR only lives in const_ir_vec; never reaches the layout_phase.
+                | IRKind::ConstDeclare
+                | IRKind::IfBegin
+                | IRKind::ElseBegin
+                | IRKind::IfEnd
+                | IRKind::BareAssign
+                | IRKind::Output => true,
+            }
+        }
+
+        result
+    }
+
     /// Repeatedly executes the IR until all location-dependent values
     /// (addresses, alignments, section sizes) stabilize.  Each pass walks the
     /// full `irdb.ir_vec` in order, updating `self.ir_locs` with the image and
     /// section offset recorded after each instruction.  Because an alignment or
     /// `sizeof` expression may change the size of an earlier section on a later
     /// pass, iteration continues until two consecutive passes produce identical
-    /// location vectors.  Returns `false` and emits diagnostics if any instruction
-    /// fails validation or execution during the loop.
+    /// location vectors.
+    ///
+    /// Convergence passes run with `suppress_arith_err = true` so that transient
+    /// underflow/overflow from not-yet-known layout values (e.g. sizeof returning 0
+    /// in iteration 1) does not abort the loop.  After the fixed point is reached,
+    /// one final strict pass with `suppress_arith_err = false` confirms that the
+    /// converged values produce no arithmetic errors.
     pub fn iterate(
         &mut self,
         irdb: &IRDb,
@@ -1371,6 +1651,8 @@ impl LayoutPhase {
         let mut stable = false;
         let mut iter_count = 0;
         const MAX_ITERATIONS: usize = 100;
+
+        diags.suppress_arith_err = true;
         while result && !stable {
             self.trace(format_args!(
                 "LayoutPhase::iterate: Iteration count {}",
@@ -1378,139 +1660,10 @@ impl LayoutPhase {
             ));
             iter_count += 1;
             diags.trace_iteration = iter_count;
-            let mut current = Location {
-                file_offset: 0,
-                addr: AddressState {
-                    addr_offset: 0,
-                    sec_offset: 0,
-                    addr_base: 0,
-                },
-            };
-
-            // make sure we exited as many sections as we entered on each iteration
-            assert!(self.scope_stack.is_empty());
             trace!("LayoutPhase::iterate Beginning iteration {}", iter_count);
 
-            for (lid, ir) in irdb.ir_vec.iter().enumerate() {
-                debug!(
-                    "LayoutPhase::iterate on lid {} at file_pos {}",
-                    lid, current.file_offset
-                );
-                // record our location after each IR
-                self.ir_locs[lid] = current.clone();
-                let operation = ir.kind;
-                result &= match operation {
-                    // Arithmetic with two operands in, one out
-                    IRKind::Add
-                    | IRKind::Subtract
-                    | IRKind::RightShift
-                    | IRKind::LeftShift
-                    | IRKind::BitAnd
-                    | IRKind::LogicalAnd
-                    | IRKind::BitOr
-                    | IRKind::LogicalOr
-                    | IRKind::Multiply
-                    | IRKind::Divide
-                    | IRKind::Modulo
-                    | IRKind::DoubleEq
-                    | IRKind::GEq
-                    | IRKind::LEq
-                    | IRKind::Gt
-                    | IRKind::Lt
-                    | IRKind::NEq => self.iterate_arithmetic(ir, irdb, operation, &current, diags),
-                    IRKind::ToI64 | IRKind::ToU64 => {
-                        self.iterate_type_conversion(ir, irdb, operation, &current, diags)
-                    }
-                    IRKind::Sizeof => self.iterate_sizeof(ir, irdb, diags, &current),
-                    IRKind::SizeofExt => self.iterate_sizeof_ext(ir, diags, ext_registry),
-                    IRKind::ObjAlign => self.iterate_obj_align(ir, irdb),
-                    IRKind::ObjLma   => self.iterate_obj_lma(ir, irdb),
-                    IRKind::ObjVma   => self.iterate_obj_vma(ir, irdb),
-                    IRKind::BuiltinOutputSize => self.iterate_output_size(ir, irdb, diags),
-                    IRKind::BuiltinOutputAddr => self.iterate_output_addr(ir, irdb, diags),
-                    IRKind::BuiltinVersionString => self.iterate_builtin_version_string(ir),
-                    IRKind::BuiltinVersionMajor => self.iterate_builtin_version_major(ir),
-                    IRKind::BuiltinVersionMinor => self.iterate_builtin_version_minor(ir),
-                    IRKind::BuiltinVersionPatch => self.iterate_builtin_version_patch(ir),
+            result = self.run_one_pass(irdb, region_db, ext_registry, diags);
 
-                    // Unlike print, we have to iterate on the string write operation since
-                    // the size of the string affects the size of the output image.
-                    IRKind::Addr | IRKind::AddrOffset | IRKind::SecOffset | IRKind::FileOffset => {
-                        self.iterate_address(ir, irdb, diags, &current)
-                    }
-                    IRKind::Wrs => self.iterate_wrs(ir, irdb, diags, &mut current),
-                    IRKind::SectionStart => {
-                        self.iterate_section_start(ir, irdb, region_db, &mut current);
-                        // Re-record after iterate_section_start so that addr(section_name)
-                        // reflects the anchored address, not the pre-entry address.
-                        self.ir_locs[lid] = current.clone();
-                        true
-                    }
-                    IRKind::SectionEnd => self.iterate_section_end(ir, irdb, diags, &mut current),
-
-                    IRKind::Wr(_, _) => self.iterate_wrx(ir, irdb, diags, &mut current),
-                    IRKind::ExtensionCall => {
-                        self.iterate_ext(ir, &mut current, ext_registry, diags)
-                    }
-                    IRKind::Align => self.iterate_align(ir, irdb, diags, &current),
-                    IRKind::SetSecOffset | IRKind::SetAddrOffset | IRKind::SetFileOffset => {
-                        if ir.kind != IRKind::SetFileOffset
-                            && let Some(true) = self.scope_stack.last().map(|f| &f.set_addr_seen)
-                                && self.warned_lids.insert((lid, "ERR_171")) {
-                                    let cmd = if ir.kind == IRKind::SetSecOffset {
-                                        "pad_sec_offset"
-                                    } else {
-                                        "pad_addr_offset"
-                                    };
-                                    let msg = format!(
-                                        "[ERR_171] Warning: '{}' follows 'set_addr' in the same \
-                                         section scope.  '{}' pads to a sec/addr_offset value, \
-                                         not to an address.  Consider 'pad_addr_offset' after \
-                                         'set_addr' to pad relative to the address anchor.",
-                                        cmd, cmd
-                                    );
-                                    diags.warn1("ERR_171", &msg, ir.src_loc.clone());
-                                }
-                        self.iterate_set(ir, irdb, diags, &current)
-                    }
-                    IRKind::SetAddr => self.iterate_set_addr(ir, irdb, lid, diags, &mut current),
-
-                    IRKind::Wrf => self.iterate_wrf(ir, irdb, diags, &mut current),
-                    IRKind::Wrobj => self.iterate_wrobj(ir, irdb, diags, &mut current),
-
-                    IRKind::Trace if diags.trace_enabled() => {
-                        if let Some(mut s) = evaluate_string_expr(
-                            &self.parms,
-                            &irdb.parms,
-                            &ir.operands,
-                            diags,
-                        ) {
-                            let prefix = format!("[Trace-{}] ", diags.trace_iteration);
-                            s.insert_str(0, &prefix);
-                            print!("{}", s);
-                        }
-                        true
-                    }
-
-                    // The following IR types are evaluated only at execute time.
-                    // Nothing to do during iteration.
-                    IRKind::Const
-                    | IRKind::Eq
-                    | IRKind::Label
-                    | IRKind::Assert
-                    | IRKind::Print
-                    | IRKind::Trace
-                    | IRKind::I64
-                    | IRKind::U64
-                    // if/else IR only lives in const_ir_vec; never reaches the layout_phase.
-                    | IRKind::ConstDeclare
-                    | IRKind::IfBegin
-                    | IRKind::ElseBegin
-                    | IRKind::IfEnd
-                    | IRKind::BareAssign
-                    | IRKind::Output => true,
-                }
-            }
             if self.ir_locs == old_locations {
                 stable = true;
             } else {
@@ -1528,13 +1681,22 @@ impl LayoutPhase {
                     let msg = "Cyclic dependency detected: layout failed to stabilize after maximum iterations.";
                     let src_loc = irdb.ir_vec[culprit_idx].src_loc.clone();
                     diags.err1("ERR_179", msg, src_loc);
+                    diags.suppress_arith_err = false;
                     return false;
                 }
-                // Record the current location information
                 old_locations = self.ir_locs.clone();
             }
         }
 
+        // Final strict pass: confirm converged values produce no arithmetic errors.
+        if result {
+            diags.suppress_arith_err = false;
+            iter_count += 1;
+            diags.trace_iteration = iter_count;
+            result = self.run_one_pass(irdb, region_db, ext_registry, diags);
+        }
+
+        diags.suppress_arith_err = false;
         result
     }
 }

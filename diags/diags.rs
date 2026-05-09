@@ -26,6 +26,7 @@ pub struct Diags {
     verbosity: u64,
     pub noprint: bool,
     pub trace_iteration: usize,
+    pub suppress_arith_err: bool,
     config: Config,
 }
 
@@ -44,6 +45,7 @@ impl Diags {
             verbosity,
             noprint,
             trace_iteration: 0,
+            suppress_arith_err: false,
             config: Config::default().with_char_set(char_set),
         }
     }

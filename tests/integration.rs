@@ -3716,4 +3716,28 @@ mod tests {
             fs::remove_file(&derived_out).unwrap();
         }
     }
+
+    #[test]
+    fn suppress_arith_err_1() {
+        // sizeof(A) is 0 on the first layout pass, making sizeof(A)-4 underflow
+        // and align(sizeof(A)-4) receive a zero.  Both must be suppressed during
+        // convergence and pass cleanly on the strict final pass.
+        assert_brink_success("tests/suppress_arith_err_1.brink", None, None);
+    }
+
+    #[test]
+    fn suppress_arith_err_2() {
+        // sizeof(A) is 0 on the first layout pass, making 0x2000 - sizeof(A) = 0x2000
+        // which is just outside the region.  The region bounds check must be skipped
+        // during convergence; the strict final pass sees 0x1FFC which is valid.
+        assert_brink_success("tests/suppress_arith_err_2.brink", None, None);
+    }
+
+    #[test]
+    fn suppress_arith_err_3_fail() {
+        // addr(A) is circular: A is placed by B, so addr(A) always converges to 0,
+        // which is genuinely outside region [0x1000, 0x2000).  ERR_185 must fire
+        // on the strict final pass even though it was suppressed during convergence.
+        assert_brink_failure("tests/suppress_arith_err_3_fail.brink", &["ERR_185"]);
+    }
 } // mod tests

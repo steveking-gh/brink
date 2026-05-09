@@ -1,0 +1,14 @@
+section B {
+    // sizeof(A) is transiently 0 during layout.
+    // The underflow error should be suppressed until layout stabilizes.
+    trace "sizeof(A): ", sizeof(A) - 4, "\n";
+    print "sizeof(A): ", sizeof(A) - 4, "\n";
+    align sizeof(A) - 4;
+    wr A;
+}
+
+section A {
+    wr64 0;
+}
+
+output B;

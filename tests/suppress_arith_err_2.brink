@@ -1,0 +1,20 @@
+region test {
+    addr = 0x1000;
+    size = 0x1000;
+}
+
+section B in test {
+    // sizeof(A) is 0 on the first layout pass, so 0x2000 - sizeof(A) = 0x2000
+    // which is just outside region [0x1000, 0x2000).  ERR_185 must be suppressed
+    // during convergence.  After convergence sizeof(A) = 4, giving 0x1FFC which
+    // is a valid address inside the region.
+    trace "0x2000 - sizeof(A): ", 0x2000 - sizeof(A), "\n";
+    set_addr 0x2000 - sizeof(A);
+    wr A;
+}
+
+section A {
+    wr32 0;
+}
+
+output B;

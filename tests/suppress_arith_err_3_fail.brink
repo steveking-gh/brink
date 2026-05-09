@@ -1,0 +1,19 @@
+region test {
+    addr = 0x1000;
+    size = 0x1000;
+}
+
+section B in test {
+    // A's address is determined by where B places it, and B places it based on
+    // addr(A) — so it always converges to the initial value of 0, which is
+    // genuinely wrong at the strict final pass too.
+    trace "addr(A): ", addr(A), "\n";
+    set_addr addr(A);
+    wr A;
+}
+
+section A {
+    wr32 0;
+}
+
+output B;
