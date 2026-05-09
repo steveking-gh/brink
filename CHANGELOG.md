@@ -17,6 +17,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - ADDED: `trace` command for debugging
 - FIXED: Top level print statements
 - FIXED: Print and assert execution order
+- FIXED: Command line string args on Windows
 - CHANGED: Unify all error codes as ERR_<n>
 - README: Added Brink features overview to the introduction
 - README: Added Brink standard extensions table
