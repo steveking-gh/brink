@@ -154,8 +154,9 @@ language_features:
     Usage: 'const NAME = "value";' or '-DNAME="value"'.
     String consts are valid as wrf path operands, wrs operands, and in == / !=
     comparisons. Arithmetic and ordered comparisons on strings are rejected
-    (ERR_92, ERR_96). CLI defines without quotes are parsed as integers; a
-    non-numeric unquoted value fails with an "invalid integer" error.
+    (ERR_92, ERR_96). CLI defines: all-digit unquoted values are integers;
+    values with any non-digit character become bare strings (e.g. -DPATH=./fw.elf works without quotes);
+    explicitly quoted values (double or single) are always strings.
   if_else:
     top_level: conditions are const; body may contain section definitions or const assigns
     section_body: conditions are const; body may contain layout-time statements (wr8, wr, etc.)

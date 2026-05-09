@@ -79,18 +79,13 @@ fn parse_define(s: &str) -> Result<(String, ParameterValue)> {
         let v = parse::<u64>(val_str)
             .map_err(|_| anyhow!("Invalid U64 value in define '{}': '{}'", s, val_str))?;
         ParameterValue::U64(v)
+    } else if val_str.chars().any(|c| !c.is_ascii_digit()) {
+        // Non-numeric characters: treat as a bare string rather than erroring.
+        // This lets -DPATH=./file.elf work without shell-level quote gymnastics.
+        ParameterValue::QuotedString(val_str.to_string())
     } else {
-        let v = parse::<i64>(val_str).map_err(|_| {
-            if val_str.chars().any(|c| !c.is_ascii_digit()) {
-                anyhow!(
-                    "Invalid value in define '{}': '{}' is not an integer. \
-                     To pass a string, use quotes: -D{}=\"{}\"",
-                    s, val_str, name, val_str
-                )
-            } else {
-                anyhow!("Invalid integer value in define '{}': '{}'", s, val_str)
-            }
-        })?;
+        let v = parse::<i64>(val_str)
+            .map_err(|_| anyhow!("Invalid integer value in define '{}': '{}'", s, val_str))?;
         ParameterValue::Integer(v)
     };
     Ok((name.to_string(), value))
@@ -400,5 +395,18 @@ mod tests {
         let (n2, v2) = name_val("LABEL='stable'");
         assert_eq!(n2, "LABEL");
         assert_eq!(v2, ParameterValue::QuotedString("stable".to_string()));
+    }
+
+    #[test]
+    fn bare_non_numeric_is_string() {
+        // Unquoted values containing non-digit characters become bare strings.
+        // This lets -DPATH=./some/file.elf work without shell-level quoting.
+        let (n, v) = name_val("PATH=./.pio/build/firmware.elf");
+        assert_eq!(n, "PATH");
+        assert_eq!(v, ParameterValue::QuotedString("./.pio/build/firmware.elf".to_string()));
+
+        let (n2, v2) = name_val(r"PATH=.\.pio\build\firmware.elf");
+        assert_eq!(n2, "PATH");
+        assert_eq!(v2, ParameterValue::QuotedString(r".\.pio\build\firmware.elf".to_string()));
     }
 }
