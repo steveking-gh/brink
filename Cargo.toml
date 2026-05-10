@@ -29,6 +29,7 @@ members = [
     "std/sha256",
     "std/md5",
     "std/xor",
+    "std/esp_checksum",
     "extensions",
     "objfile",
 ]
@@ -75,11 +76,12 @@ inherits = "release"
 lto = "thin"
 
 [features]
-default = ["std-crc32c", "std-sha256", "std-md5", "std-xor"]
-std-crc32c = ["process/std-crc32c"]
-std-sha256  = ["process/std-sha256"]
-std-md5     = ["process/std-md5"]
-std-xor     = ["process/std-xor"]
+default = ["std-crc32c", "std-sha256", "std-md5", "std-xor", "std-esp-checksum"]
+std-crc32c        = ["process/std-crc32c"]
+std-sha256        = ["process/std-sha256"]
+std-md5           = ["process/std-md5"]
+std-xor           = ["process/std-xor"]
+std-esp-checksum  = ["process/std-esp-checksum"]
 
 [dependencies]
 indextree = "4.3.1"

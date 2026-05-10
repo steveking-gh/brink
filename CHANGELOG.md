@@ -15,6 +15,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - ADDED: Support for big-endian writes
 - ADDED: Support plain-ASCII for non-terminal output, e.g. pipes
 - ADDED: `trace` command for debugging
+- ADDED: std::esp_checksum extension
 - FIXED: Top level print statements
 - FIXED: Print and assert execution order
 - FIXED: Command line string args on Windows

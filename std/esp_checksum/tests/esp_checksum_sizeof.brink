@@ -1,0 +1,7 @@
+// Verifies that sizeof(std::esp_checksum) reports 1 (byte).
+section data {
+    wr8 0x00;
+    assert sizeof(std::esp_checksum) == 1;
+}
+
+output data;

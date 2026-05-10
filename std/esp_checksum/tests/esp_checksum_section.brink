@@ -1,0 +1,69 @@
+// Computes ESP style XOR checksum over ESP segments
+//
+const FH_MAGIC_BYTE = 0xE9;
+const FH_SEGMENT_COUNT = 3;
+const SEG_HDR_SIZE = 8; // 8 bytes per segment header
+
+section file_header {
+    print "Building 8-byte File Header\n";
+    wr8 FH_MAGIC_BYTE;
+    wr8 FH_SEGMENT_COUNT; // Read by std::esp_checksum to determine segment count
+    wr8 0xFF; // Ignored by this extension
+    wr8 0xFF; // Ignored by this extension
+    wr32 0xFFFFFFFF; // Ignored by this extension
+    assert sizeof(file_header) == 24; // 8-byte fixed header + 16-byte extended header
+    wr8 0x00, 16; // Fake extended file header = 16 bytes
+}
+
+section seg0 {
+    wr32 0x80000000;  // Fake address
+    wr32 sizeof(seg0) - SEG_HDR_SIZE;
+    wr8 0xAA; // Fake payload
+    wr8 0xD1; // Fake payload
+    wr8 0x06; // Fake payload
+    wr8 0x56; // Fake payload
+    wr8 0x36; // Fake payload
+    wr8 0x19; // Fake payload
+    wr8 0x01; // Fake payload
+}
+
+section seg1 {
+    wr32 0x90000000;  // Fake address
+    wr32 sizeof(seg1) - SEG_HDR_SIZE;
+    wr8 0xBB; // Fake payload
+    wr8 0x14; // Fake payload
+    wr8 0x07; // Fake payload
+    wr8 0x88; // Fake payload
+    wr8 0x45; // Fake payload
+    wr8 0x27; // Fake payload
+    wr8 0x09; // Fake payload
+    wr8 0xD4; // Fake payload
+    wr8 0x76; // Fake payload
+    wr8 0xF8; // Fake payload
+}
+
+section seg2 {
+    wr32 0xA0000000;  // Fake address
+    wr32 sizeof(seg2) - SEG_HDR_SIZE;
+    wr8 0xCC; // Fake payload
+    wr8 0x3B; // Fake payload
+    wr8 0x08; // Fake payload
+    wr8 0x9A; // Fake payload
+    wr8 0x52; // Fake payload
+    wr8 0xE4; // Fake payload
+    wr8 0x1A; // Fake payload
+}
+
+section pre_checksum_image {
+    wr file_header;
+    wr seg0;
+    wr seg1;
+    wr seg2;
+}
+
+section image {
+    wr pre_checksum_image;
+    wr std::esp_checksum(pre_checksum_image, sizeof(file_header));
+}
+
+output image;

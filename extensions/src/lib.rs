@@ -24,4 +24,6 @@ pub fn register_all(registry: &mut ExtensionRegistry) {
     std_md5::register(registry);
     #[cfg(feature = "std-xor")]
     std_xor::register(registry);
+    #[cfg(feature = "std-esp-checksum")]
+    std_esp_checksum::register(registry);
 }
