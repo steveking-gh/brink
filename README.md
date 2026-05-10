@@ -1895,7 +1895,22 @@ that Brink purposely does not rigorously define trace output:
     [Trace-2] B1
     [Trace-2] Finish!
 
-The number in Trace-*n* is the internal iteration count.  In this example, Brink required two iterations to stabilize the output.
+The number in Trace-*n* is the internal iteration count.  In this example, Brink
+required two iterations to stabilize the output.
+
+## Transient Values in `trace` Output
+
+Because the `trace` command provides a peek into Brink's internal workings,
+displayed values may appear erroneous.  In particular, transient values (often
+equal to 0) can cause arithmetic expressions to also return bogus results.
+During image generation, Brink deals with bogus values by suppressing certain
+types of errors until the image stabilizes.  When suppressing an error, Brink
+substitutes 0 for the bogus value.  As Brink iterates, "good" values propagate
+and eventually eliminate these suppressed errors.
+
+In summary, treat `trace` values as hints.  As iteration continues, `trace`
+values should converge on the actual value, i.e. what [`print`](#print) would
+display.
 
 ---
 
@@ -2173,7 +2188,7 @@ currently support standard extensions.
 | std::crc32c | 32-bit CRC32-C Castagnoli polynomial 0x1EDC6F41 |
 | std::md5    | 128-bit MD5 hash                                |
 | std::sha256 | 256-bit SHA-256 hash                            |
-| std::xor    | 8-bit simple XOR hash                           |
+| std::esp_checksum    | 8-bit simple XOR hash                           |
 
 ---
 
