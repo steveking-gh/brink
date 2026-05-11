@@ -1,2 +1,2 @@
-include "some_file.brink"
+include "some_file.firm"
 const X = 5;

@@ -1,12 +1,12 @@
-# Fuzz Testing in Brink
+# Fuzz Testing in Firmion
 
-Fuzz testing is invaluable for catching problems in compilers!  This file contains some practical notes on fuzz testing with Brink.
+Fuzz testing is invaluable for catching problems in compilers!  This file contains some practical notes on fuzz testing with Firmion.
 
 Fuzz tests run until stopped with Ctrl-C.  In my experience, fuzz tests will
 usually catch a problem in < 60 seconds or not at all.
 
 You will generally use the fuzz tests in process/fuzz since these exercise the
-entire Brink pipeline.
+entire Firmion pipeline.
 
 Here's an example of running the fuzzer.  Note that we copy the tests into the
 seed directory to give the fuzzer better starting points.  Also, deleting the

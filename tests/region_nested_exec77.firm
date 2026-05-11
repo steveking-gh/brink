@@ -1,4 +1,4 @@
-// region_nested_exec77.brink: inner section is bound to SRAM, which is disjoint
+// region_nested_exec77.firm: inner section is bound to SRAM, which is disjoint
 // from the outer section's FLASH region.  When inner is called from outer the
 // effective region intersection is empty -> ERR_190.
 region FLASH {

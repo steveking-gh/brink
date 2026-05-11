@@ -1,5 +1,5 @@
 section top {
-    wr64 brink::test_crc(0xAABBCCDD);
+    wr64 firmion::test_crc(0xAABBCCDD);
 }
 
 output top;

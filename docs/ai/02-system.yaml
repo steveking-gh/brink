@@ -1,5 +1,5 @@
 summary: >
-  Brink is a domain-specific language (DSL) compiler for composing binary
+  Firmion is a domain-specific language (DSL) compiler for composing binary
   image files (ROM, FLASH, firmware, etc.).  Source files declare sections,
   consts, and an output; the compiler resolves sizes, addresses, and offsets,
   then writes a flat binary.
@@ -9,7 +9,7 @@ pipeline:
   stages:
     - name: Lexer + Parser → AST
       crate: ast
-      input: .brink source text
+      input: .firm source text
       output: Ast (arena-based indextree holding TokenInfo by value), AstDb (index of sections/consts/output)
       notes: Hand-rolled lexer (LexToken enum). Pratt parser for expressions.
              ParseIfContext enum distinguishes TopLevel vs Section if/else.
@@ -170,7 +170,7 @@ language_features:
   obj: top-level declaration binding a name to a section in an object file; syntax: obj name { section = "..."; file = "..."; }
        Naming convention: the section inside an external object file is called "objsec"
        in code (ObjProps.objsec, ObjSectionInfo.section_name) to avoid confusion with
-       Brink's own Section construct. Never use the bare word "section" for ELF/object
+       Firmion's own Section construct. Never use the bare word "section" for ELF/object
        file sections in identifiers or comments.
   sizeof(obj_name): returns the byte size of the named obj section (resolved at IRDb validation time)
   align: pad to alignment boundary
@@ -184,7 +184,7 @@ language_features:
   obj_align(obj_name): returns section alignment from the object file (layout-time, ELF unified API)
   obj_vma(obj_name): returns section virtual memory address (layout-time, ELF unified API)
   obj_lma(obj_name): returns section load memory address (layout-time, ELF only; ERR_122 for non-ELF when additional format features enabled)
-  include: include another .brink file
+  include: include another .firm file
 
 diagnostics:
   crate: diags

@@ -1,4 +1,4 @@
-// std::crc32c -- Castagnoli CRC-32 extension for Brink.
+// std::crc32c -- Castagnoli CRC-32 extension for Firmion.
 //
 // Computes the CRC-32C (Castagnoli polynomial, 0x1EDC6F41) over a
 // caller-specified image region and writes the 4-byte result

@@ -1,6 +1,6 @@
 // Integration tests for the std::xor extension.
 //
-// Each test invokes the brink binary and checks either the exit code or
+// Each test invokes the firmion binary and checks either the exit code or
 // the exact bytes written to the output file.  The XOR values below
 // were computed by hand and verified against the fold used by the extension.
 
@@ -18,12 +18,12 @@ mod tests {
         manifest.join("../..").join(rel)
     }
 
-    /// Runs the brink binary on a .brink file and asserts success.
+    /// Runs the firmion binary on a .firm file and asserts success.
     /// Returns the bytes written to the output file, then removes it.
     fn run_and_read(src: &str, out: &str) -> Vec<u8> {
         let src_path = workspace_path(src);
         let out_path = workspace_path(out);
-        Command::cargo_bin("brink")
+        Command::cargo_bin("firmion")
             .unwrap()
             .arg(&src_path)
             .arg("-o")
@@ -43,7 +43,7 @@ mod tests {
     /// XOR = 0x01 ^ 0x02 ^ 0x03 ^ 0x04 ^ 0x00 = 0x04.
     #[test]
     fn xor_section_form() {
-        let out = run_and_read("std/xor/tests/xor_section.brink", "xor_section.bin");
+        let out = run_and_read("std/xor/tests/xor_section.firm", "xor_section.bin");
         assert_eq!(
             out,
             vec![0x01, 0x02, 0x03, 0x04, 0x04],
@@ -57,7 +57,7 @@ mod tests {
     #[test]
     fn xor_explicit_range() {
         let out = run_and_read(
-            "std/xor/tests/xor_explicit_range.brink",
+            "std/xor/tests/xor_explicit_range.firm",
             "xor_explicit_range.bin",
         );
         assert_eq!(
@@ -70,9 +70,9 @@ mod tests {
     /// sizeof(std::xor) must be 1.
     #[test]
     fn xor_sizeof() {
-        let src_path = workspace_path("std/xor/tests/xor_sizeof.brink");
+        let src_path = workspace_path("std/xor/tests/xor_sizeof.firm");
         let out_path = workspace_path("xor_sizeof.bin");
-        Command::cargo_bin("brink")
+        Command::cargo_bin("firmion")
             .unwrap()
             .arg(&src_path)
             .arg("-o")
@@ -86,8 +86,8 @@ mod tests {
     /// than once in the output.  Expects ERR_173 and a non-zero exit code.
     #[test]
     fn xor_ambiguous_section() {
-        let src_path = workspace_path("std/xor/tests/xor_ambiguous_section.brink");
-        Command::cargo_bin("brink")
+        let src_path = workspace_path("std/xor/tests/xor_ambiguous_section.firm");
+        Command::cargo_bin("firmion")
             .unwrap()
             .arg(&src_path)
             .assert()

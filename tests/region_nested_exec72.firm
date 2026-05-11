@@ -1,4 +1,4 @@
-// region_nested_exec72.brink: inner section has no direct region binding but
+// region_nested_exec72.firm: inner section has no direct region binding but
 // inherits the FLASH constraint from the outer section via the scope stack.
 // set_addr to an address outside FLASH triggers ERR_185.
 region FLASH {

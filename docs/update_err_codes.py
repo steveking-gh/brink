@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-update_err_codes.py -- Scan Brink Rust source for error/warning codes and
+update_err_codes.py -- Scan Firmion Rust source for error/warning codes and
 rewrite docs/error_codes.md with a sorted, de-duplicated inventory.
 
 Two emission patterns are recognized:

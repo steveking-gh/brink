@@ -7,15 +7,15 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'brink' named_arg_crc",
+            "name": "Debug executable 'firmion' named_arg_crc",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=brink",
-                    "--package=brink"
+                    "--bin=firmion",
+                    "--package=firmion"
                 ],
                 "filter": {
-                    "name": "brink",
+                    "name": "firmion",
                     "kind": "bin"
                 }
             },
@@ -23,21 +23,21 @@
                      "-v",
                      "-v",
                      "-v",
-                     "${workspaceFolder}/tests/named_arg_crc.brink"],
+                     "${workspaceFolder}/tests/named_arg_crc.firm"],
         },
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in executable 'brink'",
+            "name": "Debug unit tests in executable 'firmion'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
-                    "--bin=brink",
-                    "--package=brink"
+                    "--bin=firmion",
+                    "--package=firmion"
                 ],
                 "filter": {
-                    "name": "brink",
+                    "name": "firmion",
                     "kind": "bin"
                 }
             },
@@ -53,7 +53,7 @@
                     "test",
                     "--no-run",
                     "--test=integration",
-                    "--package=brink"
+                    "--package=firmion"
                 ],
                 "filter": {
                     "name": "integration",

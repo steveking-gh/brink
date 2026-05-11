@@ -64,7 +64,7 @@ pub struct Cli {
     #[arg(index = 1, required_unless_present = "list_extensions")]
     pub input: Option<String>,
 
-    /// List all available extensions compiled into brink and exit.
+    /// List all available extensions compiled into firmion and exit.
     #[arg(long = "list-extensions")]
     pub list_extensions: bool,
 
@@ -91,22 +91,22 @@ pub struct Cli {
     pub quiet: bool,
 
     /// Write a CSV map file.  Omit FILE to derive name from input
-    /// (e.g. firmware.brink -> firmware.map.csv).  Use FILE=- for stdout.
+    /// (e.g. firmware.firm -> firmware.map.csv).  Use FILE=- for stdout.
     #[arg(long = "map-csv", value_name = "FILE", num_args(0..=1), default_missing_value = "", require_equals = true)]
     pub map_csv: Option<String>,
 
     /// Write a JSON map file.  Omit FILE to derive name from input
-    /// (e.g. firmware.brink -> firmware.map.json).  Use FILE=- for stdout.
+    /// (e.g. firmware.firm -> firmware.map.json).  Use FILE=- for stdout.
     #[arg(long = "map-json", value_name = "FILE", num_args(0..=1), default_missing_value = "", require_equals = true)]
     pub map_json: Option<String>,
 
     /// Write a C99 map file.  Omit FILE to derive name from input
-    /// (e.g. firmware.brink -> firmware.map.h).  Use FILE=- for stdout.
+    /// (e.g. firmware.firm -> firmware.map.h).  Use FILE=- for stdout.
     #[arg(long = "map-c99", value_name = "FILE", num_args(0..=1), default_missing_value = "", require_equals = true)]
     pub map_c99: Option<String>,
 
     /// Write a Rust module map file.  Omit FILE to derive name from input
-    /// (e.g. firmware.brink -> firmware.map.rs).  Use FILE=- for stdout.
+    /// (e.g. firmware.firm -> firmware.map.rs).  Use FILE=- for stdout.
     #[arg(long = "map-rs", value_name = "FILE", num_args(0..=1), default_missing_value = "", require_equals = true)]
     pub map_rs: Option<String>,
 
@@ -130,7 +130,7 @@ fn main() -> Result<()> {
 
     init_log(verbosity).expect("Unknown error initializing logging.");
 
-    info!("brink version {}", env!("CARGO_PKG_VERSION"));
+    info!("firmion version {}", env!("CARGO_PKG_VERSION"));
 
     if cli.list_extensions {
         for name in list_extensions() {

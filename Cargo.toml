@@ -22,7 +22,7 @@ members = [
     "validation_phase",
     "extension_registry",
     "const_eval",
-    "brink_extension",
+    "firmion_extension",
     "ireval",
     "output_buffer",
     "std/crc32c",
@@ -40,14 +40,14 @@ authors = ["Steve King <sk@metrokings.com>"]
 edition = "2024"
 
 [package]
-name = "brink"
+name = "firmion"
 description = "Ergonomic firmware and binary file creation tool."
 version = "8.0.0"
 build = "build.rs"
 license-file = "LICENSE.txt"
 readme = "README.md"
-homepage = "https://github.com/steveking-gh/brink"
-repository = "https://github.com/steveking-gh/brink"
+homepage = "https://github.com/steveking-gh/firmion"
+repository = "https://github.com/steveking-gh/firmion"
 keywords = ["linker",
             "cli",
             "domain-specific-language",

@@ -1,4 +1,4 @@
-// Named Slice argument to brink::test_increment.
+// Named Slice argument to firmion::test_increment.
 // data=top passes the top section slice; execute appends each byte + 1.
 // Expected output: 32 bytes -- 0x00-0x0F then 0x01-0x10.
 section top {
@@ -6,7 +6,7 @@ section top {
     wr8 0x04; wr8 0x05; wr8 0x06; wr8 0x07;
     wr8 0x08; wr8 0x09; wr8 0x0A; wr8 0x0B;
     wr8 0x0C; wr8 0x0D; wr8 0x0E; wr8 0x0F;
-    wr brink::test_increment(data=top);
+    wr firmion::test_increment(data=top);
     assert sizeof(top) == 32;
 }
 output top;

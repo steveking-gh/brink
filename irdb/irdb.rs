@@ -1,4 +1,4 @@
-// Typed IR construction and validation for brink.
+// Typed IR construction and validation for firmion.
 //
 // IRDb is the third stage of the compiler pipeline.  It consumes the flat
 // LinIR and LinOperand records from LayoutDb and converts them into fully

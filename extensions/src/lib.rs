@@ -1,7 +1,7 @@
-// Extension registration for Brink.
+// Extension registration for Firmion.
 //
 // This crate is the single place where all compiled-in extensions are
-// registered with Brink's extension registry.  To add a new extension:
+// registered with Firmion's extension registry.  To add a new extension:
 //
 //   1. Create a new crate implementing `BrinkExtension` or
 //      `BrinkRangedExtension` from the `brink_extension` crate.
@@ -14,7 +14,7 @@
 use extension_registry::ExtensionRegistry;
 
 /// Registers all compiled-in extensions into `registry`.
-/// Call once before compiling any Brink scripts.
+/// Call once before compiling any Firmion scripts.
 pub fn register_all(registry: &mut ExtensionRegistry) {
     #[cfg(feature = "std-crc32c")]
     std_crc32c::register(registry);

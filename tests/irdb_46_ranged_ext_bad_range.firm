@@ -5,7 +5,7 @@
 
 section foo {
     wr8 0x01; wr8 0x02; wr8 0x03; wr8 0x04;
-    wr brink::test_ranged_sum("start");
+    wr firmion::test_ranged_sum("start");
 }
 
 output foo;

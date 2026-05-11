@@ -1,4 +1,4 @@
-include "include_nested_a.brink";
+include "include_nested_a.firm";
 section main {
     set_addr 0x2000;
     wr8 MY_A_VAL;

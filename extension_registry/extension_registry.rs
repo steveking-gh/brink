@@ -4,7 +4,7 @@ pub use brink_extension::{BrinkExtension, ParamArg, ParamDesc, ParamKind};
 
 /// Owns a registered extension alongside its cached metadata.
 ///
-/// Brink calls `size()` and `params()` exactly once -- at registration time --
+/// Firmion calls `size()` and `params()` exactly once -- at registration time --
 /// and stores the results here.  All internal lookups use cached values rather
 /// than calling the extension again.
 pub struct ExtensionEntry {
@@ -22,7 +22,7 @@ impl ExtensionEntry {
     }
 }
 
-/// A registry that owns and provides lookup for all available Brink extensions.
+/// A registry that owns and provides lookup for all available Firmion extensions.
 pub struct ExtensionRegistry {
     extensions: HashMap<String, ExtensionEntry>,
 }
@@ -90,7 +90,7 @@ mod tests {
         reg.register(Box::new(MockCrc::new()));
 
         assert!(
-            reg.get("brink::test_crc").is_some(),
+            reg.get("firmion::test_crc").is_some(),
             "Should find registered extension"
         );
         assert!(
@@ -100,7 +100,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Extension 'brink::test_crc' is already registered")]
+    #[should_panic(expected = "Extension 'firmion::test_crc' is already registered")]
     fn test_duplicate_registration_panics() {
         let mut reg = ExtensionRegistry::new();
         reg.register(Box::new(MockCrc::new()));
@@ -113,8 +113,8 @@ mod tests {
         let mut reg = ExtensionRegistry::new();
         reg.register(Box::new(MockCrc::new()));
         // Retrieve the entry multiple times; the Cell counter must stay at 1.
-        let _ = reg.get("brink::test_crc");
-        let _ = reg.get("brink::test_crc");
+        let _ = reg.get("firmion::test_crc");
+        let _ = reg.get("firmion::test_crc");
         // MockCrc::size() would panic on a second call, so reaching here is the assertion.
     }
 
@@ -123,7 +123,7 @@ mod tests {
     fn test_cached_size_matches_extension() {
         let mut reg = ExtensionRegistry::new();
         reg.register(Box::new(MockCrc::new()));
-        let entry = reg.get("brink::test_crc").unwrap();
+        let entry = reg.get("firmion::test_crc").unwrap();
         assert_eq!(entry.cached_size, 4);
     }
 
@@ -131,7 +131,7 @@ mod tests {
     fn test_valid_extension_execution() {
         let mut reg = ExtensionRegistry::new();
         reg.register(Box::new(MockCrc::new()));
-        let entry = reg.get("brink::test_crc").unwrap();
+        let entry = reg.get("firmion::test_crc").unwrap();
 
         let args = vec![ParamArg::Int(0xDEADBEEF_u64)];
         let mut out = vec![0u8; 4];
@@ -143,7 +143,7 @@ mod tests {
     fn test_invalid_argument_count() {
         let mut reg = ExtensionRegistry::new();
         reg.register(Box::new(MockCrc::new()));
-        let entry = reg.get("brink::test_crc").unwrap();
+        let entry = reg.get("firmion::test_crc").unwrap();
 
         // MockCrc expects exactly 1 arg; provide 2.
         let args = vec![ParamArg::Int(1), ParamArg::Int(2)];
@@ -157,7 +157,7 @@ mod tests {
     fn test_invalid_output_buffer() {
         let mut reg = ExtensionRegistry::new();
         reg.register(Box::new(MockCrc::new()));
-        let entry = reg.get("brink::test_crc").unwrap();
+        let entry = reg.get("firmion::test_crc").unwrap();
 
         let args = vec![ParamArg::Int(1)];
         let mut out = vec![0u8; 2]; // MockCrc expects 4 bytes
@@ -170,7 +170,7 @@ mod tests {
     fn test_ranged_sum_execution() {
         let mut reg = ExtensionRegistry::new();
         reg.register(Box::new(MockRangedSum::new()));
-        let entry = reg.get("brink::test_ranged_sum").unwrap();
+        let entry = reg.get("firmion::test_ranged_sum").unwrap();
         assert_eq!(entry.cached_size, 8);
 
         let img = vec![0x01u8, 0x02, 0x03, 0x04];
@@ -220,7 +220,7 @@ mod tests {
         let mut reg = ExtensionRegistry::new();
         reg.register(Box::new(MockLogger::new()));
 
-        let entry = reg.get("brink::test_logger").unwrap();
+        let entry = reg.get("firmion::test_logger").unwrap();
         let args: Vec<ParamArg<'_>> = vec![];
         let res = entry.extension.execute(&args, &mut []);
 

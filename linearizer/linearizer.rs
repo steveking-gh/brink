@@ -1,4 +1,4 @@
-// Shared expression linearization for brink.
+// Shared expression linearization for firmion.
 //
 // This crate provides the core types and expression-lowering logic shared by
 // both the const-time (ConstDb) and layout-time (LayoutDb) pipeline stages.

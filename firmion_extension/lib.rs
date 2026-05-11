@@ -1,27 +1,27 @@
-// Extension API for the Brink binary image compiler.
+// Extension API for the Firmion binary image compiler.
 //
-// This crate defines the public API for Brink extension authors.
+// This crate defines the public API for Firmion extension authors.
 //
 // BrinkExtension -- the single trait all extensions implement.
 //
 // ExtArg -- typed argument passed to execute().  Each parameter passed
-// to an extension in Brink code maps to one ExtArg passed to the extension
+// to an extension in Firmion code maps to one ExtArg passed to the extension
 // by the compiler.
 //
 // Argument types:
 //   Int(u64)                     -- numeric expression (u64, i64, or integer const)
 //   Str(&str)                    -- quoted string const
 //   Slice { start, len, data }   -- Data slice from the in-flight output data.
-//                                   Brink automatically converts sections names
+//                                   Firmion automatically converts sections names
 //                                   into slices.
 //
-// Args may appear in any order.  Brink resolves the section name to its
+// Args may appear in any order.  Firmion resolves the section name to its
 // location and provides the image bytes without extension authors having to
 // compute offsets.
 //
-// Brink registers extensions at startup via the ExtensionRegistry.
-// Brink calls size() exactly once during registration and caches
-// the result.  The `brink` and `std` namespaces are reserved.
+// Firmion registers extensions at startup via the ExtensionRegistry.
+// Firmion calls size() exactly once during registration and caches
+// the result.  The `firmion` and `std` namespaces are reserved.
 //
 // Named parameters:
 //   An extension declares named parameters via params(), returning a slice of
@@ -57,7 +57,7 @@ pub struct ParamDesc {
 
 /// The argument type passed to an extension at execution time.
 ///
-/// Each Brink call-site argument produces exactly one `ExtArg`.
+/// Each Firmion call-site argument produces exactly one `ExtArg`.
 #[derive(Debug)]
 pub enum ParamArg<'a> {
     /// A numeric argument: u64, i64, or an untyped integer constant.
@@ -71,11 +71,11 @@ pub enum ParamArg<'a> {
     },
 }
 
-/// Implement this trait to create a Brink extension.
+/// Implement this trait to create a Firmion extension.
 ///
 /// An extension writes a fixed number of bytes into the output image.
 /// Arguments arrive as typed [`ExtArg`] values corresponding 1:1 to the
-/// Brink call-site arguments.  A section name argument delivers the image
+/// Firmion call-site arguments.  A section name argument delivers the image
 /// bytes at that section directly in the [`ExtArg::Section`] variant.
 ///
 /// # Example: numeric argument
@@ -122,13 +122,13 @@ pub enum ParamArg<'a> {
 /// ```
 pub trait BrinkExtension {
     /// Returns the namespace-qualified name used to invoke the extension.
-    /// For example, `"my_org::crc"`. The `brink` and `std` namespaces are
+    /// For example, `"my_org::crc"`. The `firmion` and `std` namespaces are
     /// reserved for internal use.
     fn name(&self) -> &str;
 
     /// Returns the exact number of bytes the extension writes to `out`.
     ///
-    /// Brink calls this method once at registration and caches the result.
+    /// Firmion calls this method once at registration and caches the result.
     /// All layout calculations use the cached value.
     fn size(&self) -> usize;
 
@@ -137,7 +137,7 @@ pub trait BrinkExtension {
     /// Each entry in the slice declares one parameter: its name and kind.
     /// Returns the declared parameters for this extension.
     ///
-    /// Each entry declares one parameter: its name and kind.  Brink validates
+    /// Each entry declares one parameter: its name and kind.  Firmion validates
     /// argument names against this slice and reorders call-site args to
     /// declaration order before passing them to [`execute`](Self::execute).
     fn params(&self) -> &[ParamDesc] {
@@ -146,7 +146,7 @@ pub trait BrinkExtension {
 
     /// Produces the extension output bytes.
     ///
-    /// * `args` -- one [`ExtArg`] per Brink call-site argument, in declaration order.
+    /// * `args` -- one [`ExtArg`] per Firmion call-site argument, in declaration order.
     /// * `out`  -- pre-allocated buffer of exactly [`size`](Self::size) bytes.
     ///
     /// Return `Err(message)` to abort compilation with a diagnostic.

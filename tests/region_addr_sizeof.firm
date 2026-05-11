@@ -1,4 +1,4 @@
-// region_addr_sizeof.brink: addr(REGION) and sizeof(REGION) resolve to the
+// region_addr_sizeof.firm: addr(REGION) and sizeof(REGION) resolve to the
 // region's const-evaluated addr and size properties.
 region FLASH {
     addr = 0x08000000;

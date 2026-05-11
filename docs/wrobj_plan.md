@@ -3,7 +3,7 @@
 ## Overview
 
 `wrobj` reads a named section from an object file and writes the section bytes
-into the Brink output:
+into the Firmion output:
 
 ```
 wrobj(".text", "/path/to/file.elf");
@@ -318,25 +318,25 @@ Check in both the source (`tests/wrobj_test.asm`) and the pre-built binary
 
 **wrobj fixtures:**
 
-`tests/wrobj_rodata.brink` — success:
+`tests/wrobj_rodata.firm` — success:
 ```
 section foo { wrobj(".rodata", "tests/wrobj_test.elf"); }
 output foo;
 ```
 
-`tests/wrobj_bad_section.brink` — ERR_119:
+`tests/wrobj_bad_section.firm` — ERR_119:
 ```
 section foo { wrobj(".nonexistent", "tests/wrobj_test.elf"); }
 output foo;
 ```
 
-`tests/wrobj_bad_file.brink` — ERR_118:
+`tests/wrobj_bad_file.firm` — ERR_118:
 ```
 section foo { wrobj(".rodata", "tests/no_such_file.elf"); }
 output foo;
 ```
 
-`tests/wrobj_wrong_args.brink` — ERR_60:
+`tests/wrobj_wrong_args.firm` — ERR_60:
 ```
 section foo { wrobj(".rodata"); }
 output foo;
@@ -344,7 +344,7 @@ output foo;
 
 **sizeof fixtures:**
 
-`tests/sizeof_obj.brink` — success (assert result equals known section size):
+`tests/sizeof_obj.firm` — success (assert result equals known section size):
 ```
 section foo {
     assert sizeof(".rodata", "tests/wrobj_test.elf") == 4;
@@ -354,7 +354,7 @@ section foo {
 output foo;
 ```
 
-`tests/sizeof_obj_bad_section.brink` — ERR_119:
+`tests/sizeof_obj_bad_section.firm` — ERR_119:
 ```
 section foo {
     assert sizeof(".nonexistent", "tests/wrobj_test.elf") == 0;
@@ -370,7 +370,7 @@ output foo;
 ```rust
 #[test]
 fn wrobj_rodata() {
-    assert_brink_success("tests/wrobj_rodata.brink", Some("wrobj_rodata.bin"), None);
+    assert_brink_success("tests/wrobj_rodata.firm", Some("wrobj_rodata.bin"), None);
     let bytes = fs::read("wrobj_rodata.bin").unwrap();
     assert_eq!(bytes, vec![0xDE, 0xAD, 0xBE, 0xEF]);
     fs::remove_file("wrobj_rodata.bin").unwrap();
@@ -378,27 +378,27 @@ fn wrobj_rodata() {
 
 #[test]
 fn wrobj_bad_section() {
-    assert_brink_failure("tests/wrobj_bad_section.brink", &["[ERR_119]"]);
+    assert_brink_failure("tests/wrobj_bad_section.firm", &["[ERR_119]"]);
 }
 
 #[test]
 fn wrobj_bad_file() {
-    assert_brink_failure("tests/wrobj_bad_file.brink", &["[ERR_118]"]);
+    assert_brink_failure("tests/wrobj_bad_file.firm", &["[ERR_118]"]);
 }
 
 #[test]
 fn wrobj_wrong_args() {
-    assert_brink_failure("tests/wrobj_wrong_args.brink", &["[ERR_60]"]);
+    assert_brink_failure("tests/wrobj_wrong_args.firm", &["[ERR_60]"]);
 }
 
 #[test]
 fn sizeof_obj() {
-    assert_brink_success("tests/sizeof_obj.brink", None, None);
+    assert_brink_success("tests/sizeof_obj.firm", None, None);
 }
 
 #[test]
 fn sizeof_obj_bad_section() {
-    assert_brink_failure("tests/sizeof_obj_bad_section.brink", &["[ERR_119]"]);
+    assert_brink_failure("tests/sizeof_obj_bad_section.firm", &["[ERR_119]"]);
 }
 ```
 

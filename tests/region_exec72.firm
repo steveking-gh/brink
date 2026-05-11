@@ -1,4 +1,4 @@
-// region_exec72.brink: set_addr targets an address outside the region.
+// region_exec72.firm: set_addr targets an address outside the region.
 region FLASH {
     addr = 0x08000000;
     size = 0x00001000;

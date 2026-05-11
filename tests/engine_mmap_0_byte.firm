@@ -1,5 +1,5 @@
 output top;
 
 section top {
-    wr brink::test_logger();
+    wr firmion::test_logger();
 }

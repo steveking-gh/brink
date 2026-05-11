@@ -1,4 +1,4 @@
-// region_if_addr.brink: region address selected by an if/else const assignment.
+// region_if_addr.firm: region address selected by an if/else const assignment.
 // Verifies that a region addr resolved from an if/else-assigned const correctly
 // anchors the bound section.
 const USE_FLASH = 1;

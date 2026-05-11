@@ -1,4 +1,4 @@
-// std::sha256 -- SHA-256 extension for Brink.
+// std::sha256 -- SHA-256 extension for Firmion.
 //
 // Computes a SHA-256 digest over a caller-specified image region and
 // writes the 32-byte result into the output image.

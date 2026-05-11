@@ -1,4 +1,4 @@
-// Shared intermediate representation (IR) types for brink.
+// Shared intermediate representation (IR) types for firmion.
 //
 // This crate defines the data types that flow between the lineardb, irdb and
 // engine pipeline stages.  IRKind enumerates every operation the compiler
@@ -517,7 +517,7 @@ pub struct IR {
     pub src_loc: SourceSpan,
 }
 
-/// All compile-time constants exposed as Brink built-in variables.
+/// All compile-time constants exposed as Firmion built-in variables.
 ///
 /// Call `ConstBuiltins::init()` once at process startup before any built-in
 /// variable is accessed.  Add new compile-time builtins as fields here as the

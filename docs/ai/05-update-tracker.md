@@ -32,9 +32,9 @@ Changes:
   `validate=true` on pruned AST before LayoutDb.
 - `layoutdb/fuzz/fuzz_targets/fuzz_target_1.rs`: Updated `AstDb::new` call to
   three-arg signature.
-- 4 new test fixtures: `toplevel_if_section_true.brink`,
-  `toplevel_if_section_false.brink`, `toplevel_if_else_section.brink`,
-  `toplevel_if_nested_if.brink`.
+- 4 new test fixtures: `toplevel_if_section_true.firm`,
+  `toplevel_if_section_false.firm`, `toplevel_if_else_section.firm`,
+  `toplevel_if_nested_if.firm`.
 - 4 new integration tests in `tests/integration.rs`.
 - All 286 tests pass.
 
@@ -203,7 +203,7 @@ ERR_224: output image size exceeds `--max-output-size` limit.
 (64 KiB for fast fuzzing).
 
 **Regression test**
-`tests/fuzz_found_19.brink` added to integration suite; expects ERR_224.
+`tests/fuzz_found_19.firm` added to integration suite; expects ERR_224.
 `max_output_size_flag` inline test: `--max-output-size 0` on 1-byte output.
 
 ---
@@ -238,9 +238,9 @@ ERR_113: assert condition in if/else body is non-numeric.
 ERR_114: `&&`/`||` operand is non-numeric.
 
 **New test files**
-`fuzz_found_20.brink`, `fuzz_found_21.brink`, `fuzz_found_22.brink`,
-`const_bool_string_assert.brink`, `const_bool_string_and.brink`,
-`const_bool_string_or.brink`.
+`fuzz_found_20.firm`, `fuzz_found_21.firm`, `fuzz_found_22.firm`,
+`const_bool_string_assert.firm`, `const_bool_string_and.firm`,
+`const_bool_string_or.firm`.
 
 **New error code registry**
 `docs/error-codes.md`: unified list of all error codes by prefix with
@@ -312,7 +312,7 @@ in the output statement.
 ERR_50: `output` address argument; use `set_addr` or region binding.
 
 **Test migration**
-~80 `.brink` test files updated.  Zero-address files: remove address.
+~80 `.firm` test files updated.  Zero-address files: remove address.
 Non-zero-address files: remove address + add `set_addr <addr>;` as first
 statement inside the output section.  Special cases: `wrx_4` expected byte
 values recalculated with `addr(foo)=0`; `output_addr_1` and
@@ -411,9 +411,9 @@ ERR_180: region property value is not numeric.
 ERR_226: evaluate_regions failure halt.
 
 **Tests**
-`region_anchor.brink`: writes `addr(top)` as `wr32`; verifies bytes equal
+`region_anchor.firm`: writes `addr(top)` as `wr32`; verifies bytes equal
 `0x08000000` LE, confirming the anchor is applied correctly.
-`region_exec66.brink`: string-valued region property triggers ERR_180.
+`region_exec66.firm`: string-valued region property triggers ERR_180.
 
 336 tests pass.
 
@@ -450,7 +450,7 @@ repeated errors across iterate passes.
 **Overlapping region detection (ERR_183)**
 `evaluate_regions` now checks all region pairs after property evaluation.
 Two regions with non-zero size that share any address range emit ERR_183.
-`region_nested_2.brink` converted from a success fixture to an ERR_183
+`region_nested_2.firm` converted from a success fixture to an ERR_183
 error fixture.
 
 **New error codes**
@@ -520,7 +520,7 @@ Changes:
     `addr_offset`/`sec_offset`/`file_offset` applied to a region emit ERR_189.
     ERR_135 message updated to "section, label, or region".
 - New error code ERR_189: offset-style address operation applied to a region name.
-- `tests/region_addr_sizeof.brink`: verifies `addr()` and `sizeof()` on two
+- `tests/region_addr_sizeof.firm`: verifies `addr()` and `sizeof()` on two
   regions with asserts and `wr32` output bytes.
 - 1 new integration test: `region_addr_sizeof`.
 
@@ -585,17 +585,17 @@ sections).  Emitted in `iterate_section_start` via `warned_lids` deduplication.
 
 Tests:
 
-- `region_exec70_partial.brink`: two partially-overlapping regions (A straddles B)
+- `region_exec70_partial.firm`: two partially-overlapping regions (A straddles B)
   still trigger ERR_183. Integration test `region_exec70_partial`.
-- `region_nested_2.brink`: comment updated; test changed from failure (ERR_183) to
+- `region_nested_2.firm`: comment updated; test changed from failure (ERR_183) to
   success -- FLASH1 fully inside FLASH is valid containment.
-- `region_nested_containment.brink`: outer in FLASH, inner (called via `wr`) in CODE
+- `region_nested_containment.firm`: outer in FLASH, inner (called via `wr`) in CODE
   where CODE is a subset of FLASH; both fit; no errors. Integration test
   `region_nested_containment`.
-- `region_nested_exec72.brink`: inner section (no direct binding) inherits FLASH
+- `region_nested_exec72.firm`: inner section (no direct binding) inherits FLASH
   from outer; `set_addr` outside FLASH triggers ERR_185. Integration test
   `region_nested_exec72`.
-- `region_nested_exec77.brink`: inner bound to SRAM (disjoint from outer's FLASH);
+- `region_nested_exec77.firm`: inner bound to SRAM (disjoint from outer's FLASH);
   ERR_190 fires. Integration test `region_nested_exec77`.
 
 352 tests pass.
@@ -624,10 +624,10 @@ binding size.
 
 Tests:
 
-- `region_exec70_partial.brink` repurposed: outer in A, inner in B (partial
+- `region_exec70_partial.firm` repurposed: outer in A, inner in B (partial
   overlap A & B = 128 bytes); inner writes exactly 128 bytes -- succeeds.
   Integration test `region_exec70_partial` changed from failure to success.
-- `region_exec73_partial_overlap.brink`: same regions, inner writes 192 bytes;
+- `region_exec73_partial_overlap.firm`: same regions, inner writes 192 bytes;
   exceeds intersection 128 -> ERR_186.  Integration test `region_exec73_partial_overlap`.
 
 353 tests pass.
@@ -675,7 +675,7 @@ New error code: ERR_191.
 
 Tests:
 
-- `region_exec78_bad_start.brink`: A=[0x1080,0x100), B=[0x1000,0x200); B starts
+- `region_exec78_bad_start.firm`: A=[0x1080,0x100), B=[0x1000,0x200); B starts
   before A; intersection non-empty but B.addr (0x1000) < intersection start
   (0x1080); ERR_191 fires.  Integration test `region_exec78_bad_start`.
 
@@ -727,7 +727,7 @@ New error codes: ERR_192, ERR_227.
 
 Tests:
 
-- `region_exec79_reuse.brink`: `wr pinned` twice where `pinned in FLASH`;
+- `region_exec79_reuse.firm`: `wr pinned` twice where `pinned in FLASH`;
   ERR_192 fires.  Integration test `region_exec79_reuse`.
 
 355 tests pass.
@@ -752,10 +752,10 @@ Changes:
 - `ir/ir.rs`: `IRKind` variants renamed (`PadAddrOffset`, `PadSecOffset`, `PadFileOffset`).
 - `layout_phase/layout_phase.rs`: match arms updated to new variant names.
 - `tests/brink_fuzz.dict`: new names added; old names removed.
-- All test fixtures in `tests/*.brink` updated.
-- `process/fuzz/seeds/*.brink` and `process/fuzz/seeds/brink_fuzz.dict` updated.
+- All test fixtures in `tests/*.firm` updated.
+- `process/fuzz/seeds/*.firm` and `process/fuzz/seeds/brink_fuzz.dict` updated.
 - `docs/`: `02-system.yaml`, `region-plan.md`, and this file updated.
-- `vscode-brink/CHANGELOG.md`: keyword list updated.
+- `vscode-firmion/CHANGELOG.md`: keyword list updated.
 
 355 tests pass.
 
@@ -768,7 +768,7 @@ Replaced the point-solution `wrobj "section", "file"` command with a holistic
 `obj` declaration that binds a name to a section in an external object file.
 The name is then used with `wr` and `sizeof` exactly like a section name.
 
-```brink
+```firmion
 obj rodata = ".rodata" in "tests/obj_test.elf";
 section firmware {
     wr rodata;
@@ -803,7 +803,7 @@ Changes:
   `iterate_sizeof` gains obj path.
 - `exec_phase/exec_phase.rs`: `execute_wrobj` uses single Name operand.
 - `docs/error_codes.md`: ERR_62..71 added; next available updated to ERR_67.
-- Test fixtures `wrobj_*.brink` rewritten for new syntax.
+- Test fixtures `wrobj_*.firm` rewritten for new syntax.
 - `tests/integration.rs`: `wrobj_wrong_args` now checks ERR_61.
 
 361 tests pass.
@@ -827,7 +827,7 @@ individualized; ERR_71 fires when a required property is missing.  The
 `LayoutDb`; replaced by `obj_decls.contains_key`.
 
 Changed files: `ast/lexer.rs`, `ast/ast.rs`, `astdb/astdb.rs`,
-`layoutdb/layoutdb.rs`, `tests/wrobj_*.brink`, `tests/integration.rs`,
+`layoutdb/layoutdb.rs`, `tests/wrobj_*.firm`, `tests/integration.rs`,
 `docs/error_codes.md` (ERR_62..77, next ERR_73).
 
 ### obj_align / obj_lma / obj_vma
@@ -851,8 +851,8 @@ Changed files: `ir/ir.rs`, `ast/lexer.rs`, `ast/ast.rs`,
 `linearizer/linearizer.rs`, `irdb/irdb.rs`, `layout_phase/layout_phase.rs`,
 `exec_phase/exec_phase.rs`, `const_eval/const_eval.rs`,
 `docs/error_codes.md` (ERR_73, ERR_122, next ERR_74/ERR_123),
-`docs/ai/02-system.yaml`, `tests/obj_align_1.brink`, `tests/obj_vma_1.brink`,
-`tests/obj_lma_1.brink`, `tests/obj_lma_non_elf.brink`, `tests/integration.rs`.
+`docs/ai/02-system.yaml`, `tests/obj_align_1.firm`, `tests/obj_vma_1.firm`,
+`tests/obj_lma_1.firm`, `tests/obj_lma_non_elf.firm`, `tests/integration.rs`.
 
 365 tests pass.
 
@@ -883,9 +883,9 @@ Changes:
   `execute_wrx` branches on the flag: `to_be_bytes()` with trailing `byte_size`
   slice (`buf[8-byte_size..8]`) vs `to_le_bytes()` with leading slice.
 - `tests/brink_fuzz.dict`: all 8 wrbe keywords added.
-- `vscode-brink/syntaxes/brink.tmLanguage.json`: wrbe variants added to regex.
+- `vscode-firmion/syntaxes/firmion.tmLanguage.json`: wrbe variants added to regex.
 - `docs/ai/02-system.yaml`: `wrbe8/wrbe16/.../wrbe64` documented.
-- `tests/wrx_7.brink` + `tests::wrx_7` integration test: all 8 widths verified
+- `tests/wrx_7.firm` + `tests::wrx_7` integration test: all 8 widths verified
   against known big-endian byte sequences.
 
 367 tests pass.
@@ -907,7 +907,7 @@ Changes:
 - `std/xor/Cargo.toml`: new crate `std_xor`, no external dependencies.
 - `std/xor/tests/integration.rs`: 4 tests --
   `xor_section_form`, `xor_explicit_range`, `xor_sizeof`, `xor_ambiguous_section`.
-- `std/xor/tests/*.brink`: 4 test fixtures.
+- `std/xor/tests/*.firm`: 4 test fixtures.
 - `extensions/Cargo.toml`: `std-xor` feature + `std_xor` optional dep.
 - `extensions/src/lib.rs`: `#[cfg(feature = "std-xor")] std_xor::register(...)`.
 - `process/Cargo.toml`: `std-xor` feature propagated to extensions.
@@ -925,13 +925,13 @@ end-to-end across the full pipeline.
 
 New test fixtures and integration tests:
 
-- `tests/const_string_wrf_1.brink` + `const_string_wrf_1`: source literal
+- `tests/const_string_wrf_1.firm` + `const_string_wrf_1`: source literal
   `const F = "..."; wrf F;` reads the file and verifies output bytes.
-- `tests/const_string_wrf_2.brink` + `const_string_wrf_2`: CLI define
+- `tests/const_string_wrf_2.firm` + `const_string_wrf_2`: CLI define
   `-DF="..."` supplies the path; `const F;` in source declares without default.
-- `tests/const_string_if_1.brink` + `const_string_if_1`: string const in an
+- `tests/const_string_if_1.firm` + `const_string_if_1`: string const in an
   `if` guard prunes the dead else branch; verifies `[0x01]` in output.
-- `tests/const_string_if_2.brink` + `const_string_if_2`: same but the variant
+- `tests/const_string_if_2.firm` + `const_string_if_2`: same but the variant
   name comes from `-DVARIANT="v1"` CLI define.
 
 `docs/ai/02-system.yaml`: `const` entry expanded to document string const
@@ -971,7 +971,7 @@ Changes:
 - `layout_phase/layout_phase.rs`: `diags.trace_iteration = iter_count`; `IRKind::Trace if diags.trace_enabled()` arm fires with prefix.
 - `validation_phase/validation_phase.rs`: `IRKind::Trace if diags.trace_enabled()` arm (pre-output only).
 - `exec_phase/exec_phase.rs`: `IRKind::Trace` no-op in `execute_core_operations`; fires in `execute_post_output`.
-- `tests/trace_1.brink`, `tests/trace_pre_post_1.brink`: fixtures.
+- `tests/trace_1.firm`, `tests/trace_pre_post_1.firm`: fixtures.
 - `tests/integration.rs`: `trace_silent_1`, `trace_pre_output_1`, `trace_post_output_1`, `trace_order_1`.
 
 388 tests pass.

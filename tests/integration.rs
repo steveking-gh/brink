@@ -5,7 +5,7 @@ mod tests {
     use std::fs;
 
     fn assert_brink_success(src: &str, output_bin: Option<&str>, expected_output: Option<&str>) {
-        let mut cmd = Command::cargo_bin("brink").unwrap();
+        let mut cmd = Command::cargo_bin("firmion").unwrap();
         cmd.arg(src);
 
         let derived_out;
@@ -13,7 +13,7 @@ mod tests {
             cmd.arg("-o").arg(out_file);
             out_file
         } else {
-            // Generate a locally unique binary filename like `tests_dynamic_wr.brink.bin`
+            // Generate a locally unique binary filename like `tests_dynamic_wr.firm.bin`
             // avoiding `output.bin` race-conditions across the parallel testing harness entirely!
             derived_out = format!("{}.bin", src.replace('/', "_").replace('\\', "_"));
             cmd.arg("-o").arg(&derived_out);
@@ -32,7 +32,7 @@ mod tests {
     }
 
     fn assert_brink_failure(src: &str, expected_err_codes: &[&str]) {
-        let mut assert = Command::cargo_bin("brink")
+        let mut assert = Command::cargo_bin("firmion")
             .unwrap()
             .arg(src)
             .assert()
@@ -42,11 +42,11 @@ mod tests {
         }
     }
 
-    /// Asserts that brink succeeds and none of the specified codes appear on stderr.
+    /// Asserts that firmion succeeds and none of the specified codes appear on stderr.
     /// Runs with `-v` so that any warnings would be visible if present.
     fn assert_brink_no_warning(src: &str, absent_codes: &[&str]) {
         let derived_out = format!("{}.bin", src.replace('/', "_").replace('\\', "_"));
-        let mut assert = Command::cargo_bin("brink")
+        let mut assert = Command::cargo_bin("firmion")
             .unwrap()
             .arg("-v")
             .arg(src)
@@ -62,11 +62,11 @@ mod tests {
         }
     }
 
-    /// Asserts that brink succeeds and emits the specified warning codes on stderr.
+    /// Asserts that firmion succeeds and emits the specified warning codes on stderr.
     /// Runs with `-v` so that warnings are not suppressed.
     fn assert_brink_warning(src: &str, expected_warn_codes: &[&str]) {
         let derived_out = format!("{}.bin", src.replace('/', "_").replace('\\', "_"));
-        let mut assert = Command::cargo_bin("brink")
+        let mut assert = Command::cargo_bin("firmion")
             .unwrap()
             .arg("-v")
             .arg(src)
@@ -84,12 +84,12 @@ mod tests {
 
     #[test]
     fn help_only() {
-        let _cmd = Command::cargo_bin("brink").unwrap().arg("--help").unwrap();
+        let _cmd = Command::cargo_bin("firmion").unwrap().arg("--help").unwrap();
     }
 
     #[test]
     fn list_extensions_flag() {
-        Command::cargo_bin("brink")
+        Command::cargo_bin("firmion")
             .unwrap()
             .arg("--list-extensions")
             .assert()
@@ -103,70 +103,70 @@ mod tests {
     #[test]
     #[should_panic]
     fn no_cli_input() {
-        let _cmd = Command::cargo_bin("brink").unwrap().unwrap();
+        let _cmd = Command::cargo_bin("firmion").unwrap().unwrap();
     }
 
     #[test]
     fn empty_1() {
-        assert_brink_failure("tests/empty_1.brink", &[]);
+        assert_brink_failure("tests/empty_1.firm", &[]);
     }
 
     #[test]
     fn accidental_infix() {
-        assert_brink_failure("tests/accidental_infix.brink", &["ERR_8"]);
+        assert_brink_failure("tests/accidental_infix.firm", &["ERR_8"]);
     }
 
     #[test]
     fn bitwise_precedence() {
-        assert_brink_success("tests/bitwise_precedence.brink", None, None);
+        assert_brink_success("tests/bitwise_precedence.firm", None, None);
     }
 
     #[test]
 
     fn wr_multi() {
-        assert_brink_success("tests/wr_multi.brink", None, None);
+        assert_brink_success("tests/wr_multi.firm", None, None);
     }
 
     #[test]
 
     fn wr_single() {
-        assert_brink_success("tests/wr_single.brink", None, None);
+        assert_brink_success("tests/wr_single.firm", None, None);
     }
 
     #[test]
     fn empty_2() {
-        assert_brink_failure("tests/empty_2.brink", &[]);
+        assert_brink_failure("tests/empty_2.firm", &[]);
     }
 
     #[test]
     fn line_comment_1() {
-        assert_brink_failure("tests/line_comment_1.brink", &["[ERR_7]"]);
+        assert_brink_failure("tests/line_comment_1.firm", &["[ERR_7]"]);
     }
 
     #[test]
     fn line_comment_2() {
-        assert_brink_failure("tests/line_comment_2.brink", &["[ERR_7]"]);
+        assert_brink_failure("tests/line_comment_2.firm", &["[ERR_7]"]);
     }
 
     #[test]
     fn multi_comment_1() {
-        assert_brink_failure("tests/multi_comment_1.brink", &["[ERR_7]"]);
+        assert_brink_failure("tests/multi_comment_1.firm", &["[ERR_7]"]);
     }
 
     #[test]
     fn multi_comment_2() {
-        assert_brink_failure("tests/multi_comment_2.brink", &["[ERR_7]"]);
+        assert_brink_failure("tests/multi_comment_2.firm", &["[ERR_7]"]);
     }
 
     #[test]
     fn multi_comment_3() {
-        assert_brink_failure("tests/multi_comment_3.brink", &["[ERR_7]"]);
+        assert_brink_failure("tests/multi_comment_3.firm", &["[ERR_7]"]);
     }
 
     #[test]
     fn empty_section_1() {
         assert_brink_success(
-            "tests/empty_section_1.brink",
+            "tests/empty_section_1.firm",
             Some("empty_section_1.bin"),
             Some(""),
         );
@@ -175,7 +175,7 @@ mod tests {
     #[test]
     fn simple_section_2() {
         assert_brink_success(
-            "tests/simple_section_2.brink",
+            "tests/simple_section_2.firm",
             Some("simple_section_2.bin"),
             Some("Wow!"),
         );
@@ -184,7 +184,7 @@ mod tests {
     #[test]
     fn simple_section_3() {
         assert_brink_success(
-            "tests/simple_section_3.brink",
+            "tests/simple_section_3.firm",
             Some("simple_section_3.bin"),
             Some("Wow!Bye"),
         );
@@ -193,7 +193,7 @@ mod tests {
     #[test]
     fn simple_section_4() {
         assert_brink_success(
-            "tests/simple_section_4.brink",
+            "tests/simple_section_4.firm",
             Some("simple_section_4.bin"),
             Some("Wow!\nBye"),
         );
@@ -201,244 +201,244 @@ mod tests {
 
     #[test]
     fn assert_1() {
-        assert_brink_success("tests/assert_1.brink", Some("assert_1.bin"), Some("Wow!"));
+        assert_brink_success("tests/assert_1.firm", Some("assert_1.bin"), Some("Wow!"));
     }
 
     #[test]
     fn assert_2() {
-        assert_brink_success("tests/assert_2.brink", Some("assert_2.bin"), Some("Wow!"));
+        assert_brink_success("tests/assert_2.firm", Some("assert_2.bin"), Some("Wow!"));
     }
 
     #[test]
     fn assert_3() {
-        assert_brink_success("tests/assert_3.brink", Some("assert_3.bin"), Some("Wow!"));
+        assert_brink_success("tests/assert_3.firm", Some("assert_3.bin"), Some("Wow!"));
     }
 
     #[test]
     fn assert_4() {
-        assert_brink_success("tests/assert_4.brink", Some("assert_4.bin"), Some("Wow!"));
+        assert_brink_success("tests/assert_4.firm", Some("assert_4.bin"), Some("Wow!"));
     }
 
     #[test]
     fn assert_5() {
-        assert_brink_success("tests/assert_5.brink", Some("assert_5.bin"), Some("Wow!"));
+        assert_brink_success("tests/assert_5.firm", Some("assert_5.bin"), Some("Wow!"));
     }
 
     #[test]
     fn assert_6() {
-        assert_brink_failure("tests/assert_6.brink", &[]);
+        assert_brink_failure("tests/assert_6.firm", &[]);
     }
 
     #[test]
     fn assert_7() {
-        assert_brink_failure("tests/assert_7.brink", &[]);
+        assert_brink_failure("tests/assert_7.firm", &[]);
     }
 
     #[test]
     fn assert_8() {
-        assert_brink_success("tests/assert_8.brink", Some("assert_8.bin"), Some("Wow!"));
+        assert_brink_success("tests/assert_8.firm", Some("assert_8.bin"), Some("Wow!"));
     }
 
     #[test]
     fn assert_9() {
-        assert_brink_success("tests/assert_9.brink", Some("assert_9.bin"), Some("Wow!"));
+        assert_brink_success("tests/assert_9.firm", Some("assert_9.bin"), Some("Wow!"));
     }
 
     #[test]
     fn assert_10() {
-        assert_brink_success("tests/assert_10.brink", Some("assert_10.bin"), Some("Wow!"));
+        assert_brink_success("tests/assert_10.firm", Some("assert_10.bin"), Some("Wow!"));
     }
 
     #[test]
     fn assert_11() {
-        assert_brink_failure("tests/assert_11.brink", &[]);
+        assert_brink_failure("tests/assert_11.firm", &[]);
     }
 
     #[test]
     fn assert_12() {
-        assert_brink_failure("tests/assert_12.brink", &[]);
+        assert_brink_failure("tests/assert_12.firm", &[]);
     }
 
     #[test]
     fn assert_13() {
-        assert_brink_success("tests/assert_13.brink", Some("assert_13.bin"), Some("Wow!"));
+        assert_brink_success("tests/assert_13.firm", Some("assert_13.bin"), Some("Wow!"));
     }
 
     #[test]
     fn assert_14() {
-        assert_brink_success("tests/assert_14.brink", Some("assert_14.bin"), Some("Wow!"));
+        assert_brink_success("tests/assert_14.firm", Some("assert_14.bin"), Some("Wow!"));
     }
 
     #[test]
     fn assert_15() {
-        assert_brink_failure("tests/assert_15.brink", &["[ERR_77]"]);
+        assert_brink_failure("tests/assert_15.firm", &["[ERR_77]"]);
     }
 
     #[test]
     fn section_rename_err_1() {
-        assert_brink_failure("tests/section_rename_err_1.brink", &[]);
+        assert_brink_failure("tests/section_rename_err_1.firm", &[]);
     }
 
     #[test]
     fn fuzz_found_1() {
-        assert_brink_failure("tests/fuzz_found_1.brink", &["[ERR_218]"]);
+        assert_brink_failure("tests/fuzz_found_1.firm", &["[ERR_218]"]);
     }
 
     #[test]
     fn fuzz_found_2() {
-        assert_brink_failure("tests/fuzz_found_2.brink", &["[ERR_12]"]);
+        assert_brink_failure("tests/fuzz_found_2.firm", &["[ERR_12]"]);
     }
 
     #[test]
     fn fuzz_found_3() {
-        assert_brink_failure("tests/fuzz_found_3.brink", &["[ERR_12]"]);
+        assert_brink_failure("tests/fuzz_found_3.firm", &["[ERR_12]"]);
     }
 
     #[test]
     fn fuzz_found_4() {
-        assert_brink_failure("tests/fuzz_found_4.brink", &["[ERR_12]"]);
+        assert_brink_failure("tests/fuzz_found_4.firm", &["[ERR_12]"]);
     }
 
     #[test]
     fn fuzz_found_5() {
-        assert_brink_failure("tests/fuzz_found_5.brink", &["[ERR_14]"]);
+        assert_brink_failure("tests/fuzz_found_5.firm", &["[ERR_14]"]);
     }
 
     #[test]
     fn fuzz_found_6() {
-        assert_brink_failure("tests/fuzz_found_6.brink", &["[ERR_14]"]);
+        assert_brink_failure("tests/fuzz_found_6.firm", &["[ERR_14]"]);
     }
 
     #[test]
     fn fuzz_found_7() {
-        assert_brink_failure("tests/fuzz_found_7.brink", &["[ERR_12]", "[ERR_13]"]);
+        assert_brink_failure("tests/fuzz_found_7.firm", &["[ERR_12]", "[ERR_13]"]);
     }
 
     #[test]
     fn fuzz_found_8() {
-        assert_brink_failure("tests/fuzz_found_8.brink", &["[ERR_18]"]);
+        assert_brink_failure("tests/fuzz_found_8.firm", &["[ERR_18]"]);
     }
 
     #[test]
     fn fuzz_found_9() {
-        assert_brink_failure("tests/fuzz_found_9.brink", &["[ERR_78]"]);
+        assert_brink_failure("tests/fuzz_found_9.firm", &["[ERR_78]"]);
     }
 
     #[test]
     fn fuzz_found_10() {
-        assert_brink_failure("tests/fuzz_found_10.brink", &["[ERR_201]"]);
+        assert_brink_failure("tests/fuzz_found_10.firm", &["[ERR_201]"]);
     }
 
     #[test]
     fn fuzz_found_11() {
-        assert_brink_failure("tests/fuzz_found_11.brink", &["[ERR_17]"]);
+        assert_brink_failure("tests/fuzz_found_11.firm", &["[ERR_17]"]);
     }
 
     #[test]
     fn fuzz_found_12() {
-        assert_brink_failure("tests/fuzz_found_12.brink", &["[ERR_17]"]);
+        assert_brink_failure("tests/fuzz_found_12.firm", &["[ERR_17]"]);
     }
 
     #[test]
     fn fuzz_found_13() {
-        assert_brink_failure("tests/fuzz_found_13.brink", &["[ERR_148]"]);
+        assert_brink_failure("tests/fuzz_found_13.firm", &["[ERR_148]"]);
     }
 
     #[test]
     fn fuzz_found_14() {
-        assert_brink_failure("tests/fuzz_found_14.brink", &["[ERR_208]"]);
+        assert_brink_failure("tests/fuzz_found_14.firm", &["[ERR_208]"]);
     }
 
     #[test]
     fn fuzz_found_15() {
-        assert_brink_failure("tests/fuzz_found_15.brink", &["[ERR_19]"]);
+        assert_brink_failure("tests/fuzz_found_15.firm", &["[ERR_19]"]);
     }
 
     #[test]
 
     fn fuzz_found_16() {
-        assert_brink_success("tests/fuzz_found_16.brink", None, None);
+        assert_brink_success("tests/fuzz_found_16.firm", None, None);
     }
 
     #[test]
     fn fuzz_found_17() {
-        assert_brink_failure("tests/fuzz_found_17.brink", &["[ERR_207]"]);
+        assert_brink_failure("tests/fuzz_found_17.firm", &["[ERR_207]"]);
     }
 
     #[test]
     fn fuzz_found_18() {
-        assert_brink_failure("tests/fuzz_found_18.brink", &["[ERR_205]"]);
+        assert_brink_failure("tests/fuzz_found_18.firm", &["[ERR_205]"]);
     }
 
     #[test]
     fn fuzz_found_19() {
-        assert_brink_failure("tests/fuzz_found_19.brink", &["[ERR_224]"]);
+        assert_brink_failure("tests/fuzz_found_19.firm", &["[ERR_224]"]);
     }
 
     #[test]
     fn fuzz_found_20() {
-        assert_brink_failure("tests/fuzz_found_20.brink", &["[ERR_37]"]);
+        assert_brink_failure("tests/fuzz_found_20.firm", &["[ERR_37]"]);
     }
 
     #[test]
     fn fuzz_found_21() {
-        assert_brink_failure("tests/fuzz_found_21.brink", &["[ERR_111]"]);
+        assert_brink_failure("tests/fuzz_found_21.firm", &["[ERR_111]"]);
     }
 
     #[test]
     fn fuzz_found_22() {
-        assert_brink_failure("tests/fuzz_found_22.brink", &["[ERR_112]"]);
+        assert_brink_failure("tests/fuzz_found_22.firm", &["[ERR_112]"]);
     }
 
     #[test]
     fn fuzz_found_23() {
-        assert_brink_failure("tests/fuzz_found_23.brink", &["[ERR_38]"]);
+        assert_brink_failure("tests/fuzz_found_23.firm", &["[ERR_38]"]);
     }
 
     #[test]
     fn fuzz_found_24() {
-        assert_brink_failure("tests/fuzz_found_24.brink", &["[ERR_115]"]);
+        assert_brink_failure("tests/fuzz_found_24.firm", &["[ERR_115]"]);
     }
 
     #[test]
     fn fuzz_found_25() {
-        assert_brink_failure("tests/fuzz_found_25.brink", &["[ERR_99]"]);
+        assert_brink_failure("tests/fuzz_found_25.firm", &["[ERR_99]"]);
     }
 
     #[test]
     fn fuzz_found_26() {
-        assert_brink_failure("tests/fuzz_found_26.brink", &["[ERR_179]"]);
+        assert_brink_failure("tests/fuzz_found_26.firm", &["[ERR_179]"]);
     }
 
     #[test]
     fn fuzz_found_27() {
-        assert_brink_failure("tests/fuzz_found_27.brink", &["[ERR_16]"]);
+        assert_brink_failure("tests/fuzz_found_27.firm", &["[ERR_16]"]);
     }
 
     /// assert inside a top-level if body with a string condition panics -- latent bug.
     #[test]
     fn const_bool_string_assert() {
-        assert_brink_failure("tests/const_bool_string_assert.brink", &["[ERR_113]"]);
+        assert_brink_failure("tests/const_bool_string_assert.firm", &["[ERR_113]"]);
     }
 
     /// && with a string lhs panics -- latent bug.
     #[test]
     fn const_bool_string_and() {
-        assert_brink_failure("tests/const_bool_string_and.brink", &["[ERR_114]"]);
+        assert_brink_failure("tests/const_bool_string_and.firm", &["[ERR_114]"]);
     }
 
     /// || with a string lhs panics -- latent bug.
     #[test]
     fn const_bool_string_or() {
-        assert_brink_failure("tests/const_bool_string_or.brink", &["[ERR_114]"]);
+        assert_brink_failure("tests/const_bool_string_or.firm", &["[ERR_114]"]);
     }
 
     /// --max-output-size 0 rejects a 1-byte output.
     #[test]
     fn max_output_size_flag() {
-        Command::cargo_bin("brink")
+        Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/wr_single.brink")
+            .arg("tests/wr_single.firm")
             .arg("--max-output-size")
             .arg("0")
             .assert()
@@ -448,28 +448,28 @@ mod tests {
 
     #[test]
     fn missing_brace_1() {
-        assert_brink_failure("tests/missing_brace_1.brink", &["[ERR_3]", "[ERR_13]"]);
+        assert_brink_failure("tests/missing_brace_1.firm", &["[ERR_3]", "[ERR_13]"]);
     }
 
     #[test]
     fn multiple_outputs_1() {
-        assert_brink_failure("tests/multiple_outputs_1.brink", &["[ERR_9]"]);
+        assert_brink_failure("tests/multiple_outputs_1.firm", &["[ERR_9]"]);
     }
 
     #[test]
     fn section_self_ref_1() {
-        assert_brink_failure("tests/section_self_ref_1.brink", &["[ERR_5]"]);
+        assert_brink_failure("tests/section_self_ref_1.firm", &["[ERR_5]"]);
     }
 
     #[test]
     fn section_self_ref_2() {
-        assert_brink_failure("tests/section_self_ref_2.brink", &["[ERR_5]"]);
+        assert_brink_failure("tests/section_self_ref_2.firm", &["[ERR_5]"]);
     }
 
     #[test]
     fn nested_section_1() {
         assert_brink_success(
-            "tests/nested_section_1.brink",
+            "tests/nested_section_1.firm",
             Some("nested_section_1.bin"),
             Some("foo!\nBye\nbar!\nboo!\n"),
         );
@@ -478,7 +478,7 @@ mod tests {
     #[test]
     fn nested_section_2() {
         assert_brink_success(
-            "tests/nested_section_2.brink",
+            "tests/nested_section_2.firm",
             Some("nested_section_2.bin"),
             Some("bar!\nbar!\n"),
         );
@@ -486,13 +486,13 @@ mod tests {
 
     #[test]
     fn sizeof_1() {
-        assert_brink_success("tests/sizeof_1.brink", Some("sizeof_1.bin"), Some("Wow!"));
+        assert_brink_success("tests/sizeof_1.firm", Some("sizeof_1.bin"), Some("Wow!"));
     }
 
     #[test]
     fn sizeof_2() {
         assert_brink_success(
-            "tests/sizeof_2.brink",
+            "tests/sizeof_2.firm",
             Some("sizeof_2.bin"),
             Some("Wow!bar!\n"),
         );
@@ -500,274 +500,274 @@ mod tests {
 
     #[test]
     fn sizeof_3() {
-        assert_brink_success("tests/sizeof_3.brink", Some("sizeof_3.bin"), Some("Wow!"));
+        assert_brink_success("tests/sizeof_3.firm", Some("sizeof_3.bin"), Some("Wow!"));
     }
 
     /// __BRINK_VERSION_STRING can be written with wrs and used in print.
     #[test]
     fn version_string_1() {
-        assert_brink_success("tests/version_string_1.brink", None, None);
+        assert_brink_success("tests/version_string_1.firm", None, None);
     }
 
     /// __BRINK_VERSION_MAJOR/MINOR/PATCH are U64 values usable in expressions.
     #[test]
     fn version_numeric_1() {
-        assert_brink_success("tests/version_numeric_1.brink", None, None);
+        assert_brink_success("tests/version_numeric_1.firm", None, None);
     }
 
     /// Version builtins are usable in const expressions.
     #[test]
     fn version_in_const_1() {
-        assert_brink_success("tests/version_in_const_1.brink", None, None);
+        assert_brink_success("tests/version_in_const_1.firm", None, None);
     }
 
     /// Version builtins can be written into the output as wr8 operands.
     #[test]
     fn version_written_1() {
-        assert_brink_success("tests/version_written_1.brink", None, None);
+        assert_brink_success("tests/version_written_1.firm", None, None);
     }
 
     /// __OUTPUT_SIZE equals sizeof(output_section) and can be used in asserts.
     #[test]
     fn output_size_1() {
-        assert_brink_success("tests/output_size_1.brink", None, None);
+        assert_brink_success("tests/output_size_1.firm", None, None);
     }
 
     /// __OUTPUT_SIZE written into the output header as a 4-byte field.
     #[test]
     fn output_size_2() {
-        assert_brink_success("tests/output_size_2.brink", None, None);
+        assert_brink_success("tests/output_size_2.firm", None, None);
     }
 
     /// __OUTPUT_ADDR is zero with no region
     #[test]
     fn output_addr_2() {
-        assert_brink_success("tests/output_addr_2.brink", None, None);
+        assert_brink_success("tests/output_addr_2.firm", None, None);
     }
 
     #[test]
 
     fn integers_1() {
-        assert_brink_success("tests/integers_1.brink", None, None);
+        assert_brink_success("tests/integers_1.firm", None, None);
     }
 
     #[test]
 
     fn integers_2() {
-        assert_brink_success("tests/integers_2.brink", None, None);
+        assert_brink_success("tests/integers_2.firm", None, None);
     }
 
     #[test]
 
     fn integers_3() {
-        assert_brink_success("tests/integers_3.brink", None, None);
+        assert_brink_success("tests/integers_3.firm", None, None);
     }
 
     #[test]
 
     fn integers_4() {
-        assert_brink_failure("tests/integers_4.brink", &["[ERR_17]"]);
+        assert_brink_failure("tests/integers_4.firm", &["[ERR_17]"]);
     }
 
     #[test]
 
     fn integers_5() {
-        assert_brink_failure("tests/integers_5.brink", &["[ERR_207]"]);
+        assert_brink_failure("tests/integers_5.firm", &["[ERR_207]"]);
     }
 
     #[test]
 
     fn neq_1() {
-        assert_brink_success("tests/neq_1.brink", None, None);
+        assert_brink_success("tests/neq_1.firm", None, None);
     }
 
     #[test]
     fn neq_2() {
-        assert_brink_failure("tests/neq_2.brink", &["[ERR_126]"]);
+        assert_brink_failure("tests/neq_2.firm", &["[ERR_126]"]);
     }
 
     #[test]
 
     fn add_1() {
-        assert_brink_success("tests/add_1.brink", None, None);
+        assert_brink_success("tests/add_1.firm", None, None);
     }
 
     #[test]
     fn add_2() {
-        assert_brink_failure("tests/add_2.brink", &["[ERR_125]"]);
+        assert_brink_failure("tests/add_2.firm", &["[ERR_125]"]);
     }
 
     #[test]
 
     fn subtract_1() {
-        assert_brink_success("tests/subtract_1.brink", None, None);
+        assert_brink_success("tests/subtract_1.firm", None, None);
     }
 
     #[test]
     fn subtract_2() {
-        assert_brink_failure("tests/subtract_2.brink", &["[ERR_128]"]);
+        assert_brink_failure("tests/subtract_2.firm", &["[ERR_128]"]);
     }
 
     #[test]
     fn subtract_3() {
-        assert_brink_failure("tests/subtract_3.brink", &["[ERR_128]"]);
+        assert_brink_failure("tests/subtract_3.firm", &["[ERR_128]"]);
     }
 
     #[test]
 
     fn subtract_4() {
-        assert_brink_success("tests/subtract_4.brink", None, None);
+        assert_brink_success("tests/subtract_4.firm", None, None);
     }
 
     #[test]
 
     fn multiply_1() {
-        assert_brink_success("tests/multiply_1.brink", None, None);
+        assert_brink_success("tests/multiply_1.firm", None, None);
     }
 
     #[test]
     fn multiply_2() {
-        assert_brink_failure("tests/multiply_2.brink", &["[ERR_130]"]);
+        assert_brink_failure("tests/multiply_2.firm", &["[ERR_130]"]);
     }
 
     #[test]
 
     fn divide_1() {
-        assert_brink_success("tests/divide_1.brink", None, None);
+        assert_brink_success("tests/divide_1.firm", None, None);
     }
 
     #[test]
 
     fn modulo_1() {
-        assert_brink_success("tests/modulo_1.brink", None, None);
+        assert_brink_success("tests/modulo_1.firm", None, None);
     }
 
     #[test]
 
     fn shl_1() {
-        assert_brink_success("tests/shl_1.brink", None, None);
+        assert_brink_success("tests/shl_1.firm", None, None);
     }
 
     #[test]
 
     fn shr_1() {
-        assert_brink_success("tests/shr_1.brink", None, None);
+        assert_brink_success("tests/shr_1.firm", None, None);
     }
 
     #[test]
 
     fn bit_and_1() {
-        assert_brink_success("tests/bit_and_1.brink", None, None);
+        assert_brink_success("tests/bit_and_1.firm", None, None);
     }
 
     #[test]
 
     fn bit_or_1() {
-        assert_brink_success("tests/bit_or_1.brink", None, None);
+        assert_brink_success("tests/bit_or_1.firm", None, None);
     }
 
     #[test]
 
     fn geq_1() {
-        assert_brink_success("tests/geq_1.brink", None, None);
+        assert_brink_success("tests/geq_1.firm", None, None);
     }
 
     #[test]
 
     fn leq_1() {
-        assert_brink_success("tests/leq_1.brink", None, None);
+        assert_brink_success("tests/leq_1.firm", None, None);
     }
 
     #[test]
 
     fn logical_and_1() {
-        assert_brink_success("tests/logical_and_1.brink", None, None);
+        assert_brink_success("tests/logical_and_1.firm", None, None);
     }
 
     #[test]
 
     fn logical_or_1() {
-        assert_brink_success("tests/logical_or_1.brink", None, None);
+        assert_brink_success("tests/logical_or_1.firm", None, None);
     }
 
     #[test]
 
     fn address_1() {
-        assert_brink_success("tests/address_1.brink", None, None);
+        assert_brink_success("tests/address_1.firm", None, None);
     }
 
     #[test]
 
     fn address_2() {
-        assert_brink_success("tests/address_2.brink", None, None);
+        assert_brink_success("tests/address_2.firm", None, None);
     }
 
     #[test]
 
     fn address_3() {
-        assert_brink_success("tests/address_3.brink", None, None);
+        assert_brink_success("tests/address_3.firm", None, None);
     }
 
     #[test]
     fn address_4() {
-        assert_brink_failure("tests/address_4.brink", &["[ERR_208]"]);
+        assert_brink_failure("tests/address_4.firm", &["[ERR_208]"]);
     }
 
     #[test]
     fn address_5() {
-        assert_brink_failure("tests/address_5.brink", &["[ERR_209]"]);
+        assert_brink_failure("tests/address_5.firm", &["[ERR_209]"]);
     }
 
     #[test]
     fn address_6() {
-        assert_brink_failure("tests/address_6.brink", &["[ERR_208]"]);
+        assert_brink_failure("tests/address_6.firm", &["[ERR_208]"]);
     }
 
     #[test]
     fn address_7() {
-        assert_brink_failure("tests/address_7.brink", &["[ERR_208]"]);
+        assert_brink_failure("tests/address_7.firm", &["[ERR_208]"]);
     }
 
     #[test]
     fn abs_overflow() {
-        assert_brink_failure("tests/abs_overflow.brink", &["[ERR_165]"]);
+        assert_brink_failure("tests/abs_overflow.firm", &["[ERR_165]"]);
     }
 
     #[test]
     fn align_overflow() {
-        assert_brink_failure("tests/align_overflow.brink", &["[ERR_159]"]);
+        assert_brink_failure("tests/align_overflow.firm", &["[ERR_159]"]);
     }
 
     #[test]
     fn set_addr_overflow() {
-        assert_brink_failure("tests/set_addr_overflow.brink", &["[ERR_165]"]);
+        assert_brink_failure("tests/set_addr_overflow.firm", &["[ERR_165]"]);
     }
 
     #[test]
     fn abs_identifier_overflow() {
-        assert_brink_failure("tests/abs_identifier_overflow.brink", &["[ERR_165]"]);
+        assert_brink_failure("tests/abs_identifier_overflow.firm", &["[ERR_165]"]);
     }
 
     #[test]
 
     fn label_1() {
-        assert_brink_success("tests/label_1.brink", None, None);
+        assert_brink_success("tests/label_1.firm", None, None);
     }
 
     #[test]
     fn label_2() {
-        assert_brink_failure("tests/label_2.brink", &["[ERR_211]"]);
+        assert_brink_failure("tests/label_2.firm", &["[ERR_211]"]);
     }
 
     #[test]
     fn label_3() {
-        assert_brink_failure("tests/label_3.brink", &["[ERR_204]"]);
+        assert_brink_failure("tests/label_3.firm", &["[ERR_204]"]);
     }
 
     #[test]
     fn quoted_escapes_1() {
         assert_brink_success(
-            "tests/quoted_escapes_1.brink",
+            "tests/quoted_escapes_1.firm",
             Some("quoted_escapes_1.bin"),
             None,
         );
@@ -776,19 +776,19 @@ mod tests {
     #[test]
 
     fn to_u64_1() {
-        assert_brink_success("tests/to_u64_1.brink", None, None);
+        assert_brink_success("tests/to_u64_1.firm", None, None);
     }
 
     #[test]
 
     fn to_i64_1() {
-        assert_brink_success("tests/to_i64_1.brink", None, None);
+        assert_brink_success("tests/to_i64_1.firm", None, None);
     }
 
     #[test]
 
     fn to_i64_2() {
-        assert_brink_success("tests/to_i64_2.brink", None, None);
+        assert_brink_success("tests/to_i64_2.firm", None, None);
     }
 
     /// to_i64() in a const expression: verifies that eval_const_expr_r dispatches
@@ -797,37 +797,37 @@ mod tests {
     #[test]
 
     fn const_to_i64_const() {
-        assert_brink_success("tests/const_to_i64_const.brink", None, None);
+        assert_brink_success("tests/const_to_i64_const.firm", None, None);
     }
 
-    /// brink::logger() in a const expression is rejected with ERR_87
+    /// firmion::logger() in a const expression is rejected with ERR_87
     /// (ExtensionCall not supported in const expressions) now that eval_const_expr_r
     /// dispatches on op before reading operands.  Previously the name was
     /// accidentally caught by ERR_86 before the dispatch reached eval_const_expr_r.
     #[test]
 
     fn const_ext_call_const() {
-        assert_brink_failure("tests/const_ext_call_const.brink", &["[ERR_116]"]);
+        assert_brink_failure("tests/const_ext_call_const.firm", &["[ERR_116]"]);
     }
 
     #[test]
 
     fn print_1() {
-        assert_brink_success("tests/print_1.brink", None, None);
+        assert_brink_success("tests/print_1.firm", None, None);
     }
 
     #[test]
 
     fn print_2() {
-        assert_brink_success("tests/print_2.brink", None, None);
+        assert_brink_success("tests/print_2.firm", None, None);
     }
 
     /// All-immediate print fires at IRDb time on a clean file.
     #[test]
     fn print_immediate_1() {
-        let src = "tests/print_immediate_1.brink";
+        let src = "tests/print_immediate_1.firm";
         let derived_out = format!("{}.bin", src.replace('/', "_").replace('\\', "_"));
-        Command::cargo_bin("brink")
+        Command::cargo_bin("firmion")
             .unwrap()
             .arg(src)
             .arg("-o")
@@ -844,9 +844,9 @@ mod tests {
     /// Print before a failing assert fires; print after a failing assert is suppressed.
     #[test]
     fn print_assert_order_1() {
-        Command::cargo_bin("brink")
+        Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/print_assert_order_1.brink")
+            .arg("tests/print_assert_order_1.firm")
             .assert()
             .failure()
             .stderr(predicates::str::contains("ERR_126"))
@@ -857,9 +857,9 @@ mod tests {
     /// Print before a failing assert fires in validation_phase before the assert is reached.
     #[test]
     fn print_immediate_on_error() {
-        Command::cargo_bin("brink")
+        Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/print_immediate_on_error.brink")
+            .arg("tests/print_immediate_on_error.firm")
             .assert()
             .failure()
             .stderr(predicates::str::contains("ERR_126"))
@@ -870,9 +870,9 @@ mod tests {
     /// statements in layout order, then post-output top-level.
     #[test]
     fn print_order_1() {
-        let src = "tests/print_order_1.brink";
+        let src = "tests/print_order_1.firm";
         let derived_out = format!("{}.bin", src.replace('/', "_").replace('\\', "_"));
-        Command::cargo_bin("brink")
+        Command::cargo_bin("firmion")
             .unwrap()
             .arg(src)
             .arg("-o")
@@ -889,9 +889,9 @@ mod tests {
     /// Post-output assert passes: print after it fires normally.
     #[test]
     fn assert_post_output_1() {
-        let src = "tests/assert_post_output_1.brink";
+        let src = "tests/assert_post_output_1.firm";
         let derived_out = format!("{}.bin", src.replace('/', "_").replace('\\', "_"));
-        Command::cargo_bin("brink")
+        Command::cargo_bin("firmion")
             .unwrap()
             .arg(src)
             .arg("-o")
@@ -908,9 +908,9 @@ mod tests {
     /// Post-output assert fails: print before it fires, print after it does not.
     #[test]
     fn assert_post_output_fail_1() {
-        Command::cargo_bin("brink")
+        Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/assert_post_output_fail_1.brink")
+            .arg("tests/assert_post_output_fail_1.firm")
             .assert()
             .failure()
             .stderr(predicates::str::contains("ERR_126"))
@@ -921,7 +921,7 @@ mod tests {
     #[test]
     fn wrs_1() {
         assert_brink_success(
-            "tests/wrs_1.brink",
+            "tests/wrs_1.firm",
             Some("wrs_1.bin"),
             Some("123\x00456 Wow! 18 2\n"),
         );
@@ -930,7 +930,7 @@ mod tests {
     #[test]
     fn wrs_utf8() {
         assert_brink_success(
-            "tests/wrs_utf8.brink",
+            "tests/wrs_utf8.firm",
             Some("wrs_utf8.bin"),
             Some("日本語 emoji: 🎉 café"),
         );
@@ -938,26 +938,26 @@ mod tests {
 
     #[test]
     fn wrs_overflow() {
-        assert_brink_failure("tests/wrs_overflow.brink", &["[ERR_159]"]);
+        assert_brink_failure("tests/wrs_overflow.firm", &["[ERR_159]"]);
     }
 
     #[test]
     fn wrx_overflow() {
-        assert_brink_failure("tests/wrx_overflow.brink", &["[ERR_158]"]);
+        assert_brink_failure("tests/wrx_overflow.firm", &["[ERR_158]"]);
     }
 
-    /// brink::huge_ext has cached_size = usize::MAX.  After one preceding
+    /// firmion::huge_ext has cached_size = usize::MAX.  After one preceding
     /// byte advances file_offset to 1, iterate_wrext attempts 1 + usize::MAX
     /// (as u64) which overflows and must emit ERR_159.
     #[test]
     fn wrext_overflow() {
-        assert_brink_failure("tests/wrext_overflow.brink", &["[ERR_159]"]);
+        assert_brink_failure("tests/wrext_overflow.firm", &["[ERR_159]"]);
     }
 
     #[test]
     fn wrx_1() {
         assert_brink_success(
-            "tests/wrx_1.brink",
+            "tests/wrx_1.firm",
             Some("wrx_1.bin"),
             Some("1\n12\n123\n1234\n12345\n123456\n1234567\n12345678\n"),
         );
@@ -966,20 +966,20 @@ mod tests {
     #[test]
 
     fn wrx_2() {
-        assert_brink_success("tests/wrx_2.brink", None, None);
+        assert_brink_success("tests/wrx_2.firm", None, None);
     }
 
     #[test]
 
     fn wrx_3() {
-        assert_brink_success("tests/wrx_3.brink", None, None);
+        assert_brink_success("tests/wrx_3.firm", None, None);
     }
 
     #[test]
     fn wrx_4() {
-        let _cmd = Command::cargo_bin("brink")
+        let _cmd = Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/wrx_4.brink")
+            .arg("tests/wrx_4.firm")
             .arg("-o wrx_4.bin")
             .assert()
             .success();
@@ -1037,9 +1037,9 @@ mod tests {
 
     #[test]
     fn wrx_5() {
-        let _cmd = Command::cargo_bin("brink")
+        let _cmd = Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/wrx_5.brink")
+            .arg("tests/wrx_5.firm")
             .arg("-o wrx_5.bin")
             .assert()
             .success();
@@ -1098,9 +1098,9 @@ mod tests {
     #[test]
     fn wrx_7() {
         // Big-endian counterpart of wrx_5: same value, reversed byte order per width.
-        let _cmd = Command::cargo_bin("brink")
+        let _cmd = Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/wrx_7.brink")
+            .arg("tests/wrx_7.firm")
             .arg("-o wrx_7.bin")
             .assert()
             .success();
@@ -1157,9 +1157,9 @@ mod tests {
 
     #[test]
     fn wrx_6() {
-        let _cmd = Command::cargo_bin("brink")
+        let _cmd = Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/wrx_6.brink")
+            .arg("tests/wrx_6.firm")
             .arg("-o wrx_6.bin")
             .assert()
             .success();
@@ -1188,21 +1188,21 @@ mod tests {
 
     #[test]
     fn align_0() {
-        assert_brink_failure("tests/align_0.brink", &["[ERR_160]"]);
+        assert_brink_failure("tests/align_0.firm", &["[ERR_160]"]);
     }
 
     #[test]
 
     fn align_1() {
-        assert_brink_success("tests/align_1.brink", None, None);
+        assert_brink_success("tests/align_1.firm", None, None);
     }
 
     #[test]
 
     fn align_2() {
-        let _cmd = Command::cargo_bin("brink")
+        let _cmd = Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/align_2.brink")
+            .arg("tests/align_2.firm")
             .arg("-o align_2.bin")
             .assert()
             .success();
@@ -1223,100 +1223,100 @@ mod tests {
     #[test]
 
     fn pad_sec_offset_1() {
-        assert_brink_success("tests/pad_sec_offset_1.brink", None, None);
+        assert_brink_success("tests/pad_sec_offset_1.firm", None, None);
     }
 
     #[test]
     fn pad_sec_offset_2() {
-        assert_brink_failure("tests/pad_sec_offset_2.brink", &["[ERR_146]"]);
+        assert_brink_failure("tests/pad_sec_offset_2.firm", &["[ERR_146]"]);
     }
 
     #[test]
 
     fn pad_addr_offset_1() {
-        assert_brink_success("tests/pad_addr_offset_1.brink", None, None);
+        assert_brink_success("tests/pad_addr_offset_1.firm", None, None);
     }
 
     #[test]
     fn pad_addr_offset_2() {
-        assert_brink_failure("tests/pad_addr_offset_2.brink", &["[ERR_146]"]);
+        assert_brink_failure("tests/pad_addr_offset_2.firm", &["[ERR_146]"]);
     }
 
     #[test]
 
     fn set_addr_1() {
-        assert_brink_success("tests/set_addr_1.brink", None, None);
+        assert_brink_success("tests/set_addr_1.firm", None, None);
     }
 
     #[test]
     fn set_addr_2() {
-        assert_brink_success("tests/set_addr_2.brink", None, None);
+        assert_brink_success("tests/set_addr_2.firm", None, None);
     }
 
     #[test]
     fn pad_sec_offset_after_set_addr() {
-        assert_brink_warning("tests/pad_sec_offset_after_set_addr.brink", &["[ERR_171]"]);
+        assert_brink_warning("tests/pad_sec_offset_after_set_addr.firm", &["[ERR_171]"]);
     }
 
     #[test]
     fn set_addr_scope_restore() {
         // Child's set_addr must not leak addr_base or addr_offset into parent.
-        assert_brink_success("tests/set_addr_scope_restore.brink", None, None);
+        assert_brink_success("tests/set_addr_scope_restore.firm", None, None);
     }
 
     #[test]
     fn set_addr_three_levels() {
         // Grandchild set_addr must not reach child or grandparent on exit.
-        assert_brink_success("tests/set_addr_three_levels.brink", None, None);
+        assert_brink_success("tests/set_addr_three_levels.firm", None, None);
     }
 
     #[test]
     fn set_addr_two_siblings() {
         // Second sibling must inherit restored parent addr state, not first sibling's.
-        assert_brink_success("tests/set_addr_two_siblings.brink", None, None);
+        assert_brink_success("tests/set_addr_two_siblings.firm", None, None);
     }
 
     #[test]
     fn set_addr_repeated_section() {
         // Section with set_addr written twice; each invocation scoped independently.
-        assert_brink_success("tests/set_addr_repeated_section.brink", None, None);
+        assert_brink_success("tests/set_addr_repeated_section.firm", None, None);
     }
 
     #[test]
     fn set_addr_empty_child() {
         // Empty child with set_addr writes 0 bytes; parent addr must not change.
-        assert_brink_success("tests/set_addr_empty_child.brink", None, None);
+        assert_brink_success("tests/set_addr_empty_child.firm", None, None);
     }
 
     #[test]
     fn set_addr_backward_child() {
         // Child set_addr to lower address; parent addr_base restored correctly.
-        assert_brink_success("tests/set_addr_backward_child.brink", None, None);
+        assert_brink_success("tests/set_addr_backward_child.firm", None, None);
     }
 
     #[test]
     fn set_addr_inherit_addr_offset() {
         // Child with no set_addr inherits and continues parent addr_offset.
-        assert_brink_success("tests/set_addr_inherit_addr_offset.brink", None, None);
+        assert_brink_success("tests/set_addr_inherit_addr_offset.firm", None, None);
     }
 
     #[test]
     fn set_addr_multi_in_child() {
         // Child calls set_addr twice; parent sees only the total byte count.
-        assert_brink_success("tests/set_addr_multi_in_child.brink", None, None);
+        assert_brink_success("tests/set_addr_multi_in_child.firm", None, None);
     }
 
     #[test]
     fn output_addr_root_anchors_without_output_base_after_set_addr() {
         // __OUTPUT_ADDR should remain 0 when output has no base and first statement is set_addr.
-        assert_brink_success("tests/output_addr_section_set_addr.brink", None, None);
+        assert_brink_success("tests/output_addr_section_set_addr.firm", None, None);
     }
 
     #[test]
     fn output_addr_root_anchors_with_output_base_after_set_addr() {
         // __OUTPUT_ADDR remains 0 even when set_addr is used inside the section.
         assert_brink_success(
-            "tests/output_addr_section_set_addr_with_output_base.brink",
+            "tests/output_addr_section_set_addr_with_output_base.firm",
             None,
             None,
         );
@@ -1327,7 +1327,7 @@ mod tests {
         // set_addr as the first statement keeps addr_offset and sec_offset in
         // sync, so ERR_171 must not fire.
         assert_brink_no_warning(
-            "tests/pad_sec_offset_after_set_addr_no_warn.brink",
+            "tests/pad_sec_offset_after_set_addr_no_warn.firm",
             &["[ERR_171]"],
         );
     }
@@ -1335,9 +1335,9 @@ mod tests {
     #[test]
 
     fn pad_sec_offset_3() {
-        let _cmd = Command::cargo_bin("brink")
+        let _cmd = Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/pad_sec_offset_3.brink")
+            .arg("tests/pad_sec_offset_3.firm")
             .arg("-o pad_sec_offset_3.bin")
             .assert()
             .success();
@@ -1357,12 +1357,12 @@ mod tests {
 
     #[test]
     fn file_offset_1() {
-        // Success: assert()-heavy test inside the .brink file verifies
+        // Success: assert()-heavy test inside the .firm file verifies
         // monotonic file_offset, set_addr independence, pad_file_offset
         // padding, and the identifier form file_offset(name).
-        let _cmd = Command::cargo_bin("brink")
+        let _cmd = Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/file_offset_1.brink")
+            .arg("tests/file_offset_1.firm")
             .arg("-o file_offset_1.bin")
             .assert()
             .success();
@@ -1387,79 +1387,79 @@ mod tests {
     #[test]
     fn file_offset_overflow() {
         // pad_file_offset backwards (target < current) must produce ERR_146.
-        assert_brink_failure("tests/file_offset_overflow.brink", &["[ERR_146]"]);
+        assert_brink_failure("tests/file_offset_overflow.firm", &["[ERR_146]"]);
     }
 
     #[test]
     fn wrf_1() {
-        assert_brink_success("tests/wrf_1.brink", Some("wrf_1.bin"), Some("Hello!"));
+        assert_brink_success("tests/wrf_1.firm", Some("wrf_1.bin"), Some("Hello!"));
     }
 
     #[test]
     fn wrf_2() {
-        assert_brink_failure("tests/wrf_2.brink", &["[ERR_81]"]);
+        assert_brink_failure("tests/wrf_2.firm", &["[ERR_81]"]);
     }
 
     #[test]
     fn wrf_3() {
-        assert_brink_failure("tests/wrf_3.brink", &["[ERR_80]"]);
+        assert_brink_failure("tests/wrf_3.firm", &["[ERR_80]"]);
     }
 
     #[test]
     #[should_panic]
     fn missing_input() {
-        let mut cmd = Command::cargo_bin("brink").unwrap();
-        cmd.arg("does_not_exist.brink").unwrap();
+        let mut cmd = Command::cargo_bin("firmion").unwrap();
+        cmd.arg("does_not_exist.firm").unwrap();
     }
 
     /// sizeof() works for both section names and extension names, and the
     /// two forms agree on the byte count when the extension fills the section.
     #[test]
     fn extension_sizeof() {
-        assert_brink_success("tests/extension_sizeof.brink", None, None);
+        assert_brink_success("tests/extension_sizeof.firm", None, None);
     }
 
     /// sizeof() with extension call syntax (arguments) is a compile error.
     #[test]
     fn sizeof_ext_name_with_args_fails() {
-        assert_brink_failure("tests/extension_sizeof_fail.brink", &["[ERR_35]"]);
+        assert_brink_failure("tests/extension_sizeof_fail.firm", &["[ERR_35]"]);
     }
 
     /// Trying to use non-wr command on the extension output.
     #[test]
     fn extension_non_wr_1_fails() {
-        assert_brink_failure("tests/extension_non_wr_1.brink", &["[ERR_138]"]);
+        assert_brink_failure("tests/extension_non_wr_1.firm", &["[ERR_138]"]);
     }
 
     /// Trying to use non-wr command on the extension output.
     #[test]
     fn extension_non_wr_2_fails() {
-        assert_brink_failure("tests/extension_non_wr_2.brink", &["[ERR_79]"]);
+        assert_brink_failure("tests/extension_non_wr_2.firm", &["[ERR_79]"]);
     }
 
     /// A string const passed as an extension argument is valid at IRDb time but
     /// the extension rejects it at runtime with ERR_167.
     #[test]
     fn extension_str_arg_fails() {
-        assert_brink_failure("tests/extension_str_arg.brink", &["[ERR_167]"]);
+        assert_brink_failure("tests/extension_str_arg.firm", &["[ERR_167]"]);
     }
 
     /// An integer followed by a string const as extension arguments; the extension
     /// rejects the string arg at runtime with ERR_167.
     #[test]
     fn extension_int_str_arg_fails() {
-        assert_brink_failure("tests/extension_int_str_arg.brink", &["[ERR_167]"]);
+        assert_brink_failure("tests/extension_int_str_arg.firm", &["[ERR_167]"]);
     }
 
     /// sizeof(section) produces a numeric u64 and is valid as an extension
-    /// argument.  brink::test_crc encodes sizeof(data)==4 as big-endian u32.
+    /// argument.  firmion::test_crc encodes sizeof(data)==4 as big-endian u32.
     /// Expected output: 4 data bytes then 0x00 0x00 0x00 0x04.
     #[test]
     fn extension_sizeof_arg() {
-        let out = "tests_extension_sizeof_arg.brink.bin";
-        Command::cargo_bin("brink")
+        let out = "tests_extension_sizeof_arg.firm.bin";
+        Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/extension_sizeof_arg.brink")
+            .arg("tests/extension_sizeof_arg.firm")
             .arg("-o")
             .arg(out)
             .assert()
@@ -1473,14 +1473,14 @@ mod tests {
         fs::remove_file(out).ok();
     }
 
-    /// Eight literal integer arguments; brink::test_sum8 writes sum(1..8)==36
+    /// Eight literal integer arguments; firmion::test_sum8 writes sum(1..8)==36
     /// as a little-endian u64.
     #[test]
     fn extension_8arg() {
-        let out = "tests_extension_8arg.brink.bin";
-        Command::cargo_bin("brink")
+        let out = "tests_extension_8arg.firm.bin";
+        Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/extension_8arg.brink")
+            .arg("tests/extension_8arg.firm")
             .arg("-o")
             .arg(out)
             .assert()
@@ -1498,10 +1498,10 @@ mod tests {
     /// values match 1..8 so the sum and output are identical to extension_8arg.
     #[test]
     fn extension_8arg_expr() {
-        let out = "tests_extension_8arg_expr.brink.bin";
-        Command::cargo_bin("brink")
+        let out = "tests_extension_8arg_expr.firm.bin";
+        Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/extension_8arg_expr.brink")
+            .arg("tests/extension_8arg_expr.firm")
             .arg("-o")
             .arg(out)
             .assert()
@@ -1515,13 +1515,13 @@ mod tests {
         fs::remove_file(out).ok();
     }
 
-    /// Form 3 (section-name): brink::increment receives the `top` section
+    /// Form 3 (section-name): firmion::increment receives the `top` section
     /// slice (16 bytes) and appends each byte + 1.  Total output: 32 bytes.
     #[test]
     fn execute_extension_increment() {
-        Command::cargo_bin("brink")
+        Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/extension_increment.brink")
+            .arg("tests/extension_increment.firm")
             .arg("-o")
             .arg("execute_extension_increment.bin")
             .assert()
@@ -1550,9 +1550,9 @@ mod tests {
 
     #[test]
     fn execute_extension_no_args() {
-        Command::cargo_bin("brink")
+        Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/extension_no_args.brink")
+            .arg("tests/extension_no_args.firm")
             .arg("-o")
             .arg("execute_extension_no_args.bin")
             .assert()
@@ -1566,15 +1566,15 @@ mod tests {
         fs::remove_file("execute_extension_no_args.bin").ok();
     }
 
-    // Form 3 (section-name): brink::ranged_sum receives the entire `out`
+    // Form 3 (section-name): firmion::ranged_sum receives the entire `out`
     // section (4 data bytes + 8-byte extension slot) as its image slice.
     // Sum of 0x01+0x02+0x03+0x04 = 10; extension slot bytes are zero.
     // Total output: 4 data bytes + 8-byte sum = 12 bytes.
     #[test]
     fn execute_extension_section_sum() {
-        Command::cargo_bin("brink")
+        Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/extension_section_sum.brink")
+            .arg("tests/extension_section_sum.firm")
             .arg("-o")
             .arg("execute_extension_section_sum.bin")
             .assert()
@@ -1604,13 +1604,13 @@ mod tests {
 
     /// A ranged extension called with the section-name form on an empty section
     /// succeeds when the extension accepts empty input.
-    /// brink::ranged_sum returns 0.
+    /// firmion::ranged_sum returns 0.
     #[test]
     fn execute_extension_zero_length_section_success() {
         let out_path = "ext_zero_length_section_success.bin";
-        Command::cargo_bin("brink")
+        Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/extension_zero_length_section_success.brink")
+            .arg("tests/extension_zero_length_section_success.firm")
             .arg("-o")
             .arg(out_path)
             .assert()
@@ -1628,20 +1628,20 @@ mod tests {
     /// fails when the extension rejects empty input.
     #[test]
     fn execute_extension_zero_length_section_failure() {
-        assert_brink_failure("tests/extension_zero_length_section_failure.brink", &[]);
+        assert_brink_failure("tests/extension_zero_length_section_failure.firm", &[]);
     }
 
     /// Global asserts (outside any section) pass through the validation phase
     /// after all sections and extensions are fully written.
     #[test]
     fn global_assert_passes() {
-        assert_brink_success("tests/global_assert.brink", None, None);
+        assert_brink_success("tests/global_assert.firm", None, None);
     }
 
     /// A global assert that evaluates false must emit ERR_126.
     #[test]
     fn global_assert_fails() {
-        assert_brink_failure("tests/global_assert_fail.brink", &["[ERR_126]"]);
+        assert_brink_failure("tests/global_assert_fail.firm", &["[ERR_126]"]);
     }
 
     /// Assert that every error/warning/note code string passed to the diags API
@@ -1742,43 +1742,43 @@ mod tests {
     /// as the ambiguous-integer type and produces ERR_201.
     #[test]
     fn integer_overflow_i64() {
-        assert_brink_failure("tests/integer_overflow_i64.brink", &["[ERR_201]"]);
+        assert_brink_failure("tests/integer_overflow_i64.firm", &["[ERR_201]"]);
     }
 
     /// A hex integer literal with a 'u' suffix that exceeds u64::MAX produces ERR_198.
     #[test]
     fn integer_overflow_u64() {
-        assert_brink_failure("tests/integer_overflow_u64.brink", &["[ERR_198]"]);
+        assert_brink_failure("tests/integer_overflow_u64.firm", &["[ERR_198]"]);
     }
 
     /// K/M/G magnitude suffixes parse correctly in const expressions.
     #[test]
     fn kmg_suffix_1() {
-        assert_brink_success("tests/kmg_suffix_1.brink", None, None);
+        assert_brink_success("tests/kmg_suffix_1.firm", None, None);
     }
 
     /// K/M/G magnitude suffix used in region size and section content.
     #[test]
     fn kmg_suffix_2() {
-        assert_brink_success("tests/kmg_suffix_2.brink", None, None);
+        assert_brink_success("tests/kmg_suffix_2.firm", None, None);
     }
 
     /// Negative literals with K/M magnitude suffix produce correct I64 values.
     #[test]
     fn kmg_suffix_3() {
-        assert_brink_success("tests/kmg_suffix_3.brink", None, None);
+        assert_brink_success("tests/kmg_suffix_3.firm", None, None);
     }
 
     /// K/M/G with u suffix: value * multiplier overflowing u64::MAX produces ERR_198.
     #[test]
     fn kmg_overflow_u64() {
-        assert_brink_failure("tests/kmg_overflow_u64.brink", &["[ERR_198]"]);
+        assert_brink_failure("tests/kmg_overflow_u64.firm", &["[ERR_198]"]);
     }
 
     /// K/M/G on a const Integer: value * multiplier overflowing i64::MAX produces ERR_88.
     #[test]
     fn kmg_overflow_i64() {
-        assert_brink_failure("tests/kmg_overflow_i64.brink", &["[ERR_88]"]);
+        assert_brink_failure("tests/kmg_overflow_i64.firm", &["[ERR_88]"]);
     }
 
     // -------------------------------------------------------------------------
@@ -1789,7 +1789,7 @@ mod tests {
     #[test]
     fn const_integer_1() {
         assert_brink_success(
-            "tests/const_integer_1.brink",
+            "tests/const_integer_1.firm",
             Some("const_integer_1.bin"),
             None,
         );
@@ -1798,20 +1798,20 @@ mod tests {
     /// A u64 const is defined and used as a wr64 operand.
     #[test]
     fn const_u64_1() {
-        assert_brink_success("tests/const_u64_1.brink", Some("const_u64_1.bin"), None);
+        assert_brink_success("tests/const_u64_1.firm", Some("const_u64_1.bin"), None);
     }
 
     /// A const is defined as an arithmetic expression composed of two other consts.
     #[test]
     fn const_expr_1() {
-        assert_brink_success("tests/const_expr_1.brink", Some("const_expr_1.bin"), None);
+        assert_brink_success("tests/const_expr_1.firm", Some("const_expr_1.bin"), None);
     }
 
     /// A const is defined as an arithmetic expression composed of two other consts.
     #[test]
     fn const_builtins_1() {
         assert_brink_success(
-            "tests/const_builtins_1.brink",
+            "tests/const_builtins_1.firm",
             Some("const_builtins_1.bin"),
             None,
         );
@@ -1820,13 +1820,13 @@ mod tests {
     /// A three-deep const chain: C depends on B which depends on A.
     #[test]
     fn const_chain_1() {
-        assert_brink_success("tests/const_chain_1.brink", Some("const_chain_1.bin"), None);
+        assert_brink_success("tests/const_chain_1.firm", Some("const_chain_1.bin"), None);
     }
 
     #[test]
     fn const_deferred_assignment_1() {
         assert_brink_success(
-            "tests/const_deferred_assignment_1.brink",
+            "tests/const_deferred_assignment_1.firm",
             Some("const_deferred_assignment_1.bin"),
             None,
         );
@@ -1835,7 +1835,7 @@ mod tests {
     #[test]
     fn const_deferred_assignment_2() {
         assert_brink_success(
-            "tests/const_deferred_assignment_2.brink",
+            "tests/const_deferred_assignment_2.firm",
             Some("const_deferred_assignment_2.bin"),
             None,
         );
@@ -1843,38 +1843,38 @@ mod tests {
 
     #[test]
     fn const_deferred_assignment_3() {
-        assert_brink_failure("tests/const_deferred_assignment_3.brink", &["[ERR_231]"]);
+        assert_brink_failure("tests/const_deferred_assignment_3.firm", &["[ERR_231]"]);
     }
 
     #[test]
     fn const_deferred_assignment_4() {
-        assert_brink_failure("tests/const_deferred_assignment_4.brink", &["[ERR_231]"]);
+        assert_brink_failure("tests/const_deferred_assignment_4.firm", &["[ERR_231]"]);
     }
 
     /// A const is declared before the consts it depends on in source order.
     /// Resolution must be order-independent since consts have global scope.
     #[test]
     fn const_rev_decl_1() {
-        assert_brink_failure("tests/const_rev_decl_1.brink", &["[ERR_86]"]);
+        assert_brink_failure("tests/const_rev_decl_1.firm", &["[ERR_86]"]);
     }
 
     /// A malformed const expression.
     #[test]
     fn const_malformed_1() {
-        assert_brink_failure("tests/const_malformed_1.brink", &["[ERR_8]"]);
+        assert_brink_failure("tests/const_malformed_1.firm", &["[ERR_8]"]);
     }
 
     /// No dynamic built-ins allowed in const
     #[test]
     fn const_builtins_2() {
-        assert_brink_failure("tests/const_builtins_2.brink", &["[ERR_85]"]);
+        assert_brink_failure("tests/const_builtins_2.firm", &["[ERR_85]"]);
     }
 
     /// A const is used as one operand of an assert expression inside a section.
     #[test]
     fn const_in_assert_1() {
         assert_brink_success(
-            "tests/const_in_assert_1.brink",
+            "tests/const_in_assert_1.firm",
             Some("const_in_assert_1.bin"),
             None,
         );
@@ -1884,7 +1884,7 @@ mod tests {
     #[test]
     fn const_string_1() {
         assert_brink_success(
-            "tests/const_string_1.brink",
+            "tests/const_string_1.firm",
             Some("const_string_1.bin"),
             None,
         );
@@ -1894,7 +1894,7 @@ mod tests {
     #[test]
     fn const_string_wrf_1() {
         assert_brink_success(
-            "tests/const_string_wrf_1.brink",
+            "tests/const_string_wrf_1.firm",
             Some("const_string_wrf_1.bin"),
             Some("Hello!"),
         );
@@ -1904,9 +1904,9 @@ mod tests {
     #[test]
     fn const_string_wrf_2() {
         let out = "const_string_wrf_2.bin";
-        Command::cargo_bin("brink")
+        Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/const_string_wrf_2.brink")
+            .arg("tests/const_string_wrf_2.firm")
             .arg("-o")
             .arg(out)
             .arg(r#"-DF="tests/test_source_1.txt""#)
@@ -1922,9 +1922,9 @@ mod tests {
     #[test]
     fn const_string_if_1() {
         let out = "const_string_if_1.bin";
-        Command::cargo_bin("brink")
+        Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/const_string_if_1.brink")
+            .arg("tests/const_string_if_1.firm")
             .arg("-o")
             .arg(out)
             .assert()
@@ -1939,9 +1939,9 @@ mod tests {
     #[test]
     fn const_string_if_2() {
         let out = "const_string_if_2.bin";
-        Command::cargo_bin("brink")
+        Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/const_string_if_2.brink")
+            .arg("tests/const_string_if_2.firm")
             .arg("-o")
             .arg(out)
             .arg(r#"-DVARIANT="v1""#)
@@ -1957,7 +1957,7 @@ mod tests {
     #[test]
     fn const_as_output_addr_1() {
         assert_brink_success(
-            "tests/const_as_output_addr_1.brink",
+            "tests/const_as_output_addr_1.firm",
             Some("const_as_output_addr_1.bin"),
             None,
         );
@@ -1966,92 +1966,92 @@ mod tests {
     /// Two const declarations share the same name.
     #[test]
     fn const_duplicate_1() {
-        assert_brink_failure("tests/const_duplicate_1.brink", &["[ERR_25]"]);
+        assert_brink_failure("tests/const_duplicate_1.firm", &["[ERR_25]"]);
     }
 
     /// Two const declarations share the same name.
     #[test]
     fn const_duplicate_2() {
-        assert_brink_failure("tests/const_duplicate_2.brink", &["[ERR_25]"]);
+        assert_brink_failure("tests/const_duplicate_2.firm", &["[ERR_25]"]);
     }
 
     /// A const name collides with an existing section name.
     #[test]
     fn const_name_conflict_1() {
-        assert_brink_failure("tests/const_name_conflict_1.brink", &["[ERR_26]"]);
+        assert_brink_failure("tests/const_name_conflict_1.firm", &["[ERR_26]"]);
     }
 
     /// Two consts mutually depend on each other, forming a cycle.
     #[test]
     fn const_circular_1() {
-        assert_brink_failure("tests/const_circular_1.brink", &["[ERR_86]"]);
+        assert_brink_failure("tests/const_circular_1.firm", &["[ERR_86]"]);
     }
 
     /// Two consts mutually depend on each other, forming a cycle.
     #[test]
     fn const_circular_2() {
-        assert_brink_failure("tests/const_circular_2.brink", &["[ERR_86]"]);
+        assert_brink_failure("tests/const_circular_2.firm", &["[ERR_86]"]);
     }
 
     /// A const expression depends on sizeof(), which requires engine-time layout.
     /// Consts must be resolvable before the engine runs.
     #[test]
     fn const_sizeof_1() {
-        assert_brink_failure("tests/const_sizeof_1.brink", &["[ERR_85]"]);
+        assert_brink_failure("tests/const_sizeof_1.firm", &["[ERR_85]"]);
     }
 
     /// A const expression uses __OUTPUT_SIZE, which requires engine-time layout.
     /// Consts must be resolvable before the engine runs.
     #[test]
     fn output_builtin_const_fail() {
-        assert_brink_failure("tests/output_builtin_const_fail.brink", &["[ERR_85]"]);
+        assert_brink_failure("tests/output_builtin_const_fail.firm", &["[ERR_85]"]);
     }
 
     /// A const expression depends on addr(), which requires engine-time addressing.
     /// Consts must be resolvable before the engine runs.
     #[test]
     fn const_abs_1() {
-        assert_brink_failure("tests/const_abs_1.brink", &["[ERR_85]"]);
+        assert_brink_failure("tests/const_abs_1.firm", &["[ERR_85]"]);
     }
 
     /// A const expression references an identifier that is never defined.
     /// Expected: ERR_86.
     #[test]
     fn const_undefined_1() {
-        assert_brink_failure("tests/const_undefined_1.brink", &["[ERR_86]"]);
+        assert_brink_failure("tests/const_undefined_1.firm", &["[ERR_86]"]);
     }
 
     /// A const expression applies arithmetic to a string-typed const.
     /// Expected: ERR_91.
     #[test]
     fn const_type_mismatch_1() {
-        assert_brink_failure("tests/const_type_mismatch_1.brink", &["[ERR_91]"]);
+        assert_brink_failure("tests/const_type_mismatch_1.firm", &["[ERR_91]"]);
     }
 
     /// A const is defined but never used anywhere in the program.
     /// Expected: ERR_229 warning.
     #[test]
     fn const_unused_1() {
-        assert_brink_warning("tests/const_unused_1.brink", &["[ERR_229]"]);
+        assert_brink_warning("tests/const_unused_1.firm", &["[ERR_229]"]);
     }
 
     /// An I64 const is defined and used as a wr8 operand.
     #[test]
     fn const_i64_1() {
-        assert_brink_success("tests/const_i64_1.brink", Some("const_i64_1.bin"), None);
+        assert_brink_success("tests/const_i64_1.firm", Some("const_i64_1.bin"), None);
     }
 
     /// Const expressions exercising subtract, multiply, divide, and modulo.
     #[test]
     fn const_arith_1() {
-        assert_brink_success("tests/const_arith_1.brink", Some("const_arith_1.bin"), None);
+        assert_brink_success("tests/const_arith_1.firm", Some("const_arith_1.bin"), None);
     }
 
     /// Const expressions exercising bitwise and, or, left shift, and right shift.
     #[test]
     fn const_bitwise_1() {
         assert_brink_success(
-            "tests/const_bitwise_1.brink",
+            "tests/const_bitwise_1.firm",
             Some("const_bitwise_1.bin"),
             None,
         );
@@ -2060,168 +2060,168 @@ mod tests {
     /// A const expression uses &&, which is now supported (added with if/else).
     #[test]
     fn const_bad_op_1() {
-        assert_brink_success("tests/const_bad_op_1.brink", None, None);
+        assert_brink_success("tests/const_bad_op_1.firm", None, None);
     }
 
     /// A const integer literal overflows i64.
     /// Expected: ERR_88.
     #[test]
     fn const_bad_integer_1() {
-        assert_brink_failure("tests/const_bad_integer_1.brink", &["[ERR_88]"]);
+        assert_brink_failure("tests/const_bad_integer_1.firm", &["[ERR_88]"]);
     }
 
     /// A const U64 literal overflows u64.
     /// Expected: ERR_89.
     #[test]
     fn const_bad_u64_1() {
-        assert_brink_failure("tests/const_bad_u64_1.brink", &["[ERR_89]"]);
+        assert_brink_failure("tests/const_bad_u64_1.firm", &["[ERR_89]"]);
     }
 
     /// A const I64 literal overflows i64.
     /// Expected: ERR_90.
     #[test]
     fn const_bad_i64_1() {
-        assert_brink_failure("tests/const_bad_i64_1.brink", &["[ERR_90]"]);
+        assert_brink_failure("tests/const_bad_i64_1.firm", &["[ERR_90]"]);
     }
 
     /// A const U64 addition overflows u64::MAX.
     /// Expected: ERR_93.
     #[test]
     fn const_overflow_1() {
-        assert_brink_failure("tests/const_overflow_1.brink", &["[ERR_93]"]);
+        assert_brink_failure("tests/const_overflow_1.firm", &["[ERR_93]"]);
     }
 
     /// A const integer division by zero.
     /// Expected: ERR_94.
     #[test]
     fn const_divzero_1() {
-        assert_brink_failure("tests/const_divzero_1.brink", &["[ERR_94]"]);
+        assert_brink_failure("tests/const_divzero_1.firm", &["[ERR_94]"]);
     }
 
     /// Const comparison operators ==, !=, >=, <= produce U64 0/1 results.
     #[test]
     fn const_cmp_1() {
-        assert_brink_success("tests/const_cmp_1.brink", Some("const_cmp_1.bin"), None);
+        assert_brink_success("tests/const_cmp_1.firm", Some("const_cmp_1.bin"), None);
     }
 
     /// Comparing a numeric const with a string const is a type error.
     /// Expected: ERR_95.
     #[test]
     fn const_cmp_mismatch_1() {
-        assert_brink_failure("tests/const_cmp_mismatch_1.brink", &["[ERR_95]"]);
+        assert_brink_failure("tests/const_cmp_mismatch_1.firm", &["[ERR_95]"]);
     }
 
     /// 'include' is reserved and cannot be used as a section name.
     #[test]
     fn reserved_section_1() {
-        assert_brink_failure("tests/reserved_section_1.brink", &["[ERR_27]"]);
+        assert_brink_failure("tests/reserved_section_1.firm", &["[ERR_27]"]);
     }
 
     /// Identifiers starting with 'wr' are reserved as section names.
     #[test]
     fn reserved_section_2() {
-        assert_brink_failure("tests/reserved_section_2.brink", &["[ERR_27]"]);
+        assert_brink_failure("tests/reserved_section_2.firm", &["[ERR_27]"]);
     }
 
     /// 'include' is reserved and cannot be used as a const name.
     #[test]
     fn reserved_const_1() {
-        assert_brink_failure("tests/reserved_const_1.brink", &["[ERR_28]"]);
+        assert_brink_failure("tests/reserved_const_1.firm", &["[ERR_28]"]);
     }
 
     /// Identifiers starting with 'wr' are reserved as const names.
     #[test]
     fn reserved_const_2() {
-        assert_brink_failure("tests/reserved_const_2.brink", &["[ERR_28]"]);
+        assert_brink_failure("tests/reserved_const_2.firm", &["[ERR_28]"]);
     }
 
     /// 'include' is reserved and cannot be used as a label name.
     #[test]
     fn reserved_label_1() {
-        assert_brink_failure("tests/reserved_label_1.brink", &["[ERR_212]"]);
+        assert_brink_failure("tests/reserved_label_1.firm", &["[ERR_212]"]);
     }
 
     /// Identifiers starting with 'wr' are reserved as label names.
     #[test]
     fn reserved_label_2() {
-        assert_brink_failure("tests/reserved_label_2.brink", &["[ERR_212]"]);
+        assert_brink_failure("tests/reserved_label_2.firm", &["[ERR_212]"]);
     }
 
     /// Identifiers starting with 'set_' are reserved as section names.
     #[test]
     fn reserved_section_3() {
-        assert_brink_failure("tests/reserved_section_3.brink", &["[ERR_27]"]);
+        assert_brink_failure("tests/reserved_section_3.firm", &["[ERR_27]"]);
     }
 
     /// 'wrs' is a dedicated lexer token and cannot be used as a section name.
     /// The lexer rejects it before the reserved-identifier check fires.
     #[test]
     fn reserved_section_4() {
-        assert_brink_failure("tests/reserved_section_4.brink", &[]);
+        assert_brink_failure("tests/reserved_section_4.firm", &[]);
     }
 
     /// 'wrf' is a dedicated lexer token and cannot be used as a section name.
     /// The lexer rejects it before the reserved-identifier check fires.
     #[test]
     fn reserved_section_5() {
-        assert_brink_failure("tests/reserved_section_5.brink", &[]);
+        assert_brink_failure("tests/reserved_section_5.firm", &[]);
     }
 
     /// Identifiers starting with '__' are reserved as section names.
     #[test]
     fn reserved_section_6() {
-        assert_brink_failure("tests/reserved_section_6.brink", &["[ERR_27]"]);
+        assert_brink_failure("tests/reserved_section_6.firm", &["[ERR_27]"]);
     }
 
     /// 'let' is reserved and cannot be used as a const name.
     #[test]
     fn reserved_const_3() {
-        assert_brink_failure("tests/reserved_const_3.brink", &["[ERR_28]"]);
+        assert_brink_failure("tests/reserved_const_3.firm", &["[ERR_28]"]);
     }
 
     /// 'wrs' is a dedicated lexer token and cannot be used as a const name.
     /// The lexer rejects it before the reserved-identifier check fires.
     #[test]
     fn reserved_const_4() {
-        assert_brink_failure("tests/reserved_const_4.brink", &[]);
+        assert_brink_failure("tests/reserved_const_4.firm", &[]);
     }
 
     /// Identifiers starting with '__' are reserved as const names.
     #[test]
     fn reserved_const_5() {
-        assert_brink_failure("tests/reserved_const_5.brink", &["[ERR_28]"]);
+        assert_brink_failure("tests/reserved_const_5.firm", &["[ERR_28]"]);
     }
 
     /// 'true' is reserved and cannot be used as a label name.
     #[test]
     fn reserved_label_3() {
-        assert_brink_failure("tests/reserved_label_3.brink", &["[ERR_212]"]);
+        assert_brink_failure("tests/reserved_label_3.firm", &["[ERR_212]"]);
     }
 
     /// 'wrs' is a reserved exact keyword and cannot be used as a label name.
     #[test]
     fn reserved_label_4() {
-        assert_brink_failure("tests/reserved_label_4.brink", &["[ERR_212]"]);
+        assert_brink_failure("tests/reserved_label_4.firm", &["[ERR_212]"]);
     }
 
     /// Identifiers starting with '__' are reserved as label names.
     #[test]
     fn reserved_label_5() {
-        assert_brink_failure("tests/reserved_label_5.brink", &["[ERR_212]"]);
+        assert_brink_failure("tests/reserved_label_5.firm", &["[ERR_212]"]);
     }
 
     /// 'wr' without a following digit is now a valid identifier prefix.
     #[test]
     fn wr_prefix_now_valid() {
-        assert_brink_success("tests/wr_prefix_now_valid.brink", None, None);
+        assert_brink_success("tests/wr_prefix_now_valid.firm", None, None);
     }
 
     // ── Map file output tests ─────────────────────────────────────────────────
 
-    /// Runs brink with --map-csv=<map_file> and -o <bin_file>, reads the map,
+    /// Runs firmion with --map-csv=<map_file> and -o <bin_file>, reads the map,
     /// asserts every string in `checks` appears in the map, then cleans up.
     fn assert_map_csv(src: &str, bin_out: &str, map_out: &str, checks: &[&str]) {
-        let mut cmd = Command::cargo_bin("brink").unwrap();
+        let mut cmd = Command::cargo_bin("firmion").unwrap();
         cmd.arg(src)
             .arg("-o")
             .arg(bin_out)
@@ -2246,7 +2246,7 @@ mod tests {
     #[test]
     fn map_csv_sections_and_consts() {
         assert_map_csv(
-            "tests/map_sections.brink",
+            "tests/map_sections.firm",
             "map_sections.bin",
             "map_sections.map.csv",
             &[
@@ -2270,7 +2270,7 @@ mod tests {
     #[test]
     fn map_csv_labels() {
         assert_map_csv(
-            "tests/map_labels.brink",
+            "tests/map_labels.firm",
             "map_labels.bin",
             "map_labels.map.csv",
             &[
@@ -2286,15 +2286,15 @@ mod tests {
     #[test]
     fn map_csv_repeated_section() {
         assert_map_csv(
-            "tests/map_repeated.brink",
+            "tests/map_repeated.firm",
             "map_repeated.bin",
             "map_repeated.map.csv",
             &["chunk"],
         );
         // Verify chunk appears three times by reading the map independently.
         // (assert_map_csv already cleaned up, so re-run for the count check.)
-        let mut cmd = Command::cargo_bin("brink").unwrap();
-        cmd.arg("tests/map_repeated.brink")
+        let mut cmd = Command::cargo_bin("firmion").unwrap();
+        cmd.arg("tests/map_repeated.firm")
             .arg("-o")
             .arg("map_repeated2.bin")
             .arg("--map-csv=map_repeated2.map.csv");
@@ -2311,12 +2311,12 @@ mod tests {
     /// Omitting FILE from --map-csv creates <stem>.map.csv in the current directory.
     #[test]
     fn map_csv_default_filename() {
-        let mut cmd = Command::cargo_bin("brink").unwrap();
+        let mut cmd = Command::cargo_bin("firmion").unwrap();
         // Copy the test file locally so the default output map name doesn't collide
-        // with other map tests reading the same map_default.brink input!
-        fs::copy("tests/map_default.brink", "tests/map_csv_default.brink").unwrap();
+        // with other map tests reading the same map_default.firm input!
+        fs::copy("tests/map_default.firm", "tests/map_csv_default.firm").unwrap();
 
-        cmd.arg("tests/map_csv_default.brink")
+        cmd.arg("tests/map_csv_default.firm")
             .arg("-o")
             .arg("map_csv_default.bin")
             .arg("--map-csv");
@@ -2335,15 +2335,15 @@ mod tests {
 
         fs::remove_file("map_csv_default.bin").ok();
         fs::remove_file("map_csv_default.map.csv").ok();
-        fs::remove_file("tests/map_csv_default.brink").ok();
+        fs::remove_file("tests/map_csv_default.firm").ok();
     }
 
     /// --map-csv=- writes map content to stdout.
     #[test]
     fn map_csv_stdout() {
-        Command::cargo_bin("brink")
+        Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/map_sections.brink")
+            .arg("tests/map_sections.firm")
             .arg("-o")
             .arg("map_stdout.bin")
             .arg("--map-csv=-")
@@ -2358,11 +2358,11 @@ mod tests {
 
     // ── JSON map output tests ─────────────────────────────────────────────────
 
-    /// Runs brink with --map-json=<file>, parses the output as JSON, and
+    /// Runs firmion with --map-json=<file>, parses the output as JSON, and
     /// asserts that every (key, value) pair in `checks` is present at the
     /// top level of every object in the named array field.
     fn assert_map_json(src: &str, bin_out: &str, map_out: &str) -> serde_json::Value {
-        let mut cmd = Command::cargo_bin("brink").unwrap();
+        let mut cmd = Command::cargo_bin("firmion").unwrap();
         cmd.arg(src)
             .arg("-o")
             .arg(bin_out)
@@ -2383,7 +2383,7 @@ mod tests {
     #[test]
     fn map_json_header() {
         let v = assert_map_json(
-            "tests/map_sections.brink",
+            "tests/map_sections.firm",
             "map_json_header.bin",
             "map_json_header.map.json",
         );
@@ -2396,7 +2396,7 @@ mod tests {
     #[test]
     fn map_json_sections() {
         let v = assert_map_json(
-            "tests/map_sections.brink",
+            "tests/map_sections.firm",
             "map_json_sections.bin",
             "map_json_sections.map.json",
         );
@@ -2413,7 +2413,7 @@ mod tests {
     #[test]
     fn map_json_consts() {
         let v = assert_map_json(
-            "tests/map_sections.brink",
+            "tests/map_sections.firm",
             "map_json_consts.bin",
             "map_json_consts.map.json",
         );
@@ -2428,7 +2428,7 @@ mod tests {
     #[test]
     fn map_json_labels() {
         let v = assert_map_json(
-            "tests/map_labels.brink",
+            "tests/map_labels.firm",
             "map_json_labels.bin",
             "map_json_labels.map.json",
         );
@@ -2443,7 +2443,7 @@ mod tests {
     #[test]
     fn map_json_repeated_section() {
         let v = assert_map_json(
-            "tests/map_repeated.brink",
+            "tests/map_repeated.firm",
             "map_json_repeated.bin",
             "map_json_repeated.map.json",
         );
@@ -2459,10 +2459,10 @@ mod tests {
     /// Omitting FILE from --map-json creates <stem>.map.json in the current directory.
     #[test]
     fn map_json_default_filename() {
-        let mut cmd = Command::cargo_bin("brink").unwrap();
-        fs::copy("tests/map_default.brink", "tests/map_json_default.brink").unwrap();
+        let mut cmd = Command::cargo_bin("firmion").unwrap();
+        fs::copy("tests/map_default.firm", "tests/map_json_default.firm").unwrap();
 
-        cmd.arg("tests/map_json_default.brink")
+        cmd.arg("tests/map_json_default.firm")
             .arg("-o")
             .arg("map_json_default.bin")
             .arg("--map-json");
@@ -2475,15 +2475,15 @@ mod tests {
 
         fs::remove_file("map_json_default.bin").ok();
         fs::remove_file("map_json_default.map.json").ok();
-        fs::remove_file("tests/map_json_default.brink").ok();
+        fs::remove_file("tests/map_json_default.firm").ok();
     }
 
     /// --map-json=- writes JSON map content to stdout.
     #[test]
     fn map_json_stdout() {
-        Command::cargo_bin("brink")
+        Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/map_sections.brink")
+            .arg("tests/map_sections.firm")
             .arg("-o")
             .arg("map_json_stdout.bin")
             .arg("--map-json=-")
@@ -2499,8 +2499,8 @@ mod tests {
     /// CSV map; -DCOUNT=16 also appears as a const in the map.
     #[test]
     fn defines_appear_in_csv_map() {
-        let mut cmd = Command::cargo_bin("brink").unwrap();
-        cmd.arg("tests/map_defines.brink")
+        let mut cmd = Command::cargo_bin("firmion").unwrap();
+        cmd.arg("tests/map_defines.firm")
             .arg("-o")
             .arg("defines_csv.bin")
             .arg("--map-csv=defines_csv.map.csv")
@@ -2522,8 +2522,8 @@ mod tests {
     /// -D defines appear in JSON map output with correct types.
     #[test]
     fn defines_appear_in_json_map() {
-        let mut cmd = Command::cargo_bin("brink").unwrap();
-        cmd.arg("tests/map_defines.brink")
+        let mut cmd = Command::cargo_bin("firmion").unwrap();
+        cmd.arg("tests/map_defines.firm")
             .arg("-o")
             .arg("defines_json.bin")
             .arg("--map-json=defines_json.map.json")
@@ -2550,9 +2550,9 @@ mod tests {
     /// A -D define overrides a same-named const declared in the source.
     #[test]
     fn define_overrides_source_const() {
-        // map_sections.brink declares BASE = 0x2000u; override to 0x4000.
-        let mut cmd = Command::cargo_bin("brink").unwrap();
-        cmd.arg("tests/map_sections.brink")
+        // map_sections.firm declares BASE = 0x2000u; override to 0x4000.
+        let mut cmd = Command::cargo_bin("firmion").unwrap();
+        cmd.arg("tests/map_sections.firm")
             .arg("-o")
             .arg("define_override.bin")
             .arg("--map-json=define_override.map.json")
@@ -2574,14 +2574,14 @@ mod tests {
     #[test]
     fn define_bare_flag_is_one() {
         // Write a minimal source that uses FLAG as a const checked via assert.
-        let src = "tests/map_defines_flag.brink";
+        let src = "tests/map_defines_flag.firm";
         fs::write(
             src,
             "const FLAG = 0;\nsection s { set_addr 0x1000; wr8 0x01; }\noutput s;\n",
         )
         .unwrap();
 
-        let mut cmd = Command::cargo_bin("brink").unwrap();
+        let mut cmd = Command::cargo_bin("firmion").unwrap();
         cmd.arg(src)
             .arg("-o")
             .arg("define_flag.bin")
@@ -2606,33 +2606,33 @@ mod tests {
 
     #[test]
     fn include_missing_string() {
-        assert_brink_failure("tests/include_missing_string.brink", &["[ERR_29]"]);
+        assert_brink_failure("tests/include_missing_string.firm", &["[ERR_29]"]);
     }
 
     #[test]
     fn include_missing_semi() {
-        assert_brink_failure("tests/include_missing_semi.brink", &["[ERR_30]"]);
+        assert_brink_failure("tests/include_missing_semi.firm", &["[ERR_30]"]);
     }
 
     #[test]
     fn include_cycle() {
-        assert_brink_failure("tests/include_cycle.brink", &["[ERR_31]"]);
+        assert_brink_failure("tests/include_cycle.firm", &["[ERR_31]"]);
     }
 
     #[test]
     fn include_cycle_multi() {
-        assert_brink_failure("tests/include_cycle_a.brink", &["[ERR_31]"]);
+        assert_brink_failure("tests/include_cycle_a.firm", &["[ERR_31]"]);
     }
 
     #[test]
     fn include_missing_file() {
-        assert_brink_failure("tests/include_missing_file.brink", &["[ERR_32]"]);
+        assert_brink_failure("tests/include_missing_file.firm", &["[ERR_32]"]);
     }
 
     #[test]
     fn include_success() {
-        let mut cmd = Command::cargo_bin("brink").unwrap();
-        cmd.arg("tests/include_success_main.brink")
+        let mut cmd = Command::cargo_bin("firmion").unwrap();
+        cmd.arg("tests/include_success_main.firm")
             .arg("-o")
             .arg("include_success.bin");
         cmd.assert().success();
@@ -2645,8 +2645,8 @@ mod tests {
 
     #[test]
     fn include_nested_success() {
-        let mut cmd = Command::cargo_bin("brink").unwrap();
-        cmd.arg("tests/include_nested_main.brink")
+        let mut cmd = Command::cargo_bin("firmion").unwrap();
+        cmd.arg("tests/include_nested_main.firm")
             .arg("-o")
             .arg("include_nested.bin");
         cmd.assert().success();
@@ -2660,10 +2660,10 @@ mod tests {
     /// Omitting FILE from --map-c99 creates <stem>.map.h in the current directory.
     #[test]
     fn map_c99_default_filename() {
-        let mut cmd = Command::cargo_bin("brink").unwrap();
-        fs::copy("tests/map_default.brink", "tests/map_c99_default.brink").unwrap();
+        let mut cmd = Command::cargo_bin("firmion").unwrap();
+        fs::copy("tests/map_default.firm", "tests/map_c99_default.firm").unwrap();
 
-        cmd.arg("tests/map_c99_default.brink")
+        cmd.arg("tests/map_c99_default.firm")
             .arg("-o")
             .arg("map_c99_default.bin")
             .arg("--map-c99");
@@ -2679,15 +2679,15 @@ mod tests {
 
         fs::remove_file("map_c99_default.bin").ok();
         fs::remove_file("map_c99_default.map.h").ok();
-        fs::remove_file("tests/map_c99_default.brink").ok();
+        fs::remove_file("tests/map_c99_default.firm").ok();
     }
 
     /// --map-c99=- writes map content to stdout.
     #[test]
     fn map_c99_stdout() {
-        Command::cargo_bin("brink")
+        Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/map_sections.brink")
+            .arg("tests/map_sections.firm")
             .arg("-o")
             .arg("map_stdout.bin")
             .arg("--map-c99=-")
@@ -2702,9 +2702,9 @@ mod tests {
     /// --map-c99=- correctly parses user-defined compilation labels.
     #[test]
     fn map_c99_labels() {
-        Command::cargo_bin("brink")
+        Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/map_labels.brink")
+            .arg("tests/map_labels.firm")
             .arg("-o")
             .arg("map_labels.bin")
             .arg("--map-c99=-")
@@ -2719,10 +2719,10 @@ mod tests {
 
     #[test]
     fn map_rs_default_filename() {
-        let mut cmd = Command::cargo_bin("brink").unwrap();
-        fs::copy("tests/map_default.brink", "tests/map_rs_default.brink").unwrap();
+        let mut cmd = Command::cargo_bin("firmion").unwrap();
+        fs::copy("tests/map_default.firm", "tests/map_rs_default.firm").unwrap();
 
-        cmd.arg("tests/map_rs_default.brink")
+        cmd.arg("tests/map_rs_default.firm")
             .arg("-o")
             .arg("map_rs_default.bin")
             .arg("--map-rs");
@@ -2737,15 +2737,15 @@ mod tests {
 
         fs::remove_file("map_rs_default.bin").ok();
         fs::remove_file("map_rs_default.map.rs").ok();
-        fs::remove_file("tests/map_rs_default.brink").ok();
+        fs::remove_file("tests/map_rs_default.firm").ok();
     }
 
     /// --map-rs=- writes map content to stdout.
     #[test]
     fn map_rs_stdout() {
-        Command::cargo_bin("brink")
+        Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/map_sections.brink")
+            .arg("tests/map_sections.firm")
             .arg("-o")
             .arg("map_rs_stdout.bin")
             .arg("--map-rs=-")
@@ -2761,9 +2761,9 @@ mod tests {
     /// --map-rs=- correctly parses user-defined compilation labels.
     #[test]
     fn map_rs_labels() {
-        Command::cargo_bin("brink")
+        Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/map_labels.brink")
+            .arg("tests/map_labels.firm")
             .arg("-o")
             .arg("map_rs_labels.bin")
             .arg("--map-rs=-")
@@ -2779,23 +2779,23 @@ mod tests {
 
     #[test]
     fn invalid_namespace() {
-        assert_brink_failure("tests/invalid_namespace.brink", &["ERR_99"]);
+        assert_brink_failure("tests/invalid_namespace.firm", &["ERR_99"]);
     }
 
     #[test]
     fn invalid_cli_define() {
-        Command::cargo_bin("brink")
+        Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/map_default.brink")
+            .arg("tests/map_default.firm")
             .arg("-D")
             .arg("=")
             .assert()
             .failure()
             .stderr(predicates::str::contains("Empty name in define"));
 
-        Command::cargo_bin("brink")
+        Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/map_default.brink")
+            .arg("tests/map_default.firm")
             .arg("-D")
             .arg("=42")
             .assert()
@@ -2805,9 +2805,9 @@ mod tests {
 
     #[test]
     fn execute_extension_crc() {
-        Command::cargo_bin("brink")
+        Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/extension.brink")
+            .arg("tests/extension.firm")
             .arg("-o")
             .arg("execute_extension_crc.bin")
             .assert()
@@ -2825,31 +2825,31 @@ mod tests {
     /// Two sections placed at the exact same address — complete overlap.
     #[test]
     fn addr_overwrite_1() {
-        assert_brink_failure("tests/addr_overwrite_1.brink", &["ERR_172"]);
+        assert_brink_failure("tests/addr_overwrite_1.firm", &["ERR_172"]);
     }
 
     /// Second section starts inside the first section's range — partial overlap.
     #[test]
     fn addr_overwrite_2() {
-        assert_brink_failure("tests/addr_overwrite_2.brink", &["ERR_172"]);
+        assert_brink_failure("tests/addr_overwrite_2.firm", &["ERR_172"]);
     }
 
     /// Second section is entirely contained within the first — engulfed overlap.
     #[test]
     fn addr_overwrite_3() {
-        assert_brink_failure("tests/addr_overwrite_3.brink", &["ERR_172"]);
+        assert_brink_failure("tests/addr_overwrite_3.firm", &["ERR_172"]);
     }
 
     /// Two sections placed back-to-back with no gap — valid, no ERR_172.
     #[test]
     fn addr_no_overwrite_1() {
-        assert_brink_no_warning("tests/addr_no_overwrite_1.brink", &["ERR_172"]);
+        assert_brink_no_warning("tests/addr_no_overwrite_1.firm", &["ERR_172"]);
     }
 
     /// Two sections with a gap between them — valid, no ERR_172.
     #[test]
     fn addr_no_overwrite_2() {
-        assert_brink_no_warning("tests/addr_no_overwrite_2.brink", &["ERR_172"]);
+        assert_brink_no_warning("tests/addr_no_overwrite_2.firm", &["ERR_172"]);
     }
 
     // ── if/else tests ────────────────────────────────────────────────────────
@@ -2857,49 +2857,49 @@ mod tests {
     /// Condition true: then-branch value written to output.
     #[test]
     fn if_else_true_branch() {
-        assert_brink_success("tests/if_else_true_branch.brink", None, None);
+        assert_brink_success("tests/if_else_true_branch.firm", None, None);
     }
 
     /// Condition false: else-branch value written to output.
     #[test]
     fn if_else_false_branch() {
-        assert_brink_success("tests/if_else_false_branch.brink", None, None);
+        assert_brink_success("tests/if_else_false_branch.firm", None, None);
     }
 
     /// No else clause, condition true: assigned const used successfully.
     #[test]
     fn if_no_else() {
-        assert_brink_success("tests/if_no_else.brink", None, None);
+        assert_brink_success("tests/if_no_else.firm", None, None);
     }
 
     /// else-if chain: correct branch selected.
     #[test]
     fn if_else_if_chain() {
-        assert_brink_success("tests/if_else_if_chain.brink", None, None);
+        assert_brink_success("tests/if_else_if_chain.firm", None, None);
     }
 
     /// String comparison in if condition.
     #[test]
     fn if_string_compare() {
-        assert_brink_success("tests/if_string_compare.brink", None, None);
+        assert_brink_success("tests/if_string_compare.firm", None, None);
     }
 
     /// print and assert inside an if/else body.
     #[test]
     fn if_print_assert() {
-        assert_brink_success("tests/if_print_assert.brink", None, None);
+        assert_brink_success("tests/if_print_assert.firm", None, None);
     }
 
     /// Bare assignment to an undeclared name emits ERR_230.
     #[test]
     fn if_bare_assign_undeclared() {
-        assert_brink_failure("tests/if_bare_assign_undeclared.brink", &["ERR_230"]);
+        assert_brink_failure("tests/if_bare_assign_undeclared.firm", &["ERR_230"]);
     }
 
     /// Declared-only const never assigned and never used: no ERR_229 warning.
     #[test]
     fn if_unused_declared() {
-        assert_brink_no_warning("tests/if_unused_declared.brink", &["ERR_229"]);
+        assert_brink_no_warning("tests/if_unused_declared.firm", &["ERR_229"]);
     }
 
     /// A deferred assignment inside an if-block targets a const declared later
@@ -2907,21 +2907,21 @@ mod tests {
     /// has not been declared at the point the if-block executes.
     #[test]
     fn if_interleaved_order() {
-        assert_brink_failure("tests/if_interleaved_order.brink", &["ERR_230"]);
+        assert_brink_failure("tests/if_interleaved_order.firm", &["ERR_230"]);
     }
 
     /// An if-block condition references a const defined later in source order.
     /// The const must not be visible to the if-block; expected ERR_86.
     #[test]
     fn if_full_const_after_if() {
-        assert_brink_failure("tests/if_full_const_after_if.brink", &["ERR_86"]);
+        assert_brink_failure("tests/if_full_const_after_if.firm", &["ERR_86"]);
     }
 
     /// A top-level assert after an if-block that performs a deferred assignment
     /// must see the assigned value and pass.
     #[test]
     fn if_top_level_assert_phase() {
-        assert_brink_success("tests/if_top_level_assert_phase.brink", None, None);
+        assert_brink_success("tests/if_top_level_assert_phase.firm", None, None);
     }
 
     // ── IRDB error path coverage ──────────────────────────────────────────────
@@ -2929,21 +2929,21 @@ mod tests {
     /// ERR_75: binary operator applied to two typed but incompatible operands
     #[test]
     fn irdb_1_type_mismatch() {
-        assert_brink_failure("tests/irdb_1_type_mismatch.brink", &["[ERR_206]"]);
+        assert_brink_failure("tests/irdb_1_type_mismatch.firm", &["[ERR_206]"]);
     }
 
     /// ERR_79: wr8 operand is a quoted string rather than a numeric value.
     /// validate_numeric_1_or_2 must reject the non-integer first operand.
     #[test]
     fn irdb_9_wr_bad_type() {
-        assert_brink_failure("tests/irdb_9_wr_bad_type.brink", &["[ERR_79]"]);
+        assert_brink_failure("tests/irdb_9_wr_bad_type.firm", &["[ERR_79]"]);
     }
 
     /// ERR_82: wrf path exists but is a directory, not a regular file.
     /// The is_file() check in validate_wrf_operands must reject it.
     #[test]
     fn irdb_14_wrf_dir() {
-        assert_brink_failure("tests/irdb_14_wrf_dir.brink", &["[ERR_82]"]);
+        assert_brink_failure("tests/irdb_14_wrf_dir.firm", &["[ERR_82]"]);
     }
 
     /// ERR_92: arithmetic operator applied to a non-numeric type (QuotedString)
@@ -2951,7 +2951,7 @@ mod tests {
     /// final match arm after the reconciliation step passes.
     #[test]
     fn irdb_26_const_string_arith() {
-        assert_brink_failure("tests/irdb_26_const_string_arith.brink", &["[ERR_92]"]);
+        assert_brink_failure("tests/irdb_26_const_string_arith.firm", &["[ERR_92]"]);
     }
 
     /// ERR_96: ordered comparison (>=) applied to two string operands in a
@@ -2959,40 +2959,40 @@ mod tests {
     /// must reject >= with ERR_96.
     #[test]
     fn irdb_30_const_str_ordered_cmp() {
-        assert_brink_failure("tests/irdb_30_const_str_ordered_cmp.brink", &["[ERR_96]"]);
+        assert_brink_failure("tests/irdb_30_const_str_ordered_cmp.firm", &["[ERR_96]"]);
     }
 
     /// ERR_98: assert expression evaluates to false inside a const if/else body.
     /// exec_const_statements must emit ERR_98 when the assert condition is 0.
     #[test]
     fn irdb_32_const_assert_fails() {
-        assert_brink_failure("tests/irdb_32_const_assert_fails.brink", &["[ERR_98]"]);
+        assert_brink_failure("tests/irdb_32_const_assert_fails.firm", &["[ERR_98]"]);
     }
 
     /// ERR_100: sizeof() applied to a namespace-qualified name not in the
     /// extension registry.  validate_operands must reject unknown SizeofExt names.
     #[test]
     fn irdb_44_unknown_sizeof_ext() {
-        assert_brink_failure("tests/irdb_44_unknown_sizeof_ext.brink", &["[ERR_100]"]);
+        assert_brink_failure("tests/irdb_44_unknown_sizeof_ext.firm", &["[ERR_100]"]);
     }
 
     /// A Slice-kinded extension parameter receives a quoted string instead of a
     /// section name.  IRDb rejects the call with ERR_108.
     #[test]
     fn irdb_46_ranged_ext_bad_range() {
-        assert_brink_failure("tests/irdb_46_ranged_ext_bad_range.brink", &["[ERR_108]"]);
+        assert_brink_failure("tests/irdb_46_ranged_ext_bad_range.firm", &["[ERR_108]"]);
     }
 
     // ── Named extension arguments ─────────────────────────────────────────────
 
-    /// Named Int argument: brink::test_crc(value=42) encodes 42 as big-endian u32.
+    /// Named Int argument: firmion::test_crc(value=42) encodes 42 as big-endian u32.
     /// Expected output: 0x00 0x00 0x00 0x2A.
     #[test]
     fn named_arg_crc() {
-        let out = "tests_named_arg_crc.brink.bin";
-        Command::cargo_bin("brink")
+        let out = "tests_named_arg_crc.firm.bin";
+        Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/named_arg_crc.brink")
+            .arg("tests/named_arg_crc.firm")
             .arg("-o")
             .arg(out)
             .assert()
@@ -3006,15 +3006,15 @@ mod tests {
         fs::remove_file(out).ok();
     }
 
-    /// Named Slice argument to brink::test_increment.
+    /// Named Slice argument to firmion::test_increment.
     /// data=top passes the top section slice; execute appends each byte + 1.
     /// Expected output: 32 bytes -- 0x00-0x0F then 0x01-0x10.
     #[test]
     fn named_arg_section() {
-        let out = "tests_named_arg_section.brink.bin";
-        Command::cargo_bin("brink")
+        let out = "tests_named_arg_section.firm.bin";
+        Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/named_arg_section.brink")
+            .arg("tests/named_arg_section.firm")
             .arg("-o")
             .arg(out)
             .assert()
@@ -3037,10 +3037,10 @@ mod tests {
     /// Expected output: sum(1..8) = 36 as little-endian u64.
     #[test]
     fn named_arg_sum8_reorder() {
-        let out = "tests_named_arg_sum8_reorder.brink.bin";
-        Command::cargo_bin("brink")
+        let out = "tests_named_arg_sum8_reorder.firm.bin";
+        Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/named_arg_sum8_reorder.brink")
+            .arg("tests/named_arg_sum8_reorder.firm")
             .arg("-o")
             .arg(out)
             .assert()
@@ -3057,50 +3057,50 @@ mod tests {
     /// Mixed positional and named arguments in one call: AST rejects with ERR_35.
     #[test]
     fn ast_40_mixed_args() {
-        assert_brink_failure("tests/ast_40_mixed_args.brink", &["[ERR_35]"]);
+        assert_brink_failure("tests/ast_40_mixed_args.firm", &["[ERR_35]"]);
     }
 
     /// Named argument with no value after '=': AST rejects with ERR_36.
     #[test]
     fn ast_41_empty_rhs() {
-        assert_brink_failure("tests/ast_41_empty_rhs.brink", &["[ERR_36]"]);
+        assert_brink_failure("tests/ast_41_empty_rhs.firm", &["[ERR_36]"]);
     }
 
     /// Named argument with an unrecognized parameter name: IRDb rejects with ERR_104.
     #[test]
     fn irdb_48_unknown_param() {
-        assert_brink_failure("tests/irdb_48_unknown_param.brink", &["[ERR_104]"]);
+        assert_brink_failure("tests/irdb_48_unknown_param.firm", &["[ERR_104]"]);
     }
 
     /// The same named parameter appears twice in one call: IRDb rejects with ERR_105.
     #[test]
     fn irdb_49_dup_param() {
-        assert_brink_failure("tests/irdb_49_dup_param.brink", &["[ERR_105]"]);
+        assert_brink_failure("tests/irdb_49_dup_param.firm", &["[ERR_105]"]);
     }
 
     /// Named-arg call missing required parameters: IRDb emits ERR_107 for each absent param.
     #[test]
     fn irdb_51_missing_param() {
-        assert_brink_failure("tests/irdb_51_missing_param.brink", &["[ERR_107]"]);
+        assert_brink_failure("tests/irdb_51_missing_param.firm", &["[ERR_107]"]);
     }
 
     /// Positional call with wrong argument count: IRDb rejects with ERR_109.
     #[test]
     fn irdb_53_positional_count() {
-        assert_brink_failure("tests/irdb_53_positional_count.brink", &["[ERR_109]"]);
+        assert_brink_failure("tests/irdb_53_positional_count.firm", &["[ERR_109]"]);
     }
 
     /// Positional Slice argument names a section that does not exist: IRDb rejects with ERR_110.
     #[test]
     fn irdb_54_unknown_section() {
-        assert_brink_failure("tests/irdb_54_unknown_section.brink", &["[ERR_110]"]);
+        assert_brink_failure("tests/irdb_54_unknown_section.firm", &["[ERR_110]"]);
     }
 
     /// ERR_83: wr repeat-count operand is a quoted string, not a numeric value.
     /// validate_numeric_1_or_2 rejects a non-integer second operand.
     #[test]
     fn irdb_15_wr_bad_repeat_type() {
-        assert_brink_failure("tests/irdb_15_wr_bad_repeat_type.brink", &["[ERR_83]"]);
+        assert_brink_failure("tests/irdb_15_wr_bad_repeat_type.firm", &["[ERR_83]"]);
     }
 
     // ── Section-level if/else (Phase 1: runtime statements in const conditions) ──
@@ -3108,9 +3108,9 @@ mod tests {
     /// True branch of a section-level if/else emits 0x41 ('A').
     #[test]
     fn section_if_true() {
-        let _cmd = Command::cargo_bin("brink")
+        let _cmd = Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/section_if_true.brink")
+            .arg("tests/section_if_true.firm")
             .arg("-o")
             .arg("section_if_true.bin")
             .assert()
@@ -3123,9 +3123,9 @@ mod tests {
     /// False branch of a section-level if/else emits 0x42 ('B').
     #[test]
     fn section_if_false() {
-        let _cmd = Command::cargo_bin("brink")
+        let _cmd = Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/section_if_false.brink")
+            .arg("tests/section_if_false.firm")
             .arg("-o")
             .arg("section_if_false.bin")
             .assert()
@@ -3138,9 +3138,9 @@ mod tests {
     /// Section-level if with no else and a false condition produces one byte (from hdr).
     #[test]
     fn section_if_no_else() {
-        let _cmd = Command::cargo_bin("brink")
+        let _cmd = Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/section_if_no_else.brink")
+            .arg("tests/section_if_no_else.firm")
             .arg("-o")
             .arg("section_if_no_else.bin")
             .assert()
@@ -3154,9 +3154,9 @@ mod tests {
     /// else-if chain selects the correct branch (VAL == 2 → 0x32).
     #[test]
     fn section_if_else_if() {
-        let _cmd = Command::cargo_bin("brink")
+        let _cmd = Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/section_if_else_if.brink")
+            .arg("tests/section_if_else_if.firm")
             .arg("-o")
             .arg("section_if_else_if.bin")
             .assert()
@@ -3169,9 +3169,9 @@ mod tests {
     /// True branch with multiple statements emits all three bytes.
     #[test]
     fn section_if_multi_stmt() {
-        let _cmd = Command::cargo_bin("brink")
+        let _cmd = Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/section_if_multi_stmt.brink")
+            .arg("tests/section_if_multi_stmt.firm")
             .arg("-o")
             .arg("section_if_multi_stmt.bin")
             .assert()
@@ -3188,9 +3188,9 @@ mod tests {
     /// Outer true, inner false → else emits 0x02.
     #[test]
     fn section_if_nested() {
-        let _cmd = Command::cargo_bin("brink")
+        let _cmd = Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/section_if_nested.brink")
+            .arg("tests/section_if_nested.firm")
             .arg("-o")
             .arg("section_if_nested.bin")
             .assert()
@@ -3205,9 +3205,9 @@ mod tests {
     /// Expected output: 0xDE 0xAD (from header) then 0xBE 0xEF (literal bytes).
     #[test]
     fn section_if_wr_section() {
-        let _cmd = Command::cargo_bin("brink")
+        let _cmd = Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/section_if_wr_section.brink")
+            .arg("tests/section_if_wr_section.firm")
             .arg("-o")
             .arg("section_if_wr_section.bin")
             .assert()
@@ -3222,9 +3222,9 @@ mod tests {
     /// Verifies eval_ast_condition walks the full expression tree.
     #[test]
     fn section_if_compound_cond() {
-        let _cmd = Command::cargo_bin("brink")
+        let _cmd = Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/section_if_compound_cond.brink")
+            .arg("tests/section_if_compound_cond.firm")
             .arg("-o")
             .arg("section_if_compound_cond.bin")
             .assert()
@@ -3240,9 +3240,9 @@ mod tests {
     /// referenced via a section-body if.  Expected output: 0xAA 0xBB.
     #[test]
     fn toplevel_if_section_true() {
-        let _cmd = Command::cargo_bin("brink")
+        let _cmd = Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/toplevel_if_section_true.brink")
+            .arg("tests/toplevel_if_section_true.firm")
             .arg("-o")
             .arg("toplevel_if_section_true.bin")
             .assert()
@@ -3256,9 +3256,9 @@ mod tests {
     /// Expected output: 0xAA only.
     #[test]
     fn toplevel_if_section_false() {
-        let _cmd = Command::cargo_bin("brink")
+        let _cmd = Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/toplevel_if_section_false.brink")
+            .arg("tests/toplevel_if_section_false.firm")
             .arg("-o")
             .arg("toplevel_if_section_false.bin")
             .assert()
@@ -3272,9 +3272,9 @@ mod tests {
     /// PLATFORM == 1 selects the if branch (0x01); else branch discarded.
     #[test]
     fn toplevel_if_else_section() {
-        let _cmd = Command::cargo_bin("brink")
+        let _cmd = Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/toplevel_if_else_section.brink")
+            .arg("tests/toplevel_if_else_section.firm")
             .arg("-o")
             .arg("toplevel_if_else_section.bin")
             .assert()
@@ -3288,9 +3288,9 @@ mod tests {
     /// B=1 then promotes section combo.  Expected output: 0xCC.
     #[test]
     fn toplevel_if_nested_if() {
-        let _cmd = Command::cargo_bin("brink")
+        let _cmd = Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/toplevel_if_nested_if.brink")
+            .arg("tests/toplevel_if_nested_if.firm")
             .arg("-o")
             .arg("toplevel_if_nested_if.bin")
             .assert()
@@ -3302,174 +3302,174 @@ mod tests {
 
     #[test]
     fn layout_empty_sizeof() {
-        assert_brink_failure("tests/layout_empty_sizeof.brink", &["[ERR_35]"]);
+        assert_brink_failure("tests/layout_empty_sizeof.firm", &["[ERR_35]"]);
     }
 
     #[test]
     fn engine_infinite_loop() {
-        assert_brink_failure("tests/engine_infinite_loop.brink", &["[ERR_179]"]);
+        assert_brink_failure("tests/engine_infinite_loop.firm", &["[ERR_179]"]);
     }
 
     #[test]
     fn engine_mmap_0_byte() {
-        assert_brink_failure("tests/engine_mmap_0_byte.brink", &["[ERR_167]"]);
+        assert_brink_failure("tests/engine_mmap_0_byte.firm", &["[ERR_167]"]);
     }
 
     // ── Region system (Steps 3+4 AST layer) ─────────────────────────────────
 
     #[test]
     fn region_valid() {
-        assert_brink_success("tests/region_valid.brink", None, None);
+        assert_brink_success("tests/region_valid.firm", None, None);
     }
 
     #[test]
     fn region_ast45_unknown_prop() {
-        assert_brink_failure("tests/region_ast45_unknown_prop.brink", &["[ERR_40]"]);
+        assert_brink_failure("tests/region_ast45_unknown_prop.firm", &["[ERR_40]"]);
     }
 
     #[test]
     fn region_ast46_dup_prop() {
-        assert_brink_failure("tests/region_ast46_dup_prop.brink", &["[ERR_41]"]);
+        assert_brink_failure("tests/region_ast46_dup_prop.firm", &["[ERR_41]"]);
     }
 
     #[test]
     fn region_ast47_missing_addr() {
-        assert_brink_failure("tests/region_ast47_missing_addr.brink", &["[ERR_42]"]);
+        assert_brink_failure("tests/region_ast47_missing_addr.firm", &["[ERR_42]"]);
     }
 
     #[test]
     fn region_ast48_conflicts_section() {
-        assert_brink_failure("tests/region_ast48_conflicts_section.brink", &["[ERR_43]"]);
+        assert_brink_failure("tests/region_ast48_conflicts_section.firm", &["[ERR_43]"]);
     }
 
     #[test]
     fn region_ast49_in_no_name() {
-        assert_brink_failure("tests/region_ast49_in_no_name.brink", &["[ERR_44]"]);
+        assert_brink_failure("tests/region_ast49_in_no_name.firm", &["[ERR_44]"]);
     }
 
     #[test]
     fn region_ast56_undeclared() {
-        assert_brink_failure("tests/region_ast56_undeclared.brink", &["[ERR_51]"]);
+        assert_brink_failure("tests/region_ast56_undeclared.firm", &["[ERR_51]"]);
     }
 
     #[test]
     fn region_ast57_dup_binding() {
-        assert_brink_failure("tests/region_ast57_dup_binding.brink", &["[ERR_52]"]);
+        assert_brink_failure("tests/region_ast57_dup_binding.firm", &["[ERR_52]"]);
     }
 
     #[test]
     fn region_ast58_no_name() {
-        assert_brink_failure("tests/region_ast58_no_name.brink", &["[ERR_53]"]);
+        assert_brink_failure("tests/region_ast58_no_name.firm", &["[ERR_53]"]);
     }
 
     #[test]
     fn region_ast59_no_brace() {
-        assert_brink_failure("tests/region_ast59_no_brace.brink", &["[ERR_54]"]);
+        assert_brink_failure("tests/region_ast59_no_brace.firm", &["[ERR_54]"]);
     }
 
     #[test]
     fn region_ast60_dup_name() {
-        assert_brink_failure("tests/region_ast60_dup_name.brink", &["[ERR_55]"]);
+        assert_brink_failure("tests/region_ast60_dup_name.firm", &["[ERR_55]"]);
     }
 
     #[test]
     fn region_ast61_reserved_name() {
-        assert_brink_failure("tests/region_ast61_reserved_name.brink", &["[ERR_56]"]);
+        assert_brink_failure("tests/region_ast61_reserved_name.firm", &["[ERR_56]"]);
     }
 
     #[test]
     fn region_ast62_missing_eq() {
-        assert_brink_failure("tests/region_ast62_missing_eq.brink", &["[ERR_57]"]);
+        assert_brink_failure("tests/region_ast62_missing_eq.firm", &["[ERR_57]"]);
     }
 
     #[test]
     fn region_ast63_conflicts_const() {
-        assert_brink_failure("tests/region_ast63_conflicts_const.brink", &["[ERR_58]"]);
+        assert_brink_failure("tests/region_ast63_conflicts_const.firm", &["[ERR_58]"]);
     }
 
     #[test]
     fn region_ast64_missing_size() {
-        assert_brink_failure("tests/region_ast64_missing_size.brink", &["[ERR_59]"]);
+        assert_brink_failure("tests/region_ast64_missing_size.firm", &["[ERR_59]"]);
     }
 
     #[test]
     fn region_anchor() {
-        assert_brink_success("tests/region_anchor.brink", None, None);
+        assert_brink_success("tests/region_anchor.firm", None, None);
     }
 
     #[test]
     fn region_if_addr() {
-        assert_brink_success("tests/region_if_addr.brink", None, None);
+        assert_brink_success("tests/region_if_addr.firm", None, None);
     }
 
     #[test]
     fn region_exec66() {
-        assert_brink_failure("tests/region_exec66.brink", &["[ERR_180]"]);
+        assert_brink_failure("tests/region_exec66.firm", &["[ERR_180]"]);
     }
 
     #[test]
     fn region_exec72() {
-        assert_brink_failure("tests/region_exec72.brink", &["[ERR_185]"]);
+        assert_brink_failure("tests/region_exec72.firm", &["[ERR_185]"]);
     }
 
     #[test]
     fn region_exec73() {
-        assert_brink_failure("tests/region_exec73.brink", &["[ERR_186]"]);
+        assert_brink_failure("tests/region_exec73.firm", &["[ERR_186]"]);
     }
     #[test]
     fn region_nested() {
-        assert_brink_success("tests/region_nested.brink", None, None);
+        assert_brink_success("tests/region_nested.firm", None, None);
     }
     #[test]
     /// Containment (FLASH1 fully inside FLASH) is allowed.  Previously expected
     /// ERR_183; now succeeds because containment is valid for nested sub-regions.
     fn region_nested_2() {
-        assert_brink_success("tests/region_nested_2.brink", None, None);
+        assert_brink_success("tests/region_nested_2.firm", None, None);
     }
 
     #[test]
     fn region_nested_overflow() {
-        assert_brink_failure("tests/region_nested_overflow.brink", &["[ERR_186]"]);
+        assert_brink_failure("tests/region_nested_overflow.firm", &["[ERR_186]"]);
     }
 
     #[test]
     fn region_addr_sizeof() {
-        assert_brink_success("tests/region_addr_sizeof.brink", None, None);
+        assert_brink_success("tests/region_addr_sizeof.firm", None, None);
     }
 
     #[test]
     /// Partial overlap between two regions is allowed.  Writes within the
     /// intersection (A & B = [0x1080, 0x1100), 128 bytes) succeed.
     fn region_exec70_partial() {
-        assert_brink_success("tests/region_exec70_partial.brink", None, None);
+        assert_brink_success("tests/region_exec70_partial.firm", None, None);
     }
 
     #[test]
     /// Inner section in B called from outer in A (partial overlap).
     /// Writing 192 bytes exceeds intersection size 128 -> ERR_186.
     fn region_exec73_partial_overlap() {
-        assert_brink_failure("tests/region_exec73_partial_overlap.brink", &["[ERR_186]"]);
+        assert_brink_failure("tests/region_exec73_partial_overlap.firm", &["[ERR_186]"]);
     }
 
     #[test]
     /// Outer section in FLASH; inner section in CODE (CODE fully inside FLASH).
     /// Containment is allowed; effective constraint for inner is FLASH & CODE = CODE.
     fn region_nested_containment() {
-        assert_brink_success("tests/region_nested_containment.brink", None, None);
+        assert_brink_success("tests/region_nested_containment.firm", None, None);
     }
 
     #[test]
     /// Inner section (no direct binding) inherits FLASH from outer.
     /// set_addr outside FLASH triggers ERR_185 via inherited region constraint.
     fn region_nested_exec72() {
-        assert_brink_failure("tests/region_nested_exec72.brink", &["[ERR_185]"]);
+        assert_brink_failure("tests/region_nested_exec72.firm", &["[ERR_185]"]);
     }
 
     #[test]
     /// Inner section is bound to SRAM, which is disjoint from outer's FLASH.
     /// Empty intersection triggers ERR_190.
     fn region_nested_exec77() {
-        assert_brink_failure("tests/region_nested_exec77.brink", &["[ERR_190]"]);
+        assert_brink_failure("tests/region_nested_exec77.firm", &["[ERR_190]"]);
     }
 
     #[test]
@@ -3477,7 +3477,7 @@ mod tests {
     /// B.addr (0x1000) is before A.addr (0x1080), so the section would anchor
     /// outside the parent region. ERR_191 must fire.
     fn region_exec78_bad_start() {
-        assert_brink_failure("tests/region_exec78_bad_start.brink", &["[ERR_191]"]);
+        assert_brink_failure("tests/region_exec78_bad_start.firm", &["[ERR_191]"]);
     }
 
     #[test]
@@ -3485,7 +3485,7 @@ mod tests {
     /// Region-bound sections anchor to a fixed address; re-use is disallowed.
     /// ERR_192 must fire.
     fn region_exec79_reuse() {
-        assert_brink_failure("tests/region_exec79_reuse.brink", &["[ERR_192]"]);
+        assert_brink_failure("tests/region_exec79_reuse.firm", &["[ERR_192]"]);
     }
 
     // ── obj / wr obj ──────────────────────────────────────────────────────────
@@ -3493,10 +3493,10 @@ mod tests {
     #[test]
     /// obj declaration + wr extracts the named ELF section and writes the exact bytes.
     fn wrobj_1() {
-        let out = "tests_wrobj_1.brink.bin";
-        Command::cargo_bin("brink")
+        let out = "tests_wrobj_1.firm.bin";
+        Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/wrobj_1.brink")
+            .arg("tests/wrobj_1.firm")
             .arg("-o")
             .arg(out)
             .assert()
@@ -3517,28 +3517,28 @@ mod tests {
     #[test]
     /// obj with a section name not present in the ELF fails with ERR_119.
     fn wrobj_bad_section() {
-        assert_brink_failure("tests/wrobj_bad_section.brink", &["[ERR_119]"]);
+        assert_brink_failure("tests/wrobj_bad_section.firm", &["[ERR_119]"]);
     }
 
     #[test]
     /// obj with a non-existent file path fails with ERR_118.
     fn wrobj_bad_file() {
-        assert_brink_failure("tests/wrobj_bad_file.brink", &["[ERR_118]"]);
+        assert_brink_failure("tests/wrobj_bad_file.firm", &["[ERR_118]"]);
     }
 
     #[test]
     /// obj block missing the required 'file' property fails with ERR_71.
     fn wrobj_wrong_args() {
-        assert_brink_failure("tests/wrobj_wrong_args.brink", &["[ERR_71]"]);
+        assert_brink_failure("tests/wrobj_wrong_args.firm", &["[ERR_71]"]);
     }
 
     #[test]
     /// obj file and section supplied as source string consts produce the correct bytes.
     fn wrobj_const_file_1() {
-        let out = "tests_wrobj_const_file_1.brink.bin";
-        Command::cargo_bin("brink")
+        let out = "tests_wrobj_const_file_1.firm.bin";
+        Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/wrobj_const_file_1.brink")
+            .arg("tests/wrobj_const_file_1.firm")
             .arg("-o")
             .arg(out)
             .assert()
@@ -3558,10 +3558,10 @@ mod tests {
     #[test]
     /// obj file path supplied via -D define produces the correct bytes.
     fn wrobj_const_file_2() {
-        let out = "tests_wrobj_const_file_2.brink.bin";
-        Command::cargo_bin("brink")
+        let out = "tests_wrobj_const_file_2.firm.bin";
+        Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/wrobj_const_file_2.brink")
+            .arg("tests/wrobj_const_file_2.firm")
             .arg("-o")
             .arg(out)
             .arg(r#"-DOBJ_FILE="tests/obj_test.elf""#)
@@ -3582,16 +3582,16 @@ mod tests {
     #[test]
     /// Integer const used as obj file path fails with ERR_228.
     fn wrobj_const_file_bad_type() {
-        assert_brink_failure("tests/wrobj_const_file_bad_type.brink", &["[ERR_228]"]);
+        assert_brink_failure("tests/wrobj_const_file_bad_type.firm", &["[ERR_228]"]);
     }
 
     #[test]
     /// obj_align() returns the alignment declared in the ELF section header.
     fn obj_align_1() {
-        let out = "tests_obj_align_1.brink.bin";
-        Command::cargo_bin("brink")
+        let out = "tests_obj_align_1.firm.bin";
+        Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/obj_align_1.brink")
+            .arg("tests/obj_align_1.firm")
             .arg("-o")
             .arg(out)
             .assert()
@@ -3603,10 +3603,10 @@ mod tests {
     #[test]
     /// obj_vma() returns the virtual address of the ELF section.
     fn obj_vma_1() {
-        let out = "tests_obj_vma_1.brink.bin";
-        Command::cargo_bin("brink")
+        let out = "tests_obj_vma_1.firm.bin";
+        Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/obj_vma_1.brink")
+            .arg("tests/obj_vma_1.firm")
             .arg("-o")
             .arg(out)
             .assert()
@@ -3618,10 +3618,10 @@ mod tests {
     #[test]
     /// obj_lma() returns the load address of the ELF section.
     fn obj_lma_1() {
-        let out = "tests_obj_lma_1.brink.bin";
-        Command::cargo_bin("brink")
+        let out = "tests_obj_lma_1.firm.bin";
+        Command::cargo_bin("firmion")
             .unwrap()
-            .arg("tests/obj_lma_1.brink")
+            .arg("tests/obj_lma_1.firm")
             .arg("-o")
             .arg(out)
             .assert()
@@ -3634,14 +3634,14 @@ mod tests {
     /// obj_lma() referencing a file that is not a recognized object format fails with ERR_120.
     /// Recognized non-ELF formats return VMA as the LMA by convention.
     fn obj_lma_non_elf() {
-        assert_brink_failure("tests/obj_lma_non_elf.brink", &["[ERR_120]"]);
+        assert_brink_failure("tests/obj_lma_non_elf.firm", &["[ERR_120]"]);
     }
     /// Trace does not fire without -v; stdout is empty.
     #[test]
     fn trace_silent_1() {
-        let src = "tests/trace_pre_post_1.brink";
+        let src = "tests/trace_pre_post_1.firm";
         let derived_out = format!("{}.bin", src.replace('/', "_").replace('\\', "_"));
-        Command::cargo_bin("brink")
+        Command::cargo_bin("firmion")
             .unwrap()
             .arg(src)
             .arg("-o")
@@ -3658,9 +3658,9 @@ mod tests {
     /// Pre-output trace fires with [Trace-N] prefix when -v is supplied.
     #[test]
     fn trace_pre_output_1() {
-        let src = "tests/trace_pre_post_1.brink";
+        let src = "tests/trace_pre_post_1.firm";
         let derived_out = format!("{}.bin", src.replace('/', "_").replace('\\', "_"));
-        Command::cargo_bin("brink")
+        Command::cargo_bin("firmion")
             .unwrap()
             .arg("-v")
             .arg(src)
@@ -3677,9 +3677,9 @@ mod tests {
     /// Post-output trace fires with [Trace-N] prefix when -v is supplied.
     #[test]
     fn trace_post_output_1() {
-        let src = "tests/trace_pre_post_1.brink";
+        let src = "tests/trace_pre_post_1.firm";
         let derived_out = format!("{}.bin", src.replace('/', "_").replace('\\', "_"));
-        Command::cargo_bin("brink")
+        Command::cargo_bin("firmion")
             .unwrap()
             .arg("-v")
             .arg(src)
@@ -3693,12 +3693,12 @@ mod tests {
         }
     }
 
-    /// trace_1.brink: pre-output and post-output traces fire in the correct order with -v.
+    /// trace_1.firm: pre-output and post-output traces fire in the correct order with -v.
     #[test]
     fn trace_order_1() {
-        let src = "tests/trace_1.brink";
+        let src = "tests/trace_1.firm";
         let derived_out = format!("{}.bin", src.replace('/', "_").replace('\\', "_"));
-        Command::cargo_bin("brink")
+        Command::cargo_bin("firmion")
             .unwrap()
             .arg("-v")
             .arg(src)
@@ -3722,7 +3722,7 @@ mod tests {
         // sizeof(A) is 0 on the first layout pass, making sizeof(A)-4 underflow
         // and align(sizeof(A)-4) receive a zero.  Both must be suppressed during
         // convergence and pass cleanly on the strict final pass.
-        assert_brink_success("tests/suppress_arith_err_1.brink", None, None);
+        assert_brink_success("tests/suppress_arith_err_1.firm", None, None);
     }
 
     #[test]
@@ -3730,7 +3730,7 @@ mod tests {
         // sizeof(A) is 0 on the first layout pass, making 0x2000 - sizeof(A) = 0x2000
         // which is just outside the region.  The region bounds check must be skipped
         // during convergence; the strict final pass sees 0x1FFC which is valid.
-        assert_brink_success("tests/suppress_arith_err_2.brink", None, None);
+        assert_brink_success("tests/suppress_arith_err_2.firm", None, None);
     }
 
     #[test]
@@ -3738,6 +3738,6 @@ mod tests {
         // addr(A) is circular: A is placed by B, so addr(A) always converges to 0,
         // which is genuinely outside region [0x1000, 0x2000).  ERR_185 must fire
         // on the strict final pass even though it was suppressed during convergence.
-        assert_brink_failure("tests/suppress_arith_err_3_fail.brink", &["ERR_185"]);
+        assert_brink_failure("tests/suppress_arith_err_3_fail.firm", &["ERR_185"]);
     }
 } // mod tests

@@ -1,6 +1,6 @@
 // Integration tests for the std::md5 extension.
 //
-// Each test invokes the brink binary and checks either the exit code or
+// Each test invokes the firmion binary and checks either the exit code or
 // the exact bytes written to the output file.  The MD5 values below
 // were computed with Python's hashlib.md5 and cross-checked against
 // the md-5 crate used by the extension itself.
@@ -19,12 +19,12 @@ mod tests {
         manifest.join("../..").join(rel)
     }
 
-    /// Runs the brink binary on a .brink file and asserts success.
+    /// Runs the firmion binary on a .firm file and asserts success.
     /// Returns the bytes written to the output file, then removes it.
     fn run_and_read(src: &str, out: &str) -> Vec<u8> {
         let src_path = workspace_path(src);
         let out_path = workspace_path(out);
-        Command::cargo_bin("brink")
+        Command::cargo_bin("firmion")
             .unwrap()
             .arg(&src_path)
             .arg("-o")
@@ -44,7 +44,7 @@ mod tests {
     #[test]
     fn md5_section_form() {
         let out = run_and_read(
-            "std/md5/tests/md5_section.brink",
+            "std/md5/tests/md5_section.firm",
             "md5_section.bin",
         );
         assert_eq!(
@@ -64,7 +64,7 @@ mod tests {
     #[test]
     fn md5_1_byte() {
         let out = run_and_read(
-            "std/md5/tests/md5_1_byte.brink",
+            "std/md5/tests/md5_1_byte.firm",
             "md5_1_byte.bin",
         );
         assert_eq!(
@@ -84,7 +84,7 @@ mod tests {
     #[test]
     fn md5_16_byte() {
         let out = run_and_read(
-            "std/md5/tests/md5_16_byte.brink",
+            "std/md5/tests/md5_16_byte.firm",
             "md5_16_byte.bin",
         );
         assert_eq!(
@@ -106,7 +106,7 @@ mod tests {
     #[test]
     fn md5_64_byte() {
         let out = run_and_read(
-            "std/md5/tests/md5_64_byte.brink",
+            "std/md5/tests/md5_64_byte.firm",
             "md5_64_byte.bin",
         );
         let mut expected: Vec<u8> = (0x00u8..=0x3F).collect();
@@ -120,9 +120,9 @@ mod tests {
     /// sizeof(std::md5) must be 16.
     #[test]
     fn md5_sizeof() {
-        let src_path = workspace_path("std/md5/tests/md5_sizeof.brink");
+        let src_path = workspace_path("std/md5/tests/md5_sizeof.firm");
         let out_path = workspace_path("md5_sizeof.bin");
-        Command::cargo_bin("brink")
+        Command::cargo_bin("firmion")
             .unwrap()
             .arg(&src_path)
             .arg("-o")
@@ -136,8 +136,8 @@ mod tests {
     /// than once in the output.  Expects ERR_173 and a non-zero exit code.
     #[test]
     fn md5_ambiguous_section() {
-        let src_path = workspace_path("std/md5/tests/md5_ambiguous_section.brink");
-        Command::cargo_bin("brink")
+        let src_path = workspace_path("std/md5/tests/md5_ambiguous_section.firm");
+        Command::cargo_bin("firmion")
             .unwrap()
             .arg(&src_path)
             .assert()

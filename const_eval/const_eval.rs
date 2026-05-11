@@ -1,4 +1,4 @@
-// Const-time evaluation for brink.
+// Const-time evaluation for firmion.
 //
 // The public interface is `evaluate_and_prune()`, which:
 //   1. Walks the immutable AST to evaluate constants, if-conditions, and asserts.

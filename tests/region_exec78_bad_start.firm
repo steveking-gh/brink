@@ -1,4 +1,4 @@
-// region_exec78_bad_start.brink: B starts before A's start address.
+// region_exec78_bad_start.firm: B starts before A's start address.
 // The intersection A & B = [0x1080, 0x1100) is non-empty, so ERR_190 does not
 // fire.  But B.addr (0x1000) is before the intersection start (0x1080), meaning
 // the section 'inner' would need to anchor at 0x1000 which is outside A.

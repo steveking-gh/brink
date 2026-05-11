@@ -1,6 +1,6 @@
 // Mixing positional and named arguments in one extension call.
 // AST rejects this with ERR_35.
 section top {
-    wr brink::test_sum8(1, b=2, 3, 4, 5, 6, 7, 8);
+    wr firmion::test_sum8(1, b=2, 3, 4, 5, 6, 7, 8);
 }
 output top;

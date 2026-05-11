@@ -30,13 +30,13 @@ cargo build
 cargo test --release --all
 
 # Single integration test by name
-cargo test --release -p brink <test_name>
+cargo test --release -p firmion <test_name>
 
 # Run tests for one crate (e.g. a std extension)
 cargo test -p std_xor
 
 # Run the binary directly
-cargo run -- <file.brink> -o output.bin
+cargo run -- <file.firm> -o output.bin
 
 # Clippy lint
 cargo clippy --all
@@ -58,7 +58,7 @@ Each test uses a derived output filename (`src.replace('/', "_") + ".bin"`) to a
 
 ## Architecture
 
-Brink is a DSL compiler for composing binary image files. Source files declare sections and an output; the compiler resolves sizes, addresses, and offsets, then writes a flat binary.
+Firmion is a DSL compiler for composing binary image files. Source files declare sections and an output; the compiler resolves sizes, addresses, and offsets, then writes a flat binary.
 
 ### Pipeline (data flows left to right)
 
@@ -107,9 +107,9 @@ Files to change in order:
 7. `layout_phase/layout_phase.rs` -- update `IRKind::Wr(w) => w as usize` size helper to `Wr(w, _)`; update `IRKind::Wr(_) => self.iterate_wrx(...)` dispatch to `Wr(_, _)`.
 8. `exec_phase/exec_phase.rs` -- update `IRKind::Wr(w)` in `get_wrx_byte_width` to `Wr(w, _)`; update `IRKind::Wr(_)` dispatch to `Wr(_, _)`; in `execute_wrx` replace the fixed `to_le_bytes()` calls with a branch on the bool flag.
 9. `tests/brink_fuzz.dict` -- add `"wrbe16" "wrbe32" "wrbe64"` entries.
-10. `vscode-brink/syntaxes/brink.tmLanguage.json` -- add `wrbe64|wrbe32|wrbe16` to the write-instruction regex.
+10. `vscode-firmion/syntaxes/firmion.tmLanguage.json` -- add `wrbe64|wrbe32|wrbe16` to the write-instruction regex.
 11. `docs/ai/02-system.yaml` -- document the new instructions under `language_features`.
-12. Test fixtures `tests/wrbe*.brink` and integration tests in `tests/integration.rs`.
+12. Test fixtures `tests/wrbe*.firm` and integration tests in `tests/integration.rs`.
 
 ---
 

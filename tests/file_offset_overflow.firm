@@ -1,4 +1,4 @@
-// file_offset_overflow.brink
+// file_offset_overflow.firm
 //
 // pad_file_offset with a target less than the current file_offset must
 // produce ERR_146 (location counter cannot move backwards).

@@ -1,6 +1,6 @@
 // Integration tests for the std::crc32c extension.
 //
-// Each test invokes the brink binary and checks either the exit code or
+// Each test invokes the firmion binary and checks either the exit code or
 // the exact bytes written to the output file.  The CRC32C values below
 // were computed with the Castagnoli polynomial (0x1EDC6F41) and verified
 // against the crc32c crate used by the extension itself.
@@ -19,12 +19,12 @@ mod tests {
         manifest.join("../..").join(rel)
     }
 
-    /// Runs the brink binary on a .brink file and asserts success.
+    /// Runs the firmion binary on a .firm file and asserts success.
     /// Returns the bytes written to the output file, then removes it.
     fn run_and_read(src: &str, out: &str) -> Vec<u8> {
         let src_path = workspace_path(src);
         let out_path = workspace_path(out);
-        Command::cargo_bin("brink")
+        Command::cargo_bin("firmion")
             .unwrap()
             .arg(&src_path)
             .arg("-o")
@@ -45,7 +45,7 @@ mod tests {
     #[test]
     fn crc32c_section_form() {
         let out = run_and_read(
-            "std/crc32c/tests/crc32c_section.brink",
+            "std/crc32c/tests/crc32c_section.firm",
             "crc32c_section.bin",
         );
         assert_eq!(
@@ -61,7 +61,7 @@ mod tests {
     #[test]
     fn crc32c_explicit_range() {
         let out = run_and_read(
-            "std/crc32c/tests/crc32c_explicit_range.brink",
+            "std/crc32c/tests/crc32c_explicit_range.firm",
             "crc32c_explicit_range.bin",
         );
         assert_eq!(
@@ -74,9 +74,9 @@ mod tests {
     /// sizeof(std::crc32c) must be 4.
     #[test]
     fn crc32c_sizeof() {
-        let src_path = workspace_path("std/crc32c/tests/crc32c_sizeof.brink");
+        let src_path = workspace_path("std/crc32c/tests/crc32c_sizeof.firm");
         let out_path = workspace_path("crc32c_sizeof.bin");
-        Command::cargo_bin("brink")
+        Command::cargo_bin("firmion")
             .unwrap()
             .arg(&src_path)
             .arg("-o")
@@ -92,7 +92,7 @@ mod tests {
     #[test]
     fn crc32c_wrapped_section() {
         let out = run_and_read(
-            "std/crc32c/tests/crc32c_wrapped_section.brink",
+            "std/crc32c/tests/crc32c_wrapped_section.firm",
             "crc32c_wrapped_section.bin",
         );
         assert_eq!(
@@ -110,8 +110,8 @@ mod tests {
     /// than once in the output.  Expects ERR_173 and a non-zero exit code.
     #[test]
     fn crc32c_ambiguous_section() {
-        let src_path = workspace_path("std/crc32c/tests/crc32c_ambiguous_section.brink");
-        Command::cargo_bin("brink")
+        let src_path = workspace_path("std/crc32c/tests/crc32c_ambiguous_section.firm");
+        Command::cargo_bin("firmion")
             .unwrap()
             .arg(&src_path)
             .assert()

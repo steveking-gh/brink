@@ -1,8 +1,8 @@
-project: brink
+project: firmion
 version: "5.0.6"
 language: Rust (edition 2024)
-workspace: Cargo workspace, single binary target (brink)
-repo: https://github.com/steveking-gh/brink
+workspace: Cargo workspace, single binary target (firmion)
+repo: https://github.com/steveking-gh/firmion
 author: Steve King <sk@metrokings.com>
 license: MIT
 

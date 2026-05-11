@@ -1,4 +1,4 @@
-// std::md5 -- MD5 extension for Brink.
+// std::md5 -- MD5 extension for Firmion.
 //
 // Computes an MD5 digest over a caller-specified image region and
 // writes the 16-byte result into the output image.

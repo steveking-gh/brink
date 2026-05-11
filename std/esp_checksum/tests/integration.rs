@@ -1,6 +1,6 @@
 // Integration tests for the std::esp_checksum extension.
 //
-// Each test invokes the brink binary and checks either the exit code or
+// Each test invokes the firmion binary and checks either the exit code or
 // the exact bytes written to the output file.  The XOR values below
 // were computed by hand and verified against the fold used by the extension.
 
@@ -18,12 +18,12 @@ mod tests {
         manifest.join("../..").join(rel)
     }
 
-    /// Runs the brink binary on a .brink file and asserts success.
+    /// Runs the firmion binary on a .firm file and asserts success.
     /// Returns the bytes written to the output file, then removes it.
     fn run_and_read(src: &str, out: &str) -> Vec<u8> {
         let src_path = workspace_path(src);
         let out_path = workspace_path(out);
-        Command::cargo_bin("brink")
+        Command::cargo_bin("firmion")
             .unwrap()
             .arg(&src_path)
             .arg("-o")
@@ -41,7 +41,7 @@ mod tests {
     #[test]
     fn esp_checksum_section() {
         let out = run_and_read(
-            "std/esp_checksum/tests/esp_checksum_section.brink",
+            "std/esp_checksum/tests/esp_checksum_section.firm",
             "esp_checksum_section.bin",
         );
         assert_eq!(out.len(), 73, "unexpected image size");
@@ -51,9 +51,9 @@ mod tests {
     /// sizeof(std::esp_checksum) must be 1.
     #[test]
     fn esp_checksum_sizeof() {
-        let src_path = workspace_path("std/esp_checksum/tests/esp_checksum_sizeof.brink");
+        let src_path = workspace_path("std/esp_checksum/tests/esp_checksum_sizeof.firm");
         let out_path = workspace_path("esp_checksum_sizeof.bin");
-        Command::cargo_bin("brink")
+        Command::cargo_bin("firmion")
             .unwrap()
             .arg(&src_path)
             .arg("-o")

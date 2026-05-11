@@ -1,4 +1,4 @@
-// file_offset_1.brink
+// file_offset_1.firm
 //
 // Verifies two properties of file_offset:
 //   1) file_offset() increments monotonically across all section boundaries.

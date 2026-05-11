@@ -1,4 +1,4 @@
-// Writes bytes 0x00-0x0F, then appends the output of brink::test_increment.
+// Writes bytes 0x00-0x0F, then appends the output of firmion::test_increment.
 // The extension is called with the section-name form (form 3): it receives
 // exactly the 16 bytes of section `top` written before it.
 // Expected output: 32 bytes — 0x00-0x0F followed by 0x01-0x10.
@@ -7,10 +7,10 @@ section top {
     wr8 0x04; wr8 0x05; wr8 0x06; wr8 0x07;
     wr8 0x08; wr8 0x09; wr8 0x0A; wr8 0x0B;
     wr8 0x0C; wr8 0x0D; wr8 0x0E; wr8 0x0F;
-    wr brink::test_increment(top);
+    wr firmion::test_increment(top);
     assert sizeof(top) == 32;
 }
 
-assert sizeof(brink::test_increment) == 16;
+assert sizeof(firmion::test_increment) == 16;
 
 output top;

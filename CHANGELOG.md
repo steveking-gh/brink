@@ -8,6 +8,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [8.0.0] - 2026-05-05
 
+- CHANGED: Renamed 'brink' to 'firmion'
 - REMOVED: Removed support for old style extension args
 - ADDED: Support for `obj` external ELF format file sections.
 - ADDED: Support for `obj_lma`, `obj_vma`, `obj_align`

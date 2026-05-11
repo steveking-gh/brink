@@ -1,4 +1,4 @@
-// Indexed view of a parsed brink AST.
+// Indexed view of a parsed firmion AST.
 //
 // AstDb::new walks the top-level nodes of an Ast and builds named lookup maps
 // for sections, regions, consts, and the output statement.  When validate is

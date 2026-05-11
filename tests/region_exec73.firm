@@ -1,4 +1,4 @@
-// region_exec73.brink: section byte count exceeds region size.
+// region_exec73.firm: section byte count exceeds region size.
 region FLASH {
     addr = 0x08000000;
     size = 4;

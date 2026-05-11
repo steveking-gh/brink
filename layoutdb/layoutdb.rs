@@ -2,7 +2,7 @@
 //
 // LayoutDb walks the AST and flattens the tree into two parallel vectors: a
 // sequence of LinIR instructions and a sequence of LinOperand operands. During
-// this pass, Brink resolves section nesting and expression structure into
+// this pass, Firmion resolves section nesting and expression structure into
 // linear order. Values are still stored as raw strings at this point.  Type
 // conversion and expression evaluation happens later.
 //

@@ -1,7 +1,7 @@
-// Diagnostic output for the brink compiler.
+// Diagnostic output for the firmion compiler.
 //
 // Diags wraps the ariadne crate to produce richly formatted error, warning and
-// note messages that point back to source locations in the original .brink
+// note messages that point back to source locations in the original .firm
 // file.  Every other pipeline stage receives a mutable Diags reference and
 // calls err0/err1/err2, warn, or note0/note1 to report problems.  Diags does
 // not make any pass/fail decisions; it only formats and emits messages.

@@ -1,4 +1,4 @@
-// Top-level pipeline orchestrator for brink.
+// Top-level pipeline orchestrator for firmion.
 //
 // The process function is the single entry point that drives the entire
 // compiler pipeline.  It sequences the four stages in order — Ast, LayoutDb,

@@ -1,4 +1,4 @@
-// region_nested_containment.brink: outer section in FLASH; inner section in CODE
+// region_nested_containment.firm: outer section in FLASH; inner section in CODE
 // where CODE is fully inside FLASH.  Containment is allowed -- no ERR_183.
 // When inner is called from outer the effective region is FLASH & CODE = CODE.
 region FLASH {

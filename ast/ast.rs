@@ -1,4 +1,4 @@
-// Lexer, parser and abstract syntax tree (AST) for brink.
+// Lexer, parser and abstract syntax tree (AST) for firmion.
 //
 // This is the first stage of the compiler pipeline.  The lexer converts the raw
 // source text into a flat token stream (LexToken). The recursive-descent /
@@ -23,7 +23,7 @@ use std::io::prelude::*;
 use depth_guard::{DepthGuard, MAX_RECURSION_DEPTH};
 use tracing::{Level, debug, enabled, trace};
 
-/// All tokens in brink.
+/// All tokens in firmion.
 /// Keep this simple and do not be tempted to attach
 /// unstructured values to these enum variants.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -434,9 +434,9 @@ impl<'toks> Ast<'toks> {
 
             let span = lex.span();
             if tok == LexToken::Include {
-                // How Brink handles include files:
+                // How Firmion handles include files:
                 //
-                // First, unlike the C preprocessor, Brink does not literally
+                // First, unlike the C preprocessor, Firmion does not literally
                 // text substitute the included file into the parent.  Instead,
                 // we logically inline the tokens from the included file into
                 // our single unified token vector (tv). The token number of

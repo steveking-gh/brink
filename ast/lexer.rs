@@ -1,4 +1,4 @@
-// Lexer for brink source files.
+// Lexer for firmion source files.
 //
 // Provides the same three-method interface as the old logos version:
 //   Lexer::new(src)  — construct from source string

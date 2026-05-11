@@ -1,4 +1,4 @@
-repo_root: /home/kings/projects/brink
+repo_root: /home/kings/projects/firmion
 
 # ── Compiler pipeline crates ──────────────────────────────────────────────────
 crates:
@@ -162,7 +162,7 @@ binary:
 # ── Tests ─────────────────────────────────────────────────────────────────────
 tests:
   integration: tests/integration.rs   # 294 tests as of 2026-04-14
-  fixtures: tests/*.brink             # ~267 .brink source fixtures
+  fixtures: tests/*.firm             # ~267 .firm source fixtures
   helpers: [assert_brink_success, assert_brink_failure, assert_brink_warning,
             assert_brink_no_warning]
   binary_comparison: fs::read() → assert_eq!(bytevec, vec![...])
@@ -174,7 +174,7 @@ fuzz:
 
 # ── Other dirs ────────────────────────────────────────────────────────────────
 other:
-  vscode-brink/: VSCode syntax highlighting extension
+  vscode-firmion/: VSCode syntax highlighting extension
   images/:       SVG diagrams for README
   docs/ai/:      AI context files (this file and siblings)
   .claude/:      CLAUDE.md workspace instructions

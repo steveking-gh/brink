@@ -1,4 +1,4 @@
-// std::xor -- XOR checksum extension for Brink.
+// std::xor -- XOR checksum extension for Firmion.
 //
 // Computes an XOR checksum over a caller-specified image region and
 // writes the 1-byte result into the output image.

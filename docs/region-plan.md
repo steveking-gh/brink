@@ -1,8 +1,8 @@
-# Brink Region System — Implementation Plan
+# Firmion Region System — Implementation Plan
 
 ## Overview
 
-This plan adds three related features to brink:
+This plan adds three related features to firmion:
 
 1. **`--max-output-size` flag** (Step 1) — immediate fix for the fuzz-found
    infinite-loop bug caused by pathological `pad_addr_offset` values.
@@ -25,7 +25,7 @@ Design decisions established for this plan:
   `sizeof(FLASH)`. Dot notation (`FLASH.addr`) is not implemented.
 - `output` takes a section name only. Section placement uses `set_addr` or
   `in REGION` binding. The address argument is removed in Step 2.
-- `set_addr` is permitted inside a region-bound section. Brink reports an error
+- `set_addr` is permitted inside a region-bound section. Firmion reports an error
   if the `set_addr` target address falls outside the region. Regions set the
   starting address of the top-level section; `set_addr` may adjust the address
   within the section, but only within region bounds.
@@ -163,7 +163,7 @@ After all root nodes are recorded, checks for region/section name conflicts
 ### Integration tests
 
 15 fixtures and test functions cover all error codes above plus one success
-case (`region_valid.brink`).
+case (`region_valid.firm`).
 
 ---
 
@@ -273,7 +273,7 @@ during `Section::new`. `AstDb::new` validates:
 
 For sections declared `in REGION`, the engine sets the section's starting
 address to `region.addr` during the iterate loop in `iterate_section_start`.
-`set_addr` is permitted inside a region-bound section, but Brink reports
+`set_addr` is permitted inside a region-bound section, but Firmion reports
 `ERR_185` if the target address falls outside the region bounds.
 
 The `default_align` from the region applies to all write operations in the

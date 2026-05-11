@@ -1,6 +1,6 @@
 // Named argument with nothing after the '='.
 // AST rejects this with ERR_36.
 section top {
-    wr brink::test_crc(value=);
+    wr firmion::test_crc(value=);
 }
 output top;

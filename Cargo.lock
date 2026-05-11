@@ -137,7 +137,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "brink"
+name = "firmion"
 version = "8.0.0"
 dependencies = [
  "anyhow",

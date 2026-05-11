@@ -1,6 +1,6 @@
-// Positional call to brink::test_crc with two arguments instead of one.
+// Positional call to firmion::test_crc with two arguments instead of one.
 // IRDb rejects the count mismatch with ERR_109.
 section top {
-    wr brink::test_crc(1, 2);
+    wr firmion::test_crc(1, 2);
 }
 output top;

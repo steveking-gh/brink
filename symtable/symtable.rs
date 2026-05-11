@@ -1,4 +1,4 @@
-// Symbol table for Brink compile-time const variables.
+// Symbol table for Firmion compile-time const variables.
 //
 // SymbolTable tracks every const identifier from its declaration through its
 // use sites, enabling unused-const warnings and — in a future phase — proper

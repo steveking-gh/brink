@@ -1,4 +1,4 @@
-// region_anchor.brink: section bound to a region is anchored to region.addr.
+// region_anchor.firm: section bound to a region is anchored to region.addr.
 // Writes addr(top) as a LE wr32 to prove the anchor value is correct.
 region FLASH {
     addr = 0x08000000;

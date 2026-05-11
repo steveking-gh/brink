@@ -1,5 +1,5 @@
 // Integration test source for --map-hf default filename derivation.
-// When --map-hf is given without a filename, brink creates map_hf_default.map.txt.
+// When --map-hf is given without a filename, firmion creates map_hf_default.map.txt.
 section foo {
     set_addr 0x1000;
     wrs "map";

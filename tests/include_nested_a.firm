@@ -1,2 +1,2 @@
-include "include_nested_b.brink";
+include "include_nested_b.firm";
 const MY_A_VAL = 0x11;

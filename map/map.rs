@@ -1,4 +1,4 @@
-// Output map construction for brink.
+// Output map construction for firmion.
 //
 // MapDb collects the semantic payload for all map output formats.
 // All data derives from the Engine and IRDb after iteration completes.

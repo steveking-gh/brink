@@ -4,7 +4,7 @@ obj rodata {
 }
 obj notelf {
     section = ".rodata";
-    file    = "tests/wrobj_1.brink";
+    file    = "tests/wrobj_1.firm";
 }
 section out {
     assert obj_lma(notelf) == 0;

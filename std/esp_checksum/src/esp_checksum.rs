@@ -1,4 +1,4 @@
-// std::esp_checksum -- ESP checksum extension for Brink.
+// std::esp_checksum -- ESP checksum extension for Firmion.
 //
 // Computes an XOR checksum across the payload of all ESP style segments in the
 // specified section.  The first byte of the section must be the start of the

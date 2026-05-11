@@ -1,4 +1,4 @@
-// Object file parsing and section resolution for brink.
+// Object file parsing and section resolution for firmion.
 //
 // This crate isolates all interaction with the `object` crate.  ObjsecProps
 // and the LMA-fill helpers are private implementation details.  The only public

@@ -4,11 +4,11 @@
 section foo {
     wr8 0x01;
     wr8 0x02;
-    wr brink::test_crc(0xAABBCCDD);
+    wr firmion::test_crc(0xAABBCCDD);
 }
 
 // Verifiable after the generate and extension phases complete.
 assert sizeof(foo) == 6;
-assert sizeof(brink::test_crc) == 4;
+assert sizeof(firmion::test_crc) == 4;
 
 output foo;

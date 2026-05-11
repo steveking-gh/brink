@@ -22,7 +22,7 @@ impl Default for MockCrc {
 
 impl BrinkExtension for MockCrc {
     fn name(&self) -> &str {
-        "brink::test_crc"
+        "firmion::test_crc"
     }
 
     fn size(&self) -> usize {
@@ -72,7 +72,7 @@ impl Default for MockLogger {
 
 impl BrinkExtension for MockLogger {
     fn name(&self) -> &str {
-        "brink::test_logger"
+        "firmion::test_logger"
     }
 
     fn size(&self) -> usize {
@@ -111,7 +111,7 @@ impl Default for MockIncrement {
 
 impl BrinkExtension for MockIncrement {
     fn name(&self) -> &str {
-        "brink::test_increment"
+        "firmion::test_increment"
     }
 
     fn size(&self) -> usize {
@@ -166,7 +166,7 @@ impl Default for MockRangedSum {
 
 impl BrinkExtension for MockRangedSum {
     fn name(&self) -> &str {
-        "brink::test_ranged_sum"
+        "firmion::test_ranged_sum"
     }
 
     fn size(&self) -> usize {
@@ -219,7 +219,7 @@ impl Default for MockRejectEmpty {
 
 impl BrinkExtension for MockRejectEmpty {
     fn name(&self) -> &str {
-        "brink::test_reject_empty"
+        "firmion::test_reject_empty"
     }
 
     fn size(&self) -> usize {
@@ -240,7 +240,7 @@ impl BrinkExtension for MockRejectEmpty {
             return Err("MockRejectEmpty: args[0] must be ParamArg::Slice".to_string());
         };
         if img_buffer.is_empty() {
-            return Err("brink::test_reject_empty: input range must not be empty".to_string());
+            return Err("firmion::test_reject_empty: input range must not be empty".to_string());
         }
         out_buffer.fill(0xAB);
         Ok(())
@@ -253,7 +253,7 @@ pub struct MockSum8;
 
 impl BrinkExtension for MockSum8 {
     fn name(&self) -> &str {
-        "brink::test_sum8"
+        "firmion::test_sum8"
     }
 
     fn size(&self) -> usize {
@@ -276,7 +276,7 @@ impl BrinkExtension for MockSum8 {
     fn execute<'a>(&self, args: &[ParamArg<'a>], out: &mut [u8]) -> Result<(), String> {
         if args.len() != 8 {
             return Err(format!(
-                "brink::test_sum8: expected 8 args, got {}",
+                "firmion::test_sum8: expected 8 args, got {}",
                 args.len()
             ));
         }
@@ -284,7 +284,7 @@ impl BrinkExtension for MockSum8 {
         for (i, arg) in args.iter().enumerate() {
             let ParamArg::Int(v) = arg else {
                 return Err(format!(
-                    "brink::test_sum8: arg {} must be ParamArg::Int",
+                    "firmion::test_sum8: arg {} must be ParamArg::Int",
                     i
                 ));
             };
@@ -300,7 +300,7 @@ pub struct MockNoArgs;
 
 impl BrinkExtension for MockNoArgs {
     fn name(&self) -> &str {
-        "brink::no_args"
+        "firmion::no_args"
     }
 
     fn size(&self) -> usize {
@@ -319,7 +319,7 @@ pub struct MockHugeExt;
 
 impl BrinkExtension for MockHugeExt {
     fn name(&self) -> &str {
-        "brink::test_huge_ext"
+        "firmion::test_huge_ext"
     }
 
     fn size(&self) -> usize {
