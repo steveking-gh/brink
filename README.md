@@ -1,15 +1,15 @@
-﻿[![Rust](https://github.com/steveking-gh/brink/actions/workflows/rust.yml/badge.svg)](https://github.com/steveking-gh/brink/actions/workflows/rust.yml)
-[![codecov](https://codecov.io/gh/steveking-gh/brink/graph/badge.svg)](https://codecov.io/gh/steveking-gh/brink)
-[![rust report card](https://rust-reportcard.xuri.me/badge/github.com/steveking-gh/brink)](https://rust-reportcard.xuri.me/report/github.com/steveking-gh/brink)
-[![Audit Check](https://github.com/steveking-gh/brink/actions/workflows/audit-check.yml/badge.svg?branch=master)](https://github.com/steveking-gh/brink/actions/workflows/audit-check.yml)
+﻿[![Rust](https://github.com/steveking-gh/firmion/actions/workflows/rust.yml/badge.svg)](https://github.com/steveking-gh/firmion/actions/workflows/rust.yml)
+[![codecov](https://codecov.io/gh/steveking-gh/firmion/graph/badge.svg)](https://codecov.io/gh/steveking-gh/firmion)
+[![rust report card](https://rust-reportcard.xuri.me/badge/github.com/steveking-gh/firmion)](https://rust-reportcard.xuri.me/report/github.com/steveking-gh/firmion)
+[![Audit Check](https://github.com/steveking-gh/firmion/actions/workflows/audit-check.yml/badge.svg?branch=master)](https://github.com/steveking-gh/firmion/actions/workflows/audit-check.yml)
 ![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)
 
-# Brink
+# Firmion
 
-Brink is a domain specific language for linking and composing of an output file.
-Brink simplifies construction of complex files by managing sizes, offsets and
-ordering in a readable declarative style.  Brink tries to be especially useful
-when creating FLASH, ROM or other non-volatile memory images.
+Firmion is a domain specific language for linking and composing of an output
+file. Firmion simplifies construction of complex files by managing sizes,
+offsets and ordering in a readable declarative style.  Firmion tries to be
+especially useful when creating FLASH, ROM or other non-volatile memory images.
 
 # Features
 
@@ -25,28 +25,29 @@ when creating FLASH, ROM or other non-volatile memory images.
 - Align and pad content
 - Output detailed map files in various formats: Rust, C header, JSON and CSV
 
-## Brink Language Features
+## Firmion Language Features
 
 - Thorough reference documentation
 - Comfortable curly-brace and semicolon syntax
-- Declarative style so your Brink source resembles your output file
-- Include other `.brink` files for modularity
+- Declarative style so source code resembles the output file
+- Include other `.firm` files for modularity
 - Robust address and offset management with full [section](#section) scope support
 - Full support for arithmetic expressions
 - Conditional expressions with if/else
 - Compile-time interface for user-defined extensions
 - Handy shorthand for numeric values, e.g. 4M is 4 x 1024 x 1024.
-- Label any content for easy reference and debugging
+- Label any output location for easy reference
 - Support for "-D" command-line definitions visible to your program, e.g. "-DMEM_SIZE=1M"
 
 ## Debug And Diagnostic Features
 
 - Use [`assert`](#assert) statements to provide inline validation of your program
 - Use [`print`](#print) statements for debug and or any other console messages
-- Brink provides clear error messages with source code context
+- Use [`trace`](#trace) statements to peek into Firmion's iterative image generation process
+- Firmion provides clear error messages with full source code context
 - Optional verbose debug output levels
-- Brink has hundreds of integration tests exercising features and edge cases
-- Brink is actively fuzz tested against panics
+- Firmion has hundreds of integration tests exercising features and edge cases
+- Firmion is actively fuzz tested against panics
 
 ## Cross-Platform Support
 
@@ -57,29 +58,29 @@ when creating FLASH, ROM or other non-volatile memory images.
 
 ## Install Prebuilt Binaries for Linux
 
-    curl --proto '=https' --tlsv1.2 -LsSf https://github.com/steveking-gh/brink/releases/download/7.0.2/brink-installer.sh | sh
+    curl --proto '=https' --tlsv1.2 -LsSf https://github.com/steveking-gh/firmion/releases/download/7.0.2/firmion-installer.sh | sh
 
 ## Install Prebuilt Binaries for Windows
 
 Start a command prompt and execute the following:
 
-    powershell -ExecutionPolicy Bypass -c "irm https://github.com/steveking-gh/brink/releases/download/7.0.2/brink-installer.ps1 | iex"
+    powershell -ExecutionPolicy Bypass -c "irm https://github.com/steveking-gh/firmion/releases/download/7.0.2/firmion-installer.ps1 | iex"
 
 ## Build From Source
 
 ### Step 1: Install Rust
 
-Brink is written in rust, which works on all major operating systems.
+Firmion is written in rust, which works on all major operating systems.
 Installing rust is simple and documented in the [Rust Getting
 Started](https://www.rust-lang.org/learn/get-started) guide.
 
-### Step 2: Clone Brink
+### Step 2: Clone Firmion
 
-From a command prompt, clone Brink and change directory to your clone.  For
+From a command prompt, clone Firmion and change directory to your clone.  For
 example:
 
-    git clone https://github.com/steveking-gh/brink.git
-    cd brink
+    git clone https://github.com/steveking-gh/firmion.git
+    cd firmion
 
 ### Step 3: Build and Run Self-Tests
 
@@ -87,49 +88,52 @@ example:
 
 All tests should pass, 0 tests should fail.
 
-### Step 4: Install Brink
+### Step 4: Install Firmion
 
-The previous build step created the Brink binary as `./target/release/brink`.
-You can install the Brink binary anywhere on your system.  As a convenience,
-cargo provides a per-user installation as `$HOME/.cargo/bin/brink`.
+The previous build step created the Firmion binary as `./target/release/firmion`.
+You can install the Firmion binary anywhere on your system.  As a convenience,
+cargo provides a per-user installation as `$HOME/.cargo/bin/firmion`.
 
     cargo install --path ./
 
 ---
 
-# What Can Brink Do?
+# What Can Firmion Do?
 
-Brink can assemble any number of input files into a unified output.
+Firmion can assemble any number of input files into a unified output.
 
 <img src="./images/unified_binary.svg" width="400">
 
 ---
 
-Brink can calculate relative or absolute offsets, allowing your output to contain pointer tables, cross-references and so on.
+Firmion can calculate relative or absolute offsets, allowing your output to
+contain pointer tables, cross-references and so on.
 
 <img src="./images/offsets.svg" width="400">
 
 ---
 
-Brink can add pad bytes to force parts of the file to be a certain size.
+Firmion can add pad bytes to force parts of the file to be a certain size.
 
 <img src="./images/pad.svg" width="400">
 
 ---
 
-Brink can add pad bytes to force parts of the file to start at an aligned boundary or at an absolute location.
+Firmion can add pad bytes to force parts of the file to start at an aligned
+boundary or at an absolute location.
 
 <img src="./images/align.svg" width="400">
 
 ---
 
-Brink can write your own strings and data defined within your Brink source file.
+Firmion can write your own strings and data defined within your Firmion source
+file.
 
 <img src="./images/adhoc.svg" width="400">
 
 ---
 
-Brink provides full featured assert and print statement support to help with
+Firmion provides full featured assert and print statement support to help with
 debugging complex output files.
 
 <img src="./images/debug.svg" width="400">
@@ -138,7 +142,7 @@ debugging complex output files.
 
 ## Hello World
 
-For a source file called hello.brink:
+For a source file called hello.firm:
 
     /*
      * A section defines part of an output.
@@ -151,16 +155,16 @@ For a source file called hello.brink:
     // An output statement outputs the section to a file
     output foo;
 
-Running Brink on the file produces the expected message:
+Running Firmion on the file produces the expected message:
 
-    $ brink hello.brink
+    $ firmion hello.firm
     Hello World!
     $
 
-Brink also produced an empty file called `output.bin`.  This file is the default
-output when you don't specify some other name on the command line with the `-o`
-option.  Why is the file empty?  Because nothing in our program produced output
-file content -- we just printed the console message.
+Firmion also produced an empty file called `output.bin`.  This file is the
+default output when you don't specify some other name on the command line with
+the `-o` option.  Why is the file empty?  Because nothing in our program
+produced output file content -- we just printed the console message.
 
 Let's fix that.  We can replace the `print` command with the `wrs` command,
 which is shorthand for 'write string':
@@ -178,19 +182,19 @@ which is shorthand for 'write string':
 
 Now, running the command again:
 
-    $ brink hello.brink
+    $ firmion hello.firm
     $
 
 Produces output.bin containing the string `Hello World!\n`.
 
-# Basic Structure of a Brink Program
+# Basic Structure of a Firmion Program
 
-A Brink source file consists of one or more [section](#section) definitions and exactly one
-[output](#output-statement) statement. The output statement specifies the
-top-level [section](#section) that defines the output file. Starting from this top section,
-Brink recursively evaluates each nested [section](#section) and command to produce the
-output file.  For example, we can define a [section](#section) with a write-string
-([wrs](#write-string)) command:
+A Firmion source file consists of one or more [section](#section) definitions
+and exactly one [output](#output-statement) statement. The output statement
+specifies the top-level [section](#section) that defines the output file.
+Starting from this top section, Firmion recursively evaluates each nested
+[section](#section) and command to produce the output file.  For example, we can
+define a [section](#section) with a write-string ([wrs](#write-string)) command:
 
     section foo {        // Start a new section named 'foo'
         wrs "I'm foo";   // wrs writes a string into the section.
@@ -222,9 +226,9 @@ Produces `output.bin`:
     I'm bar
     I'm foo
 
-Users can extend Brink with custom data processing using [Brink
-extensions](#brink-extensions).  Users write the output of their extension call
-into a [section](#section) with a `wr`.
+Users can extend Firmion with custom data processing using [Firmion
+extensions](#firmion-extensions).  Users write the output of their extension
+call into a [section](#section) with a `wr`.
 
     section foo {
         wrs "I'm foo\n";
@@ -247,7 +251,7 @@ into a [section](#section) with a `wr`.
 
 # Assert and Print
 
-To aid in debug, Brink supports `assert` and `print` statements in your
+To aid in debug, Firmion supports `assert` and `print` statements in your
 programs.
 
 Assert expressions automate error checking.  This example verifies our
@@ -279,17 +283,17 @@ Prints the console message:
 
 Unlike the [GNU linker
 'ld'](https://ftp.gnu.org/old-gnu/Manuals/ld-2.9.1/html_mono/ld.html) concept of
-a *location counter*, Brink uses *scoped addresses* and *scoped offsets* to
+a *location counter*, Firmion uses *scoped addresses* and *scoped offsets* to
 track locations.  **Addresses and offsets are 64-bit unsigned values that mark
-the position of the *next* byte of output**.  Brink allows users to reference
+the position of the *next* byte of output**.  Firmion allows users to reference
 and manipulate these values, adding pad bytes as necessary.
 
-Importantly, addresses and offsets are *scoped* to their enclosing section.
-When entering a nested (child) section, Brink saves the outer (parent) section's
-inflight address and offset values.  When exiting a child section, Brink
+Importantly, addresses and offsets are *scoped* to their enclosing section. When
+entering a nested (child) section, Firmion saves the outer (parent) section's
+inflight address and offset values.  When exiting a child section, Firmion
 restores and updates the parent's address and offset values.  From the
-perspective of the parent section, a child [section](#section) is a `wr` with the parent's
-addresses and offsets updated per the size of the child.
+perspective of the parent section, a child [section](#section) is a `wr` with
+the parent's addresses and offsets updated per the size of the child.
 
 For the specific case of the address and address offset, a child section
 inherits these values by default from the parent section.  If the child section
@@ -300,7 +304,7 @@ The only global (non-scoped) offset is the `file_offset`.  Starting from 0, this
 value monotonically increases to the end of the output file.
 
 The following table provides a summary of the addresses and offsets used in
-Brink.
+Firmion.
 
 | Variable       | Section Entry | Section Exit     | [`set_addr`](#set_addr) | [`pad_sec_offset`](#pad_sec_offset) | [`pad_addr_offset`](#pad_addr_offset) | [`pad_file_offset`](#pad_file_offset) |
 | -------------- | ------------- | ---------------- | ----------------------- | ----------------------------------- | ------------------------------------- | ------------------------------------- |
@@ -320,21 +324,21 @@ Alternatively, users can change the address within `D` using
   </figcaption>
 </figure>
 
-## Brink Disallows Address Overwrites
+## Firmion Disallows Address Overwrites
 
-By address, Brink tracks all bytes written to the output.  Brink reports an
+By address, Firmion tracks all bytes written to the output.  Firmion reports an
 error if a program's offset or address manipulations cause more than one write
 to the same address.
 
-## Brink Disallows Negative Offset Changes
+## Firmion Disallows Negative Offset Changes
 
-Brink enforces that set offset commands must specify an offset change greater or
-equal to 0.  Brink emits pad bytes into the output for any offset change greater
-than 0.
+Firmion enforces that set offset commands must specify an offset change greater
+or equal to 0.  Firmion emits pad bytes into the output for any offset change
+greater than 0.
 
-## Brink Disallows Address and Offset Overflows
+## Firmion Disallows Address and Offset Overflows
 
-Brink emits an error if an address or offset change causes 64-bit unsigned
+Firmion emits an error if an address or offset change causes 64-bit unsigned
 overflow.  In other words, programs cannot use unsigned overflow wrapping back
 to 0.
 
@@ -346,18 +350,18 @@ will execute before an operation producing the second byte.
 
 Within a section, output order and source code order are the same. Outside of a
 section, output order and source code order may differ.  For example, source
-code may declare sections in a different order than instantiated into in
-the output.
+code may declare sections in a different order than instantiated into in the
+output.
 
-For top-level statements, i.e. statements outside of a [section](#section) declaration,
-Brink orders execution as follows:
+For top-level statements, i.e. statements outside of a [section](#section)
+declaration, Firmion orders execution as follows:
 
 1. Top level statements *before* the [`output`](#output) statement execute
-   *before* Brink begins producing output bytes.
+   *before* Firmion begins producing output bytes.
 2. The location of the output statement dictates the location of all
    output-ordered statements relative to top level statements like
    [`print`](#print) and [`assert`](#assert).
-3. Top level statements *after* the output statement execute *after* Brink
+3. Top level statements *after* the output statement execute *after* Firmion
    produces the output file.
 
 For example:
@@ -392,53 +396,53 @@ Produces the output:
 
 ## Output Creation Phases
 
-This section provides an overview of Brink's internal output creation phases.
+This section provides an overview of Firmion's internal output creation phases.
 
-1. `const` **Evaluation Phase**: First, Brink evaluates all const expressions.
+1. `const` **Evaluation Phase**: First, Firmion evaluates all const expressions.
    This phase includes evaluation of all `if/else` statements and the dependent
    const-time operations such as `include` statements in the taken path.
-2. **Layout Phase**: Next, Brink iteratively evaluates all expressions that
-   affect output size and layout.  For example, Brink evaluates `align`
-   expressions and extension `size()` calls during this phase.  Brink skips data
-   generation, since knowing the size of operations suffices to determine the
-   precise output structure.  This phase completes when successive layout
+2. **Layout Phase**: Next, Firmion iteratively evaluates all expressions that
+   affect output size and layout.  For example, Firmion evaluates `align`
+   expressions and extension `size()` calls during this phase.  Firmion skips
+   data generation, since knowing the size of operations suffices to determine
+   the precise output structure.  This phase completes when successive layout
    iterations produce identical results.
-3. **Generate Phase 1**: Next, Brink begins populating data values into the
-   output.  In this first generation phase, Brink first evaluates `wr`
-   statements that do NOT call extensions.  Brink evaluates wr calls in output
+3. **Generate Phase 1**: Next, Firmion begins populating data values into the
+   output.  In this first generation phase, Firmion first evaluates `wr`
+   statements that do NOT call extensions.  Firmion evaluates wr calls in output
    order.
-4. **Generate Phase 2**: Next, Brink evaluates `wr` statement that call an
-   [extension](#brink-extensions).  Like before, brink evaluates extension calls
-   in output order.  Brink executes all extension calls serially on the engine
-   thread.
-5. **Validation Phase**: Finally, Brink evaluates `assert` statements, including
-   those that call extensions.  Note that Brink may take an early exit in any
+4. **Generate Phase 2**: Next, Firmion evaluates `wr` statement that call an
+   [extension](#firmion-extensions).  Like before, Firmion evaluates extension
+   calls in output order.  Firmion executes all extension calls serially on the
+   engine thread.
+5. **Validation Phase**: Finally, Firmion evaluates `assert` statements, including
+   those that call extensions.  Note that Firmion may take an early exit in any
    phase if an `assert` statement will unambiguously fail.
 
 ---
 
 # Command Line Options Reference
 
-    brink [OPTIONS] <input>
+    firmion [OPTIONS] <input>
 
-The required input file contains the brink source code to compile and build the
-output file.  Brink source files typically have a .brink file extension.
+The required input file contains the Firmion source code to compile and build
+the output file.  Firmion source files typically have a .firm file extension.
 
 | Option                     | Description                                                                                                                                                           |
 | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `-D<name>[=value]`         | Defines a `const` value from the command line.<br>See [Command-Line Const Defines](#command-line-const-defines) below.                                                |
-| `--list-extensions`        | List all available extensions compiled into brink as controlled by Cargo feature flags.                                                                               |
+| `--list-extensions`        | List all available extensions compiled into Firmion as controlled by Cargo feature flags.                                                                               |
 | `--max-output-size=<size>` | Reject the output if its size exceeds `<size>` bytes before writing data.<br>Accepts a plain integer or a K/M/G suffix (e.g. `64M`, `512K`, `1G`). Default is `256M`. |
-| `--map-csv`                | Writes a CSV format map file `<stem>.map.csv` to the current directory.<br>For example: `firmware.brink` → `firmware.map.csv`.                                        |
+| `--map-csv`                | Writes a CSV format map file `<stem>.map.csv` to the current directory.<br>For example: `firmware.firm` → `firmware.map.csv`.                                        |
 | `--map-csv=<file>`         | Writes a CSV map file to the specified file.                                                                                                                          |
 | `--map-csv=-`              | Writes a CSV map file to stdout.                                                                                                                                      |
-| `--map-c99`                | Writes a C99 header file `<stem>.map.h` to the current directory.<br>For example: `firmware.brink` → `firmware.map.h`.                                                |
+| `--map-c99`                | Writes a C99 header file `<stem>.map.h` to the current directory.<br>For example: `firmware.firm` → `firmware.map.h`.                                                |
 | `--map-c99=<file>`         | Writes a C99 header to the specified file.                                                                                                                            |
 | `--map-c99=-`              | Writes a C99 header to stdout.                                                                                                                                        |
-| `--map-json`               | Writes a JSON format map file `<stem>.map.json` to the current directory.<br>For example: `firmware.brink` → `firmware.map.json`.                                     |
+| `--map-json`               | Writes a JSON format map file `<stem>.map.json` to the current directory.<br>For example: `firmware.firm` → `firmware.map.json`.                                     |
 | `--map-json=<file>`        | Writes a JSON map to the specified file.                                                                                                                              |
 | `--map-json=-`             | Writes a JSON map to stdout.                                                                                                                                          |
-| `--map-rs`                 | Writes a Rust module file `<stem>.map.rs` to the current directory.<br>For example: `firmware.brink` → `firmware.map.rs`.                                             |
+| `--map-rs`                 | Writes a Rust module file `<stem>.map.rs` to the current directory.<br>For example: `firmware.firm` → `firmware.map.rs`.                                             |
 | `--map-rs=<file>`          | Writes a Rust module map to the specified file.                                                                                                                       |
 | `--map-rs=-`               | Writes a Rust module map to stdout.                                                                                                                                   |
 | `--noprint`                | Suppress `print` statement output from the source program.                                                                                                            |
@@ -446,7 +450,8 @@ output file.  Brink source files typically have a .brink file extension.
 | `-q`, `--quiet`            | Suppress all console output, including errors. Overrides `-v`. Useful for fuzz testing.                                                                               |
 | `-v`                       | Increase verbosity. Repeat up to four times (`-v -v -v -v`).                                                                                                          |
 
-When the user does not specify a path, Brink writes map file(s) and the output to the current working directory.
+When the user does not specify a path, Firmion writes map file(s) and the output
+to the current working directory.
 
 ## Command-Line Const Defines
 
@@ -454,10 +459,10 @@ The `-D` option injects a [`const`](#const) definition into the program from the
 command line. This option is modelled after the GCC `-D` preprocessor syntax.
 You can specify `-D` multiple times, once per each definition.  For example:
 
-    brink -DBASE=0x8000 -DCOUNT=16 -DSOME_PATH="/path/to/file" firmware.brink
+    firmion -DBASE=0x8000 -DCOUNT=16 -DSOME_PATH="/path/to/file" firmware.firm
 
-The `name` must be a valid Brink [identifier](#identifiers).  The `value` is
-optional and can be numeric or a quoted string.  Without a value, Brink sets the
+The `name` must be a valid Firmion [identifier](#identifiers).  The `value` is
+optional and can be numeric or a quoted string.  Without a value, Firmion sets the
 `const` to 1, with type `Integer`, following the GCC boolean-flag convention.
 
 `-D` **overrides** any same-named `const` definition in the source.
@@ -466,7 +471,7 @@ Map output lists all `const` definitions including `-D` consts.
 
 ### Value Type Inference
 
-Brink knows or infers the type from the value string using the same rules as
+Firmion knows or infers the type from the value string using the same rules as
 source code for type inference.
 
 | Example          | Value   | Type      | Description                                |
@@ -483,7 +488,7 @@ source code for type inference.
 
 Define a base address at the command line:
 
-    brink -DBASE=0x0800_0000 firmware.brink -o firmware.bin
+    firmion -DBASE=0x0800_0000 firmware.firm -o firmware.bin
 
 The source can reference `BASE` as an ordinary const:
 
@@ -493,15 +498,15 @@ The source can reference `BASE` as an ordinary const:
 
 ---
 
-# Brink Language Reference
+# Firmion Language Reference
 
 ## Comments
 
-Brink supports C language line and block comments.
+Firmion supports C language line and block comments.
 
 ## Whitespace
 
-Brink supports lenient C language style whitespace rules.
+Firmion supports lenient C language style whitespace rules.
 
 ## Semicolon Termination
 
@@ -510,14 +515,14 @@ character.
 
 ## Types
 
-Brink supports the following data types:
+Firmion supports the following data types:
 
 - U64: 64-bit unsigned values
 - I64: 64-bit signed values
 - Integer: 64-bit integers with flexible sign treatment
 - String: UTF-8 string in double quotes
 
-Brink reports an error for under/overflow on arithmetic operations on U64, I64
+Firmion reports an error for under/overflow on arithmetic operations on U64, I64
 and Integer types as described in [Arithmetic Operators](#arithmetic-operators).
 
 ## Identifiers
@@ -528,10 +533,10 @@ case-sensitive.
 
 ### Reserved Identifiers
 
-Brink reserves certain identifiers and rejects their use as [section](#section) names, const
-names, or label names at compile time.
+Firmion reserves certain identifiers and rejects their use as
+[section](#section) names, const names, or label names at compile time.
 
-Brink also reserves two identifier *prefixes*.  Any user defined identifier
+Firmion also reserves two identifier *prefixes*.  Any user defined identifier
 beginning with a reserved prefix triggers an error.
 
 | Reserved Prefix | Reason                                                                        |
@@ -539,7 +544,7 @@ beginning with a reserved prefix triggers an error.
 | `wr` + digit    | Numeric write instructions (`wr8`, `wr16`, `wr32`, and future width variants) |
 | `__`            | Leading double underscore names refer to builtin identifiers.                 |
 
-Brink also reserves the following *exact* keywords:
+Firmion also reserves the following *exact* keywords:
 
 | Reserved Keyword | Reason / possible future use  |
 | ---------------- | ----------------------------- |
@@ -552,7 +557,8 @@ Brink also reserves the following *exact* keywords:
 | `let`            | Variable declarations         |
 | `fill`           | Fill / pad byte ranges        |
 
-Keyword reservation is case-sensitive.  `Fill` and `FILL` are valid identifiers; `fill` is not.
+Keyword reservation is case-sensitive.  `Fill` and `FILL` are valid identifiers;
+`fill` is not.
 
 ---
 
@@ -560,8 +566,8 @@ Keyword reservation is case-sensitive.  `Fill` and `FILL` are valid identifiers;
 
 ### Number Literals
 
-Brink supports number literals in decimal, hex (0x) and binary (0b) forms. After
-the first digit, you can use '_' within number literals to help with
+Firmion supports number literals in decimal, hex (0x) and binary (0b) forms.
+After the first digit, you can use '_' within number literals to help with
 readability.
 
     assert 42 == 42;
@@ -577,7 +583,7 @@ readability.
     assert 0b101000010 == 0x142;
     assert 0b0000_0000_0100_0010 == 0x42;
 
-The following table summarizes how Brink determines the type of number literals.
+The following table summarizes how Firmion determines the type of number literals.
 
 | Example | Type    | Description                                                        |
 | ------- | ------- | ------------------------------------------------------------------ |
@@ -589,7 +595,7 @@ The following table summarizes how Brink determines the type of number literals.
 | 0x4i    | I64     | Explicitly `I64` hex number                                        |
 | 0b100   | U64     | Binary numbers are `U64` by default                                |
 
-Brink does not support negative hex or binary literals.
+Firmion does not support negative hex or binary literals.
 
 For convenience, the compiler casts the flexible `Integer` type to `U64` or
 `I64` as needed.
@@ -604,7 +610,7 @@ Otherwise the types used in an expression must match.  For example:
 Produces an error message:
 
     [ERR_137] Error: Input operand types do not match.  Left is 'U64', right is 'I64'
-       ╭─[tests/integers_5.brink:2:12]
+       ╭─[tests/integers_5.firm:2:12]
        │
      2 │     assert 42u == 42i; // mix unsigned and signed
        ·            ^^^    ^^^
@@ -637,11 +643,11 @@ an I64.
 
 ### True and False
 
-Brink considers a zero value false and all non-zero values true.
+Firmion considers a zero value false and all non-zero values true.
 
 ### Quoted Strings
 
-Brink allows utf-8 quoted strings with the following escape characters:
+Firmion allows utf-8 quoted strings with the following escape characters:
 
 | Escape Character | UTF-8 Value | Name           |
 | ---------------- | ----------- | -------------- |
@@ -654,8 +660,8 @@ Newlines are Linux style, so "A\n" is a two byte string on all platforms.
 
 ## Arithmetic Operators
 
-Brink supports the following arithmetic operators with same relative precedence
-as the Rust language.  Where applicable, Brink checks for arithmetic
+Firmion supports the following arithmetic operators with same relative precedence
+as the Rust language.  Where applicable, Firmion checks for arithmetic
 under/overflow.
 
 | Precedence | Operator | Under/Overflow<br>Check? | Description                                  |
@@ -681,7 +687,7 @@ When called with an identifier, returns the address of the identifier as a U64.
 When called without an identifier, returns the current address.  See [Addresses
 and Offsets](#addresses-and-offsets) for more information.
 
-The following table shows the scoping rules for `addr`.  To summarize, Brink
+The following table shows the scoping rules for `addr`.  To summarize, Firmion
 tracks **exactly one address value** per name.  An `addr(<name>)` command
 retrieves that one value regardless of the scope of the caller.
 
@@ -739,7 +745,7 @@ section or label.
 The offset resets to zero on each `set_addr` call.
 
 The following table shows the scoping rules for `addr_offset`.  To summarize,
-Brink tracks **exactly one address offset value** per name.  An
+Firmion tracks **exactly one address offset value** per name.  An
 `addr_offset(<name>)` command retrieves that one value regardless of the scope
 of the caller.
 
@@ -862,7 +868,7 @@ for expressing relationships between constants:
     assert NO_OVERLAP;
 
 A const value expression cannot depend on addresses, sizes, offsets or any other
-dynamic aspect of the output file.  Brink resolves all const values before
+dynamic aspect of the output file.  Firmion resolves all const values before
 starting layout of the output.  For example:
 
     const RAM_BASE = 0x8000_0000;         // OK, just a 64b unsigned literal.
@@ -891,7 +897,7 @@ Deferred assignment is primarily useful in
 [`if/else`](#ifelse) statements, which allow users to
 conditionally determine the value to assign.
 
-To provide errors and warnings, Brink tracks the defined/undefined and
+To provide errors and warnings, Firmion tracks the defined/undefined and
 used/unused state of each variable.
 
 ---
@@ -901,7 +907,7 @@ used/unused state of each variable.
 `if <expression> { ... } else { ... }`
 
 Allows conditional execution of other statements. As described in [Output
-Creation](#output-creation-phases), Brink evaluates all `if/else` statements
+Creation](#output-creation-phases), Firmion evaluates all `if/else` statements
 before starting layout of the output.  Therefore, an `if/else` expression must
 only depend on `const` variables and literal values.  In other words, `if/else`
 statements must not depend on dynamic addresses, sizes, offsets or any other
@@ -913,7 +919,7 @@ to them. For example:
     // Assume the user specified -DMEM_CONFIG="BIG" on the command line.
 
     // Pre-declare variables prior to conditional assignment in an if/else.
-    // Brink strictly tracks variable definitions to prevent use of
+    // Firmion strictly tracks variable definitions to prevent use of
     // uninitialized variables.
     const FLASH_SIZE;
     const RAM_SIZE;
@@ -922,17 +928,17 @@ to them. For example:
     if MEM_CONFIG == "BIG" {
         FLASH_SIZE = 0x8_0000;
         RAM_SIZE = 0x80_0000;
-        include "big_config.brink";
+        include "big_config.firm";
     } else {
         if MEM_CONFIG == "MEDIUM" {
             FLASH_SIZE = 0x4_0000;
             RAM_SIZE = 0x40_0000;
-            include "medium_config.brink";
+            include "medium_config.firm";
         } else {
             if MEM_CONFIG == "SMALL" {
                 FLASH_SIZE = 0x2_0000;
                 RAM_SIZE = 0x20_0000;
-                include "small_config.brink";
+                include "small_config.firm";
             } else {
                 print "Invalid configuration. MEM_CONFIG must be BIG, MEDIUM, or SMALL.\n";
                 assert(0);  // Halt execution
@@ -941,14 +947,14 @@ to them. For example:
     }
 
 If the taken path in an `if/else` statement does not assign a value to a
-predeclared `const` variable, then Brink reports an error if any later program
+predeclared `const` variable, then Firmion reports an error if any later program
 statement uses that variable.
 
 For compactness, user's may omit braces around an `else/if` block.  For example:
 
-    if MEM_CONFIG == "BIG" { include "big_config.brink"; }
-    else if MEM_CONFIG == "MEDIUM" { include "medium_config.brink"; }
-    else if MEM_CONFIG == "SMALL" { include "small_config.brink"; }
+    if MEM_CONFIG == "BIG" { include "big_config.firm"; }
+    else if MEM_CONFIG == "MEDIUM" { include "medium_config.firm"; }
+    else if MEM_CONFIG == "SMALL" { include "small_config.firm"; }
     else { assert(0); }
 
 ---
@@ -957,38 +963,38 @@ For compactness, user's may omit braces around an `else/if` block.  For example:
 
 `include "<file>";`
 
-Includes another Brink source file.  Brink processes the included file as if it
+Includes another Firmion source file.  Firmion processes the included file as if it
 were part of the current file.  For example, the included file can define
 sections, labels, constants and nested include files.
 
-An included file may contain an output statement.  Brink will enforce that the
+An included file may contain an output statement.  Firmion will enforce that the
 entire program after include file resolution contains only one output statement.
 See the [`output`
 statement](#output) for more
 information.
 
 The default path for an included file is the directory of the source file that
-contains the include statement.  For example, if `main.brink` is in
-`/home/user/project/` and contains `include "sections.brink"`, then Brink will
-look for `/home/user/project/sections.brink`.
+contains the include statement.  For example, if `main.firm` is in
+`/home/user/project/` and contains `include "sections.firm"`, then Firmion will
+look for `/home/user/project/sections.firm`.
 
-Include files starting with a `/` are absolute paths.  Likewise, Brink supports
+Include files starting with a `/` are absolute paths.  Likewise, Firmion supports
 relative paths such as `../`.
 
 All paths use Linux style forward slashes.
 
 Example:
 
-    // file: main.brink
-    include "../constants.brink";
-    include "sections.brink";
+    // file: main.firm
+    include "../constants.firm";
+    include "sections.firm";
 
     output main_rom;
 
-    // file: ../constants.brink
+    // file: ../constants.firm
     const RAM_BASE = 0x8000_0000u;
 
-    // file: sections.brink
+    // file: sections.firm
     section main_rom {
         set_addr 0x1000;
         wrs "Hello\n";
@@ -1030,15 +1036,15 @@ For example:
 `obj <obj name> { ... }`
 
 An `obj` statement assigns a name to a specific section in an external object or
-executable file.  The *section* in this case is not a Brink `section`, but a
+executable file.  The *section* in this case is not a Firmion `section`, but a
 linker section such as ".text" or ".rodata" created by an external compiler
 toolchain, e.g. [gcc](https://en.wikipedia.org/wiki/GNU_toolchain).
 
-By default, Brink supports only the
+By default, Firmion supports only the
 [ELF](https://en.wikipedia.org/wiki/Executable_and_Linkable_Format) format.
 However, using compile-time feature flags, users can enable support for any
 object file format supported by the Rust
-[object](https://crates.io/crates/object) crate and rebuild Brink from source.
+[object](https://crates.io/crates/object) crate and rebuild Firmion from source.
 
 > [!NOTE]
 > On Linux systems, the `objdump -h <filename>` command lists all the
@@ -1072,7 +1078,7 @@ Obj definitions support the following properties:
 
 #### Obj Property `file`
 
-Path to the object or executable file.  Brink uses the same path resolution as
+Path to the object or executable file.  Firmion uses the same path resolution as
 the [wrf](#wrf-quoted-file-path) command.  Namely, paths can relative to the
 current directory or absolute.
 
@@ -1110,14 +1116,14 @@ before execution.
 Users can query the ELF LMA and VMA of an `obj` using the [obj_lma](#obj_lma) and
 [obj_vma](#obj_vma) commands.
 
-### Brink `addr` vs LMA and VMA
+### Firmion `addr` vs LMA and VMA
 
-Users fully control their output files and can use Brink's address support
+Users fully control their output files and can use Firmion's address support
 ([addr](#addr), [set_addr](#set_addr), [region](#region), etc) as they see fit.
-For most systems however, Brink's `addr` plays the same role as the ELF LMA. The
-Brink `addr` value is usually the section's *storage* address as might be used
+For most systems however, Firmion's `addr` plays the same role as the ELF LMA. The
+Firmion `addr` value is usually the section's *storage* address as might be used
 by a FLASH update utility.  Any subsequent copy at runtime is typically outside
-the scope of Brink.
+the scope of Firmion.
 
 ---
 
@@ -1166,7 +1172,7 @@ For example:
 
 Some non-ELF file formats do not support an LMA different from a VMA.  If the
 user sets feature flags to enable additional object file formats and calls
-`obj_lma` on an unsupported format, then Brink simply returns the obj's VMA
+`obj_lma` on an unsupported format, then Firmion simply returns the obj's VMA
 value.  In this way, a user can consistently use `obj_lma` for all formats.
 
 ---
@@ -1202,9 +1208,9 @@ file. Use `set_addr` inside the [section](#section) to control the absolute
 starting address, or place the top [section](#section) in region with a start
 address.
 
-**A Brink program must have exactly one output statement.**
+**A Firmion program must have exactly one output statement.**
 
-An `include` file may contain an output statement.  Brink will enforce that the
+An `include` file may contain an output statement.  Firmion will enforce that the
 entire program after include file resolution contains only one output statement.
 
 ---
@@ -1218,7 +1224,7 @@ them to the console.  For expressions, print displays unsigned values in hex and
 signed values in decimal.  If needed, the `to_u64` and `to_i64` functions can
 control the output style.
 
-Brink executes a given print statement for each instance found in the output
+Firmion executes a given print statement for each instance found in the output
 file.  In other words, a print statement in a [section](#section) written
 multiple times will execute multiple times in output order.
 
@@ -1333,7 +1339,7 @@ property of a region with `addr(<region name>)`.
 
 #### Region Property `size`
 
-Specifies the size of the region in bytes.  Brink reports an error if the
+Specifies the size of the region in bytes.  Firmion reports an error if the
 size of the bound [section](#section) exceeds this value.
 
 Users can query the `size` property of a region with `sizeof(<region name>)`.
@@ -1408,7 +1414,7 @@ constrained to fit in the region.  For example:
 ### Nested Regions
 
 Users can freely nest sections in different regions into each other.  However,
-Brink allows write operations only in the address range intersection permitted
+Firmion allows write operations only in the address range intersection permitted
 by *all* the parent regions.  For example:
 
     region READ_ONLY {
@@ -1440,7 +1446,7 @@ by *all* the parent regions.  For example:
 ### Partially Overlapping Nested Regions
 
 For completeness, the region of a nested [section](#section) need not be a
-proper subset of the parent region. Brink still enforces the constraints of
+proper subset of the parent region. Firmion still enforces the constraints of
 *all* parent sections as follows:
 
 - Any address written by the child [section](#section) must lie in the
@@ -1521,7 +1527,7 @@ scope of the current section.  For example:
 `section <name> [in <region>] { ... }`
 
 A section is a named, reusable block of content.  Sections are the primary
-building block of a Brink program.  Each section defines a sequence of bytes,
+building block of a Firmion program.  Each section defines a sequence of bytes,
 built up from write statements and padding operations such as `align`.
 Sections may also contain labels, assertions, print statements and so on.
 Sections may write other sections into themselves so long as the nesting does
@@ -1538,7 +1544,7 @@ location counter with [`sec_offset()`](#sec_offset) and
 respectively.
 
 The root section named in the [`output`](#output) statement is the only section
-Brink writes to the output file.  Other sections can be directly or indirectly
+Firmion writes to the output file.  Other sections can be directly or indirectly
 included via [`wr`](#wr) statements from the output section.  Unreachable
 sections produce a warning.
 
@@ -1584,7 +1590,7 @@ Using `set_addr` *does not* change the value of the [section](#section) offset n
 offset.  A `set_addr` command *does not* add pad bytes to the output.
 
 The `set_addr` command may move the address forward or backwards.  However,
-Brink tracks every output byte by address and reports an error if a program
+Firmion tracks every output byte by address and reports an error if a program
 tries to write to the same address more than once.
 
 Example:
@@ -1613,7 +1619,7 @@ Example:
 
     output foo;
 
-When used in a [section](#section) in a [region](#region), Brink reports an error if the `set_addr` command sets the address outside of a region.
+When used in a [section](#section) in a [region](#region), Firmion reports an error if the `set_addr` command sets the address outside of a region.
 
 ---
 
@@ -1624,7 +1630,7 @@ When used in a [section](#section) in a [region](#region), Brink reports an erro
 Pads the output until `addr_offset` reaches the specified value.  Users may
 specify an optional pad byte value or use the default value of 0.
 
-If the specified value is less than the current `addr_offset`, Brink reports an
+If the specified value is less than the current `addr_offset`, Firmion reports an
 error.
 
 `pad_addr_offset` is most useful after a `set_addr` call, because `set_addr`
@@ -1667,7 +1673,7 @@ The pad_file_offset command pads the output file until the *file offset* reaches
 the specified value.  Users may specify an optional pad byte value or use the
 default value of 0.
 
-If the specified offset is less the current offset, Brink reports an error.
+If the specified offset is less the current offset, Firmion reports an error.
 
 `pad_file_offset` is most useful when a [section](#section) is written inside a parent
 section, because `sec_offset` resets to zero at the start of each child section
@@ -1713,7 +1719,7 @@ The pad_sec_offset command pads the current [section](#section) until the *secti
 reaches the specified value.  Users may specify an optional pad byte value or
 use the default value of 0.
 
-If the specified offset is less the current offset, Brink reports an error.
+If the specified offset is less the current offset, Firmion reports an error.
 
 Example:
 
@@ -1762,7 +1768,7 @@ Example:
     output foo;
 ---
 
-When called with an [extension](#brink-extensions) identifier, `sizeof` returns the size of the
+When called with an [extension](#firmion-extensions) identifier, `sizeof` returns the size of the
 extension's output.  For example:
 
     print "CRC size=", sizeof(std::crc32c);  // returns "CRC size=4"
@@ -1830,28 +1836,28 @@ Example:
 
 `trace <expression> [, <expression>, ...];`
 
-The `trace` command provides debug output to help diagnose errors before Brink
+The `trace` command provides debug output to help diagnose errors before Firmion
 is able to internally execute a program.  Trace is especially useful for errors
-reported during layout phase operations before Brink determines the size and
-location of everything in the output file.  During this time, Brink is actively
+reported during layout phase operations before Firmion determines the size and
+location of everything in the output file.  During this time, Firmion is actively
 *cooking* the output, so layout depend values revealed by `trace` may change as
 iteration proceeds.
 
 > [!NOTE]
-> Brink suppresses `trace` output unless the user specifies at least one `-v`
+> Firmion suppresses `trace` output unless the user specifies at least one `-v`
 > verbosity level on the command line.
 
 The `trace` command has the same form and capability as the [`print`](#print)
-command. However, `trace` executes on every internal iteration pass as Brink
+command. However, `trace` executes on every internal iteration pass as Firmion
 tries to stabilize the output's layout.
 
 > [!NOTE]
-> Brink does not specify the order of execution of `trace` relative to other
+> Firmion does not specify the order of execution of `trace` relative to other
 > statements in the program.
 
 > [!NOTE]
 > As shown by a `trace` command, layout dependent values such as
-> addresses and sizes may change as Brink iterates.  Use [`print`](#print) to see
+> addresses and sizes may change as Firmion iterates.  Use [`print`](#print) to see
 > stabilized values.
 
 For example:
@@ -1874,7 +1880,7 @@ For example:
     trace "Finish!\n";
 
 The program above *might* produce an output like the following, the caveat being
-that Brink purposely does not rigorously define trace output:
+that Firmion purposely does not rigorously define trace output:
 
     [Trace-1] Start!
     [Trace-1] Top1
@@ -1895,17 +1901,17 @@ that Brink purposely does not rigorously define trace output:
     [Trace-2] B1
     [Trace-2] Finish!
 
-The number in Trace-*n* is the internal iteration count.  In this example, Brink
+The number in Trace-*n* is the internal iteration count.  In this example, Firmion
 required two iterations to stabilize the output.
 
 ## Transient Values in `trace` Output
 
-Because the `trace` command provides a peek into Brink's internal workings,
+Because the `trace` command provides a peek into Firmion's internal workings,
 displayed values may appear erroneous.  In particular, transient values (often
 equal to 0) can cause arithmetic expressions to also return bogus results.
-During image generation, Brink deals with bogus values by suppressing certain
-types of errors until the image stabilizes.  When suppressing an error, Brink
-substitutes 0 for the bogus value.  As Brink iterates, "good" values propagate
+During image generation, Firmion deals with bogus values by suppressing certain
+types of errors until the image stabilizes.  When suppressing an error, Firmion
+substitutes 0 for the bogus value.  As Firmion iterates, "good" values propagate
 and eventually eliminate these suppressed errors.
 
 In summary, treat `trace` values as hints.  As iteration continues, `trace`
@@ -1924,7 +1930,7 @@ writes the output into the current section.
 
 `wr <section identifier>;`
 
-Brink adds the specified in [section](#section) to the current [section](#section) at the current
+Firmion adds the specified in [section](#section) to the current [section](#section) at the current
 section offset.
 
 ### wr extension
@@ -1932,8 +1938,8 @@ section offset.
 `wr <namespace>::<extension_name>(<arg1>, <arg2>, ...);`
 
 Evaluates the specified extension call and writes the result to the output.  The
-extension's `.size()` method specifies the size of the result.  See [Brink
-Extensions](#brink-extensions) for more information.
+extension's `.size()` method specifies the size of the result.  See [Firmion
+Extensions](#firmion-extensions) for more information.
 
 ### Example
 
@@ -1993,7 +1999,7 @@ Evaluates the first expression and writes the result as a little-endian
 value to the output file, or as a big-endian value for the `be` form.  The
 optional second expression specifies the repetition count.
 
-> [!IMPORTANT] Brink silently truncates the upper bits of the expression to fit the specified width.
+> [!IMPORTANT] Firmion silently truncates the upper bits of the expression to fit the specified width.
 
 Example:
 
@@ -2024,7 +2030,7 @@ Another example using the optional repetition expression.
 
 ## `wrf "<quoted file path>";`
 
-Write the file at the specified path into the output file.  Brink treats all
+Write the file at the specified path into the output file.  Firmion treats all
 input files as binary files.  Paths can be relative to the current directory or
 absolute.
 
@@ -2060,7 +2066,7 @@ should add an explicit \0.
 
 # Built-in Variables
 
-Brink pre-defines built-in identifiers that begin with `__` (double underscore).
+Firmion pre-defines built-in identifiers that begin with `__` (double underscore).
 They can appear in any expression context that accepts the corresponding type.
 As shown in the table below, some builtins cannot be used in `const` expressions
 because their values depend on dynamic layout values.
@@ -2069,7 +2075,7 @@ because their values depend on dynamic layout values.
 | ------------------------ | -------- | -------------- | ----------------------------------------------------------------------------------- |
 | `__OUTPUT_SIZE`          | `U64`    | No             | Total output size in bytes.  Equivalent to `sizeof(<output-section>)`.              |
 | `__OUTPUT_ADDR`          | `U64`    | No             | Address of output section at SectionStart.  Equivalent to `addr(<output-section>)`. |
-| `__BRINK_VERSION_STRING` | `String` | Yes            | Brink version as a string, e.g. `"4.3.2"`.                                          |
+| `__BRINK_VERSION_STRING` | `String` | Yes            | Firmion version as a string, e.g. `"4.3.2"`.                                          |
 | `__BRINK_VERSION_MAJOR`  | `U64`    | Yes            | Major version component, e.g. "4" in "4.3.2"                                        |
 | `__BRINK_VERSION_MINOR`  | `U64`    | Yes            | Minor version component, e.g. "3" in "4.3.2"                                        |
 | `__BRINK_VERSION_PATCH`  | `U64`    | Yes            | Patch version component, e.g. "2" in "4.3.2"                                        |
@@ -2130,7 +2136,7 @@ Example — embed the output base address in a table:
 
 ## `__BRINK_VERSION_STRING`
 
-Returns the Brink tool version as a string (e.g. `"4.0.0"`).  The value is fixed
+Returns the Firmion tool version as a string (e.g. `"4.0.0"`).  The value is fixed
 at compile time and may be used in `const` expressions, `wrs`, and `print`.
 
 Example — stamp the tool version into a firmware header:
@@ -2148,7 +2154,7 @@ Example — stamp the tool version into a firmware header:
 
 ## `__BRINK_VERSION_MAJOR`, `__BRINK_VERSION_MINOR`, `__BRINK_VERSION_PATCH`
 
-Return the individual numeric components of the Brink version as `U64` values.
+Return the individual numeric components of the Firmion version as `U64` values.
 All three are fixed at compile time and may be used in `const` expressions and
 arithmetic.
 
@@ -2172,9 +2178,9 @@ Example — pack the version into a 3-byte field and assert the tool is new enou
 
 ---
 
-# Brink Extensions
+# Firmion Extensions
 
-Brink supports compile time extensions to simplify the addition of new
+Firmion supports compile time extensions to simplify the addition of new
 functionality. This extension capability enables user defined hashing,
 compression, validation and other binary data processing tasks.  The following
 sections describe how extensions work and how to create them.
@@ -2194,13 +2200,13 @@ currently support standard extensions.
 
 ## Extensions Are A Compile-Time Feature
 
-Extensions build and link to Brink at compile time as controlled by Cargo
+Extensions build and link to Firmion at compile time as controlled by Cargo
 feature flags.  Because Rust does not guarantee a stable ABI between versions,
-Brink requires compile time construction to eliminate ABI incompatibilities and
+Firmion requires compile time construction to eliminate ABI incompatibilities and
 enable the use of safe Rust.  The following bullets provide an overview of how
 extensions work:
 
-- Extensions interact with Brink through the `BrinkExtension` trait.
+- Extensions interact with Firmion through the `BrinkExtension` trait.
 
 - Extensions can read directly from the output buffer for a specified section
   via zero-copy and safe-memory slices (`&[u8]`).
@@ -2208,26 +2214,26 @@ extensions work:
 - In addition to output buffer access, extensions can have their own input
   parameters like a normal function call.
 
-- Extensions are identified by a **name** in a **namespace**.  Brink reserves
-  the namespaces `std` and `brink`.
+- Extensions are identified by a **name** in a **namespace**.  Firmion reserves
+  the namespaces `std` and `firmion`.
 
 - Extensions report their fixed length binary footprint by implementing the
-  `.size()` trait method. Brink calls each extension's `.size()` method
+  `.size()` trait method. Firmion calls each extension's `.size()` method
   **exactly once** during output layout calculations and caches the result.
-  Brink always passes a mutable output slice (`&mut [u8]`) of the reported size
+  Firmion always passes a mutable output slice (`&mut [u8]`) of the reported size
   to the extension's `.generate()` method.
 
-- Extensions register themselves at compile time in Brink's internal extension
+- Extensions register themselves at compile time in Firmion's internal extension
   registry.
 
 - The `BrinkExtension` trait interface allows extensions to return logging and
-  error diagnostics integrated with Brink's own diagnostic output.  See []
+  error diagnostics integrated with Firmion's own diagnostic output.  See []
 
 ---
 
 ## Invoking Extensions
 
-Users invoke extensions using function-style syntax.  Users creating their own extension can take any number of parameters of any Brink support type:
+Users invoke extensions using function-style syntax.  Users creating their own extension can take any number of parameters of any Firmion support type:
 
     turbo::boost("Big", 1, -42, 0x12345678);
 
@@ -2272,7 +2278,7 @@ Users can also pass the [section](#section) containing the extensions own output
 
 ### Named Parameters
 
-To help eliminate bugs, Brink extensions support named parameters.  Extensions
+To help eliminate bugs, Firmion extensions support named parameters.  Extensions
 define their parameter names when registered.  In the example below, we call the
 extension `custom::my_extension` passing it the required parameters
 `data_section` and `code_section`.  The compiler passes the values by name in
@@ -2358,9 +2364,9 @@ In `extensions/src/lib.rs`, call its register function inside `register_all`:
 
 ### Step 4 — Add tests
 
-Create a `tests/` directory in your extension crate with `.brink` scripts
+Create a `tests/` directory in your extension crate with `.firm` scripts
 and an `integration.rs` test file.  Use `CARGO_MANIFEST_DIR` to locate
-`.brink` files relative to the workspace root — see
+`.firm` files relative to the workspace root — see
 `std/crc32c/tests/integration.rs` for a complete example.
 
 Run the extension's tests with:
@@ -2369,19 +2375,19 @@ Run the extension's tests with:
 
 ---
 
-# Brink Development
+# Firmion Development
 
-This section provides notes for developers interested in contributing to Brink.
+This section provides notes for developers interested in contributing to Firmion.
 
 ## Unit Testing
 
-Brink relies on 100's of unit tests to catch bugs.  You can run these with:
+Firmion relies on 100's of unit tests to catch bugs.  You can run these with:
 
     cargo test --all
 
 ## Fuzz Testing
 
-Brink supports fuzz tests for several of its internal libraries.  Fuzz testing
+Firmion supports fuzz tests for several of its internal libraries.  Fuzz testing
 starts from a corpus of random inputs and then further randomizes those inputs
 to try to cause crashes and hangs.  At the time of writing, fuzz testing
 **requires the nightly build**.  See `fuzz_help.md` in the source repo for more
@@ -2440,7 +2446,7 @@ TOTAL                                          13152              1893    85.61%
 ```
 <!-- COVERAGE_END -->
 
-## Brink Source Code Overview
+## Firmion Source Code Overview
 
 | File                                     | Stage         | Summary                                                                                 |
 | ---------------------------------------- | ------------- | --------------------------------------------------------------------------------------- |
@@ -2478,12 +2484,12 @@ Building the extension requires
 
 Now you're ready to rebuild the extension.
 
-    cd vscode-brink
+    cd vscode-firmion
     vsce package
 
 To install the extension into vscode locally:
 
-    code --install-extension vscode-brink-0.1.0.vsix
+    code --install-extension vscode-firmion-0.1.0.vsix
 
 
 
