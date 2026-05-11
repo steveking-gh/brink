@@ -370,7 +370,7 @@ output foo;
 ```rust
 #[test]
 fn wrobj_rodata() {
-    assert_brink_success("tests/wrobj_rodata.firm", Some("wrobj_rodata.bin"), None);
+    assert_firmion_success("tests/wrobj_rodata.firm", Some("wrobj_rodata.bin"), None);
     let bytes = fs::read("wrobj_rodata.bin").unwrap();
     assert_eq!(bytes, vec![0xDE, 0xAD, 0xBE, 0xEF]);
     fs::remove_file("wrobj_rodata.bin").unwrap();
@@ -378,27 +378,27 @@ fn wrobj_rodata() {
 
 #[test]
 fn wrobj_bad_section() {
-    assert_brink_failure("tests/wrobj_bad_section.firm", &["[ERR_119]"]);
+    assert_firmion_failure("tests/wrobj_bad_section.firm", &["[ERR_119]"]);
 }
 
 #[test]
 fn wrobj_bad_file() {
-    assert_brink_failure("tests/wrobj_bad_file.firm", &["[ERR_118]"]);
+    assert_firmion_failure("tests/wrobj_bad_file.firm", &["[ERR_118]"]);
 }
 
 #[test]
 fn wrobj_wrong_args() {
-    assert_brink_failure("tests/wrobj_wrong_args.firm", &["[ERR_60]"]);
+    assert_firmion_failure("tests/wrobj_wrong_args.firm", &["[ERR_60]"]);
 }
 
 #[test]
 fn sizeof_obj() {
-    assert_brink_success("tests/sizeof_obj.firm", None, None);
+    assert_firmion_success("tests/sizeof_obj.firm", None, None);
 }
 
 #[test]
 fn sizeof_obj_bad_section() {
-    assert_brink_failure("tests/sizeof_obj_bad_section.firm", &["[ERR_119]"]);
+    assert_firmion_failure("tests/sizeof_obj_bad_section.firm", &["[ERR_119]"]);
 }
 ```
 

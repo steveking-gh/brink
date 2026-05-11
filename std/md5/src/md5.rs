@@ -8,7 +8,7 @@
 //
 // Output: 16 bytes, standard MD5 byte order.
 
-use brink_extension::{BrinkExtension, ParamArg, ParamDesc, ParamKind};
+use firmion_extension::{BrinkExtension, ParamArg, ParamDesc, ParamKind};
 use extension_registry::ExtensionRegistry;
 use md5::{Digest, Md5};
 

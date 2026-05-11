@@ -11,7 +11,7 @@ workspace = true
 path = "src/crc32c.rs"
 
 [dependencies]
-brink_extension = { path = "../../brink_extension" }
+firmion_extension = { path = "../../firmion_extension" }
 crc32c = "0.6"
 extension_registry = { path = "../../extension_registry" }
 

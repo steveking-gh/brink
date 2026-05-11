@@ -95,7 +95,7 @@ All 291 tests pass.
 Eliminated the two-trait extension design (`BrinkExtension` + `BrinkRangedExtension`)
 in favor of a single typed-argument API.
 
-`ExtArg<'a>` enum added to `brink_extension`:
+`ExtArg<'a>` enum added to `firmion_extension`:
 
 - `Int(u64)` -- numeric arg
 - `Str(&'a str)` -- quoted string arg
@@ -130,7 +130,7 @@ receive image data from `args[0]` as `ExtArg::Section`.
 
 Changes:
 
-- `brink_extension/lib.rs`: Added `ExtArg`, rewrote `BrinkExtension` trait,
+- `firmion_extension/lib.rs`: Added `ExtArg`, rewrote `BrinkExtension` trait,
   removed `BrinkRangedExtension`.
 - `ext/ext.rs`: Removed `RegisteredExtension` enum; `ExtensionEntry.extension`
   is now `Box<dyn BrinkExtension>` directly. Removed `register_ranged`,
@@ -751,9 +751,9 @@ Changes:
 - `ast/lexer.rs`: keyword table entries renamed.
 - `ir/ir.rs`: `IRKind` variants renamed (`PadAddrOffset`, `PadSecOffset`, `PadFileOffset`).
 - `layout_phase/layout_phase.rs`: match arms updated to new variant names.
-- `tests/brink_fuzz.dict`: new names added; old names removed.
+- `tests/firmion_fuzz.dict`: new names added; old names removed.
 - All test fixtures in `tests/*.firm` updated.
-- `process/fuzz/seeds/*.firm` and `process/fuzz/seeds/brink_fuzz.dict` updated.
+- `process/fuzz/seeds/*.firm` and `process/fuzz/seeds/firmion_fuzz.dict` updated.
 - `docs/`: `02-system.yaml`, `region-plan.md`, and this file updated.
 - `vscode-firmion/CHANGELOG.md`: keyword list updated.
 
@@ -882,7 +882,7 @@ Changes:
 - `exec_phase/exec_phase.rs`: `Wr(w, _)` in width helper and dispatch;
   `execute_wrx` branches on the flag: `to_be_bytes()` with trailing `byte_size`
   slice (`buf[8-byte_size..8]`) vs `to_le_bytes()` with leading slice.
-- `tests/brink_fuzz.dict`: all 8 wrbe keywords added.
+- `tests/firmion_fuzz.dict`: all 8 wrbe keywords added.
 - `vscode-firmion/syntaxes/firmion.tmLanguage.json`: wrbe variants added to regex.
 - `docs/ai/02-system.yaml`: `wrbe8/wrbe16/.../wrbe64` documented.
 - `tests/wrx_7.firm` + `tests::wrx_7` integration test: all 8 widths verified

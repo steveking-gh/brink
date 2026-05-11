@@ -4,7 +4,7 @@
 // registered with Firmion's extension registry.  To add a new extension:
 //
 //   1. Create a new crate implementing `BrinkExtension` or
-//      `BrinkRangedExtension` from the `brink_extension` crate.
+//      `BrinkRangedExtension` from the `firmion_extension` crate.
 //   2. Add it as a dependency in this file's Cargo.toml.
 //   3. Call its `register` function inside `register_all` below.
 //

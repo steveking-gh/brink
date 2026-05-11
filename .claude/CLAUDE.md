@@ -47,10 +47,10 @@ cargo fmt --all -- --check
 
 The main integration suite is `tests/integration.rs` (~365 tests). Test helpers:
 
-- `assert_brink_success(src, output_bin, expected_output)` — expects clean exit and empty stderr
-- `assert_brink_failure(src, expected_err_codes)` — expects non-zero exit; checks stderr contains each code
-- `assert_brink_warning(src, codes)` — expects success with `-v`; checks stderr contains each code
-- `assert_brink_no_warning(src, codes)` — expects success with `-v`; checks stderr does NOT contain each code
+- `assert_firmion_success(src, output_bin, expected_output)` — expects clean exit and empty stderr
+- `assert_firmion_failure(src, expected_err_codes)` — expects non-zero exit; checks stderr contains each code
+- `assert_firmion_warning(src, codes)` — expects success with `-v`; checks stderr contains each code
+- `assert_firmion_no_warning(src, codes)` — expects success with `-v`; checks stderr does NOT contain each code
 
 Each test uses a derived output filename (`src.replace('/', "_") + ".bin"`) to avoid race conditions under parallel test execution.
 
@@ -90,7 +90,7 @@ Source text
 
 **ExecPhase** calls `execute_core_operations` (writes `Wr`/`Wrs`/`Wrf` bytes and zeroed extension placeholders), then `execute_extensions` (patches extension output in place via `OutputBuffer`).
 
-**Extensions** implement `BrinkExtension` from the `brink_extension` crate. They are registered in `extensions/src/lib.rs` via feature-gated `#[cfg(feature = "std-*")]` blocks. The feature chain is: root `Cargo.toml` -> `process` -> `extensions` -> individual `std/*` crates. Standard extensions: `std::crc32c`, `std::sha256`, `std::md5`, `std::xor`.
+**Extensions** implement `BrinkExtension` from the `firmion_extension` crate. They are registered in `extensions/src/lib.rs` via feature-gated `#[cfg(feature = "std-*")]` blocks. The feature chain is: root `Cargo.toml` -> `process` -> `extensions` -> individual `std/*` crates. Standard extensions: `std::crc32c`, `std::sha256`, `std::md5`, `std::xor`.
 
 ### Adding wrbe16..wrbe64 (big-endian write instructions)
 
@@ -106,7 +106,7 @@ Files to change in order:
 6. `irdb/irdb.rs` -- update `IRKind::Wr(_)` pattern to `IRKind::Wr(_, _)` in `validate_numeric_1_or_2`.
 7. `layout_phase/layout_phase.rs` -- update `IRKind::Wr(w) => w as usize` size helper to `Wr(w, _)`; update `IRKind::Wr(_) => self.iterate_wrx(...)` dispatch to `Wr(_, _)`.
 8. `exec_phase/exec_phase.rs` -- update `IRKind::Wr(w)` in `get_wrx_byte_width` to `Wr(w, _)`; update `IRKind::Wr(_)` dispatch to `Wr(_, _)`; in `execute_wrx` replace the fixed `to_le_bytes()` calls with a branch on the bool flag.
-9. `tests/brink_fuzz.dict` -- add `"wrbe16" "wrbe32" "wrbe64"` entries.
+9. `tests/firmion_fuzz.dict` -- add `"wrbe16" "wrbe32" "wrbe64"` entries.
 10. `vscode-firmion/syntaxes/firmion.tmLanguage.json` -- add `wrbe64|wrbe32|wrbe16` to the write-instruction regex.
 11. `docs/ai/02-system.yaml` -- document the new instructions under `language_features`.
 12. Test fixtures `tests/wrbe*.firm` and integration tests in `tests/integration.rs`.

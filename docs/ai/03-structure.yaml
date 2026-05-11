@@ -129,8 +129,8 @@ crates:
     key_types: [ExtensionEntry, ExtensionRegistry]
     key_fns: [register, get]
 
-  brink_extension:
-    path: brink_extension/
+  firmion_extension:
+    path: firmion_extension/
     role: Public extension API traits
     key_types: [BrinkExtension, ExtArg]
     notes: >
@@ -163,8 +163,8 @@ binary:
 tests:
   integration: tests/integration.rs   # 294 tests as of 2026-04-14
   fixtures: tests/*.firm             # ~267 .firm source fixtures
-  helpers: [assert_brink_success, assert_brink_failure, assert_brink_warning,
-            assert_brink_no_warning]
+  helpers: [assert_firmion_success, assert_firmion_failure, assert_firmion_warning,
+            assert_firmion_no_warning]
   binary_comparison: fs::read() → assert_eq!(bytevec, vec![...])
 
 # ── Fuzzing ───────────────────────────────────────────────────────────────────

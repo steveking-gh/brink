@@ -11,7 +11,7 @@ workspace = true
 path = "src/xor.rs"
 
 [dependencies]
-brink_extension = { path = "../../brink_extension" }
+firmion_extension = { path = "../../firmion_extension" }
 extension_registry = { path = "../../extension_registry" }
 
 [dev-dependencies]

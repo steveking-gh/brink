@@ -73,7 +73,7 @@ pipeline:
     ERR_232: evaluate_obj_props failure
 
 extensions:
-  api_crate: brink_extension
+  api_crate: firmion_extension
   registry: ExtensionRegistry (built in process.rs, passed to IRDb + Engine)
   bundled:
     - std/crc32c  (feature: std-crc32c)
@@ -126,7 +126,7 @@ extensions:
          ERR_173 (ambiguous section) now fires per-Slice-param, not once globally.
 
       Phase order:
-        1. brink_extension/lib.rs -- ParamDesc, ParamKind (Int|Str|Slice), params() default
+        1. firmion_extension/lib.rs -- ParamDesc, ParamKind (Int|Str|Slice), params() default
         2. std extensions + mocks -- implement params() with Slice where applicable
         3. ast/ast.rs -- LexToken::NamedArg, named-arg parsing, ERR_35/ERR_36
         4. linearizer/linearizer.rs -- param_name on LinOperand, Namespace arm update

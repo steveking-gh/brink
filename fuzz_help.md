@@ -18,7 +18,7 @@ existing fuzz/target directory is often needed since cargo gets confused between
     cargo +nightly fuzz build fuzz_target_1
     ./fuzz/target/x86_64-unknown-linux-gnu/release/fuzz_target_1 \
        ./fuzz/seeds -- -only_ascii=1 \
-       -dict=../tests/brink_fuzz.dict -timeout=5
+       -dict=../tests/firmion_fuzz.dict -timeout=5
 
 Cargo fuzz uses LLVM's libFuzzer internally, which provides a vast array of
 runtime options.  To see the options using the nightly compiler build:
@@ -38,7 +38,7 @@ Now, run the fuzz target you just built using gdb or lldb.
 
     gdb --args fuzz/target/x86_64-unknown-linux-gnu/release/fuzz_target_1 \
         fuzz/corpus/fuzz_target_1 ./fuzz/seeds -only_ascii=1 \
-        -dict=../tests/brink_fuzz.dict -timeout=5
+        -dict=../tests/firmion_fuzz.dict -timeout=5
 
 That starts the debugger, gdb in this example.  Run the fuzz target:
 

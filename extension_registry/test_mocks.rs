@@ -1,5 +1,5 @@
 use super::*;
-use brink_extension::{ParamArg, ParamDesc, ParamKind};
+use firmion_extension::{ParamArg, ParamDesc, ParamKind};
 use std::cell::Cell;
 
 pub struct MockCrc {

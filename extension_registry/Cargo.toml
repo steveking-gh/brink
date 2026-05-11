@@ -11,7 +11,7 @@ workspace = true
 path = "extension_registry.rs"
 
 [dependencies]
-brink_extension = { path = "../brink_extension" }
+firmion_extension = { path = "../firmion_extension" }
 tracing = "0.1.44"
 
 [dev-dependencies]

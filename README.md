@@ -2324,10 +2324,10 @@ extension requires no changes outside `extensions/`.
 
 Place new extensions under `std/` for proposed standard library extensions, or
 under a workspace path matching your namespace for third-party extensions.
-Implement the `BrinkExtension` trait from the `brink_extension` crate.
+Implement the `BrinkExtension` trait from the `firmion_extension` crate.
 
     // my_extension/src/lib.rs
-    use brink_extension::BrinkExtension;
+    use firmion_extension::BrinkExtension;
     use extension_registry::ExtensionRegistry;
 
     pub struct MyExtension;
@@ -2417,7 +2417,7 @@ argvaldb/argvaldb.rs                               3                 0   100.00%
 ast/ast.rs                                      2426               510    78.98%          68                 9    86.76%        1319               222    83.17%           0                 0         -
 ast/lexer.rs                                     421                13    96.91%          16                 0   100.00%         259                10    96.14%           0                 0         -
 astdb/astdb.rs                                   781               117    85.02%          12                 0   100.00%         373                38    89.81%           0                 0         -
-brink_extension/lib.rs                             3                 0   100.00%           1                 0   100.00%           3                 0   100.00%           0                 0         -
+firmion_extension/lib.rs                             3                 0   100.00%           1                 0   100.00%           3                 0   100.00%           0                 0         -
 const_eval/const_eval.rs                        1259               207    83.56%          32                 5    84.38%         800               174    78.25%           0                 0         -
 depth_guard/depth_guard.rs                       146                 0   100.00%          17                 0   100.00%          77                 0   100.00%           0                 0         -
 diags/diags.rs                                   256                26    89.84%          12                 1    91.67%         134                20    85.07%           0                 0         -
@@ -2466,7 +2466,7 @@ TOTAL                                          13152              1893    85.61%
 | process/process.rs                       | Orchestrator  | Orchestration of all stages, parses `-D` defines, opens the output file                 |
 | diags/diags.rs                           | Cross-cutting | Ariadne-backed diagnostic output channel used by every stage                            |
 | extensions/src/lib.rs                    | Extensions    | Single registration point for all extensions                                            |
-| brink_extension/lib.rs                   | Extensions    | Public API for extension authors                                                        |
+| firmion_extension/lib.rs                   | Extensions    | Public API for extension authors                                                        |
 | extension_registry/extension_registry.rs | Extensions    | Runtime extension registry and dispatch wrapper                                         |
 | std/crc32c/src/lib.rs                    | std extension | CRC-32C (Castagnoli) hash over caller-specified output region                           |
 | std/sha256/src/lib.rs                    | std extension | SHA256 hash over caller-specified output region                                         |

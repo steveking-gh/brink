@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-pub use brink_extension::{BrinkExtension, ParamArg, ParamDesc, ParamKind};
+pub use firmion_extension::{BrinkExtension, ParamArg, ParamDesc, ParamKind};
 
 /// Owns a registered extension alongside its cached metadata.
 ///
@@ -81,7 +81,7 @@ pub mod test_mocks;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use brink_extension::ParamArg;
+    use firmion_extension::ParamArg;
     use test_mocks::*;
 
     #[test]

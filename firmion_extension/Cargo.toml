@@ -1,5 +1,5 @@
 [package]
-name = "brink_extension"
+name = "firmion_extension"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true

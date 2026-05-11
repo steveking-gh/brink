@@ -137,26 +137,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "firmion"
-version = "8.0.0"
-dependencies = [
- "anyhow",
- "assert_cmd",
- "clap",
- "indextree",
- "predicates",
- "process",
- "serde_json",
- "serial_test",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "brink_extension"
-version = "8.0.0"
-
-[[package]]
 name = "bstr"
 version = "1.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -323,7 +303,7 @@ dependencies = [
 name = "extension_registry"
 version = "8.0.0"
 dependencies = [
- "brink_extension",
+ "firmion_extension",
  "tracing",
  "tracing-subscriber",
 ]
@@ -339,6 +319,26 @@ dependencies = [
  "std_sha256",
  "std_xor",
 ]
+
+[[package]]
+name = "firmion"
+version = "8.0.0"
+dependencies = [
+ "anyhow",
+ "assert_cmd",
+ "clap",
+ "indextree",
+ "predicates",
+ "process",
+ "serde_json",
+ "serial_test",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "firmion_extension"
+version = "8.0.0"
 
 [[package]]
 name = "float-cmp"
@@ -966,9 +966,9 @@ name = "std_crc32c"
 version = "8.0.0"
 dependencies = [
  "assert_cmd",
- "brink_extension",
  "crc32c",
  "extension_registry",
+ "firmion_extension",
  "predicates",
 ]
 
@@ -977,8 +977,8 @@ name = "std_esp_checksum"
 version = "8.0.0"
 dependencies = [
  "assert_cmd",
- "brink_extension",
  "extension_registry",
+ "firmion_extension",
  "predicates",
 ]
 
@@ -987,8 +987,8 @@ name = "std_md5"
 version = "8.0.0"
 dependencies = [
  "assert_cmd",
- "brink_extension",
  "extension_registry",
+ "firmion_extension",
  "md-5",
  "predicates",
 ]
@@ -998,8 +998,8 @@ name = "std_sha256"
 version = "8.0.0"
 dependencies = [
  "assert_cmd",
- "brink_extension",
  "extension_registry",
+ "firmion_extension",
  "predicates",
  "sha2",
 ]
@@ -1009,8 +1009,8 @@ name = "std_xor"
 version = "8.0.0"
 dependencies = [
  "assert_cmd",
- "brink_extension",
  "extension_registry",
+ "firmion_extension",
  "predicates",
 ]
 

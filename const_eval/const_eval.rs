@@ -131,16 +131,16 @@ pub fn eval_expr_tree(
 
         // --- Builtins ---
         LexToken::BuiltinVersionString => Some(ParameterValue::QuotedString(
-            ConstBuiltins::get().brink_version_string.to_string(),
+            ConstBuiltins::get().firmion_version_string.to_string(),
         )),
         LexToken::BuiltinVersionMajor => Some(ParameterValue::U64(
-            ConstBuiltins::get().brink_version_major,
+            ConstBuiltins::get().firmion_version_major,
         )),
         LexToken::BuiltinVersionMinor => Some(ParameterValue::U64(
-            ConstBuiltins::get().brink_version_minor,
+            ConstBuiltins::get().firmion_version_minor,
         )),
         LexToken::BuiltinVersionPatch => Some(ParameterValue::U64(
-            ConstBuiltins::get().brink_version_patch,
+            ConstBuiltins::get().firmion_version_patch,
         )),
 
         // --- Unary ---

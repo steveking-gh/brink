@@ -23,7 +23,7 @@
 // section.
 //
 
-use brink_extension::{BrinkExtension, ParamArg, ParamDesc, ParamKind};
+use firmion_extension::{BrinkExtension, ParamArg, ParamDesc, ParamKind};
 use extension_registry::ExtensionRegistry;
 
 pub struct EspChecksum;

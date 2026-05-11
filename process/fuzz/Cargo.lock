@@ -61,7 +61,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
-name = "brink_extension"
+name = "firmion_extension"
 version = "6.1.1"
 
 [[package]]
@@ -128,7 +128,7 @@ dependencies = [
 name = "extension_registry"
 version = "6.1.1"
 dependencies = [
- "brink_extension",
+ "firmion_extension",
  "tracing",
 ]
 

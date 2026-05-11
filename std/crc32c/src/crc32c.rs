@@ -9,7 +9,7 @@
 //
 // Output: 4 bytes, little-endian u32.
 
-use brink_extension::{BrinkExtension, ParamArg, ParamDesc, ParamKind};
+use firmion_extension::{BrinkExtension, ParamArg, ParamDesc, ParamKind};
 use extension_registry::ExtensionRegistry;
 
 pub struct Crc32c;

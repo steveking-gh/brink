@@ -4,7 +4,7 @@ mod tests {
     use predicates::prelude::PredicateBooleanExt;
     use std::fs;
 
-    fn assert_brink_success(src: &str, output_bin: Option<&str>, expected_output: Option<&str>) {
+    fn assert_firmion_success(src: &str, output_bin: Option<&str>, expected_output: Option<&str>) {
         let mut cmd = Command::cargo_bin("firmion").unwrap();
         cmd.arg(src);
 
@@ -31,7 +31,7 @@ mod tests {
         }
     }
 
-    fn assert_brink_failure(src: &str, expected_err_codes: &[&str]) {
+    fn assert_firmion_failure(src: &str, expected_err_codes: &[&str]) {
         let mut assert = Command::cargo_bin("firmion")
             .unwrap()
             .arg(src)
@@ -44,7 +44,7 @@ mod tests {
 
     /// Asserts that firmion succeeds and none of the specified codes appear on stderr.
     /// Runs with `-v` so that any warnings would be visible if present.
-    fn assert_brink_no_warning(src: &str, absent_codes: &[&str]) {
+    fn assert_firmion_no_warning(src: &str, absent_codes: &[&str]) {
         let derived_out = format!("{}.bin", src.replace('/', "_").replace('\\', "_"));
         let mut assert = Command::cargo_bin("firmion")
             .unwrap()
@@ -64,7 +64,7 @@ mod tests {
 
     /// Asserts that firmion succeeds and emits the specified warning codes on stderr.
     /// Runs with `-v` so that warnings are not suppressed.
-    fn assert_brink_warning(src: &str, expected_warn_codes: &[&str]) {
+    fn assert_firmion_warning(src: &str, expected_warn_codes: &[&str]) {
         let derived_out = format!("{}.bin", src.replace('/', "_").replace('\\', "_"));
         let mut assert = Command::cargo_bin("firmion")
             .unwrap()
@@ -108,64 +108,64 @@ mod tests {
 
     #[test]
     fn empty_1() {
-        assert_brink_failure("tests/empty_1.firm", &[]);
+        assert_firmion_failure("tests/empty_1.firm", &[]);
     }
 
     #[test]
     fn accidental_infix() {
-        assert_brink_failure("tests/accidental_infix.firm", &["ERR_8"]);
+        assert_firmion_failure("tests/accidental_infix.firm", &["ERR_8"]);
     }
 
     #[test]
     fn bitwise_precedence() {
-        assert_brink_success("tests/bitwise_precedence.firm", None, None);
+        assert_firmion_success("tests/bitwise_precedence.firm", None, None);
     }
 
     #[test]
 
     fn wr_multi() {
-        assert_brink_success("tests/wr_multi.firm", None, None);
+        assert_firmion_success("tests/wr_multi.firm", None, None);
     }
 
     #[test]
 
     fn wr_single() {
-        assert_brink_success("tests/wr_single.firm", None, None);
+        assert_firmion_success("tests/wr_single.firm", None, None);
     }
 
     #[test]
     fn empty_2() {
-        assert_brink_failure("tests/empty_2.firm", &[]);
+        assert_firmion_failure("tests/empty_2.firm", &[]);
     }
 
     #[test]
     fn line_comment_1() {
-        assert_brink_failure("tests/line_comment_1.firm", &["[ERR_7]"]);
+        assert_firmion_failure("tests/line_comment_1.firm", &["[ERR_7]"]);
     }
 
     #[test]
     fn line_comment_2() {
-        assert_brink_failure("tests/line_comment_2.firm", &["[ERR_7]"]);
+        assert_firmion_failure("tests/line_comment_2.firm", &["[ERR_7]"]);
     }
 
     #[test]
     fn multi_comment_1() {
-        assert_brink_failure("tests/multi_comment_1.firm", &["[ERR_7]"]);
+        assert_firmion_failure("tests/multi_comment_1.firm", &["[ERR_7]"]);
     }
 
     #[test]
     fn multi_comment_2() {
-        assert_brink_failure("tests/multi_comment_2.firm", &["[ERR_7]"]);
+        assert_firmion_failure("tests/multi_comment_2.firm", &["[ERR_7]"]);
     }
 
     #[test]
     fn multi_comment_3() {
-        assert_brink_failure("tests/multi_comment_3.firm", &["[ERR_7]"]);
+        assert_firmion_failure("tests/multi_comment_3.firm", &["[ERR_7]"]);
     }
 
     #[test]
     fn empty_section_1() {
-        assert_brink_success(
+        assert_firmion_success(
             "tests/empty_section_1.firm",
             Some("empty_section_1.bin"),
             Some(""),
@@ -174,7 +174,7 @@ mod tests {
 
     #[test]
     fn simple_section_2() {
-        assert_brink_success(
+        assert_firmion_success(
             "tests/simple_section_2.firm",
             Some("simple_section_2.bin"),
             Some("Wow!"),
@@ -183,7 +183,7 @@ mod tests {
 
     #[test]
     fn simple_section_3() {
-        assert_brink_success(
+        assert_firmion_success(
             "tests/simple_section_3.firm",
             Some("simple_section_3.bin"),
             Some("Wow!Bye"),
@@ -192,7 +192,7 @@ mod tests {
 
     #[test]
     fn simple_section_4() {
-        assert_brink_success(
+        assert_firmion_success(
             "tests/simple_section_4.firm",
             Some("simple_section_4.bin"),
             Some("Wow!\nBye"),
@@ -201,236 +201,236 @@ mod tests {
 
     #[test]
     fn assert_1() {
-        assert_brink_success("tests/assert_1.firm", Some("assert_1.bin"), Some("Wow!"));
+        assert_firmion_success("tests/assert_1.firm", Some("assert_1.bin"), Some("Wow!"));
     }
 
     #[test]
     fn assert_2() {
-        assert_brink_success("tests/assert_2.firm", Some("assert_2.bin"), Some("Wow!"));
+        assert_firmion_success("tests/assert_2.firm", Some("assert_2.bin"), Some("Wow!"));
     }
 
     #[test]
     fn assert_3() {
-        assert_brink_success("tests/assert_3.firm", Some("assert_3.bin"), Some("Wow!"));
+        assert_firmion_success("tests/assert_3.firm", Some("assert_3.bin"), Some("Wow!"));
     }
 
     #[test]
     fn assert_4() {
-        assert_brink_success("tests/assert_4.firm", Some("assert_4.bin"), Some("Wow!"));
+        assert_firmion_success("tests/assert_4.firm", Some("assert_4.bin"), Some("Wow!"));
     }
 
     #[test]
     fn assert_5() {
-        assert_brink_success("tests/assert_5.firm", Some("assert_5.bin"), Some("Wow!"));
+        assert_firmion_success("tests/assert_5.firm", Some("assert_5.bin"), Some("Wow!"));
     }
 
     #[test]
     fn assert_6() {
-        assert_brink_failure("tests/assert_6.firm", &[]);
+        assert_firmion_failure("tests/assert_6.firm", &[]);
     }
 
     #[test]
     fn assert_7() {
-        assert_brink_failure("tests/assert_7.firm", &[]);
+        assert_firmion_failure("tests/assert_7.firm", &[]);
     }
 
     #[test]
     fn assert_8() {
-        assert_brink_success("tests/assert_8.firm", Some("assert_8.bin"), Some("Wow!"));
+        assert_firmion_success("tests/assert_8.firm", Some("assert_8.bin"), Some("Wow!"));
     }
 
     #[test]
     fn assert_9() {
-        assert_brink_success("tests/assert_9.firm", Some("assert_9.bin"), Some("Wow!"));
+        assert_firmion_success("tests/assert_9.firm", Some("assert_9.bin"), Some("Wow!"));
     }
 
     #[test]
     fn assert_10() {
-        assert_brink_success("tests/assert_10.firm", Some("assert_10.bin"), Some("Wow!"));
+        assert_firmion_success("tests/assert_10.firm", Some("assert_10.bin"), Some("Wow!"));
     }
 
     #[test]
     fn assert_11() {
-        assert_brink_failure("tests/assert_11.firm", &[]);
+        assert_firmion_failure("tests/assert_11.firm", &[]);
     }
 
     #[test]
     fn assert_12() {
-        assert_brink_failure("tests/assert_12.firm", &[]);
+        assert_firmion_failure("tests/assert_12.firm", &[]);
     }
 
     #[test]
     fn assert_13() {
-        assert_brink_success("tests/assert_13.firm", Some("assert_13.bin"), Some("Wow!"));
+        assert_firmion_success("tests/assert_13.firm", Some("assert_13.bin"), Some("Wow!"));
     }
 
     #[test]
     fn assert_14() {
-        assert_brink_success("tests/assert_14.firm", Some("assert_14.bin"), Some("Wow!"));
+        assert_firmion_success("tests/assert_14.firm", Some("assert_14.bin"), Some("Wow!"));
     }
 
     #[test]
     fn assert_15() {
-        assert_brink_failure("tests/assert_15.firm", &["[ERR_77]"]);
+        assert_firmion_failure("tests/assert_15.firm", &["[ERR_77]"]);
     }
 
     #[test]
     fn section_rename_err_1() {
-        assert_brink_failure("tests/section_rename_err_1.firm", &[]);
+        assert_firmion_failure("tests/section_rename_err_1.firm", &[]);
     }
 
     #[test]
     fn fuzz_found_1() {
-        assert_brink_failure("tests/fuzz_found_1.firm", &["[ERR_218]"]);
+        assert_firmion_failure("tests/fuzz_found_1.firm", &["[ERR_218]"]);
     }
 
     #[test]
     fn fuzz_found_2() {
-        assert_brink_failure("tests/fuzz_found_2.firm", &["[ERR_12]"]);
+        assert_firmion_failure("tests/fuzz_found_2.firm", &["[ERR_12]"]);
     }
 
     #[test]
     fn fuzz_found_3() {
-        assert_brink_failure("tests/fuzz_found_3.firm", &["[ERR_12]"]);
+        assert_firmion_failure("tests/fuzz_found_3.firm", &["[ERR_12]"]);
     }
 
     #[test]
     fn fuzz_found_4() {
-        assert_brink_failure("tests/fuzz_found_4.firm", &["[ERR_12]"]);
+        assert_firmion_failure("tests/fuzz_found_4.firm", &["[ERR_12]"]);
     }
 
     #[test]
     fn fuzz_found_5() {
-        assert_brink_failure("tests/fuzz_found_5.firm", &["[ERR_14]"]);
+        assert_firmion_failure("tests/fuzz_found_5.firm", &["[ERR_14]"]);
     }
 
     #[test]
     fn fuzz_found_6() {
-        assert_brink_failure("tests/fuzz_found_6.firm", &["[ERR_14]"]);
+        assert_firmion_failure("tests/fuzz_found_6.firm", &["[ERR_14]"]);
     }
 
     #[test]
     fn fuzz_found_7() {
-        assert_brink_failure("tests/fuzz_found_7.firm", &["[ERR_12]", "[ERR_13]"]);
+        assert_firmion_failure("tests/fuzz_found_7.firm", &["[ERR_12]", "[ERR_13]"]);
     }
 
     #[test]
     fn fuzz_found_8() {
-        assert_brink_failure("tests/fuzz_found_8.firm", &["[ERR_18]"]);
+        assert_firmion_failure("tests/fuzz_found_8.firm", &["[ERR_18]"]);
     }
 
     #[test]
     fn fuzz_found_9() {
-        assert_brink_failure("tests/fuzz_found_9.firm", &["[ERR_78]"]);
+        assert_firmion_failure("tests/fuzz_found_9.firm", &["[ERR_78]"]);
     }
 
     #[test]
     fn fuzz_found_10() {
-        assert_brink_failure("tests/fuzz_found_10.firm", &["[ERR_201]"]);
+        assert_firmion_failure("tests/fuzz_found_10.firm", &["[ERR_201]"]);
     }
 
     #[test]
     fn fuzz_found_11() {
-        assert_brink_failure("tests/fuzz_found_11.firm", &["[ERR_17]"]);
+        assert_firmion_failure("tests/fuzz_found_11.firm", &["[ERR_17]"]);
     }
 
     #[test]
     fn fuzz_found_12() {
-        assert_brink_failure("tests/fuzz_found_12.firm", &["[ERR_17]"]);
+        assert_firmion_failure("tests/fuzz_found_12.firm", &["[ERR_17]"]);
     }
 
     #[test]
     fn fuzz_found_13() {
-        assert_brink_failure("tests/fuzz_found_13.firm", &["[ERR_148]"]);
+        assert_firmion_failure("tests/fuzz_found_13.firm", &["[ERR_148]"]);
     }
 
     #[test]
     fn fuzz_found_14() {
-        assert_brink_failure("tests/fuzz_found_14.firm", &["[ERR_208]"]);
+        assert_firmion_failure("tests/fuzz_found_14.firm", &["[ERR_208]"]);
     }
 
     #[test]
     fn fuzz_found_15() {
-        assert_brink_failure("tests/fuzz_found_15.firm", &["[ERR_19]"]);
+        assert_firmion_failure("tests/fuzz_found_15.firm", &["[ERR_19]"]);
     }
 
     #[test]
 
     fn fuzz_found_16() {
-        assert_brink_success("tests/fuzz_found_16.firm", None, None);
+        assert_firmion_success("tests/fuzz_found_16.firm", None, None);
     }
 
     #[test]
     fn fuzz_found_17() {
-        assert_brink_failure("tests/fuzz_found_17.firm", &["[ERR_207]"]);
+        assert_firmion_failure("tests/fuzz_found_17.firm", &["[ERR_207]"]);
     }
 
     #[test]
     fn fuzz_found_18() {
-        assert_brink_failure("tests/fuzz_found_18.firm", &["[ERR_205]"]);
+        assert_firmion_failure("tests/fuzz_found_18.firm", &["[ERR_205]"]);
     }
 
     #[test]
     fn fuzz_found_19() {
-        assert_brink_failure("tests/fuzz_found_19.firm", &["[ERR_224]"]);
+        assert_firmion_failure("tests/fuzz_found_19.firm", &["[ERR_224]"]);
     }
 
     #[test]
     fn fuzz_found_20() {
-        assert_brink_failure("tests/fuzz_found_20.firm", &["[ERR_37]"]);
+        assert_firmion_failure("tests/fuzz_found_20.firm", &["[ERR_37]"]);
     }
 
     #[test]
     fn fuzz_found_21() {
-        assert_brink_failure("tests/fuzz_found_21.firm", &["[ERR_111]"]);
+        assert_firmion_failure("tests/fuzz_found_21.firm", &["[ERR_111]"]);
     }
 
     #[test]
     fn fuzz_found_22() {
-        assert_brink_failure("tests/fuzz_found_22.firm", &["[ERR_112]"]);
+        assert_firmion_failure("tests/fuzz_found_22.firm", &["[ERR_112]"]);
     }
 
     #[test]
     fn fuzz_found_23() {
-        assert_brink_failure("tests/fuzz_found_23.firm", &["[ERR_38]"]);
+        assert_firmion_failure("tests/fuzz_found_23.firm", &["[ERR_38]"]);
     }
 
     #[test]
     fn fuzz_found_24() {
-        assert_brink_failure("tests/fuzz_found_24.firm", &["[ERR_115]"]);
+        assert_firmion_failure("tests/fuzz_found_24.firm", &["[ERR_115]"]);
     }
 
     #[test]
     fn fuzz_found_25() {
-        assert_brink_failure("tests/fuzz_found_25.firm", &["[ERR_99]"]);
+        assert_firmion_failure("tests/fuzz_found_25.firm", &["[ERR_99]"]);
     }
 
     #[test]
     fn fuzz_found_26() {
-        assert_brink_failure("tests/fuzz_found_26.firm", &["[ERR_179]"]);
+        assert_firmion_failure("tests/fuzz_found_26.firm", &["[ERR_179]"]);
     }
 
     #[test]
     fn fuzz_found_27() {
-        assert_brink_failure("tests/fuzz_found_27.firm", &["[ERR_16]"]);
+        assert_firmion_failure("tests/fuzz_found_27.firm", &["[ERR_16]"]);
     }
 
     /// assert inside a top-level if body with a string condition panics -- latent bug.
     #[test]
     fn const_bool_string_assert() {
-        assert_brink_failure("tests/const_bool_string_assert.firm", &["[ERR_113]"]);
+        assert_firmion_failure("tests/const_bool_string_assert.firm", &["[ERR_113]"]);
     }
 
     /// && with a string lhs panics -- latent bug.
     #[test]
     fn const_bool_string_and() {
-        assert_brink_failure("tests/const_bool_string_and.firm", &["[ERR_114]"]);
+        assert_firmion_failure("tests/const_bool_string_and.firm", &["[ERR_114]"]);
     }
 
     /// || with a string lhs panics -- latent bug.
     #[test]
     fn const_bool_string_or() {
-        assert_brink_failure("tests/const_bool_string_or.firm", &["[ERR_114]"]);
+        assert_firmion_failure("tests/const_bool_string_or.firm", &["[ERR_114]"]);
     }
 
     /// --max-output-size 0 rejects a 1-byte output.
@@ -448,27 +448,27 @@ mod tests {
 
     #[test]
     fn missing_brace_1() {
-        assert_brink_failure("tests/missing_brace_1.firm", &["[ERR_3]", "[ERR_13]"]);
+        assert_firmion_failure("tests/missing_brace_1.firm", &["[ERR_3]", "[ERR_13]"]);
     }
 
     #[test]
     fn multiple_outputs_1() {
-        assert_brink_failure("tests/multiple_outputs_1.firm", &["[ERR_9]"]);
+        assert_firmion_failure("tests/multiple_outputs_1.firm", &["[ERR_9]"]);
     }
 
     #[test]
     fn section_self_ref_1() {
-        assert_brink_failure("tests/section_self_ref_1.firm", &["[ERR_5]"]);
+        assert_firmion_failure("tests/section_self_ref_1.firm", &["[ERR_5]"]);
     }
 
     #[test]
     fn section_self_ref_2() {
-        assert_brink_failure("tests/section_self_ref_2.firm", &["[ERR_5]"]);
+        assert_firmion_failure("tests/section_self_ref_2.firm", &["[ERR_5]"]);
     }
 
     #[test]
     fn nested_section_1() {
-        assert_brink_success(
+        assert_firmion_success(
             "tests/nested_section_1.firm",
             Some("nested_section_1.bin"),
             Some("foo!\nBye\nbar!\nboo!\n"),
@@ -477,7 +477,7 @@ mod tests {
 
     #[test]
     fn nested_section_2() {
-        assert_brink_success(
+        assert_firmion_success(
             "tests/nested_section_2.firm",
             Some("nested_section_2.bin"),
             Some("bar!\nbar!\n"),
@@ -486,12 +486,12 @@ mod tests {
 
     #[test]
     fn sizeof_1() {
-        assert_brink_success("tests/sizeof_1.firm", Some("sizeof_1.bin"), Some("Wow!"));
+        assert_firmion_success("tests/sizeof_1.firm", Some("sizeof_1.bin"), Some("Wow!"));
     }
 
     #[test]
     fn sizeof_2() {
-        assert_brink_success(
+        assert_firmion_success(
             "tests/sizeof_2.firm",
             Some("sizeof_2.bin"),
             Some("Wow!bar!\n"),
@@ -500,273 +500,273 @@ mod tests {
 
     #[test]
     fn sizeof_3() {
-        assert_brink_success("tests/sizeof_3.firm", Some("sizeof_3.bin"), Some("Wow!"));
+        assert_firmion_success("tests/sizeof_3.firm", Some("sizeof_3.bin"), Some("Wow!"));
     }
 
     /// __BRINK_VERSION_STRING can be written with wrs and used in print.
     #[test]
     fn version_string_1() {
-        assert_brink_success("tests/version_string_1.firm", None, None);
+        assert_firmion_success("tests/version_string_1.firm", None, None);
     }
 
     /// __BRINK_VERSION_MAJOR/MINOR/PATCH are U64 values usable in expressions.
     #[test]
     fn version_numeric_1() {
-        assert_brink_success("tests/version_numeric_1.firm", None, None);
+        assert_firmion_success("tests/version_numeric_1.firm", None, None);
     }
 
     /// Version builtins are usable in const expressions.
     #[test]
     fn version_in_const_1() {
-        assert_brink_success("tests/version_in_const_1.firm", None, None);
+        assert_firmion_success("tests/version_in_const_1.firm", None, None);
     }
 
     /// Version builtins can be written into the output as wr8 operands.
     #[test]
     fn version_written_1() {
-        assert_brink_success("tests/version_written_1.firm", None, None);
+        assert_firmion_success("tests/version_written_1.firm", None, None);
     }
 
     /// __OUTPUT_SIZE equals sizeof(output_section) and can be used in asserts.
     #[test]
     fn output_size_1() {
-        assert_brink_success("tests/output_size_1.firm", None, None);
+        assert_firmion_success("tests/output_size_1.firm", None, None);
     }
 
     /// __OUTPUT_SIZE written into the output header as a 4-byte field.
     #[test]
     fn output_size_2() {
-        assert_brink_success("tests/output_size_2.firm", None, None);
+        assert_firmion_success("tests/output_size_2.firm", None, None);
     }
 
     /// __OUTPUT_ADDR is zero with no region
     #[test]
     fn output_addr_2() {
-        assert_brink_success("tests/output_addr_2.firm", None, None);
+        assert_firmion_success("tests/output_addr_2.firm", None, None);
     }
 
     #[test]
 
     fn integers_1() {
-        assert_brink_success("tests/integers_1.firm", None, None);
+        assert_firmion_success("tests/integers_1.firm", None, None);
     }
 
     #[test]
 
     fn integers_2() {
-        assert_brink_success("tests/integers_2.firm", None, None);
+        assert_firmion_success("tests/integers_2.firm", None, None);
     }
 
     #[test]
 
     fn integers_3() {
-        assert_brink_success("tests/integers_3.firm", None, None);
+        assert_firmion_success("tests/integers_3.firm", None, None);
     }
 
     #[test]
 
     fn integers_4() {
-        assert_brink_failure("tests/integers_4.firm", &["[ERR_17]"]);
+        assert_firmion_failure("tests/integers_4.firm", &["[ERR_17]"]);
     }
 
     #[test]
 
     fn integers_5() {
-        assert_brink_failure("tests/integers_5.firm", &["[ERR_207]"]);
+        assert_firmion_failure("tests/integers_5.firm", &["[ERR_207]"]);
     }
 
     #[test]
 
     fn neq_1() {
-        assert_brink_success("tests/neq_1.firm", None, None);
+        assert_firmion_success("tests/neq_1.firm", None, None);
     }
 
     #[test]
     fn neq_2() {
-        assert_brink_failure("tests/neq_2.firm", &["[ERR_126]"]);
+        assert_firmion_failure("tests/neq_2.firm", &["[ERR_126]"]);
     }
 
     #[test]
 
     fn add_1() {
-        assert_brink_success("tests/add_1.firm", None, None);
+        assert_firmion_success("tests/add_1.firm", None, None);
     }
 
     #[test]
     fn add_2() {
-        assert_brink_failure("tests/add_2.firm", &["[ERR_125]"]);
+        assert_firmion_failure("tests/add_2.firm", &["[ERR_125]"]);
     }
 
     #[test]
 
     fn subtract_1() {
-        assert_brink_success("tests/subtract_1.firm", None, None);
+        assert_firmion_success("tests/subtract_1.firm", None, None);
     }
 
     #[test]
     fn subtract_2() {
-        assert_brink_failure("tests/subtract_2.firm", &["[ERR_128]"]);
+        assert_firmion_failure("tests/subtract_2.firm", &["[ERR_128]"]);
     }
 
     #[test]
     fn subtract_3() {
-        assert_brink_failure("tests/subtract_3.firm", &["[ERR_128]"]);
+        assert_firmion_failure("tests/subtract_3.firm", &["[ERR_128]"]);
     }
 
     #[test]
 
     fn subtract_4() {
-        assert_brink_success("tests/subtract_4.firm", None, None);
+        assert_firmion_success("tests/subtract_4.firm", None, None);
     }
 
     #[test]
 
     fn multiply_1() {
-        assert_brink_success("tests/multiply_1.firm", None, None);
+        assert_firmion_success("tests/multiply_1.firm", None, None);
     }
 
     #[test]
     fn multiply_2() {
-        assert_brink_failure("tests/multiply_2.firm", &["[ERR_130]"]);
+        assert_firmion_failure("tests/multiply_2.firm", &["[ERR_130]"]);
     }
 
     #[test]
 
     fn divide_1() {
-        assert_brink_success("tests/divide_1.firm", None, None);
+        assert_firmion_success("tests/divide_1.firm", None, None);
     }
 
     #[test]
 
     fn modulo_1() {
-        assert_brink_success("tests/modulo_1.firm", None, None);
+        assert_firmion_success("tests/modulo_1.firm", None, None);
     }
 
     #[test]
 
     fn shl_1() {
-        assert_brink_success("tests/shl_1.firm", None, None);
+        assert_firmion_success("tests/shl_1.firm", None, None);
     }
 
     #[test]
 
     fn shr_1() {
-        assert_brink_success("tests/shr_1.firm", None, None);
+        assert_firmion_success("tests/shr_1.firm", None, None);
     }
 
     #[test]
 
     fn bit_and_1() {
-        assert_brink_success("tests/bit_and_1.firm", None, None);
+        assert_firmion_success("tests/bit_and_1.firm", None, None);
     }
 
     #[test]
 
     fn bit_or_1() {
-        assert_brink_success("tests/bit_or_1.firm", None, None);
+        assert_firmion_success("tests/bit_or_1.firm", None, None);
     }
 
     #[test]
 
     fn geq_1() {
-        assert_brink_success("tests/geq_1.firm", None, None);
+        assert_firmion_success("tests/geq_1.firm", None, None);
     }
 
     #[test]
 
     fn leq_1() {
-        assert_brink_success("tests/leq_1.firm", None, None);
+        assert_firmion_success("tests/leq_1.firm", None, None);
     }
 
     #[test]
 
     fn logical_and_1() {
-        assert_brink_success("tests/logical_and_1.firm", None, None);
+        assert_firmion_success("tests/logical_and_1.firm", None, None);
     }
 
     #[test]
 
     fn logical_or_1() {
-        assert_brink_success("tests/logical_or_1.firm", None, None);
+        assert_firmion_success("tests/logical_or_1.firm", None, None);
     }
 
     #[test]
 
     fn address_1() {
-        assert_brink_success("tests/address_1.firm", None, None);
+        assert_firmion_success("tests/address_1.firm", None, None);
     }
 
     #[test]
 
     fn address_2() {
-        assert_brink_success("tests/address_2.firm", None, None);
+        assert_firmion_success("tests/address_2.firm", None, None);
     }
 
     #[test]
 
     fn address_3() {
-        assert_brink_success("tests/address_3.firm", None, None);
+        assert_firmion_success("tests/address_3.firm", None, None);
     }
 
     #[test]
     fn address_4() {
-        assert_brink_failure("tests/address_4.firm", &["[ERR_208]"]);
+        assert_firmion_failure("tests/address_4.firm", &["[ERR_208]"]);
     }
 
     #[test]
     fn address_5() {
-        assert_brink_failure("tests/address_5.firm", &["[ERR_209]"]);
+        assert_firmion_failure("tests/address_5.firm", &["[ERR_209]"]);
     }
 
     #[test]
     fn address_6() {
-        assert_brink_failure("tests/address_6.firm", &["[ERR_208]"]);
+        assert_firmion_failure("tests/address_6.firm", &["[ERR_208]"]);
     }
 
     #[test]
     fn address_7() {
-        assert_brink_failure("tests/address_7.firm", &["[ERR_208]"]);
+        assert_firmion_failure("tests/address_7.firm", &["[ERR_208]"]);
     }
 
     #[test]
     fn abs_overflow() {
-        assert_brink_failure("tests/abs_overflow.firm", &["[ERR_165]"]);
+        assert_firmion_failure("tests/abs_overflow.firm", &["[ERR_165]"]);
     }
 
     #[test]
     fn align_overflow() {
-        assert_brink_failure("tests/align_overflow.firm", &["[ERR_159]"]);
+        assert_firmion_failure("tests/align_overflow.firm", &["[ERR_159]"]);
     }
 
     #[test]
     fn set_addr_overflow() {
-        assert_brink_failure("tests/set_addr_overflow.firm", &["[ERR_165]"]);
+        assert_firmion_failure("tests/set_addr_overflow.firm", &["[ERR_165]"]);
     }
 
     #[test]
     fn abs_identifier_overflow() {
-        assert_brink_failure("tests/abs_identifier_overflow.firm", &["[ERR_165]"]);
+        assert_firmion_failure("tests/abs_identifier_overflow.firm", &["[ERR_165]"]);
     }
 
     #[test]
 
     fn label_1() {
-        assert_brink_success("tests/label_1.firm", None, None);
+        assert_firmion_success("tests/label_1.firm", None, None);
     }
 
     #[test]
     fn label_2() {
-        assert_brink_failure("tests/label_2.firm", &["[ERR_211]"]);
+        assert_firmion_failure("tests/label_2.firm", &["[ERR_211]"]);
     }
 
     #[test]
     fn label_3() {
-        assert_brink_failure("tests/label_3.firm", &["[ERR_204]"]);
+        assert_firmion_failure("tests/label_3.firm", &["[ERR_204]"]);
     }
 
     #[test]
     fn quoted_escapes_1() {
-        assert_brink_success(
+        assert_firmion_success(
             "tests/quoted_escapes_1.firm",
             Some("quoted_escapes_1.bin"),
             None,
@@ -776,19 +776,19 @@ mod tests {
     #[test]
 
     fn to_u64_1() {
-        assert_brink_success("tests/to_u64_1.firm", None, None);
+        assert_firmion_success("tests/to_u64_1.firm", None, None);
     }
 
     #[test]
 
     fn to_i64_1() {
-        assert_brink_success("tests/to_i64_1.firm", None, None);
+        assert_firmion_success("tests/to_i64_1.firm", None, None);
     }
 
     #[test]
 
     fn to_i64_2() {
-        assert_brink_success("tests/to_i64_2.firm", None, None);
+        assert_firmion_success("tests/to_i64_2.firm", None, None);
     }
 
     /// to_i64() in a const expression: verifies that eval_const_expr_r dispatches
@@ -797,7 +797,7 @@ mod tests {
     #[test]
 
     fn const_to_i64_const() {
-        assert_brink_success("tests/const_to_i64_const.firm", None, None);
+        assert_firmion_success("tests/const_to_i64_const.firm", None, None);
     }
 
     /// firmion::logger() in a const expression is rejected with ERR_87
@@ -807,19 +807,19 @@ mod tests {
     #[test]
 
     fn const_ext_call_const() {
-        assert_brink_failure("tests/const_ext_call_const.firm", &["[ERR_116]"]);
+        assert_firmion_failure("tests/const_ext_call_const.firm", &["[ERR_116]"]);
     }
 
     #[test]
 
     fn print_1() {
-        assert_brink_success("tests/print_1.firm", None, None);
+        assert_firmion_success("tests/print_1.firm", None, None);
     }
 
     #[test]
 
     fn print_2() {
-        assert_brink_success("tests/print_2.firm", None, None);
+        assert_firmion_success("tests/print_2.firm", None, None);
     }
 
     /// All-immediate print fires at IRDb time on a clean file.
@@ -920,7 +920,7 @@ mod tests {
 
     #[test]
     fn wrs_1() {
-        assert_brink_success(
+        assert_firmion_success(
             "tests/wrs_1.firm",
             Some("wrs_1.bin"),
             Some("123\x00456 Wow! 18 2\n"),
@@ -929,7 +929,7 @@ mod tests {
 
     #[test]
     fn wrs_utf8() {
-        assert_brink_success(
+        assert_firmion_success(
             "tests/wrs_utf8.firm",
             Some("wrs_utf8.bin"),
             Some("日本語 emoji: 🎉 café"),
@@ -938,12 +938,12 @@ mod tests {
 
     #[test]
     fn wrs_overflow() {
-        assert_brink_failure("tests/wrs_overflow.firm", &["[ERR_159]"]);
+        assert_firmion_failure("tests/wrs_overflow.firm", &["[ERR_159]"]);
     }
 
     #[test]
     fn wrx_overflow() {
-        assert_brink_failure("tests/wrx_overflow.firm", &["[ERR_158]"]);
+        assert_firmion_failure("tests/wrx_overflow.firm", &["[ERR_158]"]);
     }
 
     /// firmion::huge_ext has cached_size = usize::MAX.  After one preceding
@@ -951,12 +951,12 @@ mod tests {
     /// (as u64) which overflows and must emit ERR_159.
     #[test]
     fn wrext_overflow() {
-        assert_brink_failure("tests/wrext_overflow.firm", &["[ERR_159]"]);
+        assert_firmion_failure("tests/wrext_overflow.firm", &["[ERR_159]"]);
     }
 
     #[test]
     fn wrx_1() {
-        assert_brink_success(
+        assert_firmion_success(
             "tests/wrx_1.firm",
             Some("wrx_1.bin"),
             Some("1\n12\n123\n1234\n12345\n123456\n1234567\n12345678\n"),
@@ -966,13 +966,13 @@ mod tests {
     #[test]
 
     fn wrx_2() {
-        assert_brink_success("tests/wrx_2.firm", None, None);
+        assert_firmion_success("tests/wrx_2.firm", None, None);
     }
 
     #[test]
 
     fn wrx_3() {
-        assert_brink_success("tests/wrx_3.firm", None, None);
+        assert_firmion_success("tests/wrx_3.firm", None, None);
     }
 
     #[test]
@@ -1188,13 +1188,13 @@ mod tests {
 
     #[test]
     fn align_0() {
-        assert_brink_failure("tests/align_0.firm", &["[ERR_160]"]);
+        assert_firmion_failure("tests/align_0.firm", &["[ERR_160]"]);
     }
 
     #[test]
 
     fn align_1() {
-        assert_brink_success("tests/align_1.firm", None, None);
+        assert_firmion_success("tests/align_1.firm", None, None);
     }
 
     #[test]
@@ -1223,99 +1223,99 @@ mod tests {
     #[test]
 
     fn pad_sec_offset_1() {
-        assert_brink_success("tests/pad_sec_offset_1.firm", None, None);
+        assert_firmion_success("tests/pad_sec_offset_1.firm", None, None);
     }
 
     #[test]
     fn pad_sec_offset_2() {
-        assert_brink_failure("tests/pad_sec_offset_2.firm", &["[ERR_146]"]);
+        assert_firmion_failure("tests/pad_sec_offset_2.firm", &["[ERR_146]"]);
     }
 
     #[test]
 
     fn pad_addr_offset_1() {
-        assert_brink_success("tests/pad_addr_offset_1.firm", None, None);
+        assert_firmion_success("tests/pad_addr_offset_1.firm", None, None);
     }
 
     #[test]
     fn pad_addr_offset_2() {
-        assert_brink_failure("tests/pad_addr_offset_2.firm", &["[ERR_146]"]);
+        assert_firmion_failure("tests/pad_addr_offset_2.firm", &["[ERR_146]"]);
     }
 
     #[test]
 
     fn set_addr_1() {
-        assert_brink_success("tests/set_addr_1.firm", None, None);
+        assert_firmion_success("tests/set_addr_1.firm", None, None);
     }
 
     #[test]
     fn set_addr_2() {
-        assert_brink_success("tests/set_addr_2.firm", None, None);
+        assert_firmion_success("tests/set_addr_2.firm", None, None);
     }
 
     #[test]
     fn pad_sec_offset_after_set_addr() {
-        assert_brink_warning("tests/pad_sec_offset_after_set_addr.firm", &["[ERR_171]"]);
+        assert_firmion_warning("tests/pad_sec_offset_after_set_addr.firm", &["[ERR_171]"]);
     }
 
     #[test]
     fn set_addr_scope_restore() {
         // Child's set_addr must not leak addr_base or addr_offset into parent.
-        assert_brink_success("tests/set_addr_scope_restore.firm", None, None);
+        assert_firmion_success("tests/set_addr_scope_restore.firm", None, None);
     }
 
     #[test]
     fn set_addr_three_levels() {
         // Grandchild set_addr must not reach child or grandparent on exit.
-        assert_brink_success("tests/set_addr_three_levels.firm", None, None);
+        assert_firmion_success("tests/set_addr_three_levels.firm", None, None);
     }
 
     #[test]
     fn set_addr_two_siblings() {
         // Second sibling must inherit restored parent addr state, not first sibling's.
-        assert_brink_success("tests/set_addr_two_siblings.firm", None, None);
+        assert_firmion_success("tests/set_addr_two_siblings.firm", None, None);
     }
 
     #[test]
     fn set_addr_repeated_section() {
         // Section with set_addr written twice; each invocation scoped independently.
-        assert_brink_success("tests/set_addr_repeated_section.firm", None, None);
+        assert_firmion_success("tests/set_addr_repeated_section.firm", None, None);
     }
 
     #[test]
     fn set_addr_empty_child() {
         // Empty child with set_addr writes 0 bytes; parent addr must not change.
-        assert_brink_success("tests/set_addr_empty_child.firm", None, None);
+        assert_firmion_success("tests/set_addr_empty_child.firm", None, None);
     }
 
     #[test]
     fn set_addr_backward_child() {
         // Child set_addr to lower address; parent addr_base restored correctly.
-        assert_brink_success("tests/set_addr_backward_child.firm", None, None);
+        assert_firmion_success("tests/set_addr_backward_child.firm", None, None);
     }
 
     #[test]
     fn set_addr_inherit_addr_offset() {
         // Child with no set_addr inherits and continues parent addr_offset.
-        assert_brink_success("tests/set_addr_inherit_addr_offset.firm", None, None);
+        assert_firmion_success("tests/set_addr_inherit_addr_offset.firm", None, None);
     }
 
     #[test]
     fn set_addr_multi_in_child() {
         // Child calls set_addr twice; parent sees only the total byte count.
-        assert_brink_success("tests/set_addr_multi_in_child.firm", None, None);
+        assert_firmion_success("tests/set_addr_multi_in_child.firm", None, None);
     }
 
     #[test]
     fn output_addr_root_anchors_without_output_base_after_set_addr() {
         // __OUTPUT_ADDR should remain 0 when output has no base and first statement is set_addr.
-        assert_brink_success("tests/output_addr_section_set_addr.firm", None, None);
+        assert_firmion_success("tests/output_addr_section_set_addr.firm", None, None);
     }
 
     #[test]
     fn output_addr_root_anchors_with_output_base_after_set_addr() {
         // __OUTPUT_ADDR remains 0 even when set_addr is used inside the section.
-        assert_brink_success(
+        assert_firmion_success(
             "tests/output_addr_section_set_addr_with_output_base.firm",
             None,
             None,
@@ -1326,7 +1326,7 @@ mod tests {
     fn pad_sec_offset_after_set_addr_no_warn() {
         // set_addr as the first statement keeps addr_offset and sec_offset in
         // sync, so ERR_171 must not fire.
-        assert_brink_no_warning(
+        assert_firmion_no_warning(
             "tests/pad_sec_offset_after_set_addr_no_warn.firm",
             &["[ERR_171]"],
         );
@@ -1387,22 +1387,22 @@ mod tests {
     #[test]
     fn file_offset_overflow() {
         // pad_file_offset backwards (target < current) must produce ERR_146.
-        assert_brink_failure("tests/file_offset_overflow.firm", &["[ERR_146]"]);
+        assert_firmion_failure("tests/file_offset_overflow.firm", &["[ERR_146]"]);
     }
 
     #[test]
     fn wrf_1() {
-        assert_brink_success("tests/wrf_1.firm", Some("wrf_1.bin"), Some("Hello!"));
+        assert_firmion_success("tests/wrf_1.firm", Some("wrf_1.bin"), Some("Hello!"));
     }
 
     #[test]
     fn wrf_2() {
-        assert_brink_failure("tests/wrf_2.firm", &["[ERR_81]"]);
+        assert_firmion_failure("tests/wrf_2.firm", &["[ERR_81]"]);
     }
 
     #[test]
     fn wrf_3() {
-        assert_brink_failure("tests/wrf_3.firm", &["[ERR_80]"]);
+        assert_firmion_failure("tests/wrf_3.firm", &["[ERR_80]"]);
     }
 
     #[test]
@@ -1416,39 +1416,39 @@ mod tests {
     /// two forms agree on the byte count when the extension fills the section.
     #[test]
     fn extension_sizeof() {
-        assert_brink_success("tests/extension_sizeof.firm", None, None);
+        assert_firmion_success("tests/extension_sizeof.firm", None, None);
     }
 
     /// sizeof() with extension call syntax (arguments) is a compile error.
     #[test]
     fn sizeof_ext_name_with_args_fails() {
-        assert_brink_failure("tests/extension_sizeof_fail.firm", &["[ERR_35]"]);
+        assert_firmion_failure("tests/extension_sizeof_fail.firm", &["[ERR_35]"]);
     }
 
     /// Trying to use non-wr command on the extension output.
     #[test]
     fn extension_non_wr_1_fails() {
-        assert_brink_failure("tests/extension_non_wr_1.firm", &["[ERR_138]"]);
+        assert_firmion_failure("tests/extension_non_wr_1.firm", &["[ERR_138]"]);
     }
 
     /// Trying to use non-wr command on the extension output.
     #[test]
     fn extension_non_wr_2_fails() {
-        assert_brink_failure("tests/extension_non_wr_2.firm", &["[ERR_79]"]);
+        assert_firmion_failure("tests/extension_non_wr_2.firm", &["[ERR_79]"]);
     }
 
     /// A string const passed as an extension argument is valid at IRDb time but
     /// the extension rejects it at runtime with ERR_167.
     #[test]
     fn extension_str_arg_fails() {
-        assert_brink_failure("tests/extension_str_arg.firm", &["[ERR_167]"]);
+        assert_firmion_failure("tests/extension_str_arg.firm", &["[ERR_167]"]);
     }
 
     /// An integer followed by a string const as extension arguments; the extension
     /// rejects the string arg at runtime with ERR_167.
     #[test]
     fn extension_int_str_arg_fails() {
-        assert_brink_failure("tests/extension_int_str_arg.firm", &["[ERR_167]"]);
+        assert_firmion_failure("tests/extension_int_str_arg.firm", &["[ERR_167]"]);
     }
 
     /// sizeof(section) produces a numeric u64 and is valid as an extension
@@ -1628,20 +1628,20 @@ mod tests {
     /// fails when the extension rejects empty input.
     #[test]
     fn execute_extension_zero_length_section_failure() {
-        assert_brink_failure("tests/extension_zero_length_section_failure.firm", &[]);
+        assert_firmion_failure("tests/extension_zero_length_section_failure.firm", &[]);
     }
 
     /// Global asserts (outside any section) pass through the validation phase
     /// after all sections and extensions are fully written.
     #[test]
     fn global_assert_passes() {
-        assert_brink_success("tests/global_assert.firm", None, None);
+        assert_firmion_success("tests/global_assert.firm", None, None);
     }
 
     /// A global assert that evaluates false must emit ERR_126.
     #[test]
     fn global_assert_fails() {
-        assert_brink_failure("tests/global_assert_fail.firm", &["[ERR_126]"]);
+        assert_firmion_failure("tests/global_assert_fail.firm", &["[ERR_126]"]);
     }
 
     /// Assert that every error/warning/note code string passed to the diags API
@@ -1742,43 +1742,43 @@ mod tests {
     /// as the ambiguous-integer type and produces ERR_201.
     #[test]
     fn integer_overflow_i64() {
-        assert_brink_failure("tests/integer_overflow_i64.firm", &["[ERR_201]"]);
+        assert_firmion_failure("tests/integer_overflow_i64.firm", &["[ERR_201]"]);
     }
 
     /// A hex integer literal with a 'u' suffix that exceeds u64::MAX produces ERR_198.
     #[test]
     fn integer_overflow_u64() {
-        assert_brink_failure("tests/integer_overflow_u64.firm", &["[ERR_198]"]);
+        assert_firmion_failure("tests/integer_overflow_u64.firm", &["[ERR_198]"]);
     }
 
     /// K/M/G magnitude suffixes parse correctly in const expressions.
     #[test]
     fn kmg_suffix_1() {
-        assert_brink_success("tests/kmg_suffix_1.firm", None, None);
+        assert_firmion_success("tests/kmg_suffix_1.firm", None, None);
     }
 
     /// K/M/G magnitude suffix used in region size and section content.
     #[test]
     fn kmg_suffix_2() {
-        assert_brink_success("tests/kmg_suffix_2.firm", None, None);
+        assert_firmion_success("tests/kmg_suffix_2.firm", None, None);
     }
 
     /// Negative literals with K/M magnitude suffix produce correct I64 values.
     #[test]
     fn kmg_suffix_3() {
-        assert_brink_success("tests/kmg_suffix_3.firm", None, None);
+        assert_firmion_success("tests/kmg_suffix_3.firm", None, None);
     }
 
     /// K/M/G with u suffix: value * multiplier overflowing u64::MAX produces ERR_198.
     #[test]
     fn kmg_overflow_u64() {
-        assert_brink_failure("tests/kmg_overflow_u64.firm", &["[ERR_198]"]);
+        assert_firmion_failure("tests/kmg_overflow_u64.firm", &["[ERR_198]"]);
     }
 
     /// K/M/G on a const Integer: value * multiplier overflowing i64::MAX produces ERR_88.
     #[test]
     fn kmg_overflow_i64() {
-        assert_brink_failure("tests/kmg_overflow_i64.firm", &["[ERR_88]"]);
+        assert_firmion_failure("tests/kmg_overflow_i64.firm", &["[ERR_88]"]);
     }
 
     // -------------------------------------------------------------------------
@@ -1788,7 +1788,7 @@ mod tests {
     /// A basic integer const is defined and used as a wr8 operand.
     #[test]
     fn const_integer_1() {
-        assert_brink_success(
+        assert_firmion_success(
             "tests/const_integer_1.firm",
             Some("const_integer_1.bin"),
             None,
@@ -1798,19 +1798,19 @@ mod tests {
     /// A u64 const is defined and used as a wr64 operand.
     #[test]
     fn const_u64_1() {
-        assert_brink_success("tests/const_u64_1.firm", Some("const_u64_1.bin"), None);
+        assert_firmion_success("tests/const_u64_1.firm", Some("const_u64_1.bin"), None);
     }
 
     /// A const is defined as an arithmetic expression composed of two other consts.
     #[test]
     fn const_expr_1() {
-        assert_brink_success("tests/const_expr_1.firm", Some("const_expr_1.bin"), None);
+        assert_firmion_success("tests/const_expr_1.firm", Some("const_expr_1.bin"), None);
     }
 
     /// A const is defined as an arithmetic expression composed of two other consts.
     #[test]
     fn const_builtins_1() {
-        assert_brink_success(
+        assert_firmion_success(
             "tests/const_builtins_1.firm",
             Some("const_builtins_1.bin"),
             None,
@@ -1820,12 +1820,12 @@ mod tests {
     /// A three-deep const chain: C depends on B which depends on A.
     #[test]
     fn const_chain_1() {
-        assert_brink_success("tests/const_chain_1.firm", Some("const_chain_1.bin"), None);
+        assert_firmion_success("tests/const_chain_1.firm", Some("const_chain_1.bin"), None);
     }
 
     #[test]
     fn const_deferred_assignment_1() {
-        assert_brink_success(
+        assert_firmion_success(
             "tests/const_deferred_assignment_1.firm",
             Some("const_deferred_assignment_1.bin"),
             None,
@@ -1834,7 +1834,7 @@ mod tests {
 
     #[test]
     fn const_deferred_assignment_2() {
-        assert_brink_success(
+        assert_firmion_success(
             "tests/const_deferred_assignment_2.firm",
             Some("const_deferred_assignment_2.bin"),
             None,
@@ -1843,37 +1843,37 @@ mod tests {
 
     #[test]
     fn const_deferred_assignment_3() {
-        assert_brink_failure("tests/const_deferred_assignment_3.firm", &["[ERR_231]"]);
+        assert_firmion_failure("tests/const_deferred_assignment_3.firm", &["[ERR_231]"]);
     }
 
     #[test]
     fn const_deferred_assignment_4() {
-        assert_brink_failure("tests/const_deferred_assignment_4.firm", &["[ERR_231]"]);
+        assert_firmion_failure("tests/const_deferred_assignment_4.firm", &["[ERR_231]"]);
     }
 
     /// A const is declared before the consts it depends on in source order.
     /// Resolution must be order-independent since consts have global scope.
     #[test]
     fn const_rev_decl_1() {
-        assert_brink_failure("tests/const_rev_decl_1.firm", &["[ERR_86]"]);
+        assert_firmion_failure("tests/const_rev_decl_1.firm", &["[ERR_86]"]);
     }
 
     /// A malformed const expression.
     #[test]
     fn const_malformed_1() {
-        assert_brink_failure("tests/const_malformed_1.firm", &["[ERR_8]"]);
+        assert_firmion_failure("tests/const_malformed_1.firm", &["[ERR_8]"]);
     }
 
     /// No dynamic built-ins allowed in const
     #[test]
     fn const_builtins_2() {
-        assert_brink_failure("tests/const_builtins_2.firm", &["[ERR_85]"]);
+        assert_firmion_failure("tests/const_builtins_2.firm", &["[ERR_85]"]);
     }
 
     /// A const is used as one operand of an assert expression inside a section.
     #[test]
     fn const_in_assert_1() {
-        assert_brink_success(
+        assert_firmion_success(
             "tests/const_in_assert_1.firm",
             Some("const_in_assert_1.bin"),
             None,
@@ -1883,7 +1883,7 @@ mod tests {
     /// A string const is defined and used as a wrs operand.
     #[test]
     fn const_string_1() {
-        assert_brink_success(
+        assert_firmion_success(
             "tests/const_string_1.firm",
             Some("const_string_1.bin"),
             None,
@@ -1893,7 +1893,7 @@ mod tests {
     /// String const used as a wrf path (source literal).
     #[test]
     fn const_string_wrf_1() {
-        assert_brink_success(
+        assert_firmion_success(
             "tests/const_string_wrf_1.firm",
             Some("const_string_wrf_1.bin"),
             Some("Hello!"),
@@ -1956,7 +1956,7 @@ mod tests {
     /// A const identifier is used as the starting address via set_addr inside the section.
     #[test]
     fn const_as_output_addr_1() {
-        assert_brink_success(
+        assert_firmion_success(
             "tests/const_as_output_addr_1.firm",
             Some("const_as_output_addr_1.bin"),
             None,
@@ -1966,91 +1966,91 @@ mod tests {
     /// Two const declarations share the same name.
     #[test]
     fn const_duplicate_1() {
-        assert_brink_failure("tests/const_duplicate_1.firm", &["[ERR_25]"]);
+        assert_firmion_failure("tests/const_duplicate_1.firm", &["[ERR_25]"]);
     }
 
     /// Two const declarations share the same name.
     #[test]
     fn const_duplicate_2() {
-        assert_brink_failure("tests/const_duplicate_2.firm", &["[ERR_25]"]);
+        assert_firmion_failure("tests/const_duplicate_2.firm", &["[ERR_25]"]);
     }
 
     /// A const name collides with an existing section name.
     #[test]
     fn const_name_conflict_1() {
-        assert_brink_failure("tests/const_name_conflict_1.firm", &["[ERR_26]"]);
+        assert_firmion_failure("tests/const_name_conflict_1.firm", &["[ERR_26]"]);
     }
 
     /// Two consts mutually depend on each other, forming a cycle.
     #[test]
     fn const_circular_1() {
-        assert_brink_failure("tests/const_circular_1.firm", &["[ERR_86]"]);
+        assert_firmion_failure("tests/const_circular_1.firm", &["[ERR_86]"]);
     }
 
     /// Two consts mutually depend on each other, forming a cycle.
     #[test]
     fn const_circular_2() {
-        assert_brink_failure("tests/const_circular_2.firm", &["[ERR_86]"]);
+        assert_firmion_failure("tests/const_circular_2.firm", &["[ERR_86]"]);
     }
 
     /// A const expression depends on sizeof(), which requires engine-time layout.
     /// Consts must be resolvable before the engine runs.
     #[test]
     fn const_sizeof_1() {
-        assert_brink_failure("tests/const_sizeof_1.firm", &["[ERR_85]"]);
+        assert_firmion_failure("tests/const_sizeof_1.firm", &["[ERR_85]"]);
     }
 
     /// A const expression uses __OUTPUT_SIZE, which requires engine-time layout.
     /// Consts must be resolvable before the engine runs.
     #[test]
     fn output_builtin_const_fail() {
-        assert_brink_failure("tests/output_builtin_const_fail.firm", &["[ERR_85]"]);
+        assert_firmion_failure("tests/output_builtin_const_fail.firm", &["[ERR_85]"]);
     }
 
     /// A const expression depends on addr(), which requires engine-time addressing.
     /// Consts must be resolvable before the engine runs.
     #[test]
     fn const_abs_1() {
-        assert_brink_failure("tests/const_abs_1.firm", &["[ERR_85]"]);
+        assert_firmion_failure("tests/const_abs_1.firm", &["[ERR_85]"]);
     }
 
     /// A const expression references an identifier that is never defined.
     /// Expected: ERR_86.
     #[test]
     fn const_undefined_1() {
-        assert_brink_failure("tests/const_undefined_1.firm", &["[ERR_86]"]);
+        assert_firmion_failure("tests/const_undefined_1.firm", &["[ERR_86]"]);
     }
 
     /// A const expression applies arithmetic to a string-typed const.
     /// Expected: ERR_91.
     #[test]
     fn const_type_mismatch_1() {
-        assert_brink_failure("tests/const_type_mismatch_1.firm", &["[ERR_91]"]);
+        assert_firmion_failure("tests/const_type_mismatch_1.firm", &["[ERR_91]"]);
     }
 
     /// A const is defined but never used anywhere in the program.
     /// Expected: ERR_229 warning.
     #[test]
     fn const_unused_1() {
-        assert_brink_warning("tests/const_unused_1.firm", &["[ERR_229]"]);
+        assert_firmion_warning("tests/const_unused_1.firm", &["[ERR_229]"]);
     }
 
     /// An I64 const is defined and used as a wr8 operand.
     #[test]
     fn const_i64_1() {
-        assert_brink_success("tests/const_i64_1.firm", Some("const_i64_1.bin"), None);
+        assert_firmion_success("tests/const_i64_1.firm", Some("const_i64_1.bin"), None);
     }
 
     /// Const expressions exercising subtract, multiply, divide, and modulo.
     #[test]
     fn const_arith_1() {
-        assert_brink_success("tests/const_arith_1.firm", Some("const_arith_1.bin"), None);
+        assert_firmion_success("tests/const_arith_1.firm", Some("const_arith_1.bin"), None);
     }
 
     /// Const expressions exercising bitwise and, or, left shift, and right shift.
     #[test]
     fn const_bitwise_1() {
-        assert_brink_success(
+        assert_firmion_success(
             "tests/const_bitwise_1.firm",
             Some("const_bitwise_1.bin"),
             None,
@@ -2060,160 +2060,160 @@ mod tests {
     /// A const expression uses &&, which is now supported (added with if/else).
     #[test]
     fn const_bad_op_1() {
-        assert_brink_success("tests/const_bad_op_1.firm", None, None);
+        assert_firmion_success("tests/const_bad_op_1.firm", None, None);
     }
 
     /// A const integer literal overflows i64.
     /// Expected: ERR_88.
     #[test]
     fn const_bad_integer_1() {
-        assert_brink_failure("tests/const_bad_integer_1.firm", &["[ERR_88]"]);
+        assert_firmion_failure("tests/const_bad_integer_1.firm", &["[ERR_88]"]);
     }
 
     /// A const U64 literal overflows u64.
     /// Expected: ERR_89.
     #[test]
     fn const_bad_u64_1() {
-        assert_brink_failure("tests/const_bad_u64_1.firm", &["[ERR_89]"]);
+        assert_firmion_failure("tests/const_bad_u64_1.firm", &["[ERR_89]"]);
     }
 
     /// A const I64 literal overflows i64.
     /// Expected: ERR_90.
     #[test]
     fn const_bad_i64_1() {
-        assert_brink_failure("tests/const_bad_i64_1.firm", &["[ERR_90]"]);
+        assert_firmion_failure("tests/const_bad_i64_1.firm", &["[ERR_90]"]);
     }
 
     /// A const U64 addition overflows u64::MAX.
     /// Expected: ERR_93.
     #[test]
     fn const_overflow_1() {
-        assert_brink_failure("tests/const_overflow_1.firm", &["[ERR_93]"]);
+        assert_firmion_failure("tests/const_overflow_1.firm", &["[ERR_93]"]);
     }
 
     /// A const integer division by zero.
     /// Expected: ERR_94.
     #[test]
     fn const_divzero_1() {
-        assert_brink_failure("tests/const_divzero_1.firm", &["[ERR_94]"]);
+        assert_firmion_failure("tests/const_divzero_1.firm", &["[ERR_94]"]);
     }
 
     /// Const comparison operators ==, !=, >=, <= produce U64 0/1 results.
     #[test]
     fn const_cmp_1() {
-        assert_brink_success("tests/const_cmp_1.firm", Some("const_cmp_1.bin"), None);
+        assert_firmion_success("tests/const_cmp_1.firm", Some("const_cmp_1.bin"), None);
     }
 
     /// Comparing a numeric const with a string const is a type error.
     /// Expected: ERR_95.
     #[test]
     fn const_cmp_mismatch_1() {
-        assert_brink_failure("tests/const_cmp_mismatch_1.firm", &["[ERR_95]"]);
+        assert_firmion_failure("tests/const_cmp_mismatch_1.firm", &["[ERR_95]"]);
     }
 
     /// 'include' is reserved and cannot be used as a section name.
     #[test]
     fn reserved_section_1() {
-        assert_brink_failure("tests/reserved_section_1.firm", &["[ERR_27]"]);
+        assert_firmion_failure("tests/reserved_section_1.firm", &["[ERR_27]"]);
     }
 
     /// Identifiers starting with 'wr' are reserved as section names.
     #[test]
     fn reserved_section_2() {
-        assert_brink_failure("tests/reserved_section_2.firm", &["[ERR_27]"]);
+        assert_firmion_failure("tests/reserved_section_2.firm", &["[ERR_27]"]);
     }
 
     /// 'include' is reserved and cannot be used as a const name.
     #[test]
     fn reserved_const_1() {
-        assert_brink_failure("tests/reserved_const_1.firm", &["[ERR_28]"]);
+        assert_firmion_failure("tests/reserved_const_1.firm", &["[ERR_28]"]);
     }
 
     /// Identifiers starting with 'wr' are reserved as const names.
     #[test]
     fn reserved_const_2() {
-        assert_brink_failure("tests/reserved_const_2.firm", &["[ERR_28]"]);
+        assert_firmion_failure("tests/reserved_const_2.firm", &["[ERR_28]"]);
     }
 
     /// 'include' is reserved and cannot be used as a label name.
     #[test]
     fn reserved_label_1() {
-        assert_brink_failure("tests/reserved_label_1.firm", &["[ERR_212]"]);
+        assert_firmion_failure("tests/reserved_label_1.firm", &["[ERR_212]"]);
     }
 
     /// Identifiers starting with 'wr' are reserved as label names.
     #[test]
     fn reserved_label_2() {
-        assert_brink_failure("tests/reserved_label_2.firm", &["[ERR_212]"]);
+        assert_firmion_failure("tests/reserved_label_2.firm", &["[ERR_212]"]);
     }
 
     /// Identifiers starting with 'set_' are reserved as section names.
     #[test]
     fn reserved_section_3() {
-        assert_brink_failure("tests/reserved_section_3.firm", &["[ERR_27]"]);
+        assert_firmion_failure("tests/reserved_section_3.firm", &["[ERR_27]"]);
     }
 
     /// 'wrs' is a dedicated lexer token and cannot be used as a section name.
     /// The lexer rejects it before the reserved-identifier check fires.
     #[test]
     fn reserved_section_4() {
-        assert_brink_failure("tests/reserved_section_4.firm", &[]);
+        assert_firmion_failure("tests/reserved_section_4.firm", &[]);
     }
 
     /// 'wrf' is a dedicated lexer token and cannot be used as a section name.
     /// The lexer rejects it before the reserved-identifier check fires.
     #[test]
     fn reserved_section_5() {
-        assert_brink_failure("tests/reserved_section_5.firm", &[]);
+        assert_firmion_failure("tests/reserved_section_5.firm", &[]);
     }
 
     /// Identifiers starting with '__' are reserved as section names.
     #[test]
     fn reserved_section_6() {
-        assert_brink_failure("tests/reserved_section_6.firm", &["[ERR_27]"]);
+        assert_firmion_failure("tests/reserved_section_6.firm", &["[ERR_27]"]);
     }
 
     /// 'let' is reserved and cannot be used as a const name.
     #[test]
     fn reserved_const_3() {
-        assert_brink_failure("tests/reserved_const_3.firm", &["[ERR_28]"]);
+        assert_firmion_failure("tests/reserved_const_3.firm", &["[ERR_28]"]);
     }
 
     /// 'wrs' is a dedicated lexer token and cannot be used as a const name.
     /// The lexer rejects it before the reserved-identifier check fires.
     #[test]
     fn reserved_const_4() {
-        assert_brink_failure("tests/reserved_const_4.firm", &[]);
+        assert_firmion_failure("tests/reserved_const_4.firm", &[]);
     }
 
     /// Identifiers starting with '__' are reserved as const names.
     #[test]
     fn reserved_const_5() {
-        assert_brink_failure("tests/reserved_const_5.firm", &["[ERR_28]"]);
+        assert_firmion_failure("tests/reserved_const_5.firm", &["[ERR_28]"]);
     }
 
     /// 'true' is reserved and cannot be used as a label name.
     #[test]
     fn reserved_label_3() {
-        assert_brink_failure("tests/reserved_label_3.firm", &["[ERR_212]"]);
+        assert_firmion_failure("tests/reserved_label_3.firm", &["[ERR_212]"]);
     }
 
     /// 'wrs' is a reserved exact keyword and cannot be used as a label name.
     #[test]
     fn reserved_label_4() {
-        assert_brink_failure("tests/reserved_label_4.firm", &["[ERR_212]"]);
+        assert_firmion_failure("tests/reserved_label_4.firm", &["[ERR_212]"]);
     }
 
     /// Identifiers starting with '__' are reserved as label names.
     #[test]
     fn reserved_label_5() {
-        assert_brink_failure("tests/reserved_label_5.firm", &["[ERR_212]"]);
+        assert_firmion_failure("tests/reserved_label_5.firm", &["[ERR_212]"]);
     }
 
     /// 'wr' without a following digit is now a valid identifier prefix.
     #[test]
     fn wr_prefix_now_valid() {
-        assert_brink_success("tests/wr_prefix_now_valid.firm", None, None);
+        assert_firmion_success("tests/wr_prefix_now_valid.firm", None, None);
     }
 
     // ── Map file output tests ─────────────────────────────────────────────────
@@ -2606,27 +2606,27 @@ mod tests {
 
     #[test]
     fn include_missing_string() {
-        assert_brink_failure("tests/include_missing_string.firm", &["[ERR_29]"]);
+        assert_firmion_failure("tests/include_missing_string.firm", &["[ERR_29]"]);
     }
 
     #[test]
     fn include_missing_semi() {
-        assert_brink_failure("tests/include_missing_semi.firm", &["[ERR_30]"]);
+        assert_firmion_failure("tests/include_missing_semi.firm", &["[ERR_30]"]);
     }
 
     #[test]
     fn include_cycle() {
-        assert_brink_failure("tests/include_cycle.firm", &["[ERR_31]"]);
+        assert_firmion_failure("tests/include_cycle.firm", &["[ERR_31]"]);
     }
 
     #[test]
     fn include_cycle_multi() {
-        assert_brink_failure("tests/include_cycle_a.firm", &["[ERR_31]"]);
+        assert_firmion_failure("tests/include_cycle_a.firm", &["[ERR_31]"]);
     }
 
     #[test]
     fn include_missing_file() {
-        assert_brink_failure("tests/include_missing_file.firm", &["[ERR_32]"]);
+        assert_firmion_failure("tests/include_missing_file.firm", &["[ERR_32]"]);
     }
 
     #[test]
@@ -2779,7 +2779,7 @@ mod tests {
 
     #[test]
     fn invalid_namespace() {
-        assert_brink_failure("tests/invalid_namespace.firm", &["ERR_99"]);
+        assert_firmion_failure("tests/invalid_namespace.firm", &["ERR_99"]);
     }
 
     #[test]
@@ -2825,31 +2825,31 @@ mod tests {
     /// Two sections placed at the exact same address — complete overlap.
     #[test]
     fn addr_overwrite_1() {
-        assert_brink_failure("tests/addr_overwrite_1.firm", &["ERR_172"]);
+        assert_firmion_failure("tests/addr_overwrite_1.firm", &["ERR_172"]);
     }
 
     /// Second section starts inside the first section's range — partial overlap.
     #[test]
     fn addr_overwrite_2() {
-        assert_brink_failure("tests/addr_overwrite_2.firm", &["ERR_172"]);
+        assert_firmion_failure("tests/addr_overwrite_2.firm", &["ERR_172"]);
     }
 
     /// Second section is entirely contained within the first — engulfed overlap.
     #[test]
     fn addr_overwrite_3() {
-        assert_brink_failure("tests/addr_overwrite_3.firm", &["ERR_172"]);
+        assert_firmion_failure("tests/addr_overwrite_3.firm", &["ERR_172"]);
     }
 
     /// Two sections placed back-to-back with no gap — valid, no ERR_172.
     #[test]
     fn addr_no_overwrite_1() {
-        assert_brink_no_warning("tests/addr_no_overwrite_1.firm", &["ERR_172"]);
+        assert_firmion_no_warning("tests/addr_no_overwrite_1.firm", &["ERR_172"]);
     }
 
     /// Two sections with a gap between them — valid, no ERR_172.
     #[test]
     fn addr_no_overwrite_2() {
-        assert_brink_no_warning("tests/addr_no_overwrite_2.firm", &["ERR_172"]);
+        assert_firmion_no_warning("tests/addr_no_overwrite_2.firm", &["ERR_172"]);
     }
 
     // ── if/else tests ────────────────────────────────────────────────────────
@@ -2857,49 +2857,49 @@ mod tests {
     /// Condition true: then-branch value written to output.
     #[test]
     fn if_else_true_branch() {
-        assert_brink_success("tests/if_else_true_branch.firm", None, None);
+        assert_firmion_success("tests/if_else_true_branch.firm", None, None);
     }
 
     /// Condition false: else-branch value written to output.
     #[test]
     fn if_else_false_branch() {
-        assert_brink_success("tests/if_else_false_branch.firm", None, None);
+        assert_firmion_success("tests/if_else_false_branch.firm", None, None);
     }
 
     /// No else clause, condition true: assigned const used successfully.
     #[test]
     fn if_no_else() {
-        assert_brink_success("tests/if_no_else.firm", None, None);
+        assert_firmion_success("tests/if_no_else.firm", None, None);
     }
 
     /// else-if chain: correct branch selected.
     #[test]
     fn if_else_if_chain() {
-        assert_brink_success("tests/if_else_if_chain.firm", None, None);
+        assert_firmion_success("tests/if_else_if_chain.firm", None, None);
     }
 
     /// String comparison in if condition.
     #[test]
     fn if_string_compare() {
-        assert_brink_success("tests/if_string_compare.firm", None, None);
+        assert_firmion_success("tests/if_string_compare.firm", None, None);
     }
 
     /// print and assert inside an if/else body.
     #[test]
     fn if_print_assert() {
-        assert_brink_success("tests/if_print_assert.firm", None, None);
+        assert_firmion_success("tests/if_print_assert.firm", None, None);
     }
 
     /// Bare assignment to an undeclared name emits ERR_230.
     #[test]
     fn if_bare_assign_undeclared() {
-        assert_brink_failure("tests/if_bare_assign_undeclared.firm", &["ERR_230"]);
+        assert_firmion_failure("tests/if_bare_assign_undeclared.firm", &["ERR_230"]);
     }
 
     /// Declared-only const never assigned and never used: no ERR_229 warning.
     #[test]
     fn if_unused_declared() {
-        assert_brink_no_warning("tests/if_unused_declared.firm", &["ERR_229"]);
+        assert_firmion_no_warning("tests/if_unused_declared.firm", &["ERR_229"]);
     }
 
     /// A deferred assignment inside an if-block targets a const declared later
@@ -2907,21 +2907,21 @@ mod tests {
     /// has not been declared at the point the if-block executes.
     #[test]
     fn if_interleaved_order() {
-        assert_brink_failure("tests/if_interleaved_order.firm", &["ERR_230"]);
+        assert_firmion_failure("tests/if_interleaved_order.firm", &["ERR_230"]);
     }
 
     /// An if-block condition references a const defined later in source order.
     /// The const must not be visible to the if-block; expected ERR_86.
     #[test]
     fn if_full_const_after_if() {
-        assert_brink_failure("tests/if_full_const_after_if.firm", &["ERR_86"]);
+        assert_firmion_failure("tests/if_full_const_after_if.firm", &["ERR_86"]);
     }
 
     /// A top-level assert after an if-block that performs a deferred assignment
     /// must see the assigned value and pass.
     #[test]
     fn if_top_level_assert_phase() {
-        assert_brink_success("tests/if_top_level_assert_phase.firm", None, None);
+        assert_firmion_success("tests/if_top_level_assert_phase.firm", None, None);
     }
 
     // ── IRDB error path coverage ──────────────────────────────────────────────
@@ -2929,21 +2929,21 @@ mod tests {
     /// ERR_75: binary operator applied to two typed but incompatible operands
     #[test]
     fn irdb_1_type_mismatch() {
-        assert_brink_failure("tests/irdb_1_type_mismatch.firm", &["[ERR_206]"]);
+        assert_firmion_failure("tests/irdb_1_type_mismatch.firm", &["[ERR_206]"]);
     }
 
     /// ERR_79: wr8 operand is a quoted string rather than a numeric value.
     /// validate_numeric_1_or_2 must reject the non-integer first operand.
     #[test]
     fn irdb_9_wr_bad_type() {
-        assert_brink_failure("tests/irdb_9_wr_bad_type.firm", &["[ERR_79]"]);
+        assert_firmion_failure("tests/irdb_9_wr_bad_type.firm", &["[ERR_79]"]);
     }
 
     /// ERR_82: wrf path exists but is a directory, not a regular file.
     /// The is_file() check in validate_wrf_operands must reject it.
     #[test]
     fn irdb_14_wrf_dir() {
-        assert_brink_failure("tests/irdb_14_wrf_dir.firm", &["[ERR_82]"]);
+        assert_firmion_failure("tests/irdb_14_wrf_dir.firm", &["[ERR_82]"]);
     }
 
     /// ERR_92: arithmetic operator applied to a non-numeric type (QuotedString)
@@ -2951,7 +2951,7 @@ mod tests {
     /// final match arm after the reconciliation step passes.
     #[test]
     fn irdb_26_const_string_arith() {
-        assert_brink_failure("tests/irdb_26_const_string_arith.firm", &["[ERR_92]"]);
+        assert_firmion_failure("tests/irdb_26_const_string_arith.firm", &["[ERR_92]"]);
     }
 
     /// ERR_96: ordered comparison (>=) applied to two string operands in a
@@ -2959,28 +2959,28 @@ mod tests {
     /// must reject >= with ERR_96.
     #[test]
     fn irdb_30_const_str_ordered_cmp() {
-        assert_brink_failure("tests/irdb_30_const_str_ordered_cmp.firm", &["[ERR_96]"]);
+        assert_firmion_failure("tests/irdb_30_const_str_ordered_cmp.firm", &["[ERR_96]"]);
     }
 
     /// ERR_98: assert expression evaluates to false inside a const if/else body.
     /// exec_const_statements must emit ERR_98 when the assert condition is 0.
     #[test]
     fn irdb_32_const_assert_fails() {
-        assert_brink_failure("tests/irdb_32_const_assert_fails.firm", &["[ERR_98]"]);
+        assert_firmion_failure("tests/irdb_32_const_assert_fails.firm", &["[ERR_98]"]);
     }
 
     /// ERR_100: sizeof() applied to a namespace-qualified name not in the
     /// extension registry.  validate_operands must reject unknown SizeofExt names.
     #[test]
     fn irdb_44_unknown_sizeof_ext() {
-        assert_brink_failure("tests/irdb_44_unknown_sizeof_ext.firm", &["[ERR_100]"]);
+        assert_firmion_failure("tests/irdb_44_unknown_sizeof_ext.firm", &["[ERR_100]"]);
     }
 
     /// A Slice-kinded extension parameter receives a quoted string instead of a
     /// section name.  IRDb rejects the call with ERR_108.
     #[test]
     fn irdb_46_ranged_ext_bad_range() {
-        assert_brink_failure("tests/irdb_46_ranged_ext_bad_range.firm", &["[ERR_108]"]);
+        assert_firmion_failure("tests/irdb_46_ranged_ext_bad_range.firm", &["[ERR_108]"]);
     }
 
     // ── Named extension arguments ─────────────────────────────────────────────
@@ -3057,50 +3057,50 @@ mod tests {
     /// Mixed positional and named arguments in one call: AST rejects with ERR_35.
     #[test]
     fn ast_40_mixed_args() {
-        assert_brink_failure("tests/ast_40_mixed_args.firm", &["[ERR_35]"]);
+        assert_firmion_failure("tests/ast_40_mixed_args.firm", &["[ERR_35]"]);
     }
 
     /// Named argument with no value after '=': AST rejects with ERR_36.
     #[test]
     fn ast_41_empty_rhs() {
-        assert_brink_failure("tests/ast_41_empty_rhs.firm", &["[ERR_36]"]);
+        assert_firmion_failure("tests/ast_41_empty_rhs.firm", &["[ERR_36]"]);
     }
 
     /// Named argument with an unrecognized parameter name: IRDb rejects with ERR_104.
     #[test]
     fn irdb_48_unknown_param() {
-        assert_brink_failure("tests/irdb_48_unknown_param.firm", &["[ERR_104]"]);
+        assert_firmion_failure("tests/irdb_48_unknown_param.firm", &["[ERR_104]"]);
     }
 
     /// The same named parameter appears twice in one call: IRDb rejects with ERR_105.
     #[test]
     fn irdb_49_dup_param() {
-        assert_brink_failure("tests/irdb_49_dup_param.firm", &["[ERR_105]"]);
+        assert_firmion_failure("tests/irdb_49_dup_param.firm", &["[ERR_105]"]);
     }
 
     /// Named-arg call missing required parameters: IRDb emits ERR_107 for each absent param.
     #[test]
     fn irdb_51_missing_param() {
-        assert_brink_failure("tests/irdb_51_missing_param.firm", &["[ERR_107]"]);
+        assert_firmion_failure("tests/irdb_51_missing_param.firm", &["[ERR_107]"]);
     }
 
     /// Positional call with wrong argument count: IRDb rejects with ERR_109.
     #[test]
     fn irdb_53_positional_count() {
-        assert_brink_failure("tests/irdb_53_positional_count.firm", &["[ERR_109]"]);
+        assert_firmion_failure("tests/irdb_53_positional_count.firm", &["[ERR_109]"]);
     }
 
     /// Positional Slice argument names a section that does not exist: IRDb rejects with ERR_110.
     #[test]
     fn irdb_54_unknown_section() {
-        assert_brink_failure("tests/irdb_54_unknown_section.firm", &["[ERR_110]"]);
+        assert_firmion_failure("tests/irdb_54_unknown_section.firm", &["[ERR_110]"]);
     }
 
     /// ERR_83: wr repeat-count operand is a quoted string, not a numeric value.
     /// validate_numeric_1_or_2 rejects a non-integer second operand.
     #[test]
     fn irdb_15_wr_bad_repeat_type() {
-        assert_brink_failure("tests/irdb_15_wr_bad_repeat_type.firm", &["[ERR_83]"]);
+        assert_firmion_failure("tests/irdb_15_wr_bad_repeat_type.firm", &["[ERR_83]"]);
     }
 
     // ── Section-level if/else (Phase 1: runtime statements in const conditions) ──
@@ -3302,174 +3302,174 @@ mod tests {
 
     #[test]
     fn layout_empty_sizeof() {
-        assert_brink_failure("tests/layout_empty_sizeof.firm", &["[ERR_35]"]);
+        assert_firmion_failure("tests/layout_empty_sizeof.firm", &["[ERR_35]"]);
     }
 
     #[test]
     fn engine_infinite_loop() {
-        assert_brink_failure("tests/engine_infinite_loop.firm", &["[ERR_179]"]);
+        assert_firmion_failure("tests/engine_infinite_loop.firm", &["[ERR_179]"]);
     }
 
     #[test]
     fn engine_mmap_0_byte() {
-        assert_brink_failure("tests/engine_mmap_0_byte.firm", &["[ERR_167]"]);
+        assert_firmion_failure("tests/engine_mmap_0_byte.firm", &["[ERR_167]"]);
     }
 
     // ── Region system (Steps 3+4 AST layer) ─────────────────────────────────
 
     #[test]
     fn region_valid() {
-        assert_brink_success("tests/region_valid.firm", None, None);
+        assert_firmion_success("tests/region_valid.firm", None, None);
     }
 
     #[test]
     fn region_ast45_unknown_prop() {
-        assert_brink_failure("tests/region_ast45_unknown_prop.firm", &["[ERR_40]"]);
+        assert_firmion_failure("tests/region_ast45_unknown_prop.firm", &["[ERR_40]"]);
     }
 
     #[test]
     fn region_ast46_dup_prop() {
-        assert_brink_failure("tests/region_ast46_dup_prop.firm", &["[ERR_41]"]);
+        assert_firmion_failure("tests/region_ast46_dup_prop.firm", &["[ERR_41]"]);
     }
 
     #[test]
     fn region_ast47_missing_addr() {
-        assert_brink_failure("tests/region_ast47_missing_addr.firm", &["[ERR_42]"]);
+        assert_firmion_failure("tests/region_ast47_missing_addr.firm", &["[ERR_42]"]);
     }
 
     #[test]
     fn region_ast48_conflicts_section() {
-        assert_brink_failure("tests/region_ast48_conflicts_section.firm", &["[ERR_43]"]);
+        assert_firmion_failure("tests/region_ast48_conflicts_section.firm", &["[ERR_43]"]);
     }
 
     #[test]
     fn region_ast49_in_no_name() {
-        assert_brink_failure("tests/region_ast49_in_no_name.firm", &["[ERR_44]"]);
+        assert_firmion_failure("tests/region_ast49_in_no_name.firm", &["[ERR_44]"]);
     }
 
     #[test]
     fn region_ast56_undeclared() {
-        assert_brink_failure("tests/region_ast56_undeclared.firm", &["[ERR_51]"]);
+        assert_firmion_failure("tests/region_ast56_undeclared.firm", &["[ERR_51]"]);
     }
 
     #[test]
     fn region_ast57_dup_binding() {
-        assert_brink_failure("tests/region_ast57_dup_binding.firm", &["[ERR_52]"]);
+        assert_firmion_failure("tests/region_ast57_dup_binding.firm", &["[ERR_52]"]);
     }
 
     #[test]
     fn region_ast58_no_name() {
-        assert_brink_failure("tests/region_ast58_no_name.firm", &["[ERR_53]"]);
+        assert_firmion_failure("tests/region_ast58_no_name.firm", &["[ERR_53]"]);
     }
 
     #[test]
     fn region_ast59_no_brace() {
-        assert_brink_failure("tests/region_ast59_no_brace.firm", &["[ERR_54]"]);
+        assert_firmion_failure("tests/region_ast59_no_brace.firm", &["[ERR_54]"]);
     }
 
     #[test]
     fn region_ast60_dup_name() {
-        assert_brink_failure("tests/region_ast60_dup_name.firm", &["[ERR_55]"]);
+        assert_firmion_failure("tests/region_ast60_dup_name.firm", &["[ERR_55]"]);
     }
 
     #[test]
     fn region_ast61_reserved_name() {
-        assert_brink_failure("tests/region_ast61_reserved_name.firm", &["[ERR_56]"]);
+        assert_firmion_failure("tests/region_ast61_reserved_name.firm", &["[ERR_56]"]);
     }
 
     #[test]
     fn region_ast62_missing_eq() {
-        assert_brink_failure("tests/region_ast62_missing_eq.firm", &["[ERR_57]"]);
+        assert_firmion_failure("tests/region_ast62_missing_eq.firm", &["[ERR_57]"]);
     }
 
     #[test]
     fn region_ast63_conflicts_const() {
-        assert_brink_failure("tests/region_ast63_conflicts_const.firm", &["[ERR_58]"]);
+        assert_firmion_failure("tests/region_ast63_conflicts_const.firm", &["[ERR_58]"]);
     }
 
     #[test]
     fn region_ast64_missing_size() {
-        assert_brink_failure("tests/region_ast64_missing_size.firm", &["[ERR_59]"]);
+        assert_firmion_failure("tests/region_ast64_missing_size.firm", &["[ERR_59]"]);
     }
 
     #[test]
     fn region_anchor() {
-        assert_brink_success("tests/region_anchor.firm", None, None);
+        assert_firmion_success("tests/region_anchor.firm", None, None);
     }
 
     #[test]
     fn region_if_addr() {
-        assert_brink_success("tests/region_if_addr.firm", None, None);
+        assert_firmion_success("tests/region_if_addr.firm", None, None);
     }
 
     #[test]
     fn region_exec66() {
-        assert_brink_failure("tests/region_exec66.firm", &["[ERR_180]"]);
+        assert_firmion_failure("tests/region_exec66.firm", &["[ERR_180]"]);
     }
 
     #[test]
     fn region_exec72() {
-        assert_brink_failure("tests/region_exec72.firm", &["[ERR_185]"]);
+        assert_firmion_failure("tests/region_exec72.firm", &["[ERR_185]"]);
     }
 
     #[test]
     fn region_exec73() {
-        assert_brink_failure("tests/region_exec73.firm", &["[ERR_186]"]);
+        assert_firmion_failure("tests/region_exec73.firm", &["[ERR_186]"]);
     }
     #[test]
     fn region_nested() {
-        assert_brink_success("tests/region_nested.firm", None, None);
+        assert_firmion_success("tests/region_nested.firm", None, None);
     }
     #[test]
     /// Containment (FLASH1 fully inside FLASH) is allowed.  Previously expected
     /// ERR_183; now succeeds because containment is valid for nested sub-regions.
     fn region_nested_2() {
-        assert_brink_success("tests/region_nested_2.firm", None, None);
+        assert_firmion_success("tests/region_nested_2.firm", None, None);
     }
 
     #[test]
     fn region_nested_overflow() {
-        assert_brink_failure("tests/region_nested_overflow.firm", &["[ERR_186]"]);
+        assert_firmion_failure("tests/region_nested_overflow.firm", &["[ERR_186]"]);
     }
 
     #[test]
     fn region_addr_sizeof() {
-        assert_brink_success("tests/region_addr_sizeof.firm", None, None);
+        assert_firmion_success("tests/region_addr_sizeof.firm", None, None);
     }
 
     #[test]
     /// Partial overlap between two regions is allowed.  Writes within the
     /// intersection (A & B = [0x1080, 0x1100), 128 bytes) succeed.
     fn region_exec70_partial() {
-        assert_brink_success("tests/region_exec70_partial.firm", None, None);
+        assert_firmion_success("tests/region_exec70_partial.firm", None, None);
     }
 
     #[test]
     /// Inner section in B called from outer in A (partial overlap).
     /// Writing 192 bytes exceeds intersection size 128 -> ERR_186.
     fn region_exec73_partial_overlap() {
-        assert_brink_failure("tests/region_exec73_partial_overlap.firm", &["[ERR_186]"]);
+        assert_firmion_failure("tests/region_exec73_partial_overlap.firm", &["[ERR_186]"]);
     }
 
     #[test]
     /// Outer section in FLASH; inner section in CODE (CODE fully inside FLASH).
     /// Containment is allowed; effective constraint for inner is FLASH & CODE = CODE.
     fn region_nested_containment() {
-        assert_brink_success("tests/region_nested_containment.firm", None, None);
+        assert_firmion_success("tests/region_nested_containment.firm", None, None);
     }
 
     #[test]
     /// Inner section (no direct binding) inherits FLASH from outer.
     /// set_addr outside FLASH triggers ERR_185 via inherited region constraint.
     fn region_nested_exec72() {
-        assert_brink_failure("tests/region_nested_exec72.firm", &["[ERR_185]"]);
+        assert_firmion_failure("tests/region_nested_exec72.firm", &["[ERR_185]"]);
     }
 
     #[test]
     /// Inner section is bound to SRAM, which is disjoint from outer's FLASH.
     /// Empty intersection triggers ERR_190.
     fn region_nested_exec77() {
-        assert_brink_failure("tests/region_nested_exec77.firm", &["[ERR_190]"]);
+        assert_firmion_failure("tests/region_nested_exec77.firm", &["[ERR_190]"]);
     }
 
     #[test]
@@ -3477,7 +3477,7 @@ mod tests {
     /// B.addr (0x1000) is before A.addr (0x1080), so the section would anchor
     /// outside the parent region. ERR_191 must fire.
     fn region_exec78_bad_start() {
-        assert_brink_failure("tests/region_exec78_bad_start.firm", &["[ERR_191]"]);
+        assert_firmion_failure("tests/region_exec78_bad_start.firm", &["[ERR_191]"]);
     }
 
     #[test]
@@ -3485,7 +3485,7 @@ mod tests {
     /// Region-bound sections anchor to a fixed address; re-use is disallowed.
     /// ERR_192 must fire.
     fn region_exec79_reuse() {
-        assert_brink_failure("tests/region_exec79_reuse.firm", &["[ERR_192]"]);
+        assert_firmion_failure("tests/region_exec79_reuse.firm", &["[ERR_192]"]);
     }
 
     // ── obj / wr obj ──────────────────────────────────────────────────────────
@@ -3517,19 +3517,19 @@ mod tests {
     #[test]
     /// obj with a section name not present in the ELF fails with ERR_119.
     fn wrobj_bad_section() {
-        assert_brink_failure("tests/wrobj_bad_section.firm", &["[ERR_119]"]);
+        assert_firmion_failure("tests/wrobj_bad_section.firm", &["[ERR_119]"]);
     }
 
     #[test]
     /// obj with a non-existent file path fails with ERR_118.
     fn wrobj_bad_file() {
-        assert_brink_failure("tests/wrobj_bad_file.firm", &["[ERR_118]"]);
+        assert_firmion_failure("tests/wrobj_bad_file.firm", &["[ERR_118]"]);
     }
 
     #[test]
     /// obj block missing the required 'file' property fails with ERR_71.
     fn wrobj_wrong_args() {
-        assert_brink_failure("tests/wrobj_wrong_args.firm", &["[ERR_71]"]);
+        assert_firmion_failure("tests/wrobj_wrong_args.firm", &["[ERR_71]"]);
     }
 
     #[test]
@@ -3582,7 +3582,7 @@ mod tests {
     #[test]
     /// Integer const used as obj file path fails with ERR_228.
     fn wrobj_const_file_bad_type() {
-        assert_brink_failure("tests/wrobj_const_file_bad_type.firm", &["[ERR_228]"]);
+        assert_firmion_failure("tests/wrobj_const_file_bad_type.firm", &["[ERR_228]"]);
     }
 
     #[test]
@@ -3634,7 +3634,7 @@ mod tests {
     /// obj_lma() referencing a file that is not a recognized object format fails with ERR_120.
     /// Recognized non-ELF formats return VMA as the LMA by convention.
     fn obj_lma_non_elf() {
-        assert_brink_failure("tests/obj_lma_non_elf.firm", &["[ERR_120]"]);
+        assert_firmion_failure("tests/obj_lma_non_elf.firm", &["[ERR_120]"]);
     }
     /// Trace does not fire without -v; stdout is empty.
     #[test]
@@ -3722,7 +3722,7 @@ mod tests {
         // sizeof(A) is 0 on the first layout pass, making sizeof(A)-4 underflow
         // and align(sizeof(A)-4) receive a zero.  Both must be suppressed during
         // convergence and pass cleanly on the strict final pass.
-        assert_brink_success("tests/suppress_arith_err_1.firm", None, None);
+        assert_firmion_success("tests/suppress_arith_err_1.firm", None, None);
     }
 
     #[test]
@@ -3730,7 +3730,7 @@ mod tests {
         // sizeof(A) is 0 on the first layout pass, making 0x2000 - sizeof(A) = 0x2000
         // which is just outside the region.  The region bounds check must be skipped
         // during convergence; the strict final pass sees 0x1FFC which is valid.
-        assert_brink_success("tests/suppress_arith_err_2.firm", None, None);
+        assert_firmion_success("tests/suppress_arith_err_2.firm", None, None);
     }
 
     #[test]
@@ -3738,6 +3738,6 @@ mod tests {
         // addr(A) is circular: A is placed by B, so addr(A) always converges to 0,
         // which is genuinely outside region [0x1000, 0x2000).  ERR_185 must fire
         // on the strict final pass even though it was suppressed during convergence.
-        assert_brink_failure("tests/suppress_arith_err_3_fail.firm", &["ERR_185"]);
+        assert_firmion_failure("tests/suppress_arith_err_3_fail.firm", &["ERR_185"]);
     }
 } // mod tests

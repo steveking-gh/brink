@@ -8,7 +8,7 @@
 //
 // Output: 1 byte, XOR of all bytes in the region.
 
-use brink_extension::{BrinkExtension, ParamArg, ParamDesc, ParamKind};
+use firmion_extension::{BrinkExtension, ParamArg, ParamDesc, ParamKind};
 use extension_registry::ExtensionRegistry;
 
 pub struct Xor;

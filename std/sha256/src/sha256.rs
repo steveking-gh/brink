@@ -8,7 +8,7 @@
 //
 // Output: 32 bytes, big-endian digest (standard SHA-256 byte order).
 
-use brink_extension::{BrinkExtension, ParamArg, ParamDesc, ParamKind};
+use firmion_extension::{BrinkExtension, ParamArg, ParamDesc, ParamKind};
 use extension_registry::ExtensionRegistry;
 use sha2::{Digest, Sha256};
 

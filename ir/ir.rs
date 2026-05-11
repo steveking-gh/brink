@@ -523,10 +523,10 @@ pub struct IR {
 /// variable is accessed.  Add new compile-time builtins as fields here as the
 /// language grows.
 pub struct ConstBuiltins {
-    pub brink_version_string: &'static str,
-    pub brink_version_major: u64,
-    pub brink_version_minor: u64,
-    pub brink_version_patch: u64,
+    pub firmion_version_string: &'static str,
+    pub firmion_version_major: u64,
+    pub firmion_version_minor: u64,
+    pub firmion_version_patch: u64,
 }
 
 impl ConstBuiltins {
@@ -539,10 +539,10 @@ impl ConstBuiltins {
     pub fn from_version_str(version: &'static str) -> Self {
         let mut parts = version.splitn(3, '.');
         ConstBuiltins {
-            brink_version_string: version,
-            brink_version_major: parts.next().and_then(|s| s.parse().ok()).unwrap_or(0),
-            brink_version_minor: parts.next().and_then(|s| s.parse().ok()).unwrap_or(0),
-            brink_version_patch: parts.next().and_then(|s| s.parse().ok()).unwrap_or(0),
+            firmion_version_string: version,
+            firmion_version_major: parts.next().and_then(|s| s.parse().ok()).unwrap_or(0),
+            firmion_version_minor: parts.next().and_then(|s| s.parse().ok()).unwrap_or(0),
+            firmion_version_patch: parts.next().and_then(|s| s.parse().ok()).unwrap_or(0),
         }
     }
 
@@ -558,36 +558,36 @@ mod tests {
     #[test]
     fn parse_version_string_valid() {
         let b = ConstBuiltins::from_version_str("4.5.6");
-        assert_eq!(b.brink_version_string, "4.5.6");
-        assert_eq!(b.brink_version_major, 4);
-        assert_eq!(b.brink_version_minor, 5);
-        assert_eq!(b.brink_version_patch, 6);
+        assert_eq!(b.firmion_version_string, "4.5.6");
+        assert_eq!(b.firmion_version_major, 4);
+        assert_eq!(b.firmion_version_minor, 5);
+        assert_eq!(b.firmion_version_patch, 6);
     }
 
     #[test]
     fn parse_version_string_malformed_minor() {
         let b = ConstBuiltins::from_version_str("10.x");
-        assert_eq!(b.brink_version_string, "10.x");
-        assert_eq!(b.brink_version_major, 10);
-        assert_eq!(b.brink_version_minor, 0);
-        assert_eq!(b.brink_version_patch, 0);
+        assert_eq!(b.firmion_version_string, "10.x");
+        assert_eq!(b.firmion_version_major, 10);
+        assert_eq!(b.firmion_version_minor, 0);
+        assert_eq!(b.firmion_version_patch, 0);
     }
 
     #[test]
     fn parse_version_string_partial_only() {
         let b = ConstBuiltins::from_version_str("7");
-        assert_eq!(b.brink_version_string, "7");
-        assert_eq!(b.brink_version_major, 7);
-        assert_eq!(b.brink_version_minor, 0);
-        assert_eq!(b.brink_version_patch, 0);
+        assert_eq!(b.firmion_version_string, "7");
+        assert_eq!(b.firmion_version_major, 7);
+        assert_eq!(b.firmion_version_minor, 0);
+        assert_eq!(b.firmion_version_patch, 0);
     }
 
     #[test]
     fn parse_version_string_nonnumeric() {
         let b = ConstBuiltins::from_version_str("foo.bar.baz");
-        assert_eq!(b.brink_version_string, "foo.bar.baz");
-        assert_eq!(b.brink_version_major, 0);
-        assert_eq!(b.brink_version_minor, 0);
-        assert_eq!(b.brink_version_patch, 0);
+        assert_eq!(b.firmion_version_string, "foo.bar.baz");
+        assert_eq!(b.firmion_version_major, 0);
+        assert_eq!(b.firmion_version_minor, 0);
+        assert_eq!(b.firmion_version_patch, 0);
     }
 }

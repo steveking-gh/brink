@@ -81,7 +81,7 @@ pub enum ParamArg<'a> {
 /// # Example: numeric argument
 ///
 /// ```rust
-/// use brink_extension::{BrinkExtension, ParamArg};
+/// use firmion_extension::{BrinkExtension, ParamArg};
 ///
 /// pub struct MyCrc;
 ///
@@ -102,7 +102,7 @@ pub enum ParamArg<'a> {
 /// # Example: section argument
 ///
 /// ```rust
-/// use brink_extension::{BrinkExtension, ParamArg};
+/// use firmion_extension::{BrinkExtension, ParamArg};
 ///
 /// pub struct MyChecksum;
 ///

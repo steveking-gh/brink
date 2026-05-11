@@ -948,25 +948,25 @@ impl LayoutPhase {
     fn iterate_builtin_version_string(&mut self, ir: &IR) -> bool {
         assert!(ir.operands.len() == 1);
         self.parms[ir.operands[0]] =
-            ParameterValue::QuotedString(ConstBuiltins::get().brink_version_string.to_string());
+            ParameterValue::QuotedString(ConstBuiltins::get().firmion_version_string.to_string());
         true
     }
 
     fn iterate_builtin_version_major(&mut self, ir: &IR) -> bool {
         assert!(ir.operands.len() == 1);
-        *self.parms[ir.operands[0]].to_u64_mut() = ConstBuiltins::get().brink_version_major;
+        *self.parms[ir.operands[0]].to_u64_mut() = ConstBuiltins::get().firmion_version_major;
         true
     }
 
     fn iterate_builtin_version_minor(&mut self, ir: &IR) -> bool {
         assert!(ir.operands.len() == 1);
-        *self.parms[ir.operands[0]].to_u64_mut() = ConstBuiltins::get().brink_version_minor;
+        *self.parms[ir.operands[0]].to_u64_mut() = ConstBuiltins::get().firmion_version_minor;
         true
     }
 
     fn iterate_builtin_version_patch(&mut self, ir: &IR) -> bool {
         assert!(ir.operands.len() == 1);
-        *self.parms[ir.operands[0]].to_u64_mut() = ConstBuiltins::get().brink_version_patch;
+        *self.parms[ir.operands[0]].to_u64_mut() = ConstBuiltins::get().firmion_version_patch;
         true
     }
 
