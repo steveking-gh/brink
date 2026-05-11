@@ -2183,12 +2183,12 @@ The command line option `--list-extensions` outputs the names of all available
 extensions as enabled by Cargo feature flags.  The following table shows the
 currently support standard extensions.
 
-| Extension   | Description                                     |
-| ----------- | ----------------------------------------------- |
-| std::crc32c | 32-bit CRC32-C Castagnoli polynomial 0x1EDC6F41 |
-| std::md5    | 128-bit MD5 hash                                |
-| std::sha256 | 256-bit SHA-256 hash                            |
-| std::esp_checksum    | 8-bit simple XOR hash                           |
+| Extension         | Description                                     |
+| ----------------- | ----------------------------------------------- |
+| std::crc32c       | 32-bit CRC32-C Castagnoli polynomial 0x1EDC6F41 |
+| std::md5          | 128-bit MD5 hash                                |
+| std::sha256       | 256-bit SHA-256 hash                            |
+| std::esp_checksum | 8-bit simple XOR hash                           |
 
 ---
 
