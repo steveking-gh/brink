@@ -2075,10 +2075,10 @@ because their values depend on dynamic layout values.
 | ------------------------ | -------- | -------------- | ----------------------------------------------------------------------------------- |
 | `__OUTPUT_SIZE`          | `U64`    | No             | Total output size in bytes.  Equivalent to `sizeof(<output-section>)`.              |
 | `__OUTPUT_ADDR`          | `U64`    | No             | Address of output section at SectionStart.  Equivalent to `addr(<output-section>)`. |
-| `__BRINK_VERSION_STRING` | `String` | Yes            | Firmion version as a string, e.g. `"4.3.2"`.                                          |
-| `__BRINK_VERSION_MAJOR`  | `U64`    | Yes            | Major version component, e.g. "4" in "4.3.2"                                        |
-| `__BRINK_VERSION_MINOR`  | `U64`    | Yes            | Minor version component, e.g. "3" in "4.3.2"                                        |
-| `__BRINK_VERSION_PATCH`  | `U64`    | Yes            | Patch version component, e.g. "2" in "4.3.2"                                        |
+| `__FIRMION_VERSION_STRING` | `String` | Yes            | Firmion version as a string, e.g. `"4.3.2"`.                                          |
+| `__FIRMION_VERSION_MAJOR`  | `U64`    | Yes            | Major version component, e.g. "4" in "4.3.2"                                        |
+| `__FIRMION_VERSION_MINOR`  | `U64`    | Yes            | Minor version component, e.g. "3" in "4.3.2"                                        |
+| `__FIRMION_VERSION_PATCH`  | `U64`    | Yes            | Patch version component, e.g. "2" in "4.3.2"                                        |
 
 ## `__OUTPUT_SIZE`
 
@@ -2134,7 +2134,7 @@ Example — embed the output base address in a table:
 
     output image;
 
-## `__BRINK_VERSION_STRING`
+## `__FIRMION_VERSION_STRING`
 
 Returns the Firmion tool version as a string (e.g. `"4.0.0"`).  The value is fixed
 at compile time and may be used in `const` expressions, `wrs`, and `print`.
@@ -2142,7 +2142,7 @@ at compile time and may be used in `const` expressions, `wrs`, and `print`.
 Example — stamp the tool version into a firmware header:
 
     section hdr {
-        wrs __BRINK_VERSION_STRING;
+        wrs __FIRMION_VERSION_STRING;
     }
 
     section image {
@@ -2152,7 +2152,7 @@ Example — stamp the tool version into a firmware header:
 
     output image;
 
-## `__BRINK_VERSION_MAJOR`, `__BRINK_VERSION_MINOR`, `__BRINK_VERSION_PATCH`
+## `__FIRMION_VERSION_MAJOR`, `__FIRMION_VERSION_MINOR`, `__FIRMION_VERSION_PATCH`
 
 Return the individual numeric components of the Firmion version as `U64` values.
 All three are fixed at compile time and may be used in `const` expressions and
@@ -2163,10 +2163,10 @@ Example — pack the version into a 3-byte field and assert the tool is new enou
     const MIN_MAJOR = 4u;
 
     section hdr {
-        assert __BRINK_VERSION_MAJOR >= MIN_MAJOR;
-        wr8 __BRINK_VERSION_MAJOR;
-        wr8 __BRINK_VERSION_MINOR;
-        wr8 __BRINK_VERSION_PATCH;
+        assert __FIRMION_VERSION_MAJOR >= MIN_MAJOR;
+        wr8 __FIRMION_VERSION_MAJOR;
+        wr8 __FIRMION_VERSION_MINOR;
+        wr8 __FIRMION_VERSION_PATCH;
     }
 
     section image {

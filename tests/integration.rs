@@ -503,13 +503,13 @@ mod tests {
         assert_firmion_success("tests/sizeof_3.firm", Some("sizeof_3.bin"), Some("Wow!"));
     }
 
-    /// __BRINK_VERSION_STRING can be written with wrs and used in print.
+    /// __FIRMION_VERSION_STRING can be written with wrs and used in print.
     #[test]
     fn version_string_1() {
         assert_firmion_success("tests/version_string_1.firm", None, None);
     }
 
-    /// __BRINK_VERSION_MAJOR/MINOR/PATCH are U64 values usable in expressions.
+    /// __FIRMION_VERSION_MAJOR/MINOR/PATCH are U64 values usable in expressions.
     #[test]
     fn version_numeric_1() {
         assert_firmion_success("tests/version_numeric_1.firm", None, None);

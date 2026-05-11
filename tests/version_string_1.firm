@@ -1,8 +1,8 @@
-// __BRINK_VERSION_STRING writes the tool version into the output.
+// __FIRMION_VERSION_STRING writes the tool version into the output.
 // Also verifies it can be used in a print statement.
 section image {
-    print "Firmion version: ", __BRINK_VERSION_STRING, "\n";
-    wrs __BRINK_VERSION_STRING;
+    print "Firmion version: ", __FIRMION_VERSION_STRING, "\n";
+    wrs __FIRMION_VERSION_STRING;
 }
 
 output image;

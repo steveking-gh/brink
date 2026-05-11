@@ -10,7 +10,7 @@
   - Intrinsics: sizeof, to_u64, to_i64
   - Address functions: addr, addr_offset, sec_offset, file_offset
   - Diagnostics: assert, print
-  - Built-in constants: __OUTPUT_SIZE, __OUTPUT_ADDR, __BRINK_VERSION_*
+  - Built-in constants: __OUTPUT_SIZE, __OUTPUT_ADDR, __FIRMION_VERSION_*
   - Namespaced extensions: std::md5, std::sha256, std::crc32c
   - Labels, numeric literals (hex, binary, decimal, negative, typed), strings, comments
 - Auto-close for `{}`, `()`, `""`
