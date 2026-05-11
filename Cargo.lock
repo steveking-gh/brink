@@ -94,7 +94,7 @@ dependencies = [
 
 [[package]]
 name = "ast"
-version = "8.0.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "depth_guard",
@@ -105,7 +105,7 @@ dependencies = [
 
 [[package]]
 name = "astdb"
-version = "8.0.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "ast",
@@ -207,7 +207,7 @@ checksum = "a6ef517f0926dd24a1582492c791b6a4818a4d94e789a334894aa15b0d12f55c"
 
 [[package]]
 name = "const_eval"
-version = "8.0.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "ast",
@@ -251,11 +251,11 @@ dependencies = [
 
 [[package]]
 name = "depth_guard"
-version = "8.0.0"
+version = "0.7.0"
 
 [[package]]
 name = "diags"
-version = "8.0.0"
+version = "0.7.0"
 dependencies = [
  "ariadne",
 ]
@@ -285,7 +285,7 @@ checksum = "48c757948c5ede0e46177b7add2e67155f70e33c07fea8284df6576da70b3719"
 
 [[package]]
 name = "exec_phase"
-version = "8.0.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "diags",
@@ -301,7 +301,7 @@ dependencies = [
 
 [[package]]
 name = "extension_registry"
-version = "8.0.0"
+version = "0.7.0"
 dependencies = [
  "firmion_extension",
  "tracing",
@@ -310,7 +310,7 @@ dependencies = [
 
 [[package]]
 name = "extensions"
-version = "8.0.0"
+version = "0.7.0"
 dependencies = [
  "extension_registry",
  "std_crc32c",
@@ -322,7 +322,7 @@ dependencies = [
 
 [[package]]
 name = "firmion"
-version = "8.0.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -338,7 +338,7 @@ dependencies = [
 
 [[package]]
 name = "firmion_extension"
-version = "8.0.0"
+version = "0.7.0"
 
 [[package]]
 name = "float-cmp"
@@ -425,7 +425,7 @@ dependencies = [
 
 [[package]]
 name = "ir"
-version = "8.0.0"
+version = "0.7.0"
 dependencies = [
  "diags",
  "parse_int",
@@ -434,7 +434,7 @@ dependencies = [
 
 [[package]]
 name = "irdb"
-version = "8.0.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "diags",
@@ -480,7 +480,7 @@ checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
 name = "layout_phase"
-version = "8.0.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "ast",
@@ -497,7 +497,7 @@ dependencies = [
 
 [[package]]
 name = "layoutdb"
-version = "8.0.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "ast",
@@ -525,7 +525,7 @@ checksum = "52ff2c0fe9bc6cb6b14a0592c2ff4fa9ceb83eea9db979b0487cd054946a2b8f"
 
 [[package]]
 name = "linearizer"
-version = "8.0.0"
+version = "0.7.0"
 dependencies = [
  "ast",
  "depth_guard",
@@ -561,7 +561,7 @@ checksum = "5e5032e24019045c762d3c0f28f5b6b8bbf38563a65908389bf7978758920897"
 
 [[package]]
 name = "map_phase"
-version = "8.0.0"
+version = "0.7.0"
 dependencies = [
  "diags",
  "ir",
@@ -641,7 +641,7 @@ dependencies = [
 
 [[package]]
 name = "objfile"
-version = "8.0.0"
+version = "0.7.0"
 dependencies = [
  "diags",
  "ir",
@@ -662,7 +662,7 @@ checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
 name = "output_buffer"
-version = "8.0.0"
+version = "0.7.0"
 
 [[package]]
 name = "parking_lot"
@@ -743,7 +743,7 @@ dependencies = [
 
 [[package]]
 name = "process"
-version = "8.0.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "ast",
@@ -816,7 +816,7 @@ checksum = "dc897dd8d9e8bd1ed8cdad82b5966c3e0ecae09fb1907d58efaa013543185d0a"
 
 [[package]]
 name = "regiondb"
-version = "8.0.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "diags",
@@ -963,7 +963,7 @@ checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 
 [[package]]
 name = "std_crc32c"
-version = "8.0.0"
+version = "0.7.0"
 dependencies = [
  "assert_cmd",
  "crc32c",
@@ -974,7 +974,7 @@ dependencies = [
 
 [[package]]
 name = "std_esp_checksum"
-version = "8.0.0"
+version = "0.7.0"
 dependencies = [
  "assert_cmd",
  "extension_registry",
@@ -984,7 +984,7 @@ dependencies = [
 
 [[package]]
 name = "std_md5"
-version = "8.0.0"
+version = "0.7.0"
 dependencies = [
  "assert_cmd",
  "extension_registry",
@@ -995,7 +995,7 @@ dependencies = [
 
 [[package]]
 name = "std_sha256"
-version = "8.0.0"
+version = "0.7.0"
 dependencies = [
  "assert_cmd",
  "extension_registry",
@@ -1006,7 +1006,7 @@ dependencies = [
 
 [[package]]
 name = "std_xor"
-version = "8.0.0"
+version = "0.7.0"
 dependencies = [
  "assert_cmd",
  "extension_registry",
@@ -1043,7 +1043,7 @@ dependencies = [
 
 [[package]]
 name = "symtable"
-version = "8.0.0"
+version = "0.7.0"
 dependencies = [
  "diags",
  "ir",
@@ -1178,7 +1178,7 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "validation_phase"
-version = "8.0.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "diags",

@@ -6,9 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic
 Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [8.0.0] - 2026-05-05
+## [0.7.0] - 2026-05-05
 
 - CHANGED: Renamed 'brink' to 'firmion'
+- CHANGED: restarted version enumeration with firmion-v0.7.0
+- CHANGED: Unify all error codes as ERR_n
 - REMOVED: Removed support for old style extension args
 - ADDED: Support for `obj` external ELF format file sections.
 - ADDED: Support for `obj_lma`, `obj_vma`, `obj_align`
@@ -21,7 +23,6 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - FIXED: Print and assert execution order
 - FIXED: Command line string args on Windows
 - FIXED: Suppress error caused by transient layout values.
-- CHANGED: Unify all error codes as ERR_<n>
 - README: Added Brink features overview to the introduction
 - README: Added Brink standard extensions table
 - README: Execution order is now more rigorously specified
