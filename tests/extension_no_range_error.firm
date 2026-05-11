@@ -1,4 +1,4 @@
-// Error case: firmion::test_ranged_sum is a BrinkExtension but is called
+// Error case: firmion::test_ranged_sum is a FirmionExtension but is called
 // with no range specifier.  Firmion must reject this at IRDB time with ERR_101.
 section top {
     wr8 0x01;

@@ -2,7 +2,7 @@
 //
 // This crate defines the public API for Firmion extension authors.
 //
-// BrinkExtension -- the single trait all extensions implement.
+// FirmionExtension -- the single trait all extensions implement.
 //
 // ExtArg -- typed argument passed to execute().  Each parameter passed
 // to an extension in Firmion code maps to one ExtArg passed to the extension
@@ -45,7 +45,7 @@ pub enum ParamKind {
 
 /// Describes one declared parameter of an extension.
 ///
-/// An extension returns a slice of `ParamDesc` from [`BrinkExtension::params`]
+/// An extension returns a slice of `ParamDesc` from [`FirmionExtension::params`]
 /// to opt into named-argument call sites.
 #[derive(Debug, Clone, Copy)]
 pub struct ParamDesc {
@@ -81,11 +81,11 @@ pub enum ParamArg<'a> {
 /// # Example: numeric argument
 ///
 /// ```rust
-/// use firmion_extension::{BrinkExtension, ParamArg};
+/// use firmion_extension::{FirmionExtension, ParamArg};
 ///
 /// pub struct MyCrc;
 ///
-/// impl BrinkExtension for MyCrc {
+/// impl FirmionExtension for MyCrc {
 ///     fn name(&self) -> &str { "my_org::crc" }
 ///     fn size(&self) -> usize { 4 }
 ///     fn execute<'a>(&self, args: &[ParamArg<'a>], out: &mut [u8]) -> Result<(), String> {
@@ -102,11 +102,11 @@ pub enum ParamArg<'a> {
 /// # Example: section argument
 ///
 /// ```rust
-/// use firmion_extension::{BrinkExtension, ParamArg};
+/// use firmion_extension::{FirmionExtension, ParamArg};
 ///
 /// pub struct MyChecksum;
 ///
-/// impl BrinkExtension for MyChecksum {
+/// impl FirmionExtension for MyChecksum {
 ///     fn name(&self) -> &str { "my_org::checksum" }
 ///     fn size(&self) -> usize { 8 }
 ///     fn execute<'a>(&self, args: &[ParamArg<'a>], out: &mut [u8]) -> Result<(), String> {
@@ -120,7 +120,7 @@ pub enum ParamArg<'a> {
 ///     }
 /// }
 /// ```
-pub trait BrinkExtension {
+pub trait FirmionExtension {
     /// Returns the namespace-qualified name used to invoke the extension.
     /// For example, `"my_org::crc"`. The `firmion` and `std` namespaces are
     /// reserved for internal use.

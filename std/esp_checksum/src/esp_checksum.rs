@@ -23,12 +23,12 @@
 // section.
 //
 
-use firmion_extension::{BrinkExtension, ParamArg, ParamDesc, ParamKind};
+use firmion_extension::{FirmionExtension, ParamArg, ParamDesc, ParamKind};
 use extension_registry::ExtensionRegistry;
 
 pub struct EspChecksum;
 
-impl BrinkExtension for EspChecksum {
+impl FirmionExtension for EspChecksum {
     fn name(&self) -> &str {
         "std::esp_checksum"
     }

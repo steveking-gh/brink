@@ -125,19 +125,19 @@ crates:
 
   ext:
     path: ext/
-    role: Extension registry and dispatch; re-exports BrinkExtension and ExtArg
+    role: Extension registry and dispatch; re-exports FirmionExtension and ExtArg
     key_types: [ExtensionEntry, ExtensionRegistry]
     key_fns: [register, get]
 
   firmion_extension:
     path: firmion_extension/
     role: Public extension API traits
-    key_types: [BrinkExtension, ExtArg]
+    key_types: [FirmionExtension, ExtArg]
     notes: >
       ExtArg<'a> enum: Int(u64), Str(&str),
       Section { start: u64, len: u64, data: &[u8] }.
-      All extensions implement BrinkExtension::execute<'a>(&self, &[ExtArg<'a>], &mut [u8]).
-      BrinkRangedExtension removed; section data arrives via ExtArg::Section in args[0].
+      All extensions implement FirmionExtension::execute<'a>(&self, &[ExtArg<'a>], &mut [u8]).
+      FirmionRangedExtension removed; section data arrives via ExtArg::Section in args[0].
 
   process:
     path: process/process.rs

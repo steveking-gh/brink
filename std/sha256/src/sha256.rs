@@ -8,13 +8,13 @@
 //
 // Output: 32 bytes, big-endian digest (standard SHA-256 byte order).
 
-use firmion_extension::{BrinkExtension, ParamArg, ParamDesc, ParamKind};
+use firmion_extension::{FirmionExtension, ParamArg, ParamDesc, ParamKind};
 use extension_registry::ExtensionRegistry;
 use sha2::{Digest, Sha256};
 
 pub struct Sha256Ext;
 
-impl BrinkExtension for Sha256Ext {
+impl FirmionExtension for Sha256Ext {
     fn name(&self) -> &str {
         "std::sha256"
     }

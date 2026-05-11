@@ -2206,7 +2206,7 @@ Firmion requires compile time construction to eliminate ABI incompatibilities an
 enable the use of safe Rust.  The following bullets provide an overview of how
 extensions work:
 
-- Extensions interact with Firmion through the `BrinkExtension` trait.
+- Extensions interact with Firmion through the `FirmionExtension` trait.
 
 - Extensions can read directly from the output buffer for a specified section
   via zero-copy and safe-memory slices (`&[u8]`).
@@ -2226,7 +2226,7 @@ extensions work:
 - Extensions register themselves at compile time in Firmion's internal extension
   registry.
 
-- The `BrinkExtension` trait interface allows extensions to return logging and
+- The `FirmionExtension` trait interface allows extensions to return logging and
   error diagnostics integrated with Firmion's own diagnostic output.  See []
 
 ---
@@ -2324,15 +2324,15 @@ extension requires no changes outside `extensions/`.
 
 Place new extensions under `std/` for proposed standard library extensions, or
 under a workspace path matching your namespace for third-party extensions.
-Implement the `BrinkExtension` trait from the `firmion_extension` crate.
+Implement the `FirmionExtension` trait from the `firmion_extension` crate.
 
     // my_extension/src/lib.rs
-    use firmion_extension::BrinkExtension;
+    use firmion_extension::FirmionExtension;
     use extension_registry::ExtensionRegistry;
 
     pub struct MyExtension;
 
-    impl BrinkExtension for MyExtension {
+    impl FirmionExtension for MyExtension {
         fn name(&self) -> &str { "my_ns::my_ext" }
         fn size(&self) -> usize { 4 }
         fn execute(&self, _args: &[u64], img: &[u8], out: &mut [u8]) -> Result<(), String> {

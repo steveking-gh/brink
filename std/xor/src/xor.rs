@@ -8,12 +8,12 @@
 //
 // Output: 1 byte, XOR of all bytes in the region.
 
-use firmion_extension::{BrinkExtension, ParamArg, ParamDesc, ParamKind};
+use firmion_extension::{FirmionExtension, ParamArg, ParamDesc, ParamKind};
 use extension_registry::ExtensionRegistry;
 
 pub struct Xor;
 
-impl BrinkExtension for Xor {
+impl FirmionExtension for Xor {
     fn name(&self) -> &str {
         "std::xor"
     }

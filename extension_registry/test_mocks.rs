@@ -20,7 +20,7 @@ impl Default for MockCrc {
     }
 }
 
-impl BrinkExtension for MockCrc {
+impl FirmionExtension for MockCrc {
     fn name(&self) -> &str {
         "firmion::test_crc"
     }
@@ -70,7 +70,7 @@ impl Default for MockLogger {
     }
 }
 
-impl BrinkExtension for MockLogger {
+impl FirmionExtension for MockLogger {
     fn name(&self) -> &str {
         "firmion::test_logger"
     }
@@ -109,7 +109,7 @@ impl Default for MockIncrement {
     }
 }
 
-impl BrinkExtension for MockIncrement {
+impl FirmionExtension for MockIncrement {
     fn name(&self) -> &str {
         "firmion::test_increment"
     }
@@ -164,7 +164,7 @@ impl Default for MockRangedSum {
     }
 }
 
-impl BrinkExtension for MockRangedSum {
+impl FirmionExtension for MockRangedSum {
     fn name(&self) -> &str {
         "firmion::test_ranged_sum"
     }
@@ -217,7 +217,7 @@ impl Default for MockRejectEmpty {
     }
 }
 
-impl BrinkExtension for MockRejectEmpty {
+impl FirmionExtension for MockRejectEmpty {
     fn name(&self) -> &str {
         "firmion::test_reject_empty"
     }
@@ -251,7 +251,7 @@ impl BrinkExtension for MockRejectEmpty {
 /// Rejects calls with any argument count other than 8.
 pub struct MockSum8;
 
-impl BrinkExtension for MockSum8 {
+impl FirmionExtension for MockSum8 {
     fn name(&self) -> &str {
         "firmion::test_sum8"
     }
@@ -298,7 +298,7 @@ impl BrinkExtension for MockSum8 {
 /// Writes the constant value 0x12345678 (big-endian) with no call-site args.
 pub struct MockNoArgs;
 
-impl BrinkExtension for MockNoArgs {
+impl FirmionExtension for MockNoArgs {
     fn name(&self) -> &str {
         "firmion::no_args"
     }
@@ -317,7 +317,7 @@ impl BrinkExtension for MockNoArgs {
 /// location counter when written after any prior byte. Used to test ERR_177.
 pub struct MockHugeExt;
 
-impl BrinkExtension for MockHugeExt {
+impl FirmionExtension for MockHugeExt {
     fn name(&self) -> &str {
         "firmion::test_huge_ext"
     }

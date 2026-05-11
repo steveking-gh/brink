@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-pub use firmion_extension::{BrinkExtension, ParamArg, ParamDesc, ParamKind};
+pub use firmion_extension::{FirmionExtension, ParamArg, ParamDesc, ParamKind};
 
 /// Owns a registered extension alongside its cached metadata.
 ///
@@ -8,9 +8,9 @@ pub use firmion_extension::{BrinkExtension, ParamArg, ParamDesc, ParamKind};
 /// and stores the results here.  All internal lookups use cached values rather
 /// than calling the extension again.
 pub struct ExtensionEntry {
-    pub extension: Box<dyn BrinkExtension>,
+    pub extension: Box<dyn FirmionExtension>,
     pub cached_size: usize,
-    /// Parameter declarations cached from `BrinkExtension::params()`.
+    /// Parameter declarations cached from `FirmionExtension::params()`.
     /// Empty when the extension opts out of named-argument enforcement.
     pub cached_params: Vec<ParamDesc>,
 }
@@ -41,10 +41,10 @@ impl ExtensionRegistry {
         }
     }
 
-    /// Registers an extension. Calls `BrinkExtension::size` exactly once and
+    /// Registers an extension. Calls `FirmionExtension::size` exactly once and
     /// caches the result. Panics if an extension with the same name is already
     /// registered.
-    pub fn register(&mut self, ext: Box<dyn BrinkExtension>) {
+    pub fn register(&mut self, ext: Box<dyn FirmionExtension>) {
         let name = ext.name().to_string();
         assert!(
             !self.extensions.contains_key(&name),

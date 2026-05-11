@@ -8,13 +8,13 @@
 //
 // Output: 16 bytes, standard MD5 byte order.
 
-use firmion_extension::{BrinkExtension, ParamArg, ParamDesc, ParamKind};
+use firmion_extension::{FirmionExtension, ParamArg, ParamDesc, ParamKind};
 use extension_registry::ExtensionRegistry;
 use md5::{Digest, Md5};
 
 pub struct Md5Ext;
 
-impl BrinkExtension for Md5Ext {
+impl FirmionExtension for Md5Ext {
     fn name(&self) -> &str {
         "std::md5"
     }

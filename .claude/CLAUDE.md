@@ -90,7 +90,7 @@ Source text
 
 **ExecPhase** calls `execute_core_operations` (writes `Wr`/`Wrs`/`Wrf` bytes and zeroed extension placeholders), then `execute_extensions` (patches extension output in place via `OutputBuffer`).
 
-**Extensions** implement `BrinkExtension` from the `firmion_extension` crate. They are registered in `extensions/src/lib.rs` via feature-gated `#[cfg(feature = "std-*")]` blocks. The feature chain is: root `Cargo.toml` -> `process` -> `extensions` -> individual `std/*` crates. Standard extensions: `std::crc32c`, `std::sha256`, `std::md5`, `std::xor`.
+**Extensions** implement `FirmionExtension` from the `firmion_extension` crate. They are registered in `extensions/src/lib.rs` via feature-gated `#[cfg(feature = "std-*")]` blocks. The feature chain is: root `Cargo.toml` -> `process` -> `extensions` -> individual `std/*` crates. Standard extensions: `std::crc32c`, `std::sha256`, `std::md5`, `std::xor`.
 
 ### Adding wrbe16..wrbe64 (big-endian write instructions)
 

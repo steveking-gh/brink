@@ -9,12 +9,12 @@
 //
 // Output: 4 bytes, little-endian u32.
 
-use firmion_extension::{BrinkExtension, ParamArg, ParamDesc, ParamKind};
+use firmion_extension::{FirmionExtension, ParamArg, ParamDesc, ParamKind};
 use extension_registry::ExtensionRegistry;
 
 pub struct Crc32c;
 
-impl BrinkExtension for Crc32c {
+impl FirmionExtension for Crc32c {
     fn name(&self) -> &str {
         "std::crc32c"
     }

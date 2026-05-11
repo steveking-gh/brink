@@ -91,8 +91,8 @@ All 291 tests pass.
 
 ## 2026-04-13 -- ExtArg typed extension API (Steps 1-4)
 
-**BrinkRangedExtension removed; ExtArg introduced**
-Eliminated the two-trait extension design (`BrinkExtension` + `BrinkRangedExtension`)
+**FirmionRangedExtension removed; ExtArg introduced**
+Eliminated the two-trait extension design (`FirmionExtension` + `FirmionRangedExtension`)
 in favor of a single typed-argument API.
 
 `ExtArg<'a>` enum added to `firmion_extension`:
@@ -102,8 +102,8 @@ in favor of a single typed-argument API.
 - `Section { start: u64, len: u64, data: &'a [u8] }` -- section name arg,
   resolved by the engine to a zero-copy mmap slice
 
-All extensions now implement `BrinkExtension::execute<'a>(&self, args: &[ExtArg<'a>], out: &mut [u8])`.
-Section-bound extensions (formerly BrinkRangedExtension) receive image data via
+All extensions now implement `FirmionExtension::execute<'a>(&self, args: &[ExtArg<'a>], out: &mut [u8])`.
+Section-bound extensions (formerly FirmionRangedExtension) receive image data via
 `args[0]` as `ExtArg::Section` when called with the section-name form.
 
 **IRKind::ExtensionCallRanged removed**
@@ -125,19 +125,19 @@ immutable `&mmap[..]` borrow held by `ExtArg::Section` before the mutable mmap
 patch write.
 
 **std extensions updated**
-`std::crc32c`, `std::sha256`, `std::md5` all switch to `BrinkExtension` and
+`std::crc32c`, `std::sha256`, `std::md5` all switch to `FirmionExtension` and
 receive image data from `args[0]` as `ExtArg::Section`.
 
 Changes:
 
-- `firmion_extension/lib.rs`: Added `ExtArg`, rewrote `BrinkExtension` trait,
-  removed `BrinkRangedExtension`.
+- `firmion_extension/lib.rs`: Added `ExtArg`, rewrote `FirmionExtension` trait,
+  removed `FirmionRangedExtension`.
 - `ext/ext.rs`: Removed `RegisteredExtension` enum; `ExtensionEntry.extension`
-  is now `Box<dyn BrinkExtension>` directly. Removed `register_ranged`,
+  is now `Box<dyn FirmionExtension>` directly. Removed `register_ranged`,
   `is_ranged`. Re-exports `ExtArg`.
 - `ext/test_mocks.rs`: All 7 mocks updated to new signature; ranged mocks
   receive image via `ExtArg::Section`.
-- `std/crc32c`, `std/sha256`, `std/md5`: Converted to `BrinkExtension`.
+- `std/crc32c`, `std/sha256`, `std/md5`: Converted to `FirmionExtension`.
 - `irdb/irdb.rs`: Removed `ExtensionCallRanged` arm; updated disambiguation
   and ERR_103 validation.
 - `ir/ir.rs`: Removed `ExtensionCallRanged` variant.
@@ -897,12 +897,12 @@ Changes:
 New `std::xor` standard extension.  Computes an XOR checksum over a
 caller-specified image region and writes the 1-byte result into the output image.
 
-Follows the same crate layout, feature-gating, and `BrinkExtension` trait
+Follows the same crate layout, feature-gating, and `FirmionExtension` trait
 implementation as `std::crc32c`, `std::sha256`, and `std::md5`.
 
 Changes:
 
-- `std/xor/src/xor.rs`: `Xor` struct implementing `BrinkExtension`.
+- `std/xor/src/xor.rs`: `Xor` struct implementing `FirmionExtension`.
   `size()` = 1.  `execute` folds all bytes with `^`.
 - `std/xor/Cargo.toml`: new crate `std_xor`, no external dependencies.
 - `std/xor/tests/integration.rs`: 4 tests --

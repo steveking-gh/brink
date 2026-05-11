@@ -3,7 +3,7 @@
 ## 0.1.0
 
 - Initial release
-- Syntax highlighting for all Brink lexer tokens:
+- Syntax highlighting for all Firmion lexer tokens:
   - Keywords: section, align, set_addr, pad_addr_offset, pad_sec_offset, pad_file_offset
   - Write instructions: wr, wr8–wr64, wrs, wrf, output
   - Control flow: if, else, const

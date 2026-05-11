@@ -3,8 +3,8 @@
 // This crate is the single place where all compiled-in extensions are
 // registered with Firmion's extension registry.  To add a new extension:
 //
-//   1. Create a new crate implementing `BrinkExtension` or
-//      `BrinkRangedExtension` from the `firmion_extension` crate.
+//   1. Create a new crate implementing `FirmionExtension` or
+//      `FirmionRangedExtension` from the `firmion_extension` crate.
 //   2. Add it as a dependency in this file's Cargo.toml.
 //   3. Call its `register` function inside `register_all` below.
 //
