@@ -4,12 +4,12 @@ version.workspace = true
 authors.workspace = true
 edition.workspace = true
 
-[lints]
-workspace = true
-
 [lib]
 path = "symtable.rs"
 
 [dependencies]
 diags = { workspace = true }
 ir = { workspace = true }
+
+[lints]
+workspace = true

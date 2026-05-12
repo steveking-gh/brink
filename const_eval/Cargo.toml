@@ -4,23 +4,23 @@ version.workspace = true
 authors.workspace = true
 edition.workspace = true
 
-[lints]
-workspace = true
-
 [lib]
 path = "const_eval.rs"
 
 [dependencies]
 anyhow = "1.0.34"
-indextree = "4.6.1"
-parse_int = "0.9.0"
 
 # local dependencies
 ast = { workspace = true }
 astdb = { workspace = true }
 depth_guard = { workspace = true }
 diags = { workspace = true }
+indextree = "4.6.1"
 ir = { workspace = true }
 linearizer = { workspace = true }
+parse_int = "0.9.0"
 symtable = { workspace = true }
 tracing = "0.1.44"
+
+[lints]
+workspace = true

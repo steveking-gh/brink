@@ -4,9 +4,6 @@ version.workspace = true
 authors.workspace = true
 edition.workspace = true
 
-[lints]
-workspace = true
-
 [lib]
 path = "extension_registry.rs"
 
@@ -16,3 +13,6 @@ tracing = "0.1.44"
 
 [dev-dependencies]
 tracing-subscriber = "0.3.22"
+
+[lints]
+workspace = true

@@ -4,18 +4,18 @@ version.workspace = true
 authors.workspace = true
 edition.workspace = true
 
-[lints]
-workspace = true
-
 [lib]
 path = "map_phase.rs"
 
 [dependencies]
-locationdb = { workspace = true }
-irdb = { workspace = true }
-ir = { workspace = true }
 diags = { workspace = true }
+ir = { workspace = true }
+irdb = { workspace = true }
+ireval = { workspace = true }
+locationdb = { workspace = true }
+mapdb = { workspace = true }
 serde_json = "1"
 tracing = "0.1.44"
-mapdb = { workspace = true }
-ireval = { workspace = true }
+
+[lints]
+workspace = true

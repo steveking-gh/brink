@@ -4,8 +4,8 @@ version.workspace = true
 authors.workspace = true
 edition.workspace = true
 
-[lints]
-workspace = true
+[lib]
+path = "process.rs"
 
 [features]
 std-crc32c = ["extensions/std-crc32c"]
@@ -14,29 +14,29 @@ std-md5     = ["extensions/std-md5"]
 std-xor          = ["extensions/std-xor"]
 std-esp-checksum = ["extensions/std-esp-checksum"]
 
-[lib]
-path = "process.rs"
-
 [dependencies]
 anyhow = "1.0.34"
-parse_int = "0.9.0"
 
 # local dependencies
 ast = { workspace = true }
 astdb = { workspace = true }
-diags = { workspace = true }
-ir = { workspace = true }
-layoutdb = { workspace = true }
 const_eval = { workspace = true }
-irdb = { workspace = true }
-regiondb = { workspace = true }
-layout_phase = { workspace = true }
-map_phase = { workspace = true }
+diags = { workspace = true }
 exec_phase = { workspace = true }
-validation_phase = { workspace = true }
-extension_registry =  { workspace = true }
+extension_registry = { workspace = true }
 extensions = { workspace = true }
-tracing = "0.1.44"
-locationdb = { workspace = true }
-mapdb = { workspace = true }
+ir = { workspace = true }
+irdb = { workspace = true }
 ireval = { workspace = true }
+layout_phase = { workspace = true }
+layoutdb = { workspace = true }
+locationdb = { workspace = true }
+map_phase = { workspace = true }
+mapdb = { workspace = true }
+parse_int = "0.9.0"
+regiondb = { workspace = true }
+tracing = "0.1.44"
+validation_phase = { workspace = true }
+
+[lints]
+workspace = true

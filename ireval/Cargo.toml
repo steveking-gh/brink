@@ -3,12 +3,12 @@ name = "firmion-ireval"
 version = "6.1.1"
 edition = "2021"
 
-[lints]
-workspace = true
-
 [lib]
 path = "ireval.rs"
 
 [dependencies]
 diags = { workspace = true }
 ir = { workspace = true }
+
+[lints]
+workspace = true

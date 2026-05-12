@@ -7,9 +7,9 @@ edition.workspace = true
 [lib]
 path = "mapdb.rs"
 
+[dependencies]
+diags = { workspace = true }
+ir = { workspace = true }
+
 [lints]
 workspace = true
-
-[dependencies]
-ir = { workspace = true }
-diags = { workspace = true }

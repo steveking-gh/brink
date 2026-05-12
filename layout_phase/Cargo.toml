@@ -4,23 +4,23 @@ version.workspace = true
 authors.workspace = true
 edition.workspace = true
 
-[lints]
-workspace = true
-
 [lib]
 path = "layout_phase.rs"
 
 [dependencies]
 anyhow = "1.0.34"
+ast = { workspace = true }
 
 # local dependencies
 diags = { workspace = true }
-ast = { workspace = true }
+extension_registry = { workspace = true }
 ir = { workspace = true }
 irdb = { workspace = true }
-extension_registry =  { workspace = true }
-tracing = "0.1.44"
-memmap2 = "0.9.10"
-locationdb = { workspace = true }
-regiondb = { workspace = true }
 ireval = { workspace = true }
+locationdb = { workspace = true }
+memmap2 = "0.9.10"
+regiondb = { workspace = true }
+tracing = "0.1.44"
+
+[lints]
+workspace = true

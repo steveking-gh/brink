@@ -4,13 +4,13 @@ version.workspace = true
 authors.workspace = true
 edition.workspace = true
 
-[lints]
-workspace = true
-
 [lib]
 path = "objfile.rs"
 
 [dependencies]
-object = { version = "0.36", default-features = false, features = ["read", "elf"] }
 diags = { workspace = true }
 ir = { workspace = true }
+object = { version = "0.36", default-features = false, features = ["read", "elf"] }
+
+[lints]
+workspace = true

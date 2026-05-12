@@ -6,9 +6,9 @@ edition.workspace = true
 [lib]
 path = "locationdb.rs"
 
-[lints]
-workspace = true
-
 [dependencies]
 diags = { workspace = true }
 ir = { workspace = true }
+
+[lints]
+workspace = true

@@ -4,12 +4,12 @@ version.workspace = true
 authors.workspace = true
 edition.workspace = true
 
-[lints]
-workspace = true
-
 [lib]
 path = "diags.rs"
 
 [dependencies]
 ariadne = "0.6.0"
+
+[lints]
+workspace = true
 

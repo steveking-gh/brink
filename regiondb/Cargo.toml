@@ -4,17 +4,17 @@ version.workspace = true
 authors.workspace = true
 edition.workspace = true
 
-[lints]
-workspace = true
-
 [lib]
 path = "regiondb.rs"
 
 [dependencies]
 anyhow = "1.0.34"
-tracing = "0.1.44"
 
 # local dependencies
 diags = { workspace = true }
 ir = { workspace = true }
 irdb = { workspace = true }
+tracing = "0.1.44"
+
+[lints]
+workspace = true

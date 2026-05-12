@@ -1,20 +1,21 @@
 [package]
 name = "firmion-astdb"
+description = "Abstract syntax tree database used by the firmion compiler."
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
-
-[lints]
-workspace = true
 
 [lib]
 path = "astdb.rs"
 
 [dependencies]
 anyhow = "1.0.34"
-indextree = "4.3.1"
+ast = { workspace = true }
 
 depth_guard = { workspace = true }
 diags = { workspace = true }
-ast = { workspace = true }
-tracing    = "0.1.44"
+indextree = "4.3.1"
+tracing = "0.1.44"
+
+[lints]
+workspace = true

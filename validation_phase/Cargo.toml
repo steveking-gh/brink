@@ -4,9 +4,6 @@ version.workspace = true
 authors.workspace = true
 edition.workspace = true
 
-[lints]
-workspace = true
-
 [lib]
 path = "validation_phase.rs"
 
@@ -17,3 +14,6 @@ ir = { workspace = true }
 irdb = { workspace = true }
 ireval = { workspace = true }
 tracing  = "0.1.44"
+
+[lints]
+workspace = true

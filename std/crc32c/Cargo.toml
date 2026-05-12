@@ -4,17 +4,17 @@ version.workspace = true
 authors.workspace = true
 edition.workspace = true
 
-[lints]
-workspace = true
-
 [lib]
 path = "src/crc32c.rs"
 
 [dependencies]
-firmion_extension = { workspace = true }
 crc32c = "0.6"
-extension_registry =  { workspace = true }
+extension_registry = { workspace = true }
+firmion_extension = { workspace = true }
 
 [dev-dependencies]
 assert_cmd = "2.2.1"
 predicates = "3.1.4"
+
+[lints]
+workspace = true

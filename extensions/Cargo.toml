@@ -4,9 +4,6 @@ version.workspace = true
 authors.workspace = true
 edition.workspace = true
 
-[lints]
-workspace = true
-
 [lib]
 path = "src/lib.rs"
 
@@ -20,7 +17,10 @@ std-esp-checksum = ["dep:std_esp_checksum"]
 [dependencies]
 extension_registry = { workspace = true }
 std_crc32c = { workspace = true, optional = true }
-std_sha256 = { workspace = true, optional = true }
-std_md5 = { workspace = true, optional = true }
-std_xor = { workspace = true, optional = true }
 std_esp_checksum = { workspace = true, optional = true }
+std_md5 = { workspace = true, optional = true }
+std_sha256 = { workspace = true, optional = true }
+std_xor = { workspace = true, optional = true }
+
+[lints]
+workspace = true

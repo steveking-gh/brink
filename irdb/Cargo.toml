@@ -4,22 +4,22 @@ version.workspace = true
 authors.workspace = true
 edition.workspace = true
 
-[lints]
-workspace = true
-
 [lib]
 path = "irdb.rs"
 
 [dependencies]
-indextree = "4.3.1"
 anyhow = "1.0.34"
-parse_int = "0.9.0"
 # local dependencies
 diags = { workspace = true }
+extension_registry = { workspace = true }
+indextree = "4.3.1"
 ir = { workspace = true }
-objfile = { workspace = true }
-symtable = { workspace = true }
 layoutdb = { workspace = true }
 linearizer = { workspace = true }
-extension_registry =  { workspace = true }
+objfile = { workspace = true }
+parse_int = "0.9.0"
+symtable = { workspace = true }
 tracing = "0.1.44"
+
+[lints]
+workspace = true
