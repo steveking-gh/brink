@@ -9,6 +9,9 @@
 // extensions, reading section slices from the buffer and patching their output
 // back in place.  The completed buffer is written to disk once at the end.
 
+// Don't clutter upstream docs.rs for an otherwise private library.
+#[doc(hidden)]
+
 use anyhow::{Result, anyhow};
 use diags::{Diags, SourceSpan};
 use extension_registry::{ExtensionRegistry, ParamArg, ParamKind};

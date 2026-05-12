@@ -10,6 +10,9 @@
 // Order of operations: process.rs sits above all four pipeline stages.
 // main.rs calls process() once per invocation after reading the source file.
 
+// Don't clutter upstream docs.rs for an otherwise private library.
+#[doc(hidden)]
+
 use anyhow::{Context, Result, anyhow};
 use parse_int::parse;
 use std::collections::HashMap;

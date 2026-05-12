@@ -8,6 +8,9 @@
 // AstDb owns all of its data and holds no references into the Ast.  The Ast
 // is only needed at construction time.
 
+// Don't clutter upstream docs.rs for an otherwise private library.
+#[doc(hidden)]
+
 use anyhow::bail;
 use ast::{Ast, LexToken, is_reserved_identifier};
 use depth_guard::{DepthGuard, MAX_RECURSION_DEPTH};

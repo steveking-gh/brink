@@ -9,6 +9,9 @@
 // ordered after execute_extensions so extension output flows into ParmValDb
 // before assert evaluation.
 
+// Don't clutter upstream docs.rs for an otherwise private library.
+#[doc(hidden)]
+
 use anyhow::{Result, anyhow};
 use diags::Diags;
 use ir::IRKind;

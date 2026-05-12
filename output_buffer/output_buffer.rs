@@ -6,6 +6,9 @@
 // slots in pass 2.  The completed image is written to disk in a single call.
 //
 
+// Don't clutter upstream docs.rs for an otherwise private library.
+#[doc(hidden)]
+
 use std::fs::File;
 use std::io::{self, Read, Write};
 

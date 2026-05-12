@@ -1,5 +1,5 @@
 [package]
-name = "ir"
+name = "firmion-ir"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -11,6 +11,6 @@ workspace = true
 path = "ir.rs"
 
 [dependencies]
-diags = { path = "../diags" }
 parse_int = "0.9.0"
 tracing = "0.1.44"
+diags = { workspace = true }

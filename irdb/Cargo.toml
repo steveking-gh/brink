@@ -1,5 +1,5 @@
 [package]
-name = "irdb"
+name = "firmion-irdb"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -15,11 +15,11 @@ indextree = "4.3.1"
 anyhow = "1.0.34"
 parse_int = "0.9.0"
 # local dependencies
-diags = { path = "../diags" }
-ir = { path = "../ir" }
-objfile = { path = "../objfile" }
-symtable = { path = "../symtable" }
-layoutdb = { path = "../layoutdb" }
-linearizer = { path = "../linearizer" }
-extension_registry = { path = "../extension_registry" }
+diags = { workspace = true }
+ir = { workspace = true }
+objfile = { workspace = true }
+symtable = { workspace = true }
+layoutdb = { workspace = true }
+linearizer = { workspace = true }
+extension_registry =  { workspace = true }
 tracing = "0.1.44"

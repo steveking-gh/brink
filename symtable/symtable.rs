@@ -9,6 +9,9 @@
 //   warn_unused() emits ERR_229 for every entry with Some(value) whose used
 //   flag is still false at the end of IRDb construction.
 
+// Don't clutter upstream docs.rs for an otherwise private library.
+#[doc(hidden)]
+
 use diags::{Diags, SourceSpan};
 use ir::ParameterValue;
 use std::collections::HashMap;

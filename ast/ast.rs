@@ -9,6 +9,9 @@
 // The astdb crate consumes the AST output and builds required lookup structures
 // for later compiler phases.
 
+// Don't clutter upstream docs.rs for an otherwise private library.
+#[doc(hidden)]
+
 mod lexer;
 use lexer::Lexer;
 

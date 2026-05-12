@@ -7,6 +7,9 @@
 // intersections are stable and do not change across layout passes.
 //
 
+// Don't clutter upstream docs.rs for an otherwise private library.
+#[doc(hidden)]
+
 use diags::Diags;
 use ir::{EffectiveRegion, IRKind, RegionProps};
 use irdb::IRDb;

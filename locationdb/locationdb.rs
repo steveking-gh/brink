@@ -1,3 +1,6 @@
+// Don't clutter upstream docs.rs for an otherwise private library.
+#[doc(hidden)]
+
 use diags::{Diags, SourceSpan};
 
 #[derive(Clone, Debug, PartialEq)]

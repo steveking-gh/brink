@@ -1,4 +1,8 @@
 #![no_main]
+
+// Don't clutter upstream docs.rs for an otherwise private library.
+#[doc(hidden)]
+
 use libfuzzer_sys::fuzz_target;
 use process::process;
 

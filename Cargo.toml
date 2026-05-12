@@ -1,3 +1,30 @@
+[workspace.package]
+version = "0.7.0"
+authors = ["Steve King <sk@metrokings.com>"]
+edition = "2024"
+
+[package]
+name = "firmion"
+description = "Ergonomic firmware and binary file creation tool."
+build = "build.rs"
+license-file = "LICENSE.txt"
+readme = "README.md"
+homepage = "https://github.com/steveking-gh/firmion"
+repository = "https://github.com/steveking-gh/firmion"
+keywords = ["firmware", "cli", "build", "flash"]
+categories = ["development-tools::compilers"]
+authors = ["Steve King <sk@metrokings.com>"]
+edition = "2024"
+exclude = [
+    "tests/*",
+    "docs/ai/*",
+    ".github/*",
+    "ast/fuzz/*",
+    "extension_registry/test_mock.rs",
+    "images/*",
+    "layoutdb/fuzz/*",
+]
+
 [workspace.lints.rust]
 unsafe_code = "forbid"
 
@@ -34,24 +61,39 @@ members = [
     "objfile",
 ]
 
-[workspace.package]
-version = "0.7.0"
-authors = ["Steve King <sk@metrokings.com>"]
-edition = "2024"
+# Strip the firmion- prefix from package names.
+# The prefix only exists to prevent name collisions on crates.io.
+[workspace.dependencies]
+locationdb = { package = "firmion-locationdb", path = "locationdb" }
+mapdb = { package = "firmion-mapdb", path = "mapdb" }
+depth_guard = { package = "firmion-depth-guard", path = "depth_guard" }
+ast = { package = "firmion-ast", path = "ast" }
+astdb = { package = "firmion-astdb", path = "astdb" }
+ir = { package = "firmion-ir", path = "ir" }
+symtable = { package = "firmion-symtable", path = "symtable" }
+linearizer = { package = "firmion-linearizer", path = "linearizer" }
+layoutdb = { package = "firmion-layoutdb", path = "layoutdb" }
+regiondb = { package = "firmion-regiondb", path = "regiondb" }
+layout_phase = { package = "firmion-layout-phase", path = "layout_phase" }
+process = { package = "firmion-process", path = "process" }
+irdb = { package = "firmion-irdb", path = "irdb" }
+diags = { package = "firmion-diags", path = "diags" }
+map_phase = { package = "firmion-map-phase", path = "map_phase" }
+exec_phase = { package = "firmion-exec-phase", path = "exec_phase" }
+validation_phase = { package = "firmion-validation-phase", path = "validation_phase" }
+extension_registry = { package = "firmion-extension-registry", path = "extension_registry" }
+const_eval = { package = "firmion-const-eval", path = "const_eval" }
+firmion_extension = { package = "firmion-extension", path = "firmion_extension" }
+ireval = { package = "firmion-ireval", path = "ireval" }
+output_buffer = { package = "firmion-output-buffer", path = "output_buffer" }
+std_crc32c = { package = "firmion-std-crc32c", path = "std/crc32c" }
+std_sha256 = { package = "firmion-std-sha256", path = "std/sha256" }
+std_md5 = { package = "firmion-std-md5", path = "std/md5" }
+std_xor = { package = "firmion-std-xor", path = "std/xor" }
+std_esp_checksum = { package = "firmion-std-esp-checksum", path = "std/esp_checksum" }
+extensions = { package = "firmion-extensions", path = "extensions" }
+objfile = { package = "firmion-objfile", path = "objfile" }
 
-[package]
-name = "firmion"
-description = "Ergonomic firmware and binary file creation tool."
-version = "0.7.0"
-build = "build.rs"
-license-file = "LICENSE.txt"
-readme = "README.md"
-homepage = "https://github.com/steveking-gh/firmion"
-repository = "https://github.com/steveking-gh/firmion"
-keywords = ["linker", "cli", "domain-specific-language", "build"]
-categories = ["development-tools::build-utils"]
-authors = ["Steve King <sk@metrokings.com>"]
-edition = "2024"
 
 [lints]
 workspace = true
@@ -81,10 +123,10 @@ std-xor = ["process/std-xor"]
 std-esp-checksum = ["process/std-esp-checksum"]
 
 [dependencies]
+process = { workspace = true }
 indextree = "4.3.1"
 clap = { version = "4.5", features = ["derive"] }
 anyhow = "1.0.34"
-process = { path = "./process" }
 tracing = "0.1.44"
 tracing-subscriber = "0.3.22"
 

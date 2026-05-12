@@ -1,5 +1,5 @@
 [package]
-name = "process"
+name = "firmion-process"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -22,21 +22,21 @@ anyhow = "1.0.34"
 parse_int = "0.9.0"
 
 # local dependencies
-ast   = { path = "../ast" }
-astdb = { path = "../astdb" }
-diags = { path = "../diags" }
-ir = { path = "../ir" }
-layoutdb = { path = "../layoutdb" }
-const_eval = { path = "../const_eval" }
-irdb = { path = "../irdb" }
-regiondb = { path = "../regiondb" }
-layout_phase = { path = "../layout_phase" }
-map_phase = { path = "../map_phase" }
-exec_phase        = { path = "../exec_phase" }
-validation_phase  = { path = "../validation_phase" }
-extension_registry = { path = "../extension_registry" }
-extensions = { path = "../extensions" }
+ast = { workspace = true }
+astdb = { workspace = true }
+diags = { workspace = true }
+ir = { workspace = true }
+layoutdb = { workspace = true }
+const_eval = { workspace = true }
+irdb = { workspace = true }
+regiondb = { workspace = true }
+layout_phase = { workspace = true }
+map_phase = { workspace = true }
+exec_phase = { workspace = true }
+validation_phase = { workspace = true }
+extension_registry =  { workspace = true }
+extensions = { workspace = true }
 tracing = "0.1.44"
-locationdb = { path = "../locationdb" }
-mapdb = { path = "../mapdb" }
-ireval = { path = "../ireval" }
+locationdb = { workspace = true }
+mapdb = { workspace = true }
+ireval = { workspace = true }

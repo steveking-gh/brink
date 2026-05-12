@@ -1,5 +1,5 @@
 [package]
-name = "exec_phase"
+name = "firmion-exec-phase"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -11,13 +11,13 @@ workspace = true
 path = "exec_phase.rs"
 
 [dependencies]
+diags = { workspace = true }
+ir = { workspace = true }
+irdb = { workspace = true }
+locationdb = { workspace = true }
+mapdb = { workspace = true }
+extension_registry =  { workspace = true }
+output_buffer = { workspace = true }
+ireval = { workspace = true }
 anyhow = "1.0.34"
-diags = { path = "../diags" }
-ir = { path = "../ir" }
-irdb = { path = "../irdb" }
-locationdb = { path = "../locationdb" }
-mapdb = { path = "../mapdb" }
-extension_registry = { path = "../extension_registry" }
 tracing = "0.1.44"
-output_buffer = { path = "../output_buffer" }
-ireval = { path = "../ireval" }

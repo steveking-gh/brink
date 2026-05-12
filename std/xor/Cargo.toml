@@ -1,5 +1,5 @@
 [package]
-name = "std_xor"
+name = "firmion-std-xor"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -11,8 +11,8 @@ workspace = true
 path = "src/xor.rs"
 
 [dependencies]
-firmion_extension = { path = "../../firmion_extension" }
-extension_registry = { path = "../../extension_registry" }
+firmion_extension = { workspace = true }
+extension_registry =  { workspace = true }
 
 [dev-dependencies]
 assert_cmd = "2.2.1"

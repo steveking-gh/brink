@@ -4,6 +4,9 @@
 // the exact bytes written to the output file.  The XOR values below
 // were computed by hand and verified against the fold used by the extension.
 
+// Don't clutter upstream docs.rs for an otherwise private library.
+#[doc(hidden)]
+
 #[cfg(test)]
 mod tests {
     use assert_cmd::Command;

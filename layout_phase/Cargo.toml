@@ -1,5 +1,5 @@
 [package]
-name = "layout_phase"
+name = "firmion-layout-phase"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -14,13 +14,13 @@ path = "layout_phase.rs"
 anyhow = "1.0.34"
 
 # local dependencies
-diags = { path = "../diags" }
-ast = { path = "../ast" }
-ir = { path = "../ir" }
-irdb = { path = "../irdb" }
-extension_registry = { path = "../extension_registry" }
+diags = { workspace = true }
+ast = { workspace = true }
+ir = { workspace = true }
+irdb = { workspace = true }
+extension_registry =  { workspace = true }
 tracing = "0.1.44"
 memmap2 = "0.9.10"
-locationdb = { path = "../locationdb" }
-regiondb = { path = "../regiondb" }
-ireval = { path = "../ireval" }
+locationdb = { workspace = true }
+regiondb = { workspace = true }
+ireval = { workspace = true }

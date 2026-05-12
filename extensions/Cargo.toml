@@ -1,5 +1,5 @@
 [package]
-name = "extensions"
+name = "firmion-extensions"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -12,15 +12,15 @@ path = "src/lib.rs"
 
 [features]
 std-crc32c = ["dep:std_crc32c"]
-std-sha256  = ["dep:std_sha256"]
-std-md5     = ["dep:std_md5"]
-std-xor          = ["dep:std_xor"]
+std-sha256 = ["dep:std_sha256"]
+std-md5 = ["dep:std_md5"]
+std-xor = ["dep:std_xor"]
 std-esp-checksum = ["dep:std_esp_checksum"]
 
 [dependencies]
-extension_registry        = { path = "../extension_registry" }
-std_crc32c        = { path = "../std/crc32c",         optional = true }
-std_sha256        = { path = "../std/sha256",         optional = true }
-std_md5           = { path = "../std/md5",            optional = true }
-std_xor           = { path = "../std/xor",            optional = true }
-std_esp_checksum  = { path = "../std/esp_checksum",   optional = true }
+extension_registry = { workspace = true }
+std_crc32c = { workspace = true, optional = true }
+std_sha256 = { workspace = true, optional = true }
+std_md5 = { workspace = true, optional = true }
+std_xor = { workspace = true, optional = true }
+std_esp_checksum = { workspace = true, optional = true }

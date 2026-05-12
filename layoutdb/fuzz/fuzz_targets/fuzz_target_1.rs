@@ -1,4 +1,7 @@
 #![no_main]
+// Don't clutter upstream docs.rs for an otherwise private library.
+#[doc(hidden)]
+
 use libfuzzer_sys::fuzz_target;
 use ast::{Ast,AstDb};
 use std::io::Write;

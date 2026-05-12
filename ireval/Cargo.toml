@@ -1,5 +1,5 @@
 [package]
-name = "ireval"
+name = "firmion-ireval"
 version = "6.1.1"
 edition = "2021"
 
@@ -10,5 +10,5 @@ workspace = true
 path = "ireval.rs"
 
 [dependencies]
-diags = { path = "../diags" }
-ir    = { path = "../ir" }
+diags = { workspace = true }
+ir = { workspace = true }

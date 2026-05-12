@@ -23,6 +23,9 @@
 // section.
 //
 
+// Don't clutter upstream docs.rs for an otherwise private library.
+#[doc(hidden)]
+
 use firmion_extension::{FirmionExtension, ParamArg, ParamDesc, ParamKind};
 use extension_registry::ExtensionRegistry;
 

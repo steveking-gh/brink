@@ -13,6 +13,9 @@
 // and IROperand values, and engine reads those values during iteration and
 // execution.
 
+// Don't clutter upstream docs.rs for an otherwise private library.
+#[doc(hidden)]
+
 use diags::Diags;
 use diags::SourceSpan;
 use parse_int::parse;

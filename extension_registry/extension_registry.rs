@@ -1,3 +1,6 @@
+// Don't clutter upstream docs.rs for an otherwise private library.
+#[doc(hidden)]
+
 use std::collections::HashMap;
 
 pub use firmion_extension::{FirmionExtension, ParamArg, ParamDesc, ParamKind};

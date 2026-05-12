@@ -1,5 +1,5 @@
 [package]
-name = "extension_registry"
+name = "firmion-extension-registry"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -11,7 +11,7 @@ workspace = true
 path = "extension_registry.rs"
 
 [dependencies]
-firmion_extension = { path = "../firmion_extension" }
+firmion_extension = { workspace = true }
 tracing = "0.1.44"
 
 [dev-dependencies]

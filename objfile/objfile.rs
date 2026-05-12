@@ -7,6 +7,9 @@
 // caching each parsed file so multi-section references to the same file pay
 // the I/O cost only once.
 
+// Don't clutter upstream docs.rs for an otherwise private library.
+#[doc(hidden)]
+
 use diags::{Diags, SourceSpan};
 use ir::{ObjProps, ObjsecInfo};
 use object::{Object, ObjectSection};

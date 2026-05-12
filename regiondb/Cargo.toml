@@ -1,5 +1,5 @@
 [package]
-name = "regiondb"
+name = "firmion-regiondb"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -15,6 +15,6 @@ anyhow = "1.0.34"
 tracing = "0.1.44"
 
 # local dependencies
-diags = { path = "../diags" }
-ir    = { path = "../ir" }
-irdb  = { path = "../irdb" }
+diags = { workspace = true }
+ir = { workspace = true }
+irdb = { workspace = true }

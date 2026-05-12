@@ -1,5 +1,5 @@
 [package]
-name = "layoutdb"
+name = "firmion-layoutdb"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -14,11 +14,11 @@ path = "layoutdb.rs"
 indextree = "4.3.1"
 anyhow = "1.0.34"
 
-depth_guard = { path = "../depth_guard" }
-diags = { path = "../diags" }
-ast   = { path = "../ast" }
-astdb = { path = "../astdb" }
-ir = { path = "../ir" }
-linearizer = { path = "../linearizer" }
-symtable = { path = "../symtable" }
+depth_guard = { workspace = true }
+diags = { workspace = true }
+ast = { workspace = true }
+astdb = { workspace = true }
+ir = { workspace = true }
+linearizer = { workspace = true }
+symtable = { workspace = true }
 tracing = "0.1.44"

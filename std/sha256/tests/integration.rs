@@ -5,6 +5,9 @@
 // were computed with Python's hashlib.sha256 and cross-checked against
 // the sha2 crate used by the extension itself.
 
+// Don't clutter upstream docs.rs for an otherwise private library.
+#[doc(hidden)]
+
 #[cfg(test)]
 mod tests {
     use assert_cmd::Command;

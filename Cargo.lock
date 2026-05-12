@@ -93,29 +93,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ast"
-version = "0.7.0"
-dependencies = [
- "anyhow",
- "depth_guard",
- "diags",
- "indextree",
- "tracing",
-]
-
-[[package]]
-name = "astdb"
-version = "0.7.0"
-dependencies = [
- "anyhow",
- "ast",
- "depth_guard",
- "diags",
- "indextree",
- "tracing",
-]
-
-[[package]]
 name = "autocfg"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -206,23 +183,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a6ef517f0926dd24a1582492c791b6a4818a4d94e789a334894aa15b0d12f55c"
 
 [[package]]
-name = "const_eval"
-version = "0.7.0"
-dependencies = [
- "anyhow",
- "ast",
- "astdb",
- "depth_guard",
- "diags",
- "indextree",
- "ir",
- "linearizer",
- "parse_int",
- "symtable",
- "tracing",
-]
-
-[[package]]
 name = "cpufeatures"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -250,17 +210,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "depth_guard"
-version = "0.7.0"
-
-[[package]]
-name = "diags"
-version = "0.7.0"
-dependencies = [
- "ariadne",
-]
-
-[[package]]
 name = "difflib"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -284,52 +233,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "48c757948c5ede0e46177b7add2e67155f70e33c07fea8284df6576da70b3719"
 
 [[package]]
-name = "exec_phase"
-version = "0.7.0"
-dependencies = [
- "anyhow",
- "diags",
- "extension_registry",
- "ir",
- "irdb",
- "ireval",
- "locationdb",
- "mapdb",
- "output_buffer",
- "tracing",
-]
-
-[[package]]
-name = "extension_registry"
-version = "0.7.0"
-dependencies = [
- "firmion_extension",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "extensions"
-version = "0.7.0"
-dependencies = [
- "extension_registry",
- "std_crc32c",
- "std_esp_checksum",
- "std_md5",
- "std_sha256",
- "std_xor",
-]
-
-[[package]]
 name = "firmion"
-version = "0.7.0"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
  "clap",
+ "firmion-process",
  "indextree",
  "predicates",
- "process",
  "serde_json",
  "serial_test",
  "tracing",
@@ -337,8 +249,329 @@ dependencies = [
 ]
 
 [[package]]
-name = "firmion_extension"
+name = "firmion-ast"
 version = "0.7.0"
+dependencies = [
+ "anyhow",
+ "firmion-depth-guard",
+ "firmion-diags",
+ "indextree",
+ "tracing",
+]
+
+[[package]]
+name = "firmion-astdb"
+version = "0.7.0"
+dependencies = [
+ "anyhow",
+ "firmion-ast",
+ "firmion-depth-guard",
+ "firmion-diags",
+ "indextree",
+ "tracing",
+]
+
+[[package]]
+name = "firmion-const-eval"
+version = "0.7.0"
+dependencies = [
+ "anyhow",
+ "firmion-ast",
+ "firmion-astdb",
+ "firmion-depth-guard",
+ "firmion-diags",
+ "firmion-ir",
+ "firmion-linearizer",
+ "firmion-symtable",
+ "indextree",
+ "parse_int",
+ "tracing",
+]
+
+[[package]]
+name = "firmion-depth-guard"
+version = "0.7.0"
+
+[[package]]
+name = "firmion-diags"
+version = "0.7.0"
+dependencies = [
+ "ariadne",
+]
+
+[[package]]
+name = "firmion-exec-phase"
+version = "0.7.0"
+dependencies = [
+ "anyhow",
+ "firmion-diags",
+ "firmion-extension-registry",
+ "firmion-ir",
+ "firmion-irdb",
+ "firmion-ireval",
+ "firmion-locationdb",
+ "firmion-mapdb",
+ "firmion-output-buffer",
+ "tracing",
+]
+
+[[package]]
+name = "firmion-extension"
+version = "0.7.0"
+
+[[package]]
+name = "firmion-extension-registry"
+version = "0.7.0"
+dependencies = [
+ "firmion-extension",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "firmion-extensions"
+version = "0.7.0"
+dependencies = [
+ "firmion-extension-registry",
+ "firmion-std-crc32c",
+ "firmion-std-esp-checksum",
+ "firmion-std-md5",
+ "firmion-std-sha256",
+ "firmion-std-xor",
+]
+
+[[package]]
+name = "firmion-ir"
+version = "0.7.0"
+dependencies = [
+ "firmion-diags",
+ "parse_int",
+ "tracing",
+]
+
+[[package]]
+name = "firmion-irdb"
+version = "0.7.0"
+dependencies = [
+ "anyhow",
+ "firmion-diags",
+ "firmion-extension-registry",
+ "firmion-ir",
+ "firmion-layoutdb",
+ "firmion-linearizer",
+ "firmion-objfile",
+ "firmion-symtable",
+ "indextree",
+ "parse_int",
+ "tracing",
+]
+
+[[package]]
+name = "firmion-ireval"
+version = "6.1.1"
+dependencies = [
+ "firmion-diags",
+ "firmion-ir",
+]
+
+[[package]]
+name = "firmion-layout-phase"
+version = "0.7.0"
+dependencies = [
+ "anyhow",
+ "firmion-ast",
+ "firmion-diags",
+ "firmion-extension-registry",
+ "firmion-ir",
+ "firmion-irdb",
+ "firmion-ireval",
+ "firmion-locationdb",
+ "firmion-regiondb",
+ "memmap2",
+ "tracing",
+]
+
+[[package]]
+name = "firmion-layoutdb"
+version = "0.7.0"
+dependencies = [
+ "anyhow",
+ "firmion-ast",
+ "firmion-astdb",
+ "firmion-depth-guard",
+ "firmion-diags",
+ "firmion-ir",
+ "firmion-linearizer",
+ "firmion-symtable",
+ "indextree",
+ "tracing",
+]
+
+[[package]]
+name = "firmion-linearizer"
+version = "0.7.0"
+dependencies = [
+ "firmion-ast",
+ "firmion-depth-guard",
+ "firmion-diags",
+ "firmion-ir",
+ "firmion-symtable",
+ "indextree",
+ "tracing",
+]
+
+[[package]]
+name = "firmion-locationdb"
+version = "0.7.0"
+dependencies = [
+ "firmion-diags",
+ "firmion-ir",
+]
+
+[[package]]
+name = "firmion-map-phase"
+version = "0.7.0"
+dependencies = [
+ "firmion-diags",
+ "firmion-ir",
+ "firmion-irdb",
+ "firmion-ireval",
+ "firmion-locationdb",
+ "firmion-mapdb",
+ "serde_json",
+ "tracing",
+]
+
+[[package]]
+name = "firmion-mapdb"
+version = "0.7.0"
+dependencies = [
+ "firmion-diags",
+ "firmion-ir",
+]
+
+[[package]]
+name = "firmion-objfile"
+version = "0.7.0"
+dependencies = [
+ "firmion-diags",
+ "firmion-ir",
+ "object",
+]
+
+[[package]]
+name = "firmion-output-buffer"
+version = "0.7.0"
+
+[[package]]
+name = "firmion-process"
+version = "0.7.0"
+dependencies = [
+ "anyhow",
+ "firmion-ast",
+ "firmion-astdb",
+ "firmion-const-eval",
+ "firmion-diags",
+ "firmion-exec-phase",
+ "firmion-extension-registry",
+ "firmion-extensions",
+ "firmion-ir",
+ "firmion-irdb",
+ "firmion-ireval",
+ "firmion-layout-phase",
+ "firmion-layoutdb",
+ "firmion-locationdb",
+ "firmion-map-phase",
+ "firmion-mapdb",
+ "firmion-regiondb",
+ "firmion-validation-phase",
+ "parse_int",
+ "tracing",
+]
+
+[[package]]
+name = "firmion-regiondb"
+version = "0.7.0"
+dependencies = [
+ "anyhow",
+ "firmion-diags",
+ "firmion-ir",
+ "firmion-irdb",
+ "tracing",
+]
+
+[[package]]
+name = "firmion-std-crc32c"
+version = "0.7.0"
+dependencies = [
+ "assert_cmd",
+ "crc32c",
+ "firmion-extension",
+ "firmion-extension-registry",
+ "predicates",
+]
+
+[[package]]
+name = "firmion-std-esp-checksum"
+version = "0.7.0"
+dependencies = [
+ "assert_cmd",
+ "firmion-extension",
+ "firmion-extension-registry",
+ "predicates",
+]
+
+[[package]]
+name = "firmion-std-md5"
+version = "0.7.0"
+dependencies = [
+ "assert_cmd",
+ "firmion-extension",
+ "firmion-extension-registry",
+ "md-5",
+ "predicates",
+]
+
+[[package]]
+name = "firmion-std-sha256"
+version = "0.7.0"
+dependencies = [
+ "assert_cmd",
+ "firmion-extension",
+ "firmion-extension-registry",
+ "predicates",
+ "sha2",
+]
+
+[[package]]
+name = "firmion-std-xor"
+version = "0.7.0"
+dependencies = [
+ "assert_cmd",
+ "firmion-extension",
+ "firmion-extension-registry",
+ "predicates",
+]
+
+[[package]]
+name = "firmion-symtable"
+version = "0.7.0"
+dependencies = [
+ "firmion-diags",
+ "firmion-ir",
+]
+
+[[package]]
+name = "firmion-validation-phase"
+version = "0.7.0"
+dependencies = [
+ "anyhow",
+ "firmion-diags",
+ "firmion-ir",
+ "firmion-irdb",
+ "firmion-ireval",
+ "tracing",
+]
 
 [[package]]
 name = "float-cmp"
@@ -424,40 +657,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ir"
-version = "0.7.0"
-dependencies = [
- "diags",
- "parse_int",
- "tracing",
-]
-
-[[package]]
-name = "irdb"
-version = "0.7.0"
-dependencies = [
- "anyhow",
- "diags",
- "extension_registry",
- "indextree",
- "ir",
- "layoutdb",
- "linearizer",
- "objfile",
- "parse_int",
- "symtable",
- "tracing",
-]
-
-[[package]]
-name = "ireval"
-version = "6.1.1"
-dependencies = [
- "diags",
- "ir",
-]
-
-[[package]]
 name = "is_terminal_polyfill"
 version = "1.70.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -479,39 +678,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
-name = "layout_phase"
-version = "0.7.0"
-dependencies = [
- "anyhow",
- "ast",
- "diags",
- "extension_registry",
- "ir",
- "irdb",
- "ireval",
- "locationdb",
- "memmap2",
- "regiondb",
- "tracing",
-]
-
-[[package]]
-name = "layoutdb"
-version = "0.7.0"
-dependencies = [
- "anyhow",
- "ast",
- "astdb",
- "depth_guard",
- "diags",
- "indextree",
- "ir",
- "linearizer",
- "symtable",
- "tracing",
-]
-
-[[package]]
 name = "lazy_static"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -522,27 +688,6 @@ name = "libc"
 version = "0.2.185"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52ff2c0fe9bc6cb6b14a0592c2ff4fa9ceb83eea9db979b0487cd054946a2b8f"
-
-[[package]]
-name = "linearizer"
-version = "0.7.0"
-dependencies = [
- "ast",
- "depth_guard",
- "diags",
- "indextree",
- "ir",
- "symtable",
- "tracing",
-]
-
-[[package]]
-name = "locationdb"
-version = "6.1.1"
-dependencies = [
- "diags",
- "ir",
-]
 
 [[package]]
 name = "lock_api"
@@ -558,28 +703,6 @@ name = "log"
 version = "0.4.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e5032e24019045c762d3c0f28f5b6b8bbf38563a65908389bf7978758920897"
-
-[[package]]
-name = "map_phase"
-version = "0.7.0"
-dependencies = [
- "diags",
- "ir",
- "irdb",
- "ireval",
- "locationdb",
- "mapdb",
- "serde_json",
- "tracing",
-]
-
-[[package]]
-name = "mapdb"
-version = "6.1.1"
-dependencies = [
- "diags",
- "ir",
-]
 
 [[package]]
 name = "md-5"
@@ -640,15 +763,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "objfile"
-version = "0.7.0"
-dependencies = [
- "diags",
- "ir",
- "object",
-]
-
-[[package]]
 name = "once_cell"
 version = "1.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -659,10 +773,6 @@ name = "once_cell_polyfill"
 version = "1.70.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
-
-[[package]]
-name = "output_buffer"
-version = "0.7.0"
 
 [[package]]
 name = "parking_lot"
@@ -742,32 +852,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "process"
-version = "0.7.0"
-dependencies = [
- "anyhow",
- "ast",
- "astdb",
- "const_eval",
- "diags",
- "exec_phase",
- "extension_registry",
- "extensions",
- "ir",
- "irdb",
- "ireval",
- "layout_phase",
- "layoutdb",
- "locationdb",
- "map_phase",
- "mapdb",
- "parse_int",
- "regiondb",
- "tracing",
- "validation_phase",
-]
-
-[[package]]
 name = "quote"
 version = "1.0.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -813,17 +897,6 @@ name = "regex-syntax"
 version = "0.8.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc897dd8d9e8bd1ed8cdad82b5966c3e0ecae09fb1907d58efaa013543185d0a"
-
-[[package]]
-name = "regiondb"
-version = "0.7.0"
-dependencies = [
- "anyhow",
- "diags",
- "ir",
- "irdb",
- "tracing",
-]
 
 [[package]]
 name = "rustc_version"
@@ -962,59 +1035,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 
 [[package]]
-name = "std_crc32c"
-version = "0.7.0"
-dependencies = [
- "assert_cmd",
- "crc32c",
- "extension_registry",
- "firmion_extension",
- "predicates",
-]
-
-[[package]]
-name = "std_esp_checksum"
-version = "0.7.0"
-dependencies = [
- "assert_cmd",
- "extension_registry",
- "firmion_extension",
- "predicates",
-]
-
-[[package]]
-name = "std_md5"
-version = "0.7.0"
-dependencies = [
- "assert_cmd",
- "extension_registry",
- "firmion_extension",
- "md-5",
- "predicates",
-]
-
-[[package]]
-name = "std_sha256"
-version = "0.7.0"
-dependencies = [
- "assert_cmd",
- "extension_registry",
- "firmion_extension",
- "predicates",
- "sha2",
-]
-
-[[package]]
-name = "std_xor"
-version = "0.7.0"
-dependencies = [
- "assert_cmd",
- "extension_registry",
- "firmion_extension",
- "predicates",
-]
-
-[[package]]
 name = "strsim"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1039,14 +1059,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "symtable"
-version = "0.7.0"
-dependencies = [
- "diags",
- "ir",
 ]
 
 [[package]]
@@ -1175,18 +1187,6 @@ name = "utf8parse"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
-
-[[package]]
-name = "validation_phase"
-version = "0.7.0"
-dependencies = [
- "anyhow",
- "diags",
- "ir",
- "irdb",
- "ireval",
- "tracing",
-]
 
 [[package]]
 name = "valuable"

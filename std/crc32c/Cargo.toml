@@ -1,5 +1,5 @@
 [package]
-name = "std_crc32c"
+name = "firmion-std-crc32c"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -11,9 +11,9 @@ workspace = true
 path = "src/crc32c.rs"
 
 [dependencies]
-firmion_extension = { path = "../../firmion_extension" }
+firmion_extension = { workspace = true }
 crc32c = "0.6"
-extension_registry = { path = "../../extension_registry" }
+extension_registry =  { workspace = true }
 
 [dev-dependencies]
 assert_cmd = "2.2.1"

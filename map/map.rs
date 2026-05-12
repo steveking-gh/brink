@@ -11,6 +11,9 @@
 //
 // Order of operations: MapDb::new runs after engine.execute() in process.rs.
 
+// Don't clutter upstream docs.rs for an otherwise private library.
+#[doc(hidden)]
+
 use engine::Engine;
 use ir::ParameterValue;
 use irdb::IRDb;

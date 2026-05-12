@@ -1,6 +1,6 @@
 
 [package]
-name = "lineardb-fuzz"
+name = "firmion-lineardb-fuzz"
 version = "0.0.1"
 authors = ["Automatically generated"]
 publish = false

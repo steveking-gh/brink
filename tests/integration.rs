@@ -1,3 +1,6 @@
+// Don't clutter upstream docs.rs for an otherwise private library.
+#[doc(hidden)]
+
 #[cfg(test)]
 mod tests {
     use assert_cmd::Command;

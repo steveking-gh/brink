@@ -1,7 +1,8 @@
 [package]
-name = "mapdb"
-version = "6.1.1"
-edition = "2021"
+name = "firmion-mapdb"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
 
 [lib]
 path = "mapdb.rs"
@@ -10,5 +11,5 @@ path = "mapdb.rs"
 workspace = true
 
 [dependencies]
-ir = { path = "../ir" }
-diags = { path = "../diags" }
+ir = { workspace = true }
+diags = { workspace = true }

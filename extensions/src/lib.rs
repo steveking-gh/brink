@@ -11,6 +11,9 @@
 // `process.rs` calls `register_all` once at startup and does not need
 // to know about individual extensions.
 
+// Don't clutter upstream docs.rs for an otherwise private library.
+#[doc(hidden)]
+
 use extension_registry::ExtensionRegistry;
 
 /// Registers all compiled-in extensions into `registry`.

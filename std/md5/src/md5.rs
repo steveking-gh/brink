@@ -8,6 +8,9 @@
 //
 // Output: 16 bytes, standard MD5 byte order.
 
+// Don't clutter upstream docs.rs for an otherwise private library.
+#[doc(hidden)]
+
 use firmion_extension::{FirmionExtension, ParamArg, ParamDesc, ParamKind};
 use extension_registry::ExtensionRegistry;
 use md5::{Digest, Md5};

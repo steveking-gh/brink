@@ -1,3 +1,6 @@
+// Don't clutter upstream docs.rs for an otherwise private library.
+#[doc(hidden)]
+
 use super::*;
 use firmion_extension::{ParamArg, ParamDesc, ParamKind};
 use std::cell::Cell;

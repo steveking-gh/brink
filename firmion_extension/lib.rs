@@ -30,6 +30,9 @@
 //   (supplied at call sites as a section name).  ParamKind::Int and
 //   ParamKind::Str declare numeric and string parameters respectively.
 
+// Don't clutter upstream docs.rs for an otherwise private library.
+#[doc(hidden)]
+
 /// The kind of a declared extension parameter.
 ///
 /// Used in [`ParamDesc`] to specify what type of argument a parameter accepts.

@@ -1,5 +1,5 @@
 [package]
-name = "map_phase"
+name = "firmion-map-phase"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -11,11 +11,11 @@ workspace = true
 path = "map_phase.rs"
 
 [dependencies]
-locationdb = { path = "../locationdb" }
-irdb = { path = "../irdb" }
-ir = { path = "../ir" }
-diags = { path = "../diags" }
+locationdb = { workspace = true }
+irdb = { workspace = true }
+ir = { workspace = true }
+diags = { workspace = true }
 serde_json = "1"
 tracing = "0.1.44"
-mapdb = { path = "../mapdb" }
-ireval = { path = "../ireval" }
+mapdb = { workspace = true }
+ireval = { workspace = true }

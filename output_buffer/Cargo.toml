@@ -1,5 +1,5 @@
 [package]
-name = "output_buffer"
+name = "firmion-output-buffer"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true

@@ -4,6 +4,9 @@
 // derives from the LocationDb and IRDb after layout_phase completes.
 //
 
+// Don't clutter upstream docs.rs for an otherwise private library.
+#[doc(hidden)]
+
 use diags::Diags;
 use ir::IRKind;
 use ir::ParameterValue;

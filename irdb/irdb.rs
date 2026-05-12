@@ -11,6 +11,9 @@
 // Order of operations: irdb runs after lineardb.  Its output — an IRDb
 // containing ir_vec, parms and file metadata — is consumed by engine.
 
+// Don't clutter upstream docs.rs for an otherwise private library.
+#[doc(hidden)]
+
 use diags::Diags;
 use diags::SourceSpan;
 use layoutdb::LayoutDb;

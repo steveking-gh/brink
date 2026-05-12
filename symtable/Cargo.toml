@@ -1,5 +1,5 @@
 [package]
-name = "symtable"
+name = "firmion-symtable"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -11,5 +11,5 @@ workspace = true
 path = "symtable.rs"
 
 [dependencies]
-diags = { path = "../diags" }
-ir = { path = "../ir" }
+diags = { workspace = true }
+ir = { workspace = true }

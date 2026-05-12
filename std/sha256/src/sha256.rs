@@ -8,6 +8,9 @@
 //
 // Output: 32 bytes, big-endian digest (standard SHA-256 byte order).
 
+// Don't clutter upstream docs.rs for an otherwise private library.
+#[doc(hidden)]
+
 use firmion_extension::{FirmionExtension, ParamArg, ParamDesc, ParamKind};
 use extension_registry::ExtensionRegistry;
 use sha2::{Digest, Sha256};

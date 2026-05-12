@@ -1,5 +1,5 @@
 [package]
-name = "depth_guard"
+name = "firmion-depth-guard"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true

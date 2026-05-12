@@ -1,5 +1,5 @@
 [package]
-name = "validation_phase"
+name = "firmion-validation-phase"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -12,8 +12,8 @@ path = "validation_phase.rs"
 
 [dependencies]
 anyhow   = "1.0.34"
-diags    = { path = "../diags" }
-ir       = { path = "../ir" }
-irdb     = { path = "../irdb" }
-ireval = { path = "../ireval" }
+diags = { workspace = true }
+ir = { workspace = true }
+irdb = { workspace = true }
+ireval = { workspace = true }
 tracing  = "0.1.44"

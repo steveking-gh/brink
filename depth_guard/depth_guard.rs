@@ -1,3 +1,8 @@
+// Utility to help manage recursive descent depth.
+
+// Don't clutter upstream docs.rs for an otherwise private library.
+#[doc(hidden)]
+
 use std::cell::Cell;
 use std::marker::PhantomData;
 
@@ -19,7 +24,7 @@ thread_local! {
 /// # Example
 ///
 /// ```
-/// use depth_guard::{DepthGuard, MAX_RECURSION_DEPTH};
+/// use firmion_depth_guard::{DepthGuard, MAX_RECURSION_DEPTH};
 ///
 /// fn parse_expr() -> bool {
 ///     let Some(_guard) = DepthGuard::enter(MAX_RECURSION_DEPTH) else {

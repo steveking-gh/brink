@@ -1,5 +1,5 @@
 [package]
-name = "std_sha256"
+name = "firmion-std-sha256"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -11,9 +11,9 @@ workspace = true
 path = "src/sha256.rs"
 
 [dependencies]
-firmion_extension = { path = "../../firmion_extension" }
+firmion_extension = { workspace = true }
 sha2 = { version = "0.11.0" }
-extension_registry = { path = "../../extension_registry" }
+extension_registry =  { workspace = true }
 
 [dev-dependencies]
 assert_cmd = "2.2.1"

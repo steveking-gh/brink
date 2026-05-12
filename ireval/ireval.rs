@@ -1,3 +1,6 @@
+// Don't clutter upstream docs.rs for an otherwise private library.
+#[doc(hidden)]
+
 use diags::Diags;
 use ir::{DataType, IR, IROperand, ParameterValue};
 

@@ -1,5 +1,5 @@
 [package]
-name = "firmion_extension"
+name = "firmion-extension"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true

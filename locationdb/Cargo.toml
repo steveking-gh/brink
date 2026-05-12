@@ -1,7 +1,7 @@
 [package]
-name = "locationdb"
-version = "6.1.1"
-edition = "2021"
+name = "firmion-locationdb"
+version.workspace = true
+edition.workspace = true
 
 [lib]
 path = "locationdb.rs"
@@ -10,5 +10,5 @@ path = "locationdb.rs"
 workspace = true
 
 [dependencies]
-diags = { path = "../diags" }
-ir = { path = "../ir" }
+diags = { workspace = true }
+ir = { workspace = true }

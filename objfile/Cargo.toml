@@ -1,5 +1,5 @@
 [package]
-name = "objfile"
+name = "firmion-objfile"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -12,5 +12,5 @@ path = "objfile.rs"
 
 [dependencies]
 object = { version = "0.36", default-features = false, features = ["read", "elf"] }
-diags = { path = "../diags" }
-ir = { path = "../ir" }
+diags = { workspace = true }
+ir = { workspace = true }
