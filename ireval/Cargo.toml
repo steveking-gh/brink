@@ -5,6 +5,9 @@ version.workspace = true
 authors.workspace = true
 edition.workspace = true
 publish.workspace = true
+license-file.workspace = true
+homepage.workspace = true
+repository.workspace = true
 
 [lib]
 path = "ireval.rs"

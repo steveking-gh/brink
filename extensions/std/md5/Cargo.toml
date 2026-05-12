@@ -1,8 +1,12 @@
 [package]
 name = "firmion-std-md5"
+description = "MD5 extension used by the firmion compiler."
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
+license-file.workspace = true
+homepage.workspace = true
+repository.workspace = true
 
 [lib]
 path = "src/md5.rs"
