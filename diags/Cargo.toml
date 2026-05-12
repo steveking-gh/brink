@@ -1,8 +1,10 @@
 [package]
 name = "firmion-diags"
+description = "Error message reporting used by the firmion compiler."
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
+publish.workspace = true
 
 [lib]
 path = "diags.rs"

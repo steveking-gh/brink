@@ -4,6 +4,7 @@ description = "Abstract syntax tree database used by the firmion compiler."
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
+publish.workspace = true
 
 [lib]
 path = "astdb.rs"

@@ -11,7 +11,7 @@
 // main.rs calls process() once per invocation after reading the source file.
 
 // Don't clutter upstream docs.rs for an otherwise private library.
-#[doc(hidden)]
+#![doc(hidden)]
 
 use anyhow::{Context, Result, anyhow};
 use parse_int::parse;

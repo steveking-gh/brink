@@ -6,7 +6,7 @@
 // owns a Linearizer instance and the resulting IR/operand vectors.
 
 // Don't clutter upstream docs.rs for an otherwise private library.
-#[doc(hidden)]
+#![doc(hidden)]
 
 use depth_guard::{DepthGuard, MAX_RECURSION_DEPTH};
 use diags::Diags;

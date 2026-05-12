@@ -5,7 +5,7 @@
 // were computed by hand and verified against the fold used by the extension.
 
 // Don't clutter upstream docs.rs for an otherwise private library.
-#[doc(hidden)]
+#![doc(hidden)]
 
 #[cfg(test)]
 mod tests {

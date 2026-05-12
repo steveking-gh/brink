@@ -1,7 +1,10 @@
 [package]
 name = "firmion-ireval"
-version = "6.1.1"
-edition = "2021"
+description = "Intermediate representation utils used by the firmion compiler."
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+publish.workspace = true
 
 [lib]
 path = "ireval.rs"

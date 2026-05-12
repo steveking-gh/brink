@@ -12,7 +12,7 @@
 // containing ir_vec, parms and file metadata — is consumed by engine.
 
 // Don't clutter upstream docs.rs for an otherwise private library.
-#[doc(hidden)]
+#![doc(hidden)]
 
 use diags::Diags;
 use diags::SourceSpan;

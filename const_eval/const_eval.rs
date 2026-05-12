@@ -8,7 +8,7 @@
 // ready for the LayoutDb phase.
 
 // Don't clutter upstream docs.rs for an otherwise private library.
-#[doc(hidden)]
+#![doc(hidden)]
 
 use anyhow::bail;
 use depth_guard::{DepthGuard, MAX_RECURSION_DEPTH};

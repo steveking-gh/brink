@@ -1,28 +1,29 @@
-// std::xor -- XOR checksum extension for Firmion.
+// std::md5 -- MD5 extension for Firmion.
 //
-// Computes an XOR checksum over a caller-specified image region and
-// writes the 1-byte result into the output image.
+// Computes an MD5 digest over a caller-specified image region and
+// writes the 16-byte result into the output image.
 //
 // Call-site syntax (section-name form):
-//     wr std::xor(my_section);
+//     wr std::md5(my_section);
 //
-// Output: 1 byte, XOR of all bytes in the region.
+// Output: 16 bytes, standard MD5 byte order.
 
 // Don't clutter upstream docs.rs for an otherwise private library.
-#[doc(hidden)]
+#![doc(hidden)]
 
 use firmion_extension::{FirmionExtension, ParamArg, ParamDesc, ParamKind};
 use extension_registry::ExtensionRegistry;
+use md5::{Digest, Md5};
 
-pub struct Xor;
+pub struct Md5Ext;
 
-impl FirmionExtension for Xor {
+impl FirmionExtension for Md5Ext {
     fn name(&self) -> &str {
-        "std::xor"
+        "std::md5"
     }
 
     fn size(&self) -> usize {
-        1
+        16
     }
 
     fn params(&self) -> &[ParamDesc] {
@@ -35,19 +36,20 @@ impl FirmionExtension for Xor {
     fn execute<'a>(&self, args: &[ParamArg<'a>], out_buffer: &mut [u8]) -> Result<(), String> {
         let ParamArg::Slice { data: img_buffer } = args
             .first()
-            .ok_or("std::xor: expected ParamArg::Slice as args[0]".to_string())?
+            .ok_or("std::md5: expected ParamArg::Slice as args[0]".to_string())?
         else {
             return Err(
-                "std::xor: args[0] must be ParamArg::Slice (use section-name form)".to_string(),
+                "std::md5: args[0] must be ParamArg::Slice (use section-name form)".to_string(),
             );
         };
-        out_buffer[0] = img_buffer.iter().fold(0u8, |acc, &b| acc ^ b);
+        let digest = Md5::digest(img_buffer);
+        out_buffer.copy_from_slice(&digest);
         Ok(())
     }
 }
 
-/// Registers `std::xor` into the given registry.
+/// Registers `std::md5` into the given registry.
 /// Call once during process startup, before compiling any scripts.
 pub fn register(registry: &mut ExtensionRegistry) {
-    registry.register(Box::new(Xor));
+    registry.register(Box::new(Md5Ext));
 }

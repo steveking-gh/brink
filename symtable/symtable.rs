@@ -10,7 +10,7 @@
 //   flag is still false at the end of IRDb construction.
 
 // Don't clutter upstream docs.rs for an otherwise private library.
-#[doc(hidden)]
+#![doc(hidden)]
 
 use diags::{Diags, SourceSpan};
 use ir::ParameterValue;

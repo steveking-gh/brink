@@ -11,6 +11,8 @@ keywords = ["firmware", "cli", "build", "flash"]
 categories = ["development-tools::compilers"]
 authors = ["Steve King <sk@metrokings.com>"]
 edition = "2024"
+version.workspace = true
+publish.workspace = true
 exclude = [
     "tests/*",
     "docs/ai/*",
@@ -45,18 +47,20 @@ members = [
     "output_buffer",
     "process",
     "regiondb",
-    "std/crc32c",
-    "std/esp_checksum",
-    "std/md5",
-    "std/sha256",
-    "std/xor",
+    "extensions/std/crc32c",
+    "extensions/std/esp_checksum",
+    "extensions/std/md5",
+    "extensions/std/sha256",
+    "extensions/std/xor",
     "symtable",
     "validation_phase",
 ]
+
 [workspace.package]
 version = "0.7.0"
 authors = ["Steve King <sk@metrokings.com>"]
 edition = "2024"
+publish = true
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
@@ -64,35 +68,35 @@ unsafe_code = "forbid"
 # Strip the firmion- prefix from package names.
 # The prefix only exists to prevent name collisions on crates.io.
 [workspace.dependencies]
-ast = { package = "firmion-ast", path = "ast" }
-astdb = { package = "firmion-astdb", path = "astdb" }
-const_eval = { package = "firmion-const-eval", path = "const_eval" }
-depth_guard = { package = "firmion-depth-guard", path = "depth_guard" }
-diags = { package = "firmion-diags", path = "diags" }
-exec_phase = { package = "firmion-exec-phase", path = "exec_phase" }
-extension_registry = { package = "firmion-extension-registry", path = "extension_registry" }
-extensions = { package = "firmion-extensions", path = "extensions" }
-firmion_extension = { package = "firmion-extension", path = "firmion_extension" }
-ir = { package = "firmion-ir", path = "ir" }
-irdb = { package = "firmion-irdb", path = "irdb" }
-ireval = { package = "firmion-ireval", path = "ireval" }
-layout_phase = { package = "firmion-layout-phase", path = "layout_phase" }
-layoutdb = { package = "firmion-layoutdb", path = "layoutdb" }
-linearizer = { package = "firmion-linearizer", path = "linearizer" }
-locationdb = { package = "firmion-locationdb", path = "locationdb" }
-map_phase = { package = "firmion-map-phase", path = "map_phase" }
-mapdb = { package = "firmion-mapdb", path = "mapdb" }
-objfile = { package = "firmion-objfile", path = "objfile" }
-output_buffer = { package = "firmion-output-buffer", path = "output_buffer" }
-process = { package = "firmion-process", path = "process" }
-regiondb = { package = "firmion-regiondb", path = "regiondb" }
-std_crc32c = { package = "firmion-std-crc32c", path = "std/crc32c" }
-std_esp_checksum = { package = "firmion-std-esp-checksum", path = "std/esp_checksum" }
-std_md5 = { package = "firmion-std-md5", path = "std/md5" }
-std_sha256 = { package = "firmion-std-sha256", path = "std/sha256" }
-std_xor = { package = "firmion-std-xor", path = "std/xor" }
-symtable = { package = "firmion-symtable", path = "symtable" }
-validation_phase = { package = "firmion-validation-phase", path = "validation_phase" }
+ast = { package = "firmion-ast", path = "ast", version = "0.7.0" }
+astdb = { package = "firmion-astdb", path = "astdb", version = "0.7.0" }
+const_eval = { package = "firmion-const-eval", path = "const_eval", version = "0.7.0" }
+depth_guard = { package = "firmion-depth-guard", path = "depth_guard", version = "0.7.0" }
+diags = { package = "firmion-diags", path = "diags", version = "0.7.0" }
+exec_phase = { package = "firmion-exec-phase", path = "exec_phase", version = "0.7.0" }
+extension_registry = { package = "firmion-extension-registry", path = "extension_registry", version = "0.7.0" }
+extensions = { package = "firmion-extensions", path = "extensions", version = "0.7.0" }
+firmion_extension = { package = "firmion-extension", path = "firmion_extension", version = "0.7.0" }
+ir = { package = "firmion-ir", path = "ir", version = "0.7.0" }
+irdb = { package = "firmion-irdb", path = "irdb", version = "0.7.0" }
+ireval = { package = "firmion-ireval", path = "ireval", version = "0.7.0" }
+layout_phase = { package = "firmion-layout-phase", path = "layout_phase", version = "0.7.0" }
+layoutdb = { package = "firmion-layoutdb", path = "layoutdb", version = "0.7.0" }
+linearizer = { package = "firmion-linearizer", path = "linearizer", version = "0.7.0" }
+locationdb = { package = "firmion-locationdb", path = "locationdb", version = "0.7.0" }
+map_phase = { package = "firmion-map-phase", path = "map_phase", version = "0.7.0" }
+mapdb = { package = "firmion-mapdb", path = "mapdb", version = "0.7.0" }
+objfile = { package = "firmion-objfile", path = "objfile", version = "0.7.0" }
+output_buffer = { package = "firmion-output-buffer", path = "output_buffer", version = "0.7.0" }
+process = { package = "firmion-process", path = "process", version = "0.7.0" }
+regiondb = { package = "firmion-regiondb", path = "regiondb", version = "0.7.0" }
+std_crc32c = { package = "firmion-std-crc32c", path = "extensions/std/crc32c", version = "0.7.0" }
+std_esp_checksum = { package = "firmion-std-esp-checksum", path = "extensions/std/esp_checksum", version = "0.7.0" }
+std_md5 = { package = "firmion-std-md5", path = "extensions/std/md5", version = "0.7.0" }
+std_sha256 = { package = "firmion-std-sha256", path = "extensions/std/sha256", version = "0.7.0" }
+std_xor = { package = "firmion-std-xor", path = "extensions/std/xor", version = "0.7.0" }
+symtable = { package = "firmion-symtable", path = "symtable", version = "0.7.0" }
+validation_phase = { package = "firmion-validation-phase", path = "validation_phase", version = "0.7.0" }
 
 [features]
 default = ["std-crc32c", "std-sha256", "std-md5", "std-xor", "std-esp-checksum"]

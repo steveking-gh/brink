@@ -1,8 +1,10 @@
 [package]
 name = "firmion-layout-phase"
+description = "Layout phase used by the firmion compiler."
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
+publish.workspace = true
 
 [lib]
 path = "layout_phase.rs"

@@ -1,29 +1,29 @@
-// std::sha256 -- SHA-256 extension for Firmion.
+// std::crc32c -- Castagnoli CRC-32 extension for Firmion.
 //
-// Computes a SHA-256 digest over a caller-specified image region and
-// writes the 32-byte result into the output image.
+// Computes the CRC-32C (Castagnoli polynomial, 0x1EDC6F41) over a
+// caller-specified image region and writes the 4-byte result
+// little-endian into the output image.
 //
 // Call-site syntax (section-name form):
-//     wr std::sha256(my_section);
+//     wr std::crc32c(my_section);
 //
-// Output: 32 bytes, big-endian digest (standard SHA-256 byte order).
+// Output: 4 bytes, little-endian u32.
 
 // Don't clutter upstream docs.rs for an otherwise private library.
-#[doc(hidden)]
+#![doc(hidden)]
 
 use firmion_extension::{FirmionExtension, ParamArg, ParamDesc, ParamKind};
 use extension_registry::ExtensionRegistry;
-use sha2::{Digest, Sha256};
 
-pub struct Sha256Ext;
+pub struct Crc32c;
 
-impl FirmionExtension for Sha256Ext {
+impl FirmionExtension for Crc32c {
     fn name(&self) -> &str {
-        "std::sha256"
+        "std::crc32c"
     }
 
     fn size(&self) -> usize {
-        32
+        4
     }
 
     fn params(&self) -> &[ParamDesc] {
@@ -36,20 +36,20 @@ impl FirmionExtension for Sha256Ext {
     fn execute<'a>(&self, args: &[ParamArg<'a>], out_buffer: &mut [u8]) -> Result<(), String> {
         let ParamArg::Slice { data: img_buffer } = args
             .first()
-            .ok_or("std::sha256: expected ParamArg::Slice as args[0]".to_string())?
+            .ok_or("std::crc32c: expected ParamArg::Slice as args[0]".to_string())?
         else {
             return Err(
-                "std::sha256: args[0] must be ParamArg::Slice (use section-name form)".to_string(),
+                "std::crc32c: args[0] must be ParamArg::Slice (use section-name form)".to_string(),
             );
         };
-        let digest = Sha256::digest(img_buffer);
-        out_buffer.copy_from_slice(&digest);
+        let crc = crc32c::crc32c(img_buffer);
+        out_buffer.copy_from_slice(&crc.to_le_bytes());
         Ok(())
     }
 }
 
-/// Registers `std::sha256` into the given registry.
+/// Registers `std::crc32c` into the given registry.
 /// Call this once during process startup, before compiling any scripts.
 pub fn register(registry: &mut ExtensionRegistry) {
-    registry.register(Box::new(Sha256Ext));
+    registry.register(Box::new(Crc32c));
 }

@@ -5,7 +5,7 @@
 //
 
 // Don't clutter upstream docs.rs for an otherwise private library.
-#[doc(hidden)]
+#![doc(hidden)]
 
 use diags::Diags;
 use ir::IRKind;

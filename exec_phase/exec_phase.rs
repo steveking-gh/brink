@@ -10,7 +10,7 @@
 // back in place.  The completed buffer is written to disk once at the end.
 
 // Don't clutter upstream docs.rs for an otherwise private library.
-#[doc(hidden)]
+#![doc(hidden)]
 
 use anyhow::{Result, anyhow};
 use diags::{Diags, SourceSpan};

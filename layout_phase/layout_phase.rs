@@ -14,7 +14,7 @@
 // before this phase begins and does not change across iterate passes.
 
 // Don't clutter upstream docs.rs for an otherwise private library.
-#[doc(hidden)]
+#![doc(hidden)]
 
 use locationdb::{AddressState, Location, LocationDb};
 

@@ -10,7 +10,7 @@
 // before assert evaluation.
 
 // Don't clutter upstream docs.rs for an otherwise private library.
-#[doc(hidden)]
+#![doc(hidden)]
 
 use anyhow::{Result, anyhow};
 use diags::Diags;

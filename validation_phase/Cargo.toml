@@ -1,8 +1,10 @@
 [package]
 name = "firmion-validation-phase"
+description = "Validation phase used by the firmion compiler."
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
+publish.workspace = true
 
 [lib]
 path = "validation_phase.rs"

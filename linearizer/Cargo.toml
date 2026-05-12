@@ -1,8 +1,10 @@
 [package]
 name = "firmion-linearizer"
+description = "AST to IR linearizer used by the firmion compiler."
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
+publish.workspace = true
 
 [lib]
 path = "linearizer.rs"

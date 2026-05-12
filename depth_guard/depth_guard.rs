@@ -1,7 +1,7 @@
 // Utility to help manage recursive descent depth.
 
 // Don't clutter upstream docs.rs for an otherwise private library.
-#[doc(hidden)]
+#![doc(hidden)]
 
 use std::cell::Cell;
 use std::marker::PhantomData;

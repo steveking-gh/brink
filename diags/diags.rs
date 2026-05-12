@@ -11,7 +11,7 @@
 // channel through which all diagnostics flow.
 
 // Don't clutter upstream docs.rs for an otherwise private library.
-#[doc(hidden)]
+#![doc(hidden)]
 
 use ariadne::{CharSet, Color, Config, Label, Report, ReportBuilder, ReportKind, sources};
 use std::io::IsTerminal;
