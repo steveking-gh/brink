@@ -23,6 +23,7 @@ especially useful when creating FLASH, ROM or other non-volatile memory images.
 - Extract and write sections from ELF and other other object file formats
 - Copy external files into your output
 - Align and pad content
+- Use little or big-endian byte order
 - Output detailed map files in various formats: Rust, C header, JSON and CSV
 
 ## Firmion Language Features
@@ -31,19 +32,22 @@ especially useful when creating FLASH, ROM or other non-volatile memory images.
 - Comfortable curly-brace and semicolon syntax
 - Declarative style so source code resembles the output file
 - Include other `.firm` files for modularity
-- Robust address and offset management with full [section](#section) scope support
+- Robust address and offset management with full [section](#section) scope
+  support
 - Full support for arithmetic expressions
 - Conditional expressions with if/else
 - Compile-time interface for user-defined extensions
 - Handy shorthand for numeric values, e.g. 4M is 4 x 1024 x 1024.
 - Label any output location for easy reference
-- Support for "-D" command-line definitions visible to your program, e.g. "-DMEM_SIZE=1M"
+- Support for "-D" command-line definitions visible to your program, e.g.
+  "-DMEM_SIZE=1M"
 
 ## Debug And Diagnostic Features
 
 - Use [`assert`](#assert) statements to provide inline validation of your program
 - Use [`print`](#print) statements for debug and or any other console messages
-- Use [`trace`](#trace) statements to peek into Firmion's iterative image generation process
+- Use [`trace`](#trace) statements to peek into Firmion's iterative image
+  generation process
 - Firmion provides clear error messages with full source code context
 - Optional verbose debug output levels
 - Firmion has hundreds of integration tests exercising features and edge cases
@@ -56,15 +60,22 @@ especially useful when creating FLASH, ROM or other non-volatile memory images.
 
 # Quick Start
 
+## Install Firmion with Cargo
+
+If you already have the Rust development tools installed, just install using
+[cargo](https://doc.rust-lang.org/cargo/).
+
+    cargo install firmion
+
 ## Install Prebuilt Binaries for Linux
 
-    curl --proto '=https' --tlsv1.2 -LsSf https://github.com/steveking-gh/firmion/releases/download/7.0.2/firmion-installer.sh | sh
+    curl --proto '=https' --tlsv1.2 -LsSf https://github.com/steveking-gh/firmion/releases/download/0.7.0/firmion-installer.sh | sh
 
 ## Install Prebuilt Binaries for Windows
 
 Start a command prompt and execute the following:
 
-    powershell -ExecutionPolicy Bypass -c "irm https://github.com/steveking-gh/firmion/releases/download/7.0.2/firmion-installer.ps1 | iex"
+    powershell -ExecutionPolicy Bypass -c "irm https://github.com/steveking-gh/firmion/releases/download/0.7.0/firmion-installer.ps1 | iex"
 
 ## Build From Source
 
@@ -90,9 +101,10 @@ All tests should pass, 0 tests should fail.
 
 ### Step 4: Install Firmion
 
-The previous build step created the Firmion binary as `./target/release/firmion`.
-You can install the Firmion binary anywhere on your system.  As a convenience,
-cargo provides a per-user installation as `$HOME/.cargo/bin/firmion`.
+The previous build step created the Firmion binary as
+`./target/release/firmion`. You can install the Firmion binary anywhere on your
+system.  As a convenience, cargo provides a per-user installation as
+`$HOME/.cargo/bin/firmion`.
 
     cargo install --path ./
 
@@ -314,13 +326,13 @@ Firmion.
 | File Offset    | No Change     | No Change        | No Change               | Pad Forward                         | Pad Forward                           | Pad Forward                           |
 
 The following diagram shows several address and offset concepts.  Users specify
-the starting logical address of the output [section](#section) `D` using a region.
-Alternatively, users can change the address within `D` using
+the starting logical address of the output [section](#section) `D` using a
+region. Alternatively, users can change the address within `D` using
 [set_addr](#set_addr) at the top of the output section.
 
 <figure>
   <img src="./images/scoped_address_plain_no_text.svg" width="100%"alt="Scoped Address and Offset Example Image">
-  <figcaption>In this example, [section](#section) D is the top level binary output and includes three other sections A, B and C.  The starting address of [section](#section) D is 0x8000 because the user placed D in FLASH region.  Section C is special and defines its own starting address.  A boot loader can find [section](#section) C using the pointer at the beginning of the file, then copy [section](#section) C to its proper starting address of 0xF000.  Notice that <code>addr(D)</code> used in the context of [section](#section) D returns 0x8C00, not the starting address value 0xF000 nested within [section](#section) C.
+  <figcaption>In this example, section D is the top level binary output and includes three other sections A, B and C.  The starting address of section D is 0x8000 because the user placed D in FLASH region.  Section C is special and defines its own starting address.  A boot loader can find section C using the pointer at the beginning of the file, then copy section C to its proper starting address of 0xF000.  Notice that <code>addr(D)</code> used in the context of section D returns 0x8C00, not the starting address value 0xF000 nested within section C.
   </figcaption>
 </figure>
 
@@ -418,6 +430,350 @@ This section provides an overview of Firmion's internal output creation phases.
 5. **Validation Phase**: Finally, Firmion evaluates `assert` statements, including
    those that call extensions.  Note that Firmion may take an early exit in any
    phase if an `assert` statement will unambiguously fail.
+
+---
+
+# Examples
+
+This section provides realistic Firmion examples tested on the corresponding hardware.
+
+## ESP32-S3
+
+ESP series microcontrollers have complex and unique firmware image requirements.
+In the ESP ecosystem, the python based
+[esptool](https://github.com/espressif/esptool) hides these formatting headaches
+from users.  The build tool [SCons](https://scons.org) drives the overall
+source-to-firmware process.  For testing, we hooked the SCons build scripts to
+invoke Firmion to create the firmware binary image.  This allowed Firmion to
+replace esptool's `elf2image` conversion.
+
+### ESP32 Firmware Image Format
+
+The [ESP32 firmware image
+format](https://docs.espressif.com/projects/esptool/en/latest/esp32s3/advanced-topics/firmware-image-format.html)
+uses a two-part file header followed by a number of *segments*.  Each segment
+has an 8-byte header containing 32b little-endian address and segment size
+values.  The following diagram gives an overview.
+
+| Byte offset   | Size | Description          |
+| ------------- | ---- | -------------------- |
+| 0             | 8    | File Header          |
+| 8             | 16   | Extended File Header |
+| 24            | 8    | Segment 0 Header     |
+| 32            | Len0 | Segment 0 Payload    |
+| 32 + Len0     | 8    | Segment 1 Header     |
+| 32 + Len0 + 8 | Len1 | Segment 1 Payload    |
+| And so on...  | ...  | ...                  |
+
+In the File Header, byte 0 contains the magic byte `0xE9` and byte 1 contains
+the number of segments.  During firmware upload, the device's bootloader reads
+this format and copies each segment to the specified load address in the
+segment's header.
+
+### ESP32 Quirks
+
+ESP32 has a few quirky requirements:
+
+- The ESP32 performs a memory remapping trick for "instruction ROM" (IROM) code
+  segments.  The net effect is that the *file offset* of the start of the IROM
+  segment payload modulo 64K must equal the *segment's load address* modulo 64K.
+- ESP32 does not support a pure padding segments, so the segment *prior* to the
+  IROM segment must include padding such that the starting file offset of the
+  IROM segment payload meets the requirement above.
+- Memory limitations in the bootloader mean that Non-ROM segments cannot
+  necessarily take on the padding requirement above.  Creating large (how large?)
+  non-ROM segments causes a bootloader overflow of some sort.  The effect is
+  boot-looping.  Consequently, the "data ROM" (DROM) segment is the proper
+  choice to precede the IROM segment to provide the IROM's required padding.
+- The firmware image must contain a legacy single-byte XOR checksum *after* the
+  last segment, but exactly one byte *before* the next 16-byte aligned address.
+  This checksum must be computed over the *segment payloads* only.
+
+### The `esptool` Reference Result
+
+As driven by SCons, the esptool `elf2image` process created the firmware image
+layout shown below.  This table is cut/paste from the `esptool image-info`
+command.  Notice the lower 16b of the IROM load address is 0x0020 while the
+lower 16b of the file offset is `0x0018`. As described in
+[quirks](#esp32-quirks) above, this file offset is no accident.  The lower 16b
+of the address and payload file offset must match.  Because the segment header
+is 8 bytes, the IROM segment payload starts at `0x10018` + `8` = `0x10020` as
+required.
+
+To achieve the required alignment, `elf2image` splits the *data RAM* (DRAM)
+content into two segments.  The first DRAM segment serves double duty of loading
+*part* of the DRAM content and being the exact length required for required IROM
+file offset.  The IROM segment comes next, followed the by another segment with
+the remaining DRAM content.  By splitting the DRAM segment, `esptool` avoid
+wasting space on pad bytes.  Finally, the IRAM segment comes last and has no
+special requirements other than 4 byte alignment.
+
+```
+Segments Information
+====================
+Segment   Length   Load addr   File offs  Memory types
+-------  -------  ----------  ----------  ------------
+      0  0x0d068  0x3c030020  0x00000018  DROM
+      1  0x02f88  0x3fc92a60  0x0000d088  BYTE_ACCESSIBLE, MEM_INTERNAL, DRAM
+      2  0x22490  0x42000020  0x00010018  IROM
+      3  0x005fc  0x3fc959e8  0x000324b0  BYTE_ACCESSIBLE, MEM_INTERNAL, DRAM
+      4  0x0ea60  0x40374000  0x00032ab4  MEM_INTERNAL, IRAM
+```
+
+Not shown in the `esptool image-info` table above are the trailing XOR checksum
+and the SHA256 hash over the entire image.
+
+### The Firmion Result
+
+Using the [source code](#esp32-s3-image-source-code) shown below, Firmion can
+produce a working ESP32 firmware image with the following layout:
+
+    Segments Information
+    ====================
+    Segment   Length   Load addr   File offs  Memory types
+    -------  -------  ----------  ----------  ------------
+          0  0x0fff8  0x3c030020  0x00000018  DROM
+          1  0x22490  0x42000020  0x00010018  IROM
+          2  0x03584  0x3fc92a60  0x000324b0  BYTE_ACCESSIBLE, MEM_INTERNAL, DRAM
+          3  0x0ea60  0x40374000  0x00035a3c  MEM_INTERNAL, IRAM
+
+Creating the complex XOR single-byte checksum required implementing the Firmion
+[extension](#firmion-extensions) `esp_checksum` which you can see used in the
+[source code](#esp32-s3-image-source-code) below.
+
+### Hooking the SCons Build Scripts
+
+The following
+### Firmion vs. Esptool Elf2image
+
+First, Firmion currently writes `obj` content to the output file as a single
+contiguous blob.  In this case, the `obj` is the two `.text` ROM sections
+extracted from an ELF binary. Consequently, Firmion cannot currently split the DRAM
+section to achieve the correct IROM file offset. Instead, the user must pad the
+preceding DROM section, which costs about 12K of pad bytes.
+
+Secondly, the `elf2image` tool patches the firmware image *inside an extracted
+ELF section* with a SHA256 hash of the firmware.elf file.  This hash is separate
+from the complete image SHA256 hash at the end of the file.  Firmion can
+calculate and write SHA256 hashes such as the trailing SHA256 hash, but cannot
+inject them *inside* extracted ELF content.  An [extension](#firmion-extensions)
+would be required for such a feature.  Consequently, this hash value in the
+firmware image is all zero for Firmion. The ESP32 image upload and execute
+process does not care about this hash value, so the image works.
+
+Developers can draw their own readability conclusions, but we contend the
+declarative style of the Firmion [source code](#esp32-s3-image-source-code)
+makes the structure of firmware images much more obvious than reading the
+existing `esptool` documentation and source code.  We also note that the
+Firmwion source file is considerably more compact and maintainable than the
+equivalent Python sources in esptool `elf2image` process.
+
+### Conclusion
+
+The `esptool` is the canonical and supported firmware image solution for ESP
+based systems.  This experiment is simply a test of Firmion's ability to handle
+a somewhat notorious set of image requirements.  On that front, the experiment
+was a success with addition of `esp_checksum` [extension](#firmion-extensions)
+to generate the segment-walking XOR checksum.
+
+### ESP32-S3 Image Source Code
+
+```rust
+    /*
+     * ESP32_S3_test.firm
+     * Specify -DFIRMWARE_PATH="path/to/firmware.elf" on the command line.
+     */
+
+    // Format reference:
+    // https://docs.espressif.com/projects/esptool/en/latest/esp32s3/advanced-topics/firmware-image-format.html
+
+    print "Firmion version ", __FIRMION_VERSION_STRING, "\n";
+    print "Firmware ELF is ", FIRMWARE_PATH, "\n";
+
+    // S3 hardware constants based on ESP-IDF and esptool definitions
+    const FH_MAGIC_BYTE = 0xE9;
+    const FH_SEGMENT_COUNT = 4;
+    const FH_FLASH_MODE_DIO = 0x02;
+    const FH_FLASH_SIZE_FREQ = 0x4F;    // 16MB, 80MHz
+    const FH_ENTRY_POINT = 0x4037708C;
+    const FH_CHIP_ID_ESP32S3 = 9;
+
+    // Define the FLASH memory region for our ESP32-S3 target hardware.
+    region ext_flash {
+        addr = 0x00000000;   // Starting offset of the flash chip
+        size = 0x1000000;    // 16MB
+    }
+
+    // File Header and Extended File Header.
+    section basic_file_header {
+        print "Building 8-byte File Header\n";
+        wr8 FH_MAGIC_BYTE;
+        wr8 FH_SEGMENT_COUNT;
+        wr8 FH_FLASH_MODE_DIO;
+        wr8 FH_FLASH_SIZE_FREQ;
+        wr32 FH_ENTRY_POINT;
+        assert sizeof(basic_file_header) == 8;
+    }
+
+    const EFH_WP = 0xEE;  // Extended File Header Write Protect byte value
+    const EFH_DRIVE_SETTINGS = 0x0;
+    const EFH_CHIP_ID_ESP32S3 = FH_CHIP_ID_ESP32S3;
+    const EFH_MIN_REV = 0;
+    const EFH_MAX_REV = 0xFFFF;
+    const EFH_HASH_APPENDED = 1; // Bit 0 indicates if SHA256 hash is appended (it is)
+
+    section extended_file_header {
+        print "Building 16-byte Extended File Header\n";
+        wr8 EFH_WP;
+        wr24 EFH_DRIVE_SETTINGS;
+        wr16 EFH_CHIP_ID_ESP32S3;
+        wr8 0x00; // Reserved byte
+        wr16 EFH_MIN_REV;
+        wr16 EFH_MAX_REV;
+        wr32 0x00; // Reserved bytes
+        wr8 EFH_HASH_APPENDED;
+        assert sizeof(extended_file_header) == 16;
+    }
+
+    section file_header {
+        wr basic_file_header;
+        wr extended_file_header;
+    }
+
+    const SEG_HEADER_SIZE = 8; // Segment header is 8 bytes: 32b LMA and 32b size
+
+    // Segment 0, FLASH data. This includes the app descriptor and read-only data.
+    obj flash_appdesc { file = FIRMWARE_PATH; section = ".flash.appdesc"; }
+    assert sizeof(flash_appdesc) > 0;
+    obj flash_rodata { file = FIRMWARE_PATH; section = ".flash.rodata"; }
+    assert sizeof(flash_rodata) > 0;
+
+    // The IROM segment coming *after* this DROM segment has extreme padding
+    // requirements described in the comment below.
+    section seg0 {
+        print "Building segment 0: DROM, File Offset:  ", file_offset(), "\n";
+        print "                          Load Address: ", obj_lma(flash_appdesc), "\n";
+        print "                          Size:         ", sizeof(seg0) - SEG_HEADER_SIZE, "\n";
+        wr32 obj_lma(flash_appdesc);
+        wr32 sizeof(seg0) - SEG_HEADER_SIZE;  // Size of the actual data, excluding the segment header.
+        wr flash_appdesc;
+        wr flash_rodata;
+        wr irom_padding;  // See definition below.
+    }
+
+    // There are some strange quirks to IROM. For this segment, the file offset in
+    // the image modulo 64K must match the IROM load address modulo 64K! For
+    // example, if IROM is at LMA = 0x42000020, then the file offset in the image of
+    // the actual ROM code must be 0xnnnn0020, e.g. 0x200020.  Then because the
+    // segment has a header of 8 bytes, we have to back up by 8 bytes to 0xnnnn0018.
+    // So the final file offset of the segment is 0xnnnn0018. In Firmion, we can
+    // achieve this by:
+    // 1. Aligning the segment to 64K
+    // 2. Additionally pad an amount of bytes equal to: the lower 16 bits of the
+    //    LMA, minus the 8 bytes needed for the segment header.
+    // 3. Fortunately, the presence of the file header + extended file header and
+    //    the first segment header totals 0x20 bytes, which means the IROM segment
+    //    will have a LMA 0xnnnn0020 to accommodate.  That lower 0x20 guarantees
+    //    enough room for the 8 byte segment header.
+    obj flash_text { file = FIRMWARE_PATH; section = ".flash.text"; }
+    assert sizeof(flash_text) > 0;
+    // Ensure the IROM LMA offset has room for the segment header.  This is
+    // essentially guaranteed by the way the ESP32 toolchain linker assigns
+    // addresses, but confirm here.
+    assert (obj_lma(flash_text) & 0xFFFF) > SEG_HEADER_SIZE;
+
+    section irom_padding {
+        align 64K, 0xFF;
+        // Now add additional pad bytes equal to the lower 16 bits of the IROM LMA,
+        // minus the segment header size.
+        wr8 0xFF, (obj_lma(flash_text) & 0xFFFF) - SEG_HEADER_SIZE;
+    }
+
+    section seg1 {
+        print "Building segment 1: IROM, File Offset:  ", file_offset(), "\n";
+        print "                          Load Address: ", obj_lma(flash_text), "\n";
+        print "                          Size:         ", sizeof(seg1) - SEG_HEADER_SIZE, "\n";
+        // Verify funky offset requirements.  seg1 above handles this headache.
+        assert (file_offset() & 0xFFFF) == (obj_lma(flash_text) & 0xFFFF) - SEG_HEADER_SIZE;
+        wr32 obj_lma(flash_text);
+        wr32 sizeof(seg1) - SEG_HEADER_SIZE;
+        wr flash_text;
+        align 4;
+    }
+
+    obj dram_data { file = FIRMWARE_PATH; section = ".dram0.data"; }
+    assert sizeof(dram_data) > 0;
+
+    section seg2 {
+        print "Building segment 2: DRAM, File Offset:  ", file_offset(), "\n";
+        print "                          Load Address: ", obj_lma(dram_data), "\n";
+        print "                          Size:         ", sizeof(seg2) - SEG_HEADER_SIZE, "\n";
+        wr32 obj_lma(dram_data);
+        wr32 sizeof(seg2) - SEG_HEADER_SIZE;
+        wr dram_data;
+        align 4;
+    }
+
+    obj iram_vectors { file = FIRMWARE_PATH; section = ".iram0.vectors"; }
+    assert sizeof(iram_vectors) > 0;
+    obj iram_text { file = FIRMWARE_PATH; section = ".iram0.text"; }
+    assert sizeof(iram_text) > 0;
+
+    section seg3 {
+        print "Building segment 3: IRAM, File Offset:  ", file_offset(), "\n";
+        print "                          Load Address: ", obj_lma(iram_vectors), "\n";
+        print "                          Size:         ", sizeof(seg3) - SEG_HEADER_SIZE, "\n";
+        wr32 obj_lma(iram_vectors);
+        wr32 sizeof(seg3) - SEG_HEADER_SIZE;
+        wr iram_vectors;
+        align 4;  // text sections start on 4 byte aligned.
+        wr iram_text;
+        align 4;
+    }
+
+    section pre_checksum_image {
+        print "Building pre_checksum_image...\n";
+        wr file_header;
+        wr seg0;
+        wr seg1;
+        wr seg2;
+        wr seg3;
+        // Starting from the end of the last segment, the ESP bootloader looks
+        // for the checksum byte on the next 16 byte boundary, minus 1.
+        // So, fill the pre_checksum_image to one byte short of 16 byte alignment.
+        // Examples:
+        // If sec_offset % 16 is 12, we write (15 - 12) = 3 bytes of padding.
+        // If sec_offset % 16 is 0, we write 15 bytes of padding.
+        wr8 0x00, 15 - (sec_offset() % 16);
+    }
+
+    section pre_sha_image {
+        print "Building pre_sha_image...\n";
+        wr pre_checksum_image;
+        // The checksum extension requires the file image and the offset to the
+        // first segment.
+        wr std::esp_checksum(pre_checksum_image, sizeof(file_header));
+    }
+
+    section firmware in ext_flash {
+        print "Building final firmware...\n";
+        wr pre_sha_image;
+        // SHA256 hash must immediately follow the checksum.
+        wr std::sha256(pre_sha_image);
+    }
+
+    output firmware;  // Generate the image file.
+    print "Firmware image built successfully!\n";
+    // Convenient output that resembles esptool's image-info
+    print "Segments Information\n";
+    print "====================\n";
+    print "Segment   Length    File offs\n";
+    print "-------   ------    ---------\n";
+    print "      0   ", sizeof(seg0) - SEG_HEADER_SIZE, "   ", file_offset(seg0), "\n";
+    print "      1   ", sizeof(seg1) - SEG_HEADER_SIZE, "   ", file_offset(seg1), "\n";
+    print "      2   ", sizeof(seg2) - SEG_HEADER_SIZE, "   ", file_offset(seg2), "\n";
+    print "      3   ", sizeof(seg3) - SEG_HEADER_SIZE, "   ", file_offset(seg3), "\n";
+```
 
 ---
 
@@ -1839,9 +2195,9 @@ Example:
 The `trace` command provides debug output to help diagnose errors before Firmion
 is able to internally execute a program.  Trace is especially useful for errors
 reported during layout phase operations before Firmion determines the size and
-location of everything in the output file.  During this time, Firmion is actively
-*cooking* the output, so layout depend values revealed by `trace` may change as
-iteration proceeds.
+location of everything in the output file.  During this time, Firmion is
+actively *cooking* the output, so layout dependent values revealed by `trace`
+may change as iteration proceeds.
 
 > [!NOTE]
 > Firmion suppresses `trace` output unless the user specifies at least one `-v`
@@ -2411,38 +2767,41 @@ To update the coverage table in this README from Windows, run
 
 <!-- COVERAGE_START -->
 ```text
-Filename                                     Regions    Missed Regions     Cover   Functions  Missed Functions  Executed       Lines      Missed Lines     Cover    Branches   Missed Branches     Cover
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-argvaldb/argvaldb.rs                               3                 0   100.00%           1                 0   100.00%           3                 0   100.00%           0                 0         -
-ast/ast.rs                                      2426               510    78.98%          68                 9    86.76%        1319               222    83.17%           0                 0         -
-ast/lexer.rs                                     421                13    96.91%          16                 0   100.00%         259                10    96.14%           0                 0         -
-astdb/astdb.rs                                   781               117    85.02%          12                 0   100.00%         373                38    89.81%           0                 0         -
-firmion_extension/lib.rs                             3                 0   100.00%           1                 0   100.00%           3                 0   100.00%           0                 0         -
-const_eval/const_eval.rs                        1259               207    83.56%          32                 5    84.38%         800               174    78.25%           0                 0         -
-depth_guard/depth_guard.rs                       146                 0   100.00%          17                 0   100.00%          77                 0   100.00%           0                 0         -
-diags/diags.rs                                   256                26    89.84%          12                 1    91.67%         134                20    85.07%           0                 0         -
-exec_phase/exec_phase.rs                         823               240    70.84%          20                 5    75.00%         535               137    74.39%           0                 0         -
-extension_registry/extension_registry.rs         258                 9    96.51%          18                 3    83.33%         126                 9    92.86%           0                 0         -
-extension_registry/test_mocks.rs                 259                34    86.87%          38                 6    84.21%         204                33    83.82%           0                 0         -
-extensions/src/lib.rs                              8                 0   100.00%           1                 0   100.00%           5                 0   100.00%           0                 0         -
-ir/ir.rs                                         309                30    90.29%          30                 1    96.67%         230                21    90.87%           0                 0         -
-irdb/irdb.rs                                    1067               111    89.60%          25                 1    96.00%         610                68    88.85%           0                 0         -
-layout_phase/layout_phase.rs                    1640               319    80.55%          48                 2    95.83%        1014               170    83.23%           0                 0         -
-layoutdb/layoutdb.rs                             795               164    79.37%          20                 0   100.00%         423                65    84.63%           0                 0         -
-linearizer/linearizer.rs                         603                29    95.19%          21                 1    95.24%         337                19    94.36%           0                 0         -
-locationdb/locationdb.rs                          39                 4    89.74%           3                 1    66.67%          28                 4    85.71%           0                 0         -
-map_phase/map_phase.rs                           892                13    98.54%          57                 0   100.00%         613                 9    98.53%           0                 0         -
-process/process.rs                               425                25    94.12%          26                 5    80.77%         240                 9    96.25%           0                 0         -
-prune/prune.rs                                   150                 9    94.00%          12                 2    83.33%          95                 7    92.63%           0                 0         -
-regiondb/regiondb.rs                             127                 5    96.06%           3                 0   100.00%         107                 5    95.33%           0                 0         -
-src/main.rs                                      164                14    91.46%          11                 3    72.73%         108                10    90.74%           0                 0         -
-std/crc32c/src/crc32c.rs                          31                 2    93.55%           5                 0   100.00%          26                 3    88.46%           0                 0         -
-std/md5/src/md5.rs                                31                 2    93.55%           5                 0   100.00%          26                 3    88.46%           0                 0         -
-std/sha256/src/sha256.rs                          31                 2    93.55%           5                 0   100.00%          26                 3    88.46%           0                 0         -
-symtable/symtable.rs                             107                 5    95.33%          14                 2    85.71%          78                 5    93.59%           0                 0         -
-validation_phase/validation_phase.rs              98                 3    96.94%           4                 0   100.00%          68                 2    97.06%           0                 0         -
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-TOTAL                                          13152              1893    85.61%         525                47    91.05%        7867              1046    86.70%           0                 0         -
+Filename                                            Regions    Missed Regions     Cover   Functions  Missed Functions  Executed       Lines      Missed Lines     Cover    Branches   Missed Branches     Cover
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ast/ast.rs                                             2452               519    78.83%          69                10    85.51%        1360               237    82.57%           0                 0         -
+ast/lexer.rs                                            439                13    97.04%          16                 0   100.00%         268                10    96.27%           0                 0         -
+astdb/astdb.rs                                          761               115    84.89%          12                 0   100.00%         374                37    90.11%           0                 0         -
+const_eval/const_eval.rs                               1079               162    84.99%          40                 5    87.50%         640               124    80.62%           0                 0         -
+depth_guard/depth_guard.rs                              146                 0   100.00%          17                 0   100.00%          77                 0   100.00%           0                 0         -
+diags/diags.rs                                          282                28    90.07%          14                 1    92.86%         150                21    86.00%           0                 0         -
+exec_phase/exec_phase.rs                                635               105    83.46%          16                 2    87.50%         423                51    87.94%           0                 0         -
+extension_registry/extension_registry.rs                258                 9    96.51%          18                 3    83.33%         126                 9    92.86%           0                 0         -
+extension_registry/test_mocks.rs                        274                34    87.59%          41                 6    85.37%         215                33    84.65%           0                 0         -
+extensions/src/lib.rs                                    12                 0   100.00%           1                 0   100.00%           7                 0   100.00%           0                 0         -
+extensions/std/crc32c/src/crc32c.rs                      31                 2    93.55%           5                 0   100.00%          26                 3    88.46%           0                 0         -
+extensions/std/esp_checksum/src/esp_checksum.rs          66                 9    86.36%           6                 1    83.33%          66                16    75.76%           0                 0         -
+extensions/std/md5/src/md5.rs                            31                 2    93.55%           5                 0   100.00%          26                 3    88.46%           0                 0         -
+extensions/std/sha256/src/sha256.rs                      31                 2    93.55%           5                 0   100.00%          26                 3    88.46%           0                 0         -
+extensions/std/xor/src/xor.rs                            31                 2    93.55%           6                 0   100.00%          26                 3    88.46%           0                 0         -
+firmion_extension/lib.rs                                  3                 0   100.00%           1                 0   100.00%           3                 0   100.00%           0                 0         -
+ir/ir.rs                                                316                31    90.19%          31                 1    96.77%         236                22    90.68%           0                 0         -
+irdb/irdb.rs                                            794               100    87.41%          20                 2    90.00%         464                72    84.48%           0                 0         -
+ireval/ireval.rs                                         85                 0   100.00%           4                 0   100.00%          58                 0   100.00%           0                 0         -
+layout_phase/layout_phase.rs                           1701               359    78.89%          48                 2    95.83%        1088               201    81.53%           0                 0         -
+layoutdb/layoutdb.rs                                    826               169    79.54%          19                 0   100.00%         501                78    84.43%           0                 0         -
+linearizer/linearizer.rs                                838                64    92.36%          23                 1    95.65%         506                51    89.92%           0                 0         -
+locationdb/locationdb.rs                                 39                 4    89.74%           3                 1    66.67%          28                 4    85.71%           0                 0         -
+map_phase/map_phase.rs                                  893                14    98.43%          57                 0   100.00%         613                 9    98.53%           0                 0         -
+objfile/objfile.rs                                      195                16    91.79%           5                 0   100.00%         116                 7    93.97%           0                 0         -
+output_buffer/output_buffer.rs                           55                 8    85.45%          10                 2    80.00%          33                 6    81.82%           0                 0         -
+process/process.rs                                      446                24    94.62%          28                 5    82.14%         252                 9    96.43%           0                 0         -
+regiondb/regiondb.rs                                    127                 5    96.06%           3                 0   100.00%         107                 5    95.33%           0                 0         -
+src/main.rs                                             164                14    91.46%          11                 3    72.73%         108                10    90.74%           0                 0         -
+symtable/symtable.rs                                    107                 5    95.33%          14                 2    85.71%          78                 5    93.59%           0                 0         -
+validation_phase/validation_phase.rs                     39                 2    94.87%           1                 0   100.00%          24                 0   100.00%           0                 0         -
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+TOTAL                                                 13156              1817    86.19%         549                47    91.44%        8025              1029    87.18%           0                 0         -
 ```
 <!-- COVERAGE_END -->
 
