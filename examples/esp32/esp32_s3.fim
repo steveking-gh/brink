@@ -1,0 +1,201 @@
+/*
+ * ESP32_S3_test.brink
+ * Specify -DFIRMWARE_PATH="path/to/firmware.elf" on the command line.
+ */
+
+// Format reference:
+// https://docs.espressif.com/projects/esptool/en/latest/esp32s3/advanced-topics/firmware-image-format.html
+
+print "Brink version ", __BRINK_VERSION_STRING, "\n";
+print "Firmware ELF is ", FIRMWARE_PATH, "\n";
+
+// S3 hardware constants based on ESP-IDF and esptool definitions
+const FH_MAGIC_BYTE = 0xE9;
+const FH_SEGMENT_COUNT = 4;
+const FH_FLASH_MODE_DIO = 0x02;
+const FH_FLASH_SIZE_FREQ = 0x4F;    // 16MB, 80MHz
+const FH_ENTRY_POINT = 0x4037708C;
+const FH_CHIP_ID_ESP32S3 = 9;
+
+// 2. Define the Target Hardware Memory Regions
+// We define the physical SPI Flash where this image will be stored.
+region ext_flash {
+    addr = 0x00000000;   // Starting offset on the flash chip
+    size = 0x1000000;    // 16MB maximum size
+}
+
+// 4. Main & Extended Headers
+// We assign these to the ext_flash region. Brink's location counter
+// will automatically ensure we don't overflow the 16MB size.
+section basic_file_header {
+    print "Building 8-byte File Header\n";
+    wr8 FH_MAGIC_BYTE;
+    wr8 FH_SEGMENT_COUNT;
+    wr8 FH_FLASH_MODE_DIO;
+    wr8 FH_FLASH_SIZE_FREQ;
+    wr32 FH_ENTRY_POINT;
+    assert sizeof(basic_file_header) == 8;
+}
+
+const EFH_WP = 0xEE;  // Extended File Header Write Protect byte value
+const EFH_DRIVE_SETTINGS = 0x0;
+const EFH_CHIP_ID_ESP32S3 = FH_CHIP_ID_ESP32S3;
+const EFH_MIN_REV = 0;
+const EFH_MAX_REV = 0xFFFF;
+const EFH_HASH_APPENDED = 1; // Bit 0 indicates if SHA256 hash is appended (it is)
+
+section extended_file_header {
+    print "Building 16-byte Extended File Header\n";
+    wr8 EFH_WP;
+    wr24 EFH_DRIVE_SETTINGS;
+    wr16 EFH_CHIP_ID_ESP32S3;
+    wr8 0x00; // Reserved byte
+    wr16 EFH_MIN_REV;
+    wr16 EFH_MAX_REV;
+    wr32 0x00; // Reserved bytes
+    wr8 EFH_HASH_APPENDED;
+    assert sizeof(extended_file_header) == 16;
+}
+
+section file_header {
+    wr basic_file_header;
+    wr extended_file_header;
+}
+
+const SEG_HEADER_SIZE = 8; // Segment header is 8 bytes: 32b LMA and 32b size
+
+// Segment 0, FLASH data. This includes the app descriptor and read-only data.
+obj flash_appdesc { file = FIRMWARE_PATH; section = ".flash.appdesc"; }
+assert sizeof(flash_appdesc) > 0;
+obj flash_rodata { file = FIRMWARE_PATH; section = ".flash.rodata"; }
+assert sizeof(flash_rodata) > 0;
+
+// The IROM segment coming *after* this DROM segment has extreme padding
+// requirements described in the comment below.  Rather than waste bytes on
+// padding, esptool fills the area with *part* of the DRAM data. After IROM,
+// esptool adds another segment for the residual DRAM data. Brink doesn't have
+// the ability to write only part of an obj section, so pad the DROM instead.
+section seg0 {
+    print "Building segment 0: DROM, File Offset:  ", file_offset(), "\n";
+    print "                          Load Address: ", obj_lma(flash_appdesc), "\n";
+    print "                          Size:         ", sizeof(seg0) - SEG_HEADER_SIZE, "\n";
+    wr32 obj_lma(flash_appdesc);
+    wr32 sizeof(seg0) - SEG_HEADER_SIZE;  // Size of the actual data, excluding the segment header.
+    wr flash_appdesc;
+    wr flash_rodata;
+    wr irom_padding;  // See comment below.
+}
+
+// There are some strange quirks to IROM. For this segment, the file offset in
+// the image modulo 64K must match the IROM load address modulo 64K! For
+// example, if IROM is at LMA = 0x42000020, then the file offset in the image of
+// the actual ROM code must be 0xnnnn0020, e.g. 0x200020.  Then because the
+// segment has a header of 8 bytes, we have to back up by 8 bytes to 0xnnnn0018.
+// So the final file offset of the segment is 0xnnnn0018. In Brink, we can
+// achieve this by:
+// 1. Aligning the segment to 64K
+// 2. Additionally pad an amount of bytes equal to: the lower 16 bits of the
+//    LMA, minus the 8 bytes needed for the segment header.
+// 3. Fortunately, the presence of the file header + extended file header and
+//    the first segment header totals 0x20 bytes, which means the IROM segment
+//    will have a LMA 0xnnnn0020 to accommodate.  That lower 0x20 guarantees
+//    enough room for the 8 byte segment header.
+obj flash_text { file = FIRMWARE_PATH; section = ".flash.text"; }
+assert sizeof(flash_text) > 0;
+// Ensure the IROM LMA offset has room for the segment header.  This is
+// essentially guaranteed by the way the ESP32 toolchain linker assigns
+// addresses, but confirm here.
+assert (obj_lma(flash_text) & 0xFFFF) > SEG_HEADER_SIZE;
+
+section irom_padding {
+    align 64K, 0xFF;
+    // Now add additional pad bytes equal to the lower 16 bits of the IROM LMA,
+    // minus the segment header size.
+    wr8 0xFF, (obj_lma(flash_text) & 0xFFFF) - SEG_HEADER_SIZE;
+}
+
+section seg1 {
+    print "Building segment 1: IROM, File Offset:  ", file_offset(), "\n";
+    print "                          Load Address: ", obj_lma(flash_text), "\n";
+    print "                          Size:         ", sizeof(seg1) - SEG_HEADER_SIZE, "\n";
+    // Verify funky offset requirements.  seg1 above handles this headache.
+    assert (file_offset() & 0xFFFF) == (obj_lma(flash_text) & 0xFFFF) - SEG_HEADER_SIZE;
+    wr32 obj_lma(flash_text);
+    wr32 sizeof(seg1) - SEG_HEADER_SIZE;
+    wr flash_text;
+    align 4;
+}
+
+// Segment 1, DRAM code. This is the code that will be copied to DRAM.
+
+obj dram_data { file = FIRMWARE_PATH; section = ".dram0.data"; }
+assert sizeof(dram_data) > 0;
+
+section seg2 {
+    print "Building segment 2: DRAM, File Offset:  ", file_offset(), "\n";
+    print "                          Load Address: ", obj_lma(dram_data), "\n";
+    print "                          Size:         ", sizeof(seg2) - SEG_HEADER_SIZE, "\n";
+    wr32 obj_lma(dram_data);
+    wr32 sizeof(seg2) - SEG_HEADER_SIZE;
+    wr dram_data;
+    align 4;
+}
+
+obj iram_vectors { file = FIRMWARE_PATH; section = ".iram0.vectors"; }
+assert sizeof(iram_vectors) > 0;
+obj iram_text { file = FIRMWARE_PATH; section = ".iram0.text"; }
+assert sizeof(iram_text) > 0;
+
+section seg3 {
+    print "Building segment 3: IRAM, File Offset:  ", file_offset(), "\n";
+    print "                          Load Address: ", obj_lma(iram_vectors), "\n";
+    print "                          Size:         ", sizeof(seg3) - SEG_HEADER_SIZE, "\n";
+    wr32 obj_lma(iram_vectors);
+    wr32 sizeof(seg3) - SEG_HEADER_SIZE;
+    wr iram_vectors;
+    align 4;  // text sections start on 4 byte aligned.
+    wr iram_text;
+    align 4;
+}
+
+// 6. Verification & Output
+section pre_checksum_image {
+    print "Building pre_checksum_image...\n";
+    wr file_header;
+    wr seg0;
+    wr seg1;
+    wr seg2;
+    wr seg3;
+    // Starting from the end of the last segment, the ESP bootloader looks
+    // for the checksum byte on the next 16 byte boundary, minus 1.
+    // So, fill the pre_checksum_image to one byte short of 16 byte alignment.
+    // Examples:
+    // If sec_offset % 16 is 12, we write (15 - 12) = 3 bytes of padding.
+    // If sec_offset % 16 is 0, we write 15 bytes of padding.
+    wr8 0x00, 15 - (sec_offset() % 16);
+}
+section pre_sha_image {
+    print "Building pre_sha_image...\n";
+    wr pre_checksum_image;
+    // The checksum extension requires the file image and the offset to the
+    // first segment.
+    wr std::esp_checksum(pre_checksum_image, sizeof(file_header));
+}
+section firmware in ext_flash {
+    print "Building final firmware...\n";
+    wr pre_sha_image;
+    // SHA256 hash must immediately follow the checksum.
+    wr std::sha256(pre_sha_image);
+}
+
+output firmware;
+print "Firmware image built successfully!\n";
+// Convenient output that resembles esptool's image-info
+print "Segments Information\n";
+print "====================\n";
+print "Segment   Length    File offs\n";
+print "-------   ------    ---------\n";
+print "      0   ", sizeof(seg0) - SEG_HEADER_SIZE, "   ", file_offset(seg0), "\n";
+print "      1   ", sizeof(seg1) - SEG_HEADER_SIZE, "   ", file_offset(seg1), "\n";
+print "      2   ", sizeof(seg2) - SEG_HEADER_SIZE, "   ", file_offset(seg2), "\n";
+print "      3   ", sizeof(seg3) - SEG_HEADER_SIZE, "   ", file_offset(seg3), "\n";
