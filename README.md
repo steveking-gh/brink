@@ -508,17 +508,16 @@ the remaining DRAM content.  By splitting the DRAM segment, `esptool` avoid
 wasting space on pad bytes.  Finally, the IRAM segment comes last and has no
 special requirements other than 4 byte alignment.
 
-```
-Segments Information
-====================
-Segment   Length   Load addr   File offs  Memory types
--------  -------  ----------  ----------  ------------
-      0  0x0d068  0x3c030020  0x00000018  DROM
-      1  0x02f88  0x3fc92a60  0x0000d088  BYTE_ACCESSIBLE, MEM_INTERNAL, DRAM
-      2  0x22490  0x42000020  0x00010018  IROM
-      3  0x005fc  0x3fc959e8  0x000324b0  BYTE_ACCESSIBLE, MEM_INTERNAL, DRAM
-      4  0x0ea60  0x40374000  0x00032ab4  MEM_INTERNAL, IRAM
-```
+    Segments Information
+    ====================
+    Segment   Length   Load addr   File offs  Memory types
+    -------  -------  ----------  ----------  ------------
+          0  0x0d068  0x3c030020  0x00000018  DROM
+          1  0x02f88  0x3fc92a60  0x0000d088  BYTE_ACCESSIBLE, MEM_INTERNAL, DRAM
+          2  0x22490  0x42000020  0x00010018  IROM
+          3  0x005fc  0x3fc959e8  0x000324b0  BYTE_ACCESSIBLE, MEM_INTERNAL, DRAM
+          4  0x0ea60  0x40374000  0x00032ab4  MEM_INTERNAL, IRAM
+
 
 Not shown in the `esptool image-info` table above are the trailing XOR checksum
 and the SHA256 hash over the entire image.
