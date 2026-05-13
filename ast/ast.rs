@@ -828,13 +828,11 @@ impl<'toks> Ast<'toks> {
         let tinfo = self.tv.peek();
         if tinfo.tok == LexToken::EOF {
             self.err_no_input(diags);
+        } else if expected_token == tinfo.tok {
+            self.add_to_parent_and_advance(parent);
+            result = true;
         } else {
-            if expected_token == tinfo.tok {
-                self.add_to_parent_and_advance(parent);
-                result = true;
-            } else {
-                self.err_expected_after(diags, code, context);
-            }
+            self.err_expected_after(diags, code, context);
         }
 
         self.dbg_exit("expect_leaf", result)
@@ -1091,7 +1089,10 @@ impl<'toks> Ast<'toks> {
                 self.err_expected_after(
                     diags,
                     "ERR_68",
-                    &format!("'{} =': expected a quoted string value or const identifier", prop_name),
+                    &format!(
+                        "'{} =': expected a quoted string value or const identifier",
+                        prop_name
+                    ),
                 );
                 return self.dbg_exit("parse_obj", false);
             }
@@ -2286,7 +2287,9 @@ impl<'toks> Ast<'toks> {
             let parse_ok = match tinfo.tok {
                 // Const-compatible statements (allowed in both TopLevel and Section)
                 LexToken::Identifier => self.parse_deferred_assign(parent, diags),
-                LexToken::Print | LexToken::Trace | LexToken::Assert => self.parse_expr(parent, diags),
+                LexToken::Print | LexToken::Trace | LexToken::Assert => {
+                    self.parse_expr(parent, diags)
+                }
                 LexToken::If => self.parse_if_r(parent, diags, ctx),
                 // Section-level statements: delegate to the shared dispatcher.
                 // try_parse_section_stmt returns None for unrecognized tokens.
