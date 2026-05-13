@@ -550,37 +550,38 @@ Code for hooks is in examples/esp32 in the source repo.
 
 ### Firmion vs. Esptool Elf2image
 
-First, Firmion currently writes `obj` content to the output file as a single
-contiguous blob.  In this case, the `obj` is the two `.text` ROM sections
-extracted from an ELF binary. Consequently, Firmion cannot currently split the DRAM
-section to achieve the correct IROM file offset. Instead, the user must pad the
-preceding DROM section, which costs about 12K of pad bytes.
+First, Firmion currently can extract and write ELF [obj](#obj) content to the
+output file as a single contiguous blob.  Instead of splitting the extracted
+DRAM [obj](#obj) to achieve the correct IROM offset, the Firmion user can pad the
+preceding DROM section. This costs about 12K of otherwise wasted pad bytes.
 
 Secondly, the `elf2image` tool patches the firmware image *inside an extracted
 ELF section* with a SHA256 hash of the firmware.elf file.  This hash is separate
 from the complete image SHA256 hash at the end of the file.  Firmion can
 calculate and write SHA256 hashes such as the trailing SHA256 hash, but cannot
-inject them *inside* extracted ELF content.  An [extension](#firmion-extensions)
-would be required for such a feature.  Consequently, this hash value in the
-firmware image is all zero for Firmion. The ESP32 image upload and execute
-process does not care about this hash value, so the image works.
+inject them *inside* extracted ELF content, aka an extracted [obj](#obj).  An
+[extension](#firmion-extensions) would be required for such a feature.
+Consequently, this hash value in the Firmion image is zero. The ESP32 image
+upload and execute process does not care about this hash value, so the image
+works.
 
 Developers can draw their own readability conclusions, but we contend the
 declarative style of the Firmion [source code](#esp32-s3-image-source-code)
-makes the structure of firmware images much more obvious than reading the
-existing `esptool` documentation and source code.  We also note that the
-Firmwion source file is considerably more compact and maintainable than the
+makes the structure of firmware images significantly more obvious than reading
+the existing `esptool` documentation and source code.  We also note that the
+Firmion source file is considerably more compact and maintainable than the
 equivalent Python sources in esptool `elf2image` process.
 
 ### Conclusion
 
 The `esptool` is the canonical and supported firmware image solution for ESP
-based systems.  This experiment simply tests Firmion's ability to handle a
-somewhat notorious set of image requirements.  On that front, the experiment was
-a success with addition of `esp_checksum` [extension](#firmion-extensions) to
-generate the segment-walking XOR checksum.  Properly replacing the `elf2image`
-process would at least require a new Firmion extension to generate the special
-`firmware.elf` SHA hash and patching the ELF section.
+based systems.  This experiment is not to replace `esptool`, but to test
+Firmion's ability to generate rather notorious set of image requirements.  On
+that front, the experiment was a success with addition of `esp_checksum`
+[extension](#firmion-extensions) to handle the segment-walking XOR checksum.
+Properly replacing the `elf2image` process would at least require a new Firmion
+extension to generate the special `firmware.elf` SHA hash and patching the ELF
+section.
 
 ### ESP32-S3 Image Source Code
 
