@@ -543,7 +543,12 @@ Creating the complex XOR single-byte checksum required implementing the Firmion
 
 ### Hooking the SCons Build Scripts
 
-The following
+To construct the Firmion version of the firmware, we hook the SCons script near
+the end of the process after `esptool` has already created its own binary image.
+We copy the `esptool` version to a backup then create the Firmion version.
+
+Code for hooks is in examples/esp32 in the source repo.
+
 ### Firmion vs. Esptool Elf2image
 
 First, Firmion currently writes `obj` content to the output file as a single
@@ -571,10 +576,12 @@ equivalent Python sources in esptool `elf2image` process.
 ### Conclusion
 
 The `esptool` is the canonical and supported firmware image solution for ESP
-based systems.  This experiment is simply a test of Firmion's ability to handle
-a somewhat notorious set of image requirements.  On that front, the experiment
-was a success with addition of `esp_checksum` [extension](#firmion-extensions)
-to generate the segment-walking XOR checksum.
+based systems.  This experiment simply tests Firmion's ability to handle a
+somewhat notorious set of image requirements.  On that front, the experiment was
+a success with addition of `esp_checksum` [extension](#firmion-extensions) to
+generate the segment-walking XOR checksum.  Properly replacing the `elf2image`
+process would at least require a new Firmion extension to generate the special
+`firmware.elf` SHA hash and patching the ELF section.
 
 ### ESP32-S3 Image Source Code
 
