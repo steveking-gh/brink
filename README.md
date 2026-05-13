@@ -1,6 +1,6 @@
 ﻿[![Rust](https://github.com/steveking-gh/firmion/actions/workflows/rust.yml/badge.svg)](https://github.com/steveking-gh/firmion/actions/workflows/rust.yml)
-[![codecov](https://codecov.io/gh/steveking-gh/firmion/graph/badge.svg)](https://codecov.io/gh/steveking-gh/firmion)
-[![rust report card](https://rust-reportcard.xuri.me/badge/github.com/steveking-gh/firmion)](https://rust-reportcard.xuri.me/report/github.com/steveking-gh/firmion)
+[![codecov](https://codecov.io/gh/steveking-gh/firmion/graph/badge.svg?v=1)](https://codecov.io/gh/steveking-gh/firmion)
+[![rust report card](https://rust-reportcard.xuri.me/badge/github.com/steveking-gh/firmion?v=1)](https://rust-reportcard.xuri.me/report/github.com/steveking-gh/firmion)
 [![Audit Check](https://github.com/steveking-gh/firmion/actions/workflows/audit-check.yml/badge.svg?branch=master)](https://github.com/steveking-gh/firmion/actions/workflows/audit-check.yml)
 ![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)
 
